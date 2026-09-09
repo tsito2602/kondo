@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "tabi - ふたりの旅行",
+    "name": "tabi",
     "slug": "tabi",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,9 +8,11 @@
     "scheme": "tabi",
     "userInterfaceStyle": "light",
     "ios": {
+      "bundleIdentifier": "com.tsito2602.tabi",
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.tsito2602.tabi",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
