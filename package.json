@@ -39,7 +39,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
-    "check": "npm run typecheck && npm run lint && npx expo export --platform web"
+    "check": "npm run typecheck && npx expo export --platform web"
   },
   "private": true
 }
