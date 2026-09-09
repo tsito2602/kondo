@@ -2,7 +2,7 @@
 
 ## 方針
 
-`tabi`はExpo AuthSessionでGoogle OpenID Connectを開始し、Authorization Code + PKCEを使用する。iOS・Android・Webでそれぞれ専用のOAuth Client IDを使う。
+`tabi`はExpo AuthSessionでGoogle OpenID Connectを開始し、iOS・Android・Webでそれぞれ専用のOAuth Client IDを使う。
 
 Googleから受け取ったID tokenはCloudflare Workerへ送り、次をすべて検証する。
 
@@ -14,7 +14,7 @@ Googleから受け取ったID tokenはCloudflare Workerへ送り、次をすべ�
 
 アプリ内の利用者IDには変更されにくいGoogleの`sub`を使い、メールアドレスは表示と招待照合にだけ使う。
 
-検証成功後はWorkerがアプリ用の短期セッションを発行する。iOS・AndroidではSecureStore、Webでは同一オリジンの安全なCookieへ保存する。Google Client Secretやrefresh tokenをアプリbundleへ含めない。
+検証成功後はWorkerが256 bitのランダムなアプリ用セッションを発行し、D1にはSHA-256 hashだけを保存する。iOS・AndroidではSecureStore、Webではブラウザを閉じるまでのsessionStorageへ保存する。Google Client Secretやrefresh tokenをアプリbundleへ含めない。
 
 ## 招待
 
