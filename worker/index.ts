@@ -209,14 +209,18 @@ async function createInvite(env: Env, user: User, tripId: string, url: URL) {
 
 async function acceptInvite(env: Env, user: User, token: string) {
   const tokenHash = await hashToken(token);
-  const invite = await env.DB.prepare('SELECT trip_id AS tripId FROM invites WHERE token_hash = ? AND expires_at > unixepoch() AND consumed_at IS NULL')
-    .bind(tokenHash)
+  const invite = await env.DB.prepare(`
+    UPDATE invites
+    SET consumed_by = ?, consumed_at = unixepoch()
+    WHERE token_hash = ? AND expires_at > unixepoch() AND consumed_at IS NULL
+    RETURNING trip_id AS tripId
+  `)
+    .bind(user.id, tokenHash)
     .first<{ tripId: string }>();
   if (!invite) return json({ error: '招待リンクが無効か期限切れです' }, 404);
-  await env.DB.batch([
-    env.DB.prepare("INSERT INTO trip_members (trip_id, user_id, role) VALUES (?, ?, 'editor') ON CONFLICT(trip_id, user_id) DO NOTHING").bind(invite.tripId, user.id),
-    env.DB.prepare('UPDATE invites SET consumed_by = ?, consumed_at = unixepoch() WHERE token_hash = ? AND consumed_at IS NULL').bind(user.id, tokenHash),
-  ]);
+  await env.DB.prepare("INSERT INTO trip_members (trip_id, user_id, role) VALUES (?, ?, 'editor') ON CONFLICT(trip_id, user_id) DO NOTHING")
+    .bind(invite.tripId, user.id)
+    .run();
   return json({ tripId: invite.tripId });
 }
 
