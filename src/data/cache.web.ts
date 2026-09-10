@@ -1,4 +1,4 @@
-import { emptyTravelCache, TravelCache } from './types';
+import { emptyTravelCache, normalizeTravelCache, TravelCache } from './types';
 
 const CACHE_KEY = 'tabi.travel-cache.v1';
 
@@ -7,7 +7,7 @@ export async function loadTravelCache(): Promise<TravelCache> {
     const raw = globalThis.localStorage?.getItem(CACHE_KEY);
     if (!raw) return emptyTravelCache();
     const value = JSON.parse(raw) as TravelCache;
-    return value.version === 1 ? value : emptyTravelCache();
+    return value.version === 1 ? normalizeTravelCache(value) : emptyTravelCache();
   } catch {
     return emptyTravelCache();
   }
