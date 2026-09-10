@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
   progressValue: { color: palette.ink, fontSize: 40, lineHeight: 40, fontWeight: '900', letterSpacing: -1.6 },
   progressLabel: { color: palette.slate, fontSize: 13 },
   progressTrack: { height: 8, backgroundColor: palette.paper, borderRadius: 4, overflow: 'hidden', marginTop: 20 },
-  progressFill: { height: '100%', backgroundColor: palette.coral, borderRadius: 4 },
+  progressFill: { height: '100%', backgroundColor: palette.accent, borderRadius: 4 },
   list: { backgroundColor: palette.paper, borderRadius: 32, paddingHorizontal: 20 },
   row: { minHeight: 76, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
   lastRow: { borderBottomWidth: 0 },
