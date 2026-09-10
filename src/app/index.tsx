@@ -57,8 +57,8 @@ export default function HomeScreen() {
         <View style={styles.quickRow}>
           <Pressable onPress={() => router.push('/packing')} style={({ pressed }) => [styles.quickCard, pressed && styles.pressed]}>
             <Text style={styles.quickIcon}>✓</Text>
-            <Text style={styles.quickValue}>12 / 18</Text>
-            <Text style={styles.quickLabel}>持ち物</Text>
+            <Text style={styles.quickValue}>3件</Text>
+            <Text style={styles.quickLabel}>準備が必要</Text>
           </Pressable>
           <Pressable onPress={() => router.push('/bookings')} style={({ pressed }) => [styles.quickCard, pressed && styles.pressed]}>
             <Text style={styles.quickIcon}>⌁</Text>

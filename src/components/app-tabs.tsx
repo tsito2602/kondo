@@ -25,7 +25,7 @@ export default function AppTabs() {
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="packing">
-        <NativeTabs.Trigger.Label>持ち物</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>準備</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'checklist', selected: 'checklist.checked' }} md="checklist" />
       </NativeTabs.Trigger>
 
