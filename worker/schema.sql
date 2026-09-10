@@ -61,6 +61,18 @@ CREATE TABLE IF NOT EXISTS bookings (
 );
 CREATE INDEX IF NOT EXISTS bookings_trip_day ON bookings(trip_id, day, time);
 
+CREATE TABLE IF NOT EXISTS packing_items (
+  id TEXT PRIMARY KEY,
+  trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'その他',
+  quantity INTEGER NOT NULL DEFAULT 1 CHECK(quantity >= 1 AND quantity <= 99),
+  packed INTEGER NOT NULL DEFAULT 0 CHECK(packed IN (0, 1)),
+  updated_by TEXT NOT NULL REFERENCES users(id),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS packing_items_trip ON packing_items(trip_id, packed, category, name);
+
 CREATE TABLE IF NOT EXISTS booking_details (
   booking_id TEXT PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
   origin TEXT NOT NULL DEFAULT '',
