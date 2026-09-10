@@ -20,6 +20,21 @@ export type ItineraryItem = {
   updatedAt?: number;
 };
 
+export type BookingKind = 'flight' | 'hotel' | 'train' | 'car' | 'restaurant' | 'ticket' | 'other';
+
+export type Booking = {
+  id: string;
+  kind: BookingKind;
+  title: string;
+  detail: string;
+  day: string;
+  time: string;
+  confirmationCode: string;
+  note: string;
+  updatedBy?: string;
+  updatedAt?: number;
+};
+
 export type PendingMutation = {
   id: string;
   method: 'POST' | 'PATCH' | 'DELETE';
@@ -32,6 +47,7 @@ export type TravelCache = {
   trips: Trip[];
   selectedTripId: string | null;
   itemsByTrip: Record<string, ItineraryItem[]>;
+  bookingsByTrip: Record<string, Booking[]>;
   pending: PendingMutation[];
 };
 
@@ -40,5 +56,11 @@ export const emptyTravelCache = (): TravelCache => ({
   trips: [],
   selectedTripId: null,
   itemsByTrip: {},
+  bookingsByTrip: {},
   pending: [],
+});
+
+export const normalizeTravelCache = (value: TravelCache): TravelCache => ({
+  ...value,
+  bookingsByTrip: value.bookingsByTrip ?? {},
 });
