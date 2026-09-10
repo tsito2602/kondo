@@ -22,6 +22,7 @@ const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const WEEKDAY_HEIGHT = 32;
 const ROW_HEIGHT = 46;
 const MARKER_SIZE = 36;
+const BAND_HEIGHT = 28;
 const WHEEL_ITEM_HEIGHT = 36;
 const WHEEL_CYCLES = 5;
 const WHEEL_MIDDLE_CYCLE = Math.floor(WHEEL_CYCLES / 2);
@@ -74,6 +75,7 @@ function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', sta
   const initial = startDate || endDate || todayValue();
   const [range, setRange] = useState<DateRange>({ startDate, endDate });
   const [anchorDate, setAnchorDate] = useState(startDate);
+  const [hoverDate, setHoverDate] = useState('');
   const [phase, setPhase] = useState<'start' | 'end'>(mode === 'range' && startDate && !endDate ? 'end' : 'start');
   const [timePhase, setTimePhase] = useState<'start' | 'end'>('start');
   const [times, setTimes] = useState({ startTime, endTime });
@@ -83,8 +85,15 @@ function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', sta
   const year = Number(month.slice(0, 4));
   const monthIndex = Number(month.slice(5)) - 1;
   const days = useMemo(() => monthDays(year, monthIndex), [monthIndex, year]);
+  const previewRange = useMemo<DateRange>(() => {
+    if (mode !== 'range' || phase !== 'end' || range.endDate || !range.startDate || !hoverDate) return range;
+    return hoverDate < range.startDate
+      ? { startDate: hoverDate, endDate: range.startDate }
+      : { startDate: range.startDate, endDate: hoverDate };
+  }, [hoverDate, mode, phase, range]);
 
   const changeMonth = (value: string) => {
+    setHoverDate('');
     setMonth(value);
     setYearText(value.slice(0, 4));
   };
@@ -99,6 +108,7 @@ function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', sta
   };
 
   const choose = (date: string) => {
+    setHoverDate('');
     if (mode === 'single') {
       setRange({ startDate: date, endDate: date });
       setAnchorDate(date);
@@ -153,7 +163,7 @@ function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', sta
           </View>
 
           <View onLayout={(event) => setGridWidth(event.nativeEvent.layout.width)} style={styles.grid}>
-            {gridWidth ? <DateRangeHighlight anchorDate={anchorDate} days={days} gridWidth={gridWidth} range={range} /> : null}
+            {gridWidth ? <DateRangeHighlight anchorDate={anchorDate} days={days} gridWidth={gridWidth} markerRange={range} range={previewRange} /> : null}
             {WEEKDAYS.map((weekday) => <View key={weekday} style={styles.weekdayCell}><Text style={styles.weekday}>{weekday}</Text></View>)}
             {days.map((date, index) => {
               if (!date) return <View key={`blank-${index}`} style={styles.dayCell} />;
@@ -164,6 +174,10 @@ function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', sta
                   accessibilityLabel={`${displayDate(date)}${date === range.startDate ? '、開始日' : ''}${date === range.endDate ? '、終了日' : ''}`}
                   accessibilityState={{ selected }}
                   key={date}
+                  onHoverIn={() => {
+                    if (mode === 'range' && phase === 'end' && range.startDate && !range.endDate) setHoverDate(date);
+                  }}
+                  onHoverOut={() => setHoverDate((current) => current === date ? '' : current)}
                   onPress={() => choose(date)}
                   style={styles.dayCell}>
                   <Text style={[styles.day, selected && styles.daySelected]}>{Number(date.slice(8))}</Text>
@@ -179,7 +193,7 @@ function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', sta
             value={timePhase === 'start' ? times.startTime : times.endTime}
           /> : null}
           <View style={styles.actions}>
-            <Pressable onPress={() => { setRange({ startDate: '', endDate: '' }); setTimes({ startTime: '', endTime: '' }); setPhase('start'); setTimePhase('start'); }} style={styles.clearButton}><Text style={styles.clearText}>クリア</Text></Pressable>
+            <Pressable onPress={() => { setRange({ startDate: '', endDate: '' }); setHoverDate(''); setTimes({ startTime: '', endTime: '' }); setPhase('start'); setTimePhase('start'); }} style={styles.clearButton}><Text style={styles.clearText}>クリア</Text></Pressable>
             <Pressable disabled={!range.startDate || (mode === 'range' && !range.endDate) || !validTime(times.startTime) || !validTime(times.endTime)} onPress={() => { onChange({ ...range, ...times }); close(); }} style={({ pressed }) => [styles.confirmButton, (!range.startDate || (mode === 'range' && !range.endDate) || !validTime(times.startTime) || !validTime(times.endTime)) && styles.confirmDisabled, pressed && styles.pressed]}><Text style={styles.confirmText}>決定</Text></Pressable>
           </View>
           </ScrollView>
@@ -249,7 +263,7 @@ function TimeWheel({ accessibilityLabel, onChange, selected, values }: { accessi
   </View>;
 }
 
-function DateRangeHighlight({ anchorDate, days, gridWidth, range }: { anchorDate: string; days: (string | null)[]; gridWidth: number; range: DateRange }) {
+function DateRangeHighlight({ anchorDate, days, gridWidth, markerRange, range }: { anchorDate: string; days: (string | null)[]; gridWidth: number; markerRange: DateRange; range: DateRange }) {
   const anchor = days.indexOf(anchorDate);
   const anchorRow = anchor < 0 ? (range.startDate < (days.find(Boolean) ?? '') ? 0 : 5) : Math.floor(anchor / 7);
   const rows = rangeRows(days, range);
@@ -265,8 +279,8 @@ function DateRangeHighlight({ anchorDate, days, gridWidth, range }: { anchorDate
         } : null;
         return <RangeBand bounds={bounds} gridWidth={gridWidth} key={row} origin={origin} row={row} />;
       })}
-      <DateMarker gridWidth={gridWidth} index={days.indexOf(range.startDate)} />
-      <DateMarker gridWidth={gridWidth} index={range.endDate !== range.startDate ? days.indexOf(range.endDate) : -1} origin={anchor} />
+      <DateMarker gridWidth={gridWidth} index={days.indexOf(markerRange.startDate)} />
+      <DateMarker gridWidth={gridWidth} index={markerRange.endDate !== markerRange.startDate ? days.indexOf(markerRange.endDate) : -1} origin={anchor} />
     </View>
   );
 }
@@ -283,7 +297,7 @@ function RangeBand({ bounds, gridWidth, origin, row }: { bounds: { start: number
       Animated.timing(opacity, { toValue: bounds && bounds.end > bounds.start ? 1 : 0, duration: 160, useNativeDriver: false }),
     ]).start();
   }, [bounds, cell, left, opacity, origin, width]);
-  return <Animated.View style={[styles.band, { left, top: WEEKDAY_HEIGHT + row * ROW_HEIGHT + 5, width, opacity }]} />;
+  return <Animated.View style={[styles.band, { left, top: WEEKDAY_HEIGHT + row * ROW_HEIGHT + 5 + (MARKER_SIZE - BAND_HEIGHT) / 2, width, opacity }]} />;
 }
 
 function DateMarker({ gridWidth, index, origin = -1 }: { gridWidth: number; index: number; origin?: number }) {
@@ -348,7 +362,7 @@ const styles = StyleSheet.create({
   dayCell: { width: `${100 / 7}%`, height: ROW_HEIGHT, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   day: { color: palette.ink, fontSize: 14, fontWeight: '600', zIndex: 3 },
   daySelected: { color: palette.paper, fontWeight: '900' },
-  band: { position: 'absolute', height: MARKER_SIZE, backgroundColor: palette.sky },
+  band: { position: 'absolute', height: BAND_HEIGHT, borderRadius: BAND_HEIGHT / 2, backgroundColor: palette.sky },
   marker: { position: 'absolute', width: MARKER_SIZE, height: MARKER_SIZE, borderRadius: MARKER_SIZE / 2, backgroundColor: palette.ocean },
   hint: { minHeight: 18, color: palette.slate, fontSize: 12, textAlign: 'center', marginTop: 10 },
   timeSection: { backgroundColor: palette.paper, borderRadius: 16, padding: 12, marginTop: 10 },
