@@ -3,11 +3,13 @@ import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { palette } from '@/constants/design';
+import type { ItineraryItem } from '@/data/types';
 import { useTravel } from '@/data/travel-provider';
 
 export default function ItineraryScreen() {
-  const { selectedTrip, items, createItem, deleteItem, pendingCount } = useTravel();
+  const { selectedTrip, items, createItem, updateItem, deleteItem, pendingCount } = useTravel();
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [day, setDay] = useState(selectedTrip?.startsOn ?? '');
   const [time, setTime] = useState('10:00');
   const [title, setTitle] = useState('');
@@ -18,15 +20,54 @@ export default function ItineraryScreen() {
     return result;
   }, {});
 
+  const openAdd = () => {
+    if (!selectedTrip) return;
+    setEditingId(null);
+    setDay(selectedTrip.startsOn);
+    setTime('10:00');
+    setTitle('');
+    setNote('');
+    setAdding(true);
+  };
+
+  const openEdit = (item: ItineraryItem) => {
+    setEditingId(item.id);
+    setDay(item.day);
+    setTime(item.time || '10:00');
+    setTitle(item.title);
+    setNote(item.note);
+    setAdding(true);
+  };
+
+  const closeEditor = () => {
+    setAdding(false);
+    setEditingId(null);
+  };
+
   const save = () => {
     if (!title.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(day) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
       Alert.alert('入力を確認してください', '日付、時刻、予定名を入力してください。');
       return;
     }
-    createItem({ day, time, kind: '予定', title: title.trim(), note: note.trim() });
-    setAdding(false);
-    setTitle('');
-    setNote('');
+    const input = { day, time, kind: '予定', title: title.trim(), note: note.trim() };
+    if (editingId) updateItem(editingId, input);
+    else createItem(input);
+    closeEditor();
+  };
+
+  const remove = () => {
+    if (!editingId) return;
+    Alert.alert('予定を削除しますか？', title, [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除',
+        style: 'destructive',
+        onPress: () => {
+          deleteItem(editingId);
+          closeEditor();
+        },
+      },
+    ]);
   };
 
   return (
@@ -34,7 +75,7 @@ export default function ItineraryScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View><Text style={styles.eyebrow}>{selectedTrip?.name ?? 'tabi'}</Text><Text style={styles.title}>日程</Text></View>
-          {selectedTrip ? <Pressable onPress={() => { setDay(selectedTrip.startsOn); setAdding(true); }} style={styles.addButton}><Text style={styles.addText}>＋ 予定</Text></Pressable> : null}
+          {selectedTrip ? <Pressable onPress={openAdd} style={styles.addButton}><Text style={styles.addText}>＋ 予定</Text></Pressable> : null}
         </View>
         {pendingCount ? <Text style={styles.pending}>{pendingCount}件を端末に保存済み · オンライン時に同期</Text> : null}
 
@@ -50,9 +91,15 @@ export default function ItineraryScreen() {
                 <Text style={styles.date}>{date}</Text>
                 <View style={styles.items}>
                   {dateItems.map((item) => (
-                    <Pressable key={item.id} onLongPress={() => Alert.alert('予定を削除しますか？', item.title, [{ text: 'キャンセル', style: 'cancel' }, { text: '削除', style: 'destructive', onPress: () => deleteItem(item.id) }])} style={styles.itemRow}>
+                    <Pressable
+                      accessibilityHint="予定を編集します"
+                      accessibilityRole="button"
+                      key={item.id}
+                      onPress={() => openEdit(item)}
+                      style={({ pressed }) => [styles.itemRow, pressed && styles.itemPressed]}>
                       <Text style={styles.time}>{item.time}</Text>
                       <View style={styles.itemCopy}><Text style={styles.itemTitle}>{item.title}</Text>{item.note ? <Text style={styles.note}>{item.note}</Text> : null}</View>
+                      <Text style={styles.chevron}>›</Text>
                     </Pressable>
                   ))}
                 </View>
@@ -62,11 +109,11 @@ export default function ItineraryScreen() {
         )}
       </ScrollView>
 
-      <Modal visible={adding} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setAdding(false)}>
+      <Modal visible={adding} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeEditor}>
         <SafeAreaView style={styles.modal}>
           <View style={styles.modalHeader}>
-            <Pressable onPress={() => setAdding(false)}><Text style={styles.cancel}>キャンセル</Text></Pressable>
-            <Text style={styles.modalTitle}>予定を追加</Text>
+            <Pressable onPress={closeEditor}><Text style={styles.cancel}>キャンセル</Text></Pressable>
+            <Text style={styles.modalTitle}>{editingId ? '予定を編集' : '予定を追加'}</Text>
             <Pressable onPress={save}><Text style={styles.save}>保存</Text></Pressable>
           </View>
           <View style={styles.form}>
@@ -76,6 +123,7 @@ export default function ItineraryScreen() {
             </View>
             <Text style={styles.label}>予定</Text><TextInput value={title} onChangeText={setTitle} placeholder="空港へ移動" style={styles.input} autoFocus />
             <Text style={styles.label}>メモ</Text><TextInput value={note} onChangeText={setNote} placeholder="集合場所や予約番号など" style={[styles.input, styles.noteInput]} multiline />
+            {editingId ? <Pressable onPress={remove} style={styles.deleteButton}><Text style={styles.deleteText}>この予定を削除</Text></Pressable> : null}
           </View>
         </SafeAreaView>
       </Modal>
@@ -103,11 +151,13 @@ const styles = StyleSheet.create({
   dayContent: { flex: 1 },
   date: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, fontWeight: '400' },
   items: { marginTop: 8 },
-  itemRow: { flexDirection: 'row', paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
+  itemRow: { minHeight: 58, flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
+  itemPressed: { opacity: 0.55 },
   time: { color: palette.ocean, width: 52, fontFamily: 'monospace', fontSize: 12, fontWeight: '700' },
   itemCopy: { flex: 1 },
   itemTitle: { color: palette.ink, fontSize: 16, fontWeight: '700' },
   note: { color: palette.slate, fontSize: 12, lineHeight: 18, marginTop: 4 },
+  chevron: { color: palette.smoke, fontSize: 22, lineHeight: 22, marginLeft: 12 },
   modal: { flex: 1, backgroundColor: palette.canvas },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
   cancel: { color: palette.slate },
@@ -120,4 +170,6 @@ const styles = StyleSheet.create({
   dateRow: { flexDirection: 'row', gap: 12 },
   dateField: { flex: 1 },
   timeField: { width: 110 },
+  deleteButton: { minHeight: 50, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
+  deleteText: { color: palette.danger, fontSize: 15, fontWeight: '700' },
 });
