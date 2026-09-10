@@ -108,7 +108,6 @@ function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', sta
   };
 
   const choose = (date: string) => {
-    setHoverDate('');
     if (mode === 'single') {
       setRange({ startDate: date, endDate: date });
       setAnchorDate(date);
@@ -167,7 +166,7 @@ function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', sta
             {WEEKDAYS.map((weekday) => <View key={weekday} style={styles.weekdayCell}><Text style={styles.weekday}>{weekday}</Text></View>)}
             {days.map((date, index) => {
               if (!date) return <View key={`blank-${index}`} style={styles.dayCell} />;
-              const previewSelected = phase === 'end' && !range.endDate && date === hoverDate;
+              const previewSelected = date === hoverDate;
               const selected = date === range.startDate || date === range.endDate;
               return (
                 <Pressable
@@ -175,9 +174,7 @@ function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', sta
                   accessibilityLabel={`${displayDate(date)}${date === range.startDate ? '、開始日' : ''}${date === range.endDate ? '、終了日' : ''}`}
                   accessibilityState={{ selected }}
                   key={date}
-                  onHoverIn={() => {
-                    if (mode === 'range' && phase === 'end' && range.startDate && !range.endDate) setHoverDate(date);
-                  }}
+                  onHoverIn={() => setHoverDate(date)}
                   onHoverOut={() => setHoverDate((current) => current === date ? '' : current)}
                   onPress={() => choose(date)}
                   style={styles.dayCell}>
@@ -249,9 +246,12 @@ function TimeWheel({ accessibilityLabel, onChange, selected, values }: { accessi
     }
     scrollRef.current?.scrollTo({ y: middleIndex * WHEEL_ITEM_HEIGHT, animated: false });
   }, [middleIndex, selectedIndex]);
+  const rawIndexFromScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    return Math.max(0, Math.min(loopValues.length - 1, Math.round(event.nativeEvent.contentOffset.y / WHEEL_ITEM_HEIGHT)));
+  };
   const indexFromScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const rawIndex = Math.round(event.nativeEvent.contentOffset.y / WHEEL_ITEM_HEIGHT);
-    return ((rawIndex % values.length) + values.length) % values.length;
+    const rawIndex = rawIndexFromScroll(event);
+    return rawIndex % values.length;
   };
   const selectFromScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const index = indexFromScroll(event);
@@ -266,17 +266,22 @@ function TimeWheel({ accessibilityLabel, onChange, selected, values }: { accessi
     const centeredIndex = WHEEL_MIDDLE_CYCLE * values.length + index;
     scrollRef.current?.scrollTo({ y: centeredIndex * WHEEL_ITEM_HEIGHT, animated: false });
   };
+  const snapScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const rawIndex = rawIndexFromScroll(event);
+    selectFromScroll(event);
+    scrollRef.current?.scrollTo({ y: rawIndex * WHEEL_ITEM_HEIGHT, animated: true });
+  };
   return <View accessibilityLabel={accessibilityLabel} style={styles.wheelFrame}>
     <View pointerEvents="none" style={styles.wheelSelection} />
     <ScrollView
+      bounces={false}
       contentContainerStyle={styles.wheelContent}
       decelerationRate="fast"
       disableIntervalMomentum
       onMomentumScrollEnd={settleScroll}
-      onScroll={selectFromScroll}
-      onScrollEndDrag={selectFromScroll}
+      onScrollEndDrag={snapScroll}
+      overScrollMode="never"
       ref={scrollRef}
-      scrollEventThrottle={16}
       showsVerticalScrollIndicator={false}
       snapToInterval={WHEEL_ITEM_HEIGHT}>
       {loopValues.map((entry, index) => <Pressable key={`${entry}-${index}`} onPress={() => onChange(entry)} style={styles.wheelItem}><Text style={[styles.wheelText, entry === selected && styles.wheelTextSelected]}>{entry}</Text></Pressable>)}
@@ -303,9 +308,14 @@ function DateRangeHighlight({ anchorDate, days, gridWidth, markerRange, previewE
       <DateMarker gridWidth={gridWidth} index={days.indexOf(markerRange.startDate)} />
       <DateMarker
         gridWidth={gridWidth}
-        index={(markerRange.endDate || previewEndDate) && (markerRange.endDate || previewEndDate) !== markerRange.startDate ? days.indexOf(markerRange.endDate || previewEndDate) : -1}
+        index={markerRange.endDate && markerRange.endDate !== markerRange.startDate ? days.indexOf(markerRange.endDate) : -1}
         origin={anchor}
-        preview={!markerRange.endDate && !!previewEndDate}
+      />
+      <DateMarker
+        gridWidth={gridWidth}
+        index={days.indexOf(previewEndDate)}
+        origin={days.indexOf(markerRange.endDate || markerRange.startDate)}
+        preview
       />
     </View>
   );
