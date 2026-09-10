@@ -108,7 +108,6 @@ function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', sta
   };
 
   const choose = (date: string) => {
-    setHoverDate('');
     if (mode === 'single') {
       setRange({ startDate: date, endDate: date });
       setAnchorDate(date);
@@ -167,7 +166,7 @@ function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', sta
             {WEEKDAYS.map((weekday) => <View key={weekday} style={styles.weekdayCell}><Text style={styles.weekday}>{weekday}</Text></View>)}
             {days.map((date, index) => {
               if (!date) return <View key={`blank-${index}`} style={styles.dayCell} />;
-              const previewSelected = phase === 'end' && !range.endDate && date === hoverDate;
+              const previewSelected = date === hoverDate;
               const selected = date === range.startDate || date === range.endDate;
               return (
                 <Pressable
@@ -175,9 +174,7 @@ function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', sta
                   accessibilityLabel={`${displayDate(date)}${date === range.startDate ? '、開始日' : ''}${date === range.endDate ? '、終了日' : ''}`}
                   accessibilityState={{ selected }}
                   key={date}
-                  onHoverIn={() => {
-                    if (mode === 'range' && phase === 'end' && range.startDate && !range.endDate) setHoverDate(date);
-                  }}
+                  onHoverIn={() => setHoverDate(date)}
                   onHoverOut={() => setHoverDate((current) => current === date ? '' : current)}
                   onPress={() => choose(date)}
                   style={styles.dayCell}>
@@ -311,9 +308,14 @@ function DateRangeHighlight({ anchorDate, days, gridWidth, markerRange, previewE
       <DateMarker gridWidth={gridWidth} index={days.indexOf(markerRange.startDate)} />
       <DateMarker
         gridWidth={gridWidth}
-        index={(markerRange.endDate || previewEndDate) && (markerRange.endDate || previewEndDate) !== markerRange.startDate ? days.indexOf(markerRange.endDate || previewEndDate) : -1}
+        index={markerRange.endDate && markerRange.endDate !== markerRange.startDate ? days.indexOf(markerRange.endDate) : -1}
         origin={anchor}
-        preview={!markerRange.endDate && !!previewEndDate}
+      />
+      <DateMarker
+        gridWidth={gridWidth}
+        index={days.indexOf(previewEndDate)}
+        origin={days.indexOf(markerRange.endDate || markerRange.startDate)}
+        preview
       />
     </View>
   );
