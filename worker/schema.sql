@@ -61,6 +61,16 @@ CREATE TABLE IF NOT EXISTS bookings (
 );
 CREATE INDEX IF NOT EXISTS bookings_trip_day ON bookings(trip_id, day, time);
 
+CREATE TABLE IF NOT EXISTS booking_details (
+  booking_id TEXT PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
+  origin TEXT NOT NULL DEFAULT '',
+  origin_code TEXT NOT NULL DEFAULT '',
+  destination TEXT NOT NULL DEFAULT '',
+  destination_code TEXT NOT NULL DEFAULT '',
+  end_day TEXT NOT NULL DEFAULT '',
+  end_time TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS invites (
   token_hash TEXT PRIMARY KEY,
   trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
