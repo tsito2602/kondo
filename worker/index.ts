@@ -41,6 +41,12 @@ function dateField(value: unknown) {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
 }
 
+function idField(value: unknown) {
+  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    ? value
+    : null;
+}
+
 async function memberRole(env: Env, tripId: string, userId: string) {
   const row = await env.DB.prepare('SELECT role FROM trip_members WHERE trip_id = ? AND user_id = ?')
     .bind(tripId, userId)
@@ -119,12 +125,24 @@ async function createTrip(request: Request, env: Env, user: User) {
   if (!name || destination === null || !startsOn || !endsOn || startsOn > endsOn) {
     return json({ error: '旅行名と正しい日付を入力してください' }, 400);
   }
-  const id = crypto.randomUUID();
+  const id = idField(body.id) ?? crypto.randomUUID();
   await env.DB.batch([
-    env.DB.prepare('INSERT INTO trips (id, name, destination, starts_on, ends_on, created_by) VALUES (?, ?, ?, ?, ?, ?)')
+    env.DB.prepare(`
+      INSERT INTO trips (id, name, destination, starts_on, ends_on, created_by)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        destination = excluded.destination,
+        starts_on = excluded.starts_on,
+        ends_on = excluded.ends_on,
+        updated_at = unixepoch()
+      WHERE trips.created_by = excluded.created_by
+    `)
       .bind(id, name, destination, startsOn, endsOn, user.id),
-    env.DB.prepare("INSERT INTO trip_members (trip_id, user_id, role) VALUES (?, ?, 'owner')").bind(id, user.id),
+    env.DB.prepare("INSERT INTO trip_members (trip_id, user_id, role) SELECT id, ?, 'owner' FROM trips WHERE id = ? AND created_by = ? ON CONFLICT(trip_id, user_id) DO NOTHING")
+      .bind(user.id, id, user.id),
   ]);
+  if (!(await memberRole(env, id, user.id))) return json({ error: '旅行IDが競合しました' }, 409);
   return json({ trip: { id, name, destination, startsOn, endsOn, role: 'owner', memberCount: 1 } }, 201);
 }
 
@@ -171,10 +189,23 @@ async function createItem(request: Request, env: Env, user: User, tripId: string
   const body = await request.json().catch(() => null);
   const fields = isObject(body) ? itineraryFields(body) : null;
   if (!fields) return json({ error: '正しい旅程を入力してください' }, 400);
-  const id = crypto.randomUUID();
-  await env.DB.prepare(`INSERT INTO itinerary_items (id, trip_id, day, time, kind, title, note, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+  const id = idField(body?.id) ?? crypto.randomUUID();
+  const result = await env.DB.prepare(`
+    INSERT INTO itinerary_items (id, trip_id, day, time, kind, title, note, updated_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      day = excluded.day,
+      time = excluded.time,
+      kind = excluded.kind,
+      title = excluded.title,
+      note = excluded.note,
+      updated_by = excluded.updated_by,
+      updated_at = unixepoch()
+    WHERE itinerary_items.trip_id = excluded.trip_id
+  `)
     .bind(id, tripId, fields.day, fields.time, fields.kind, fields.title, fields.note, user.id)
     .run();
+  if (!result.meta.changes) return json({ error: '旅程IDが競合しました' }, 409);
   return json({ item: { id, ...fields, updatedBy: user.id } }, 201);
 }
 

@@ -5,6 +5,7 @@ import { useColorScheme } from 'react-native';
 import { AuthGate } from '@/auth/auth-gate';
 import { AuthProvider } from '@/auth/auth-provider';
 import AppTabs from '@/components/app-tabs';
+import { TravelProvider } from '@/data/travel-provider';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -13,7 +14,9 @@ export default function TabLayout() {
       <StatusBar style="dark" />
       <AuthProvider>
         <AuthGate>
-          <AppTabs />
+          <TravelProvider>
+            <AppTabs />
+          </TravelProvider>
         </AuthGate>
       </AuthProvider>
     </ThemeProvider>

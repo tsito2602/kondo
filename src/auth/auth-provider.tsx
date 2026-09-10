@@ -13,6 +13,7 @@ type AuthContextValue = {
   signingIn: boolean;
   user: User | null;
   error: string | null;
+  request: <T>(path: string, init?: RequestInit) => Promise<T>;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -45,6 +46,7 @@ async function api<T>(path: string, init: RequestInit = {}, token?: string | nul
       ...init.headers,
     },
   });
+  if (response.status === 204) return undefined as T;
   const result = (await response.json()) as T & { error?: string };
   if (!response.ok) throw new Error(result.error ?? '通信に失敗しました');
   return result;
@@ -142,9 +144,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setUser(null);
   }, []);
 
+  const requestApi = useCallback(async <T,>(path: string, init: RequestInit = {}) => {
+    const token = await readToken();
+    if (!token) throw new Error('ログインが必要です');
+    return api<T>(path, init, token);
+  }, []);
+
   const value = useMemo(
-    () => ({ configured, loading, signingIn, user, error, signIn, signOut }),
-    [configured, error, loading, signIn, signOut, signingIn, user],
+    () => ({ configured, loading, signingIn, user, error, request: requestApi, signIn, signOut }),
+    [configured, error, loading, requestApi, signIn, signOut, signingIn, user],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

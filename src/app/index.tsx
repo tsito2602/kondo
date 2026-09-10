@@ -1,111 +1,126 @@
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const itinerary = [
-  { time: '10:30', title: '羽田空港を出発', detail: '第2ターミナル・保安検査は9:45まで' },
-  { time: '12:05', title: '福岡空港に到着', detail: '地下鉄で博多へ' },
-  { time: '13:30', title: '博多でランチ', detail: '博多一双 本店' },
-];
+import { useTravel } from '@/data/travel-provider';
+
+const today = new Date().toISOString().slice(0, 10);
 
 export default function HomeScreen() {
+  const { trips, selectedTrip, selectTrip, createTrip, createInvite, syncing, pendingCount, error } = useTravel();
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState('');
+  const [destination, setDestination] = useState('');
+  const [startsOn, setStartsOn] = useState(today);
+  const [endsOn, setEndsOn] = useState(today);
+
+  const save = () => {
+    if (!name.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(startsOn) || !/^\d{4}-\d{2}-\d{2}$/.test(endsOn) || startsOn > endsOn) {
+      Alert.alert('入力を確認してください', '旅行名と正しい日付を入力してください。');
+      return;
+    }
+    createTrip({ name: name.trim(), destination: destination.trim(), startsOn, endsOn });
+    setCreating(false);
+    setName('');
+    setDestination('');
+  };
+
+  const shareInvite = async () => {
+    try {
+      const url = await createInvite();
+      await Share.share({ message: `tabiで旅程を一緒に編集しよう\n${url}`, url });
+    } catch (cause) {
+      Alert.alert('招待リンクを作れませんでした', cause instanceof Error ? cause.message : 'オンラインで再度お試しください。');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.eyebrow}>次の旅まであと18日</Text>
-            <Text style={styles.title}>福岡、ふたり旅</Text>
-            <Text style={styles.date}>9月14日 — 9月16日・2泊3日</Text>
+            <Text style={styles.brand}>tabi</Text>
+            <Text style={styles.sync}>{syncing ? '同期中…' : pendingCount ? `${pendingCount}件を同期待ち` : '同期済み'}</Text>
           </View>
-          <View style={styles.avatarRow}>
-            <View style={[styles.avatar, styles.avatarFirst]}><Text style={styles.avatarText}>つ</Text></View>
-            <View style={[styles.avatar, styles.avatarSecond]}><Text style={styles.avatarText}>み</Text></View>
-          </View>
+          <Pressable onPress={() => setCreating(true)} style={styles.addButton}><Text style={styles.addButtonText}>＋ 旅行</Text></Pressable>
         </View>
 
-        <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>DAY 1 · 9月14日</Text>
-          <Text style={styles.heroTitle}>福岡へ出発</Text>
-          <Text style={styles.heroBody}>羽田 10:30 → 福岡 12:05</Text>
-          <View style={styles.weatherRow}>
-            <Text style={styles.weather}>☀︎ 28°</Text>
-            <Text style={styles.weatherNote}>歩きやすい靴がおすすめ</Text>
-          </View>
-        </View>
+        {error ? <Text style={styles.error}>オフラインで表示中 · {error}</Text> : null}
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>今日の予定</Text>
-          <Text style={styles.sectionLink}>すべて見る</Text>
-        </View>
-        <View style={styles.timelineCard}>
-          {itinerary.map((item, index) => (
-            <View key={item.time} style={styles.timelineRow}>
-              <Text style={styles.time}>{item.time}</Text>
-              <View style={styles.timelineRail}>
-                <View style={styles.dot} />
-                {index < itinerary.length - 1 && <View style={styles.line} />}
+        {!selectedTrip ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyMark}>⌁</Text>
+            <Text style={styles.emptyTitle}>最初の旅行を作成</Text>
+            <Text style={styles.emptyBody}>予定は端末に保存され、通信が戻ると自動で同期されます。</Text>
+            <Pressable onPress={() => setCreating(true)} style={styles.primaryButton}><Text style={styles.primaryButtonText}>旅行を作る</Text></Pressable>
+          </View>
+        ) : (
+          <>
+            {trips.length > 1 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tripTabs}>
+                {trips.map((trip) => (
+                  <Pressable key={trip.id} onPress={() => selectTrip(trip.id)} style={[styles.tripTab, trip.id === selectedTrip.id && styles.tripTabActive]}>
+                    <Text style={[styles.tripTabText, trip.id === selectedTrip.id && styles.tripTabTextActive]}>{trip.name}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            ) : null}
+            <View style={styles.ticket}>
+              <View style={styles.ticketMain}>
+                <Text style={styles.ticketLabel}>{selectedTrip.destination || 'DESTINATION'}</Text>
+                <Text style={styles.ticketTitle}>{selectedTrip.name}</Text>
+                <Text style={styles.ticketDate}>{selectedTrip.startsOn} — {selectedTrip.endsOn}</Text>
               </View>
-              <View style={styles.timelineCopy}>
-                <Text style={styles.itemTitle}>{item.title}</Text>
-                <Text style={styles.itemDetail}>{item.detail}</Text>
+              <View style={styles.ticketStub}>
+                <Text style={styles.memberCount}>{selectedTrip.memberCount}</Text>
+                <Text style={styles.memberLabel}>MEMBERS</Text>
               </View>
             </View>
-          ))}
-        </View>
 
-        <View style={styles.quickRow}>
-          <Pressable onPress={() => router.push('/packing')} style={({ pressed }) => [styles.quickCard, pressed && styles.pressed]}>
-            <Text style={styles.quickIcon}>✓</Text>
-            <Text style={styles.quickValue}>12 / 18</Text>
-            <Text style={styles.quickLabel}>持ち物</Text>
-          </Pressable>
-          <Pressable onPress={() => router.push('/bookings')} style={({ pressed }) => [styles.quickCard, pressed && styles.pressed]}>
-            <Text style={styles.quickIcon}>⌁</Text>
-            <Text style={styles.quickValue}>4件</Text>
-            <Text style={styles.quickLabel}>予約済み</Text>
-          </Pressable>
-        </View>
+            <View style={styles.actionRow}>
+              <Pressable onPress={() => router.push('/itinerary')} style={styles.actionCard}>
+                <Text style={styles.actionIcon}>≡</Text><Text style={styles.actionTitle}>旅程を編集</Text>
+              </Pressable>
+              <Pressable onPress={() => void shareInvite()} style={styles.actionCard}>
+                <Text style={styles.actionIcon}>↗</Text><Text style={styles.actionTitle}>一緒に編集</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
       </ScrollView>
+
+      <Modal visible={creating} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setCreating(false)}>
+        <SafeAreaView style={styles.modal}>
+          <View style={styles.modalHeader}>
+            <Pressable onPress={() => setCreating(false)}><Text style={styles.cancel}>キャンセル</Text></Pressable>
+            <Text style={styles.modalTitle}>新しい旅行</Text>
+            <Pressable onPress={save}><Text style={styles.save}>保存</Text></Pressable>
+          </View>
+          <View style={styles.form}>
+            <Text style={styles.label}>旅行名</Text>
+            <TextInput value={name} onChangeText={setName} placeholder="ローマ旅行" style={styles.input} autoFocus />
+            <Text style={styles.label}>行き先</Text>
+            <TextInput value={destination} onChangeText={setDestination} placeholder="Rome, Italy" style={styles.input} />
+            <View style={styles.dateRow}>
+              <View style={styles.dateField}><Text style={styles.label}>出発日</Text><TextInput value={startsOn} onChangeText={setStartsOn} placeholder="2026-11-21" style={styles.input} /></View>
+              <View style={styles.dateField}><Text style={styles.label}>帰着日</Text><TextInput value={endsOn} onChangeText={setEndsOn} placeholder="2026-11-28" style={styles.input} /></View>
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F6F4EF' },
-  content: { padding: 20, paddingBottom: 120, gap: 18 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  eyebrow: { color: '#C65338', fontSize: 13, fontWeight: '700', marginBottom: 7 },
-  title: { color: '#20332C', fontSize: 29, lineHeight: 35, fontWeight: '800', letterSpacing: -0.7 },
-  date: { color: '#6E756F', fontSize: 14, marginTop: 6 },
-  avatarRow: { flexDirection: 'row', paddingTop: 2 },
-  avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#F6F4EF' },
-  avatarFirst: { backgroundColor: '#355E52' },
-  avatarSecond: { backgroundColor: '#D17A5B', marginLeft: -10 },
-  avatarText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
-  heroCard: { backgroundColor: '#2F5A4E', borderRadius: 26, padding: 22, minHeight: 190, justifyContent: 'flex-end', shadowColor: '#19372F', shadowOpacity: 0.2, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 5 },
-  heroLabel: { color: '#D3E4DD', fontSize: 12, fontWeight: '800', letterSpacing: 1.1 },
-  heroTitle: { color: '#FFFFFF', fontSize: 28, fontWeight: '800', marginTop: 8 },
-  heroBody: { color: '#E7F0EC', fontSize: 15, marginTop: 5 },
-  weatherRow: { flexDirection: 'row', gap: 12, marginTop: 20, alignItems: 'center' },
-  weather: { color: '#20332C', backgroundColor: '#F3D79D', overflow: 'hidden', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6, fontSize: 13, fontWeight: '800' },
-  weatherNote: { color: '#D3E4DD', fontSize: 13 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
-  sectionTitle: { color: '#20332C', fontSize: 20, fontWeight: '800' },
-  sectionLink: { color: '#C65338', fontSize: 13, fontWeight: '700' },
-  timelineCard: { backgroundColor: '#FFFFFF', borderRadius: 22, padding: 18, gap: 2 },
-  timelineRow: { minHeight: 72, flexDirection: 'row' },
-  time: { width: 52, color: '#6E756F', fontSize: 13, fontWeight: '700', paddingTop: 1 },
-  timelineRail: { width: 22, alignItems: 'center' },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#D56B4B', marginTop: 3 },
-  line: { width: 2, flex: 1, backgroundColor: '#E6E3DC', marginVertical: 4 },
-  timelineCopy: { flex: 1, paddingBottom: 18 },
-  itemTitle: { color: '#20332C', fontSize: 15, fontWeight: '800' },
-  itemDetail: { color: '#777D78', fontSize: 13, lineHeight: 19, marginTop: 3 },
-  quickRow: { flexDirection: 'row', gap: 12 },
-  quickCard: { flex: 1, backgroundColor: '#ECE8DD', borderRadius: 20, padding: 17 },
-  quickIcon: { color: '#C65338', fontSize: 20, fontWeight: '800' },
-  quickValue: { color: '#20332C', fontSize: 18, fontWeight: '800', marginTop: 13 },
-  quickLabel: { color: '#777D78', fontSize: 13, marginTop: 2 },
-  pressed: { opacity: 0.65, transform: [{ scale: 0.98 }] },
+  safeArea: { flex: 1, backgroundColor: '#F3F0E9' }, content: { padding: 20, paddingBottom: 120, gap: 18 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, brand: { color: '#20332C', fontSize: 31, fontWeight: '900', letterSpacing: -1 }, sync: { color: '#737A74', fontSize: 12, marginTop: 2 },
+  addButton: { backgroundColor: '#20332C', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 11 }, addButtonText: { color: '#FFF', fontWeight: '800' }, error: { color: '#9D563F', fontSize: 12 },
+  empty: { minHeight: 440, alignItems: 'center', justifyContent: 'center', padding: 32 }, emptyMark: { color: '#C45F43', fontSize: 40 }, emptyTitle: { color: '#20332C', fontSize: 23, fontWeight: '800', marginTop: 18 }, emptyBody: { color: '#717871', fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 8 },
+  primaryButton: { backgroundColor: '#C45F43', paddingHorizontal: 22, paddingVertical: 14, borderRadius: 17, marginTop: 22 }, primaryButtonText: { color: '#FFF', fontWeight: '800' },
+  tripTabs: { gap: 8 }, tripTab: { paddingHorizontal: 15, paddingVertical: 9, borderRadius: 20, backgroundColor: '#E5E0D6' }, tripTabActive: { backgroundColor: '#20332C' }, tripTabText: { color: '#626A63', fontWeight: '700' }, tripTabTextActive: { color: '#FFF' },
+  ticket: { flexDirection: 'row', backgroundColor: '#31594E', borderRadius: 26, overflow: 'hidden', minHeight: 210 }, ticketMain: { flex: 1, padding: 24, justifyContent: 'flex-end' }, ticketStub: { width: 88, borderLeftWidth: 1, borderStyle: 'dashed', borderLeftColor: '#91A9A1', alignItems: 'center', justifyContent: 'center' }, ticketLabel: { color: '#C7D8D2', fontSize: 11, fontWeight: '800', letterSpacing: 1.3, textTransform: 'uppercase' }, ticketTitle: { color: '#FFF', fontSize: 27, fontWeight: '900', marginTop: 8 }, ticketDate: { color: '#D8E4E0', fontSize: 13, marginTop: 7 }, memberCount: { color: '#FFF', fontSize: 28, fontWeight: '900' }, memberLabel: { color: '#B9CDC6', fontSize: 8, fontWeight: '800', marginTop: 3 },
+  actionRow: { flexDirection: 'row', gap: 12 }, actionCard: { flex: 1, backgroundColor: '#FFF', borderRadius: 20, padding: 18, minHeight: 112, justifyContent: 'space-between' }, actionIcon: { color: '#C45F43', fontSize: 24, fontWeight: '700' }, actionTitle: { color: '#20332C', fontSize: 15, fontWeight: '800' },
+  modal: { flex: 1, backgroundColor: '#F7F5F0' }, modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderBottomColor: '#E4E0D8' }, cancel: { color: '#69716B' }, modalTitle: { color: '#20332C', fontSize: 17, fontWeight: '800' }, save: { color: '#C45F43', fontWeight: '800' }, form: { padding: 20, gap: 9 }, label: { color: '#56605A', fontSize: 12, fontWeight: '800', marginTop: 10 }, input: { backgroundColor: '#FFF', borderRadius: 15, paddingHorizontal: 15, paddingVertical: 14, color: '#20332C', fontSize: 15 }, dateRow: { flexDirection: 'row', gap: 12 }, dateField: { flex: 1 },
 });
