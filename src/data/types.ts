@@ -27,8 +27,14 @@ export type Booking = {
   kind: BookingKind;
   title: string;
   detail: string;
+  origin: string;
+  originCode: string;
+  destination: string;
+  destinationCode: string;
   day: string;
   time: string;
+  endDay: string;
+  endTime: string;
   confirmationCode: string;
   note: string;
   updatedBy?: string;
@@ -62,5 +68,18 @@ export const emptyTravelCache = (): TravelCache => ({
 
 export const normalizeTravelCache = (value: TravelCache): TravelCache => ({
   ...value,
-  bookingsByTrip: value.bookingsByTrip ?? {},
+  bookingsByTrip: Object.fromEntries(
+    Object.entries(value.bookingsByTrip ?? {}).map(([tripId, bookings]) => [
+      tripId,
+      bookings.map((booking) => ({
+        ...booking,
+        origin: booking.origin ?? '',
+        originCode: booking.originCode ?? '',
+        destination: booking.destination ?? '',
+        destinationCode: booking.destinationCode ?? '',
+        endDay: booking.endDay ?? booking.day,
+        endTime: booking.endTime ?? '',
+      })),
+    ]),
+  ),
 });
