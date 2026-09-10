@@ -323,6 +323,76 @@ async function deleteBooking(env: Env, user: User, tripId: string, bookingId: st
   return result.meta.changes ? new Response(null, { status: 204 }) : json({ error: '予約が見つかりません' }, 404);
 }
 
+type PackingRow = {
+  id: string;
+  name: string;
+  category: string;
+  quantity: number;
+  packed: number;
+  updatedBy: string;
+  updatedAt: number;
+};
+
+function packingFields(body: Record<string, unknown>) {
+  const name = textField(body.name, 120, true);
+  const category = textField(body.category, 40) || 'その他';
+  const quantity = typeof body.quantity === 'number' && Number.isInteger(body.quantity) ? body.quantity : 1;
+  const packed = typeof body.packed === 'boolean' ? body.packed : false;
+  if (!name || !category || quantity < 1 || quantity > 99) return null;
+  return { name, category, quantity, packed };
+}
+
+async function listPacking(env: Env, user: User, tripId: string) {
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  const result = await env.DB.prepare(`
+    SELECT id, name, category, quantity, packed, updated_by AS updatedBy, updated_at AS updatedAt
+    FROM packing_items WHERE trip_id = ? ORDER BY packed, category, name, id
+  `).bind(tripId).all<PackingRow>();
+  return json({ items: result.results.map((item) => ({ ...item, packed: Boolean(item.packed) })) });
+}
+
+async function createPackingItem(request: Request, env: Env, user: User, tripId: string) {
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  const body = await request.json().catch(() => null);
+  const fields = isObject(body) ? packingFields(body) : null;
+  if (!fields) return json({ error: '正しい持ち物情報を入力してください' }, 400);
+  const id = idField(body?.id) ?? crypto.randomUUID();
+  const result = await env.DB.prepare(`
+    INSERT INTO packing_items (id, trip_id, name, category, quantity, packed, updated_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      name = excluded.name, category = excluded.category, quantity = excluded.quantity,
+      packed = excluded.packed, updated_by = excluded.updated_by, updated_at = unixepoch()
+    WHERE packing_items.trip_id = excluded.trip_id
+  `).bind(id, tripId, fields.name, fields.category, fields.quantity, fields.packed ? 1 : 0, user.id).run();
+  if (!result.meta.changes) return json({ error: '持ち物IDが競合しました' }, 409);
+  return json({ item: { id, ...fields, updatedBy: user.id } }, 201);
+}
+
+async function updatePackingItem(request: Request, env: Env, user: User, tripId: string, itemId: string) {
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  const body = await request.json().catch(() => null);
+  const fields = isObject(body) ? packingFields(body) : null;
+  if (!fields) return json({ error: '正しい持ち物情報を入力してください' }, 400);
+  const result = await env.DB.prepare(`
+    UPDATE packing_items SET name = ?, category = ?, quantity = ?, packed = ?, updated_by = ?, updated_at = unixepoch()
+    WHERE id = ? AND trip_id = ?
+  `).bind(fields.name, fields.category, fields.quantity, fields.packed ? 1 : 0, user.id, itemId, tripId).run();
+  return result.meta.changes
+    ? json({ item: { id: itemId, ...fields, updatedBy: user.id } })
+    : json({ error: '持ち物が見つかりません' }, 404);
+}
+
+async function deletePackingItem(env: Env, user: User, tripId: string, itemId: string) {
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  const result = await env.DB.prepare('DELETE FROM packing_items WHERE id = ? AND trip_id = ?').bind(itemId, tripId).run();
+  return result.meta.changes ? new Response(null, { status: 204 }) : json({ error: '持ち物が見つかりません' }, 404);
+}
+
 async function createInvite(env: Env, user: User, tripId: string, url: URL) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
@@ -381,6 +451,14 @@ async function api(request: Request, env: Env, url: URL) {
   const bookingMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/bookings\/([^/]+)$/);
   if (bookingMatch && request.method === 'PATCH') return updateBooking(request, env, user, bookingMatch[1], bookingMatch[2]);
   if (bookingMatch && request.method === 'DELETE') return deleteBooking(env, user, bookingMatch[1], bookingMatch[2]);
+
+  const packingItemsMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/packing$/);
+  if (packingItemsMatch && request.method === 'GET') return listPacking(env, user, packingItemsMatch[1]);
+  if (packingItemsMatch && request.method === 'POST') return createPackingItem(request, env, user, packingItemsMatch[1]);
+
+  const packingItemMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/packing\/([^/]+)$/);
+  if (packingItemMatch && request.method === 'PATCH') return updatePackingItem(request, env, user, packingItemMatch[1], packingItemMatch[2]);
+  if (packingItemMatch && request.method === 'DELETE') return deletePackingItem(env, user, packingItemMatch[1], packingItemMatch[2]);
 
   const inviteMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/invites$/);
   if (inviteMatch && request.method === 'POST') return createInvite(env, user, inviteMatch[1], url);
