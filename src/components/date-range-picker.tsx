@@ -163,10 +163,11 @@ function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', sta
           </View>
 
           <View onLayout={(event) => setGridWidth(event.nativeEvent.layout.width)} style={styles.grid}>
-            {gridWidth ? <DateRangeHighlight anchorDate={anchorDate} days={days} gridWidth={gridWidth} markerRange={range} range={previewRange} /> : null}
+            {gridWidth ? <DateRangeHighlight anchorDate={anchorDate} days={days} gridWidth={gridWidth} markerRange={range} previewEndDate={hoverDate} range={previewRange} /> : null}
             {WEEKDAYS.map((weekday) => <View key={weekday} style={styles.weekdayCell}><Text style={styles.weekday}>{weekday}</Text></View>)}
             {days.map((date, index) => {
               if (!date) return <View key={`blank-${index}`} style={styles.dayCell} />;
+              const previewSelected = phase === 'end' && !range.endDate && date === hoverDate;
               const selected = date === range.startDate || date === range.endDate;
               return (
                 <Pressable
@@ -180,7 +181,7 @@ function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', sta
                   onHoverOut={() => setHoverDate((current) => current === date ? '' : current)}
                   onPress={() => choose(date)}
                   style={styles.dayCell}>
-                  <Text style={[styles.day, selected && styles.daySelected]}>{Number(date.slice(8))}</Text>
+                  <Text style={[styles.day, (selected || previewSelected) && styles.daySelected]}>{Number(date.slice(8))}</Text>
                 </Pressable>
               );
             })}
@@ -263,7 +264,7 @@ function TimeWheel({ accessibilityLabel, onChange, selected, values }: { accessi
   </View>;
 }
 
-function DateRangeHighlight({ anchorDate, days, gridWidth, markerRange, range }: { anchorDate: string; days: (string | null)[]; gridWidth: number; markerRange: DateRange; range: DateRange }) {
+function DateRangeHighlight({ anchorDate, days, gridWidth, markerRange, previewEndDate, range }: { anchorDate: string; days: (string | null)[]; gridWidth: number; markerRange: DateRange; previewEndDate: string; range: DateRange }) {
   const anchor = days.indexOf(anchorDate);
   const anchorRow = anchor < 0 ? (range.startDate < (days.find(Boolean) ?? '') ? 0 : 5) : Math.floor(anchor / 7);
   const rows = rangeRows(days, range);
@@ -280,7 +281,11 @@ function DateRangeHighlight({ anchorDate, days, gridWidth, markerRange, range }:
         return <RangeBand bounds={bounds} gridWidth={gridWidth} key={row} origin={origin} row={row} />;
       })}
       <DateMarker gridWidth={gridWidth} index={days.indexOf(markerRange.startDate)} />
-      <DateMarker gridWidth={gridWidth} index={markerRange.endDate !== markerRange.startDate ? days.indexOf(markerRange.endDate) : -1} origin={anchor} />
+      <DateMarker
+        gridWidth={gridWidth}
+        index={(markerRange.endDate || previewEndDate) && (markerRange.endDate || previewEndDate) !== markerRange.startDate ? days.indexOf(markerRange.endDate || previewEndDate) : -1}
+        origin={anchor}
+      />
     </View>
   );
 }
