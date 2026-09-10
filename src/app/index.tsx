@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   addButtonText: { color: palette.paper, fontWeight: '700' },
   error: { color: palette.danger, fontSize: 12 },
   empty: { minHeight: 440, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  emptyMark: { color: palette.coral, fontSize: 48, fontWeight: '900' },
+  emptyMark: { color: palette.accent, fontSize: 48, fontWeight: '900' },
   emptyTitle: { color: palette.ink, fontSize: 28, lineHeight: 30, fontWeight: '900', letterSpacing: -0.9, marginTop: 18 },
   emptyBody: { color: palette.slate, fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 8 },
   primaryButton: { backgroundColor: palette.ocean, paddingHorizontal: 24, paddingVertical: 15, borderRadius: 8, marginTop: 22 },
