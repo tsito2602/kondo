@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { DateRangePicker } from '@/components/date-range-picker';
 import { palette } from '@/constants/design';
 import type { ItineraryItem } from '@/data/types';
 import { useTravel } from '@/data/travel-provider';
@@ -118,7 +119,7 @@ export default function ItineraryScreen() {
           </View>
           <View style={styles.form}>
             <View style={styles.dateRow}>
-              <View style={styles.dateField}><Text style={styles.label}>日付</Text><TextInput value={day} onChangeText={setDay} placeholder="2026-11-21" style={styles.input} /></View>
+              <View style={styles.dateField}><DateRangePicker mode="single" label="日付" startDate={day} endDate={day} onChange={(range) => setDay(range.startDate)} /></View>
               <View style={styles.timeField}><Text style={styles.label}>時刻</Text><TextInput value={time} onChangeText={setTime} placeholder="10:00" style={styles.input} /></View>
             </View>
             <Text style={styles.label}>予定</Text><TextInput value={title} onChangeText={setTitle} placeholder="空港へ移動" style={styles.input} autoFocus />
