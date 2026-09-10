@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { TripTicket } from '@/components/trip-ticket';
 import { useTravel } from '@/data/travel-provider';
 
 const today = new Date().toISOString().slice(0, 10);
@@ -79,17 +80,7 @@ export default function HomeScreen() {
                 ))}
               </ScrollView>
             ) : null}
-            <View style={styles.ticket}>
-              <View style={styles.ticketMain}>
-                <Text style={styles.ticketLabel}>{selectedTrip.destination || 'DESTINATION'}</Text>
-                <Text style={styles.ticketTitle}>{selectedTrip.name}</Text>
-                <Text style={styles.ticketDate}>{selectedTrip.startsOn} — {selectedTrip.endsOn}</Text>
-              </View>
-              <View style={styles.ticketStub}>
-                <Text style={styles.memberCount}>{selectedTrip.memberCount}</Text>
-                <Text style={styles.memberLabel}>MEMBERS</Text>
-              </View>
-            </View>
+            <TripTicket trip={selectedTrip} />
 
             <View style={styles.actionRow}>
               <Pressable onPress={() => router.push('/itinerary')} style={styles.actionCard}>
@@ -127,13 +118,12 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F3F0E9' }, content: { padding: 20, paddingBottom: 120, gap: 18 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, brand: { color: '#20332C', fontSize: 31, fontWeight: '900', letterSpacing: -1 }, sync: { color: '#737A74', fontSize: 12, marginTop: 2 },
-  addButton: { backgroundColor: '#20332C', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 11 }, addButtonText: { color: '#FFF', fontWeight: '800' }, error: { color: '#9D563F', fontSize: 12 },
-  empty: { minHeight: 440, alignItems: 'center', justifyContent: 'center', padding: 32 }, emptyMark: { color: '#C45F43', fontSize: 40 }, emptyTitle: { color: '#20332C', fontSize: 23, fontWeight: '800', marginTop: 18 }, emptyBody: { color: '#717871', fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 8 },
-  primaryButton: { backgroundColor: '#C45F43', paddingHorizontal: 22, paddingVertical: 14, borderRadius: 17, marginTop: 22 }, primaryButtonText: { color: '#FFF', fontWeight: '800' },
-  tripTabs: { gap: 8 }, tripTab: { paddingHorizontal: 15, paddingVertical: 9, borderRadius: 20, backgroundColor: '#E5E0D6' }, tripTabActive: { backgroundColor: '#20332C' }, tripTabText: { color: '#626A63', fontWeight: '700' }, tripTabTextActive: { color: '#FFF' },
-  ticket: { flexDirection: 'row', backgroundColor: '#31594E', borderRadius: 26, overflow: 'hidden', minHeight: 210 }, ticketMain: { flex: 1, padding: 24, justifyContent: 'flex-end' }, ticketStub: { width: 88, borderLeftWidth: 1, borderStyle: 'dashed', borderLeftColor: '#91A9A1', alignItems: 'center', justifyContent: 'center' }, ticketLabel: { color: '#C7D8D2', fontSize: 11, fontWeight: '800', letterSpacing: 1.3, textTransform: 'uppercase' }, ticketTitle: { color: '#FFF', fontSize: 27, fontWeight: '900', marginTop: 8 }, ticketDate: { color: '#D8E4E0', fontSize: 13, marginTop: 7 }, memberCount: { color: '#FFF', fontSize: 28, fontWeight: '900' }, memberLabel: { color: '#B9CDC6', fontSize: 8, fontWeight: '800', marginTop: 3 },
-  actionRow: { flexDirection: 'row', gap: 12 }, actionCard: { flex: 1, backgroundColor: '#FFF', borderRadius: 20, padding: 18, minHeight: 112, justifyContent: 'space-between' }, actionIcon: { color: '#C45F43', fontSize: 24, fontWeight: '700' }, actionTitle: { color: '#20332C', fontSize: 15, fontWeight: '800' },
-  modal: { flex: 1, backgroundColor: '#F7F5F0' }, modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderBottomColor: '#E4E0D8' }, cancel: { color: '#69716B' }, modalTitle: { color: '#20332C', fontSize: 17, fontWeight: '800' }, save: { color: '#C45F43', fontWeight: '800' }, form: { padding: 20, gap: 9 }, label: { color: '#56605A', fontSize: 12, fontWeight: '800', marginTop: 10 }, input: { backgroundColor: '#FFF', borderRadius: 15, paddingHorizontal: 15, paddingVertical: 14, color: '#20332C', fontSize: 15 }, dateRow: { flexDirection: 'row', gap: 12 }, dateField: { flex: 1 },
+  safeArea: { flex: 1, backgroundColor: '#FAF9F6' }, content: { padding: 20, paddingBottom: 120, gap: 18 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, brand: { color: '#17191C', fontSize: 31, fontWeight: '500', letterSpacing: -1 }, sync: { color: '#777B86', fontSize: 12, marginTop: 2 },
+  addButton: { backgroundColor: '#17191C', borderRadius: 9999, paddingHorizontal: 18, paddingVertical: 11 }, addButtonText: { color: '#FFF', fontWeight: '500' }, error: { color: '#A13D32', fontSize: 12 },
+  empty: { minHeight: 440, alignItems: 'center', justifyContent: 'center', padding: 32 }, emptyMark: { color: '#5D2A1A', fontSize: 40 }, emptyTitle: { color: '#17191C', fontSize: 23, fontWeight: '500', marginTop: 18 }, emptyBody: { color: '#777B86', fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 8 },
+  primaryButton: { backgroundColor: '#17191C', paddingHorizontal: 22, paddingVertical: 14, borderRadius: 9999, marginTop: 22 }, primaryButtonText: { color: '#FFF', fontWeight: '500' },
+  tripTabs: { gap: 8 }, tripTab: { paddingHorizontal: 15, paddingVertical: 9, borderRadius: 9999, backgroundColor: '#F2F2F3' }, tripTabActive: { backgroundColor: '#17191C' }, tripTabText: { color: '#777B86', fontWeight: '500' }, tripTabTextActive: { color: '#FFF' },
+  actionRow: { flexDirection: 'row', gap: 12 }, actionCard: { flex: 1, backgroundColor: '#F2F2F3', borderRadius: 24, padding: 18, minHeight: 112, justifyContent: 'space-between' }, actionIcon: { color: '#17191C', fontSize: 24, fontWeight: '500' }, actionTitle: { color: '#17191C', fontSize: 15, fontWeight: '500' },
+  modal: { flex: 1, backgroundColor: '#FAF9F6' }, modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#ECECEC' }, cancel: { color: '#777B86' }, modalTitle: { color: '#17191C', fontSize: 17, fontWeight: '500' }, save: { color: '#17191C', fontWeight: '500' }, form: { padding: 20, gap: 9 }, label: { color: '#777B86', fontSize: 12, fontWeight: '500', marginTop: 10 }, input: { backgroundColor: '#FFF', borderWidth: StyleSheet.hairlineWidth, borderColor: '#ECECEC', borderRadius: 16, paddingHorizontal: 15, paddingVertical: 14, color: '#17191C', fontSize: 15 }, dateRow: { flexDirection: 'row', gap: 12 }, dateField: { flex: 1 },
 });
