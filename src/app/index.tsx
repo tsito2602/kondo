@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,12 +8,25 @@ import { useTravel } from '@/data/travel-provider';
 const today = new Date().toISOString().slice(0, 10);
 
 export default function HomeScreen() {
-  const { trips, selectedTrip, selectTrip, createTrip, createInvite, syncing, pendingCount, error } = useTravel();
+  const { invite } = useLocalSearchParams<{ invite?: string | string[] }>();
+  const { trips, selectedTrip, selectTrip, createTrip, createInvite, acceptInvite, ready, syncing, pendingCount, error } = useTravel();
+  const acceptingInvite = useRef(false);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [destination, setDestination] = useState('');
   const [startsOn, setStartsOn] = useState(today);
   const [endsOn, setEndsOn] = useState(today);
+
+  useEffect(() => {
+    const token = Array.isArray(invite) ? invite[0] : invite;
+    if (!ready || !token || acceptingInvite.current) return;
+
+    acceptingInvite.current = true;
+    void acceptInvite(token)
+      .then(() => Alert.alert('旅行に参加しました', '旅程がこの端末にも同期されました。'))
+      .catch((cause) => Alert.alert('旅行に参加できませんでした', cause instanceof Error ? cause.message : '招待リンクを確認してください。'))
+      .finally(() => router.replace('/'));
+  }, [acceptInvite, invite, ready]);
 
   const save = () => {
     if (!name.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(startsOn) || !/^\d{4}-\d{2}-\d{2}$/.test(endsOn) || startsOn > endsOn) {

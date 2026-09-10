@@ -235,7 +235,7 @@ async function createInvite(env: Env, user: User, tripId: string, url: URL) {
   await env.DB.prepare('INSERT INTO invites (token_hash, trip_id, created_by, expires_at) VALUES (?, ?, ?, unixepoch() + 604800)')
     .bind(await hashToken(token), tripId, user.id)
     .run();
-  return json({ invite: { url: `${url.origin}/invite/${token}`, expiresIn: 604800 } }, 201);
+  return json({ invite: { url: `${url.origin}/?invite=${encodeURIComponent(token)}`, expiresIn: 604800 } }, 201);
 }
 
 async function acceptInvite(env: Env, user: User, token: string) {
