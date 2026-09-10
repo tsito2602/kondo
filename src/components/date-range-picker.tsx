@@ -234,20 +234,37 @@ function TimeSelector({ label, onChange, value }: { label: string; onChange: (va
 function TimeWheel({ accessibilityLabel, onChange, selected, values }: { accessibilityLabel: string; onChange: (value: string) => void; selected: string; values: string[] }) {
   const scrollRef = useRef<ScrollView>(null);
   const selectedIndex = Math.max(0, values.indexOf(selected));
+  const activeIndex = useRef(selectedIndex);
+  const internalSelection = useRef<number | null>(null);
   const loopValues = useMemo(
     () => Array.from({ length: values.length * WHEEL_CYCLES }, (_, index) => values[index % values.length]),
     [values],
   );
   const middleIndex = WHEEL_MIDDLE_CYCLE * values.length + selectedIndex;
   useEffect(() => {
+    activeIndex.current = selectedIndex;
+    if (internalSelection.current === selectedIndex) {
+      internalSelection.current = null;
+      return;
+    }
     scrollRef.current?.scrollTo({ y: middleIndex * WHEEL_ITEM_HEIGHT, animated: false });
-  }, [middleIndex]);
-  const selectFromScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+  }, [middleIndex, selectedIndex]);
+  const indexFromScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const rawIndex = Math.round(event.nativeEvent.contentOffset.y / WHEEL_ITEM_HEIGHT);
-    const index = ((rawIndex % values.length) + values.length) % values.length;
+    return ((rawIndex % values.length) + values.length) % values.length;
+  };
+  const selectFromScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const index = indexFromScroll(event);
+    if (activeIndex.current === index) return;
+    activeIndex.current = index;
+    internalSelection.current = index;
+    onChange(values[index]);
+  };
+  const settleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const index = indexFromScroll(event);
+    selectFromScroll(event);
     const centeredIndex = WHEEL_MIDDLE_CYCLE * values.length + index;
     scrollRef.current?.scrollTo({ y: centeredIndex * WHEEL_ITEM_HEIGHT, animated: false });
-    onChange(values[index]);
   };
   return <View accessibilityLabel={accessibilityLabel} style={styles.wheelFrame}>
     <View pointerEvents="none" style={styles.wheelSelection} />
@@ -255,8 +272,11 @@ function TimeWheel({ accessibilityLabel, onChange, selected, values }: { accessi
       contentContainerStyle={styles.wheelContent}
       decelerationRate="fast"
       disableIntervalMomentum
-      onMomentumScrollEnd={selectFromScroll}
+      onMomentumScrollEnd={settleScroll}
+      onScroll={selectFromScroll}
+      onScrollEndDrag={selectFromScroll}
       ref={scrollRef}
+      scrollEventThrottle={16}
       showsVerticalScrollIndicator={false}
       snapToInterval={WHEEL_ITEM_HEIGHT}>
       {loopValues.map((entry, index) => <Pressable key={`${entry}-${index}`} onPress={() => onChange(entry)} style={styles.wheelItem}><Text style={[styles.wheelText, entry === selected && styles.wheelTextSelected]}>{entry}</Text></Pressable>)}
@@ -285,6 +305,7 @@ function DateRangeHighlight({ anchorDate, days, gridWidth, markerRange, previewE
         gridWidth={gridWidth}
         index={(markerRange.endDate || previewEndDate) && (markerRange.endDate || previewEndDate) !== markerRange.startDate ? days.indexOf(markerRange.endDate || previewEndDate) : -1}
         origin={anchor}
+        preview={!markerRange.endDate && !!previewEndDate}
       />
     </View>
   );
@@ -305,7 +326,7 @@ function RangeBand({ bounds, gridWidth, origin, row }: { bounds: { start: number
   return <Animated.View style={[styles.band, { left, top: WEEKDAY_HEIGHT + row * ROW_HEIGHT + 5 + (MARKER_SIZE - BAND_HEIGHT) / 2, width, opacity }]} />;
 }
 
-function DateMarker({ gridWidth, index, origin = -1 }: { gridWidth: number; index: number; origin?: number }) {
+function DateMarker({ gridWidth, index, origin = -1, preview = false }: { gridWidth: number; index: number; origin?: number; preview?: boolean }) {
   const [position] = useState(() => new Animated.ValueXY());
   const [opacity] = useState(() => new Animated.Value(index >= 0 ? 1 : 0));
   const positioned = useRef(false);
@@ -325,7 +346,7 @@ function DateMarker({ gridWidth, index, origin = -1 }: { gridWidth: number; inde
       Animated.timing(opacity, { toValue: 1, duration: 120, useNativeDriver: false }),
     ]).start();
   }, [gridWidth, index, opacity, origin, position]);
-  return <Animated.View style={[styles.marker, { left: position.x, top: position.y, opacity }]} />;
+  return <Animated.View style={[styles.marker, preview && styles.markerPreview, { left: position.x, top: position.y, opacity }]} />;
 }
 
 const styles = StyleSheet.create({
@@ -369,6 +390,7 @@ const styles = StyleSheet.create({
   daySelected: { color: palette.paper, fontWeight: '900' },
   band: { position: 'absolute', height: BAND_HEIGHT, borderRadius: BAND_HEIGHT / 2, backgroundColor: palette.sky },
   marker: { position: 'absolute', width: MARKER_SIZE, height: MARKER_SIZE, borderRadius: MARKER_SIZE / 2, backgroundColor: palette.ocean },
+  markerPreview: { backgroundColor: palette.smoke },
   hint: { minHeight: 18, color: palette.slate, fontSize: 12, textAlign: 'center', marginTop: 10 },
   timeSection: { backgroundColor: palette.paper, borderRadius: 16, padding: 12, marginTop: 10 },
   timeHeading: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
