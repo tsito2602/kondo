@@ -118,10 +118,7 @@ export default function ItineraryScreen() {
             <Pressable onPress={save}><Text style={styles.save}>保存</Text></Pressable>
           </View>
           <View style={styles.form}>
-            <View style={styles.dateRow}>
-              <View style={styles.dateField}><DateRangePicker mode="single" label="日付" startDate={day} endDate={day} onChange={(range) => setDay(range.startDate)} /></View>
-              <View style={styles.timeField}><Text style={styles.label}>時刻</Text><TextInput value={time} onChangeText={setTime} placeholder="10:00" style={styles.input} /></View>
-            </View>
+            <DateRangePicker mode="single" showTime label="日時" startDate={day} endDate={day} startTime={time} onChange={(range) => { setDay(range.startDate); setTime(range.startTime); }} />
             <Text style={styles.label}>予定</Text><TextInput value={title} onChangeText={setTitle} placeholder="空港へ移動" style={styles.input} autoFocus />
             <Text style={styles.label}>メモ</Text><TextInput value={note} onChangeText={setNote} placeholder="集合場所や予約番号など" style={[styles.input, styles.noteInput]} multiline />
             {editingId ? <Pressable onPress={remove} style={styles.deleteButton}><Text style={styles.deleteText}>この予定を削除</Text></Pressable> : null}
@@ -168,9 +165,6 @@ const styles = StyleSheet.create({
   label: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, fontWeight: '400', marginTop: 10 },
   input: { minHeight: 50, backgroundColor: palette.paper, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 14, color: palette.ink, fontSize: 16 },
   noteInput: { minHeight: 120, textAlignVertical: 'top' },
-  dateRow: { flexDirection: 'row', gap: 12 },
-  dateField: { flex: 1 },
-  timeField: { width: 110 },
   deleteButton: { minHeight: 50, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
   deleteText: { color: palette.danger, fontSize: 15, fontWeight: '700' },
 });

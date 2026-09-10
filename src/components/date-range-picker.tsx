@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { palette } from '@/constants/design';
@@ -8,29 +8,44 @@ import { calendarDate, displayDate, monthDays, rangeRows, selectRangeDate, type 
 
 type Props = DateRange & {
   disabled?: boolean;
+  endLabel?: string;
+  endTime?: string;
   label?: string;
   mode?: 'range' | 'single';
-  onChange: (range: DateRange) => void;
+  onChange: (range: DateRange & { startTime: string; endTime: string }) => void;
+  showTime?: boolean;
+  startLabel?: string;
+  startTime?: string;
 };
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const WEEKDAY_HEIGHT = 32;
 const ROW_HEIGHT = 46;
 const MARKER_SIZE = 36;
+const WHEEL_ITEM_HEIGHT = 36;
+const HOURS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, '0'));
+const MINUTES = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, '0'));
+
+function validTime(value: string) {
+  return !value || /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
 
 function todayValue() {
   const today = new Date();
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 }
 
-export function DateRangePicker({ startDate, endDate, disabled, label = '期間', mode = 'range', onChange }: Props) {
+export function DateRangePicker({ startDate, endDate, startTime = '', endTime = '', disabled, label = '期間', mode = 'range', onChange, showTime = false, startLabel, endLabel }: Props) {
   const [open, setOpen] = useState(false);
+  const firstLabel = startLabel ?? (mode === 'single' ? '日付' : '出発日');
+  const lastLabel = endLabel ?? '帰着日';
+  const value = (date: string, time: string) => `${displayDate(date)}${showTime && time ? ` ${time}` : ''}`;
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={mode === 'single' ? `日付 ${displayDate(startDate)}` : `開始日 ${displayDate(startDate)}、終了日 ${displayDate(endDate)}`}
+        accessibilityLabel={mode === 'single' ? `${firstLabel} ${value(startDate, startTime)}` : `${firstLabel} ${value(startDate, startTime)}、${lastLabel} ${value(endDate, endTime)}`}
         disabled={disabled}
         onPress={() => setOpen(true)}
         style={({ pressed }) => [styles.trigger, disabled && styles.disabled, pressed && styles.pressed]}>
@@ -39,25 +54,27 @@ export function DateRangePicker({ startDate, endDate, disabled, label = '期間'
           <View style={styles.calendarDots}><View style={styles.calendarDot} /><View style={styles.calendarDot} /></View>
         </View>
         {mode === 'single' ? (
-          <View style={styles.triggerPart}><Text style={styles.triggerMeta}>日付</Text><Text style={styles.triggerValue}>{displayDate(startDate)}</Text></View>
+          <View style={styles.triggerPart}><Text style={styles.triggerMeta}>{firstLabel}</Text><Text style={styles.triggerValue}>{value(startDate, startTime)}</Text></View>
         ) : (
           <>
-            <View style={styles.triggerPart}><Text style={styles.triggerMeta}>出発日</Text><Text style={styles.triggerValue}>{displayDate(startDate)}</Text></View>
+            <View style={styles.triggerPart}><Text style={styles.triggerMeta}>{firstLabel}</Text><Text style={styles.triggerValue}>{value(startDate, startTime)}</Text></View>
             <Text style={styles.triggerDash}>—</Text>
-            <View style={styles.triggerPart}><Text style={styles.triggerMeta}>帰着日</Text><Text style={styles.triggerValue}>{displayDate(endDate)}</Text></View>
+            <View style={styles.triggerPart}><Text style={styles.triggerMeta}>{lastLabel}</Text><Text style={styles.triggerValue}>{value(endDate, endTime)}</Text></View>
           </>
         )}
       </Pressable>
-      {open ? <DateRangeDialog startDate={startDate} endDate={endDate} mode={mode} close={() => setOpen(false)} onChange={onChange} /> : null}
+      {open ? <DateRangeDialog startDate={startDate} endDate={endDate} startTime={startTime} endTime={endTime} startLabel={firstLabel} endLabel={lastLabel} label={label} mode={mode} showTime={showTime} close={() => setOpen(false)} onChange={onChange} /> : null}
     </View>
   );
 }
 
-function DateRangeDialog({ startDate, endDate, mode, close, onChange }: Props & { close: () => void }) {
+function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', startLabel = '出発日', endLabel = '帰着日', label = '期間', mode, showTime = false, close, onChange }: Props & { close: () => void }) {
   const initial = startDate || endDate || todayValue();
   const [range, setRange] = useState<DateRange>({ startDate, endDate });
   const [anchorDate, setAnchorDate] = useState(startDate);
   const [phase, setPhase] = useState<'start' | 'end'>(mode === 'range' && startDate && !endDate ? 'end' : 'start');
+  const [timePhase, setTimePhase] = useState<'start' | 'end'>('start');
+  const [times, setTimes] = useState({ startTime, endTime });
   const [month, setMonth] = useState(initial.slice(0, 7));
   const [yearText, setYearText] = useState(initial.slice(0, 4));
   const [gridWidth, setGridWidth] = useState(0);
@@ -83,12 +100,14 @@ function DateRangeDialog({ startDate, endDate, mode, close, onChange }: Props & 
     if (mode === 'single') {
       setRange({ startDate: date, endDate: date });
       setAnchorDate(date);
+      setTimePhase('start');
       return;
     }
     const next = selectRangeDate(range, phase, date);
     if (!next.endDate) setAnchorDate(next.startDate);
     setRange(next);
     setPhase(next.endDate ? 'start' : 'end');
+    setTimePhase(next.endDate ? 'end' : 'start');
   };
 
   const hint = mode === 'single'
@@ -104,19 +123,20 @@ function DateRangeDialog({ startDate, endDate, mode, close, onChange }: Props & 
       <SafeAreaView style={styles.backdrop}>
         <Pressable accessibilityLabel="日付選択を閉じる" onPress={close} style={StyleSheet.absoluteFill} />
         <View accessibilityViewIsModal style={styles.dialog}>
+          <ScrollView contentContainerStyle={styles.dialogContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.heading}>
-            <Text style={styles.dialogTitle}>{mode === 'single' ? '日付' : '旅行期間'}</Text>
+            <Text style={styles.dialogTitle}>{label}</Text>
             <Pressable accessibilityLabel="日付選択を閉じる" onPress={close} style={styles.iconButton}><Text style={styles.close}>×</Text></Pressable>
           </View>
 
           <View style={styles.summary}>
-            <Pressable onPress={() => setPhase('start')} style={[styles.summaryPart, phase === 'start' && styles.summaryActive]}>
-              <Text style={styles.summaryMeta}>{mode === 'single' ? '日付' : '出発日'}</Text>
-              <Text style={styles.summaryValue}>{displayDate(range.startDate)}</Text>
+            <Pressable onPress={() => { setPhase('start'); setTimePhase('start'); }} style={[styles.summaryPart, (showTime ? timePhase === 'start' : phase === 'start') && styles.summaryActive]}>
+              <Text style={styles.summaryMeta}>{startLabel}</Text>
+              <Text style={styles.summaryValue}>{displayDate(range.startDate)}{showTime && times.startTime ? ` ${times.startTime}` : ''}</Text>
             </Pressable>
-            {mode === 'range' ? <Pressable onPress={() => setPhase('end')} style={[styles.summaryPart, phase === 'end' && styles.summaryActive]}>
-              <Text style={styles.summaryMeta}>帰着日</Text>
-              <Text style={styles.summaryValue}>{displayDate(range.endDate)}</Text>
+            {mode === 'range' ? <Pressable onPress={() => { setPhase('end'); setTimePhase('end'); }} style={[styles.summaryPart, (showTime ? timePhase === 'end' : phase === 'end') && styles.summaryActive]}>
+              <Text style={styles.summaryMeta}>{endLabel}</Text>
+              <Text style={styles.summaryValue}>{displayDate(range.endDate)}{showTime && times.endTime ? ` ${times.endTime}` : ''}</Text>
             </Pressable> : null}
           </View>
 
@@ -151,14 +171,72 @@ function DateRangeDialog({ startDate, endDate, mode, close, onChange }: Props & 
           </View>
 
           <Text accessibilityLiveRegion="polite" style={styles.hint}>{hint}</Text>
+          {showTime ? <TimeSelector
+            label={mode === 'single' ? '時刻' : timePhase === 'start' ? `${startLabel}の時刻` : `${endLabel}の時刻`}
+            onChange={(value) => setTimes((current) => timePhase === 'start' ? { ...current, startTime: value } : { ...current, endTime: value })}
+            value={timePhase === 'start' ? times.startTime : times.endTime}
+          /> : null}
           <View style={styles.actions}>
-            <Pressable onPress={() => { setRange({ startDate: '', endDate: '' }); setPhase('start'); }} style={styles.clearButton}><Text style={styles.clearText}>クリア</Text></Pressable>
-            <Pressable disabled={!range.startDate || (mode === 'range' && !range.endDate)} onPress={() => { onChange(range); close(); }} style={({ pressed }) => [styles.confirmButton, (!range.startDate || (mode === 'range' && !range.endDate)) && styles.confirmDisabled, pressed && styles.pressed]}><Text style={styles.confirmText}>決定</Text></Pressable>
+            <Pressable onPress={() => { setRange({ startDate: '', endDate: '' }); setTimes({ startTime: '', endTime: '' }); setPhase('start'); setTimePhase('start'); }} style={styles.clearButton}><Text style={styles.clearText}>クリア</Text></Pressable>
+            <Pressable disabled={!range.startDate || (mode === 'range' && !range.endDate) || !validTime(times.startTime) || !validTime(times.endTime)} onPress={() => { onChange({ ...range, ...times }); close(); }} style={({ pressed }) => [styles.confirmButton, (!range.startDate || (mode === 'range' && !range.endDate) || !validTime(times.startTime) || !validTime(times.endTime)) && styles.confirmDisabled, pressed && styles.pressed]}><Text style={styles.confirmText}>決定</Text></Pressable>
           </View>
+          </ScrollView>
         </View>
       </SafeAreaView>
     </Modal>
   );
+}
+
+function TimeSelector({ label, onChange, value }: { label: string; onChange: (value: string) => void; value: string }) {
+  const parts = validTime(value) && value ? value.split(':') : ['10', '00'];
+  const setPart = (part: 'hour' | 'minute', next: string) => onChange(part === 'hour' ? `${next}:${parts[1]}` : `${parts[0]}:${next}`);
+  return <View style={styles.timeSection}>
+    <View style={styles.timeHeading}>
+      <Text style={styles.timeLabel}>{label}</Text>
+      <TextInput
+        accessibilityLabel={`${label}を直接入力`}
+        keyboardType="numbers-and-punctuation"
+        maxLength={5}
+        onChangeText={onChange}
+        placeholder="--:--"
+        placeholderTextColor={palette.smoke}
+        selectTextOnFocus
+        style={[styles.timeInput, !validTime(value) && styles.timeInputInvalid]}
+        value={value}
+      />
+    </View>
+    <View style={styles.wheelRow}>
+      <TimeWheel accessibilityLabel={`${label}の時`} onChange={(next) => setPart('hour', next)} selected={parts[0]} values={HOURS} />
+      <Text style={styles.timeColon}>:</Text>
+      <TimeWheel accessibilityLabel={`${label}の分`} onChange={(next) => setPart('minute', next)} selected={parts[1]} values={MINUTES} />
+    </View>
+    {!validTime(value) ? <Text style={styles.timeError}>時刻は24時間表記（例 09:30）で入力してください。</Text> : null}
+  </View>;
+}
+
+function TimeWheel({ accessibilityLabel, onChange, selected, values }: { accessibilityLabel: string; onChange: (value: string) => void; selected: string; values: string[] }) {
+  const scrollRef = useRef<ScrollView>(null);
+  const selectedIndex = Math.max(0, values.indexOf(selected));
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: selectedIndex * WHEEL_ITEM_HEIGHT, animated: false });
+  }, [selectedIndex]);
+  const selectFromScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const index = Math.max(0, Math.min(values.length - 1, Math.round(event.nativeEvent.contentOffset.y / WHEEL_ITEM_HEIGHT)));
+    onChange(values[index]);
+  };
+  return <View accessibilityLabel={accessibilityLabel} style={styles.wheelFrame}>
+    <View pointerEvents="none" style={styles.wheelSelection} />
+    <ScrollView
+      contentContainerStyle={styles.wheelContent}
+      decelerationRate="fast"
+      onMomentumScrollEnd={selectFromScroll}
+      onScrollEndDrag={selectFromScroll}
+      ref={scrollRef}
+      showsVerticalScrollIndicator={false}
+      snapToInterval={WHEEL_ITEM_HEIGHT}>
+      {values.map((entry) => <Pressable key={entry} onPress={() => onChange(entry)} style={styles.wheelItem}><Text style={[styles.wheelText, entry === selected && styles.wheelTextSelected]}>{entry}</Text></Pressable>)}
+    </ScrollView>
+  </View>;
 }
 
 function DateRangeHighlight({ anchorDate, days, gridWidth, range }: { anchorDate: string; days: (string | null)[]; gridWidth: number; range: DateRange }) {
@@ -230,7 +308,8 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.65 },
   backdrop: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(24,42,54,0.34)', padding: 16 },
-  dialog: { width: '100%', maxWidth: 500, backgroundColor: palette.canvas, borderRadius: 28, padding: 20 },
+  dialog: { width: '100%', maxWidth: 500, maxHeight: '96%', backgroundColor: palette.canvas, borderRadius: 28, overflow: 'hidden' },
+  dialogContent: { padding: 20 },
   heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dialogTitle: { color: palette.ink, fontSize: 24, fontWeight: '900', letterSpacing: -0.6 },
   iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
@@ -256,6 +335,20 @@ const styles = StyleSheet.create({
   band: { position: 'absolute', height: MARKER_SIZE, borderRadius: MARKER_SIZE / 2, backgroundColor: palette.sky },
   marker: { position: 'absolute', width: MARKER_SIZE, height: MARKER_SIZE, borderRadius: MARKER_SIZE / 2, backgroundColor: palette.ocean },
   hint: { minHeight: 18, color: palette.slate, fontSize: 12, textAlign: 'center', marginTop: 10 },
+  timeSection: { backgroundColor: palette.paper, borderRadius: 16, padding: 12, marginTop: 10 },
+  timeHeading: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  timeLabel: { flex: 1, color: palette.ink, fontSize: 13, fontWeight: '800' },
+  timeInput: { width: 82, height: 38, color: palette.ink, backgroundColor: palette.mist, borderRadius: 8, fontFamily: 'monospace', fontSize: 16, fontWeight: '800', textAlign: 'center', padding: 0, borderWidth: 1, borderColor: 'transparent' },
+  timeInputInvalid: { borderColor: palette.danger },
+  wheelRow: { height: 108, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  wheelFrame: { width: 78, height: 108, position: 'relative', overflow: 'hidden' },
+  wheelContent: { paddingVertical: WHEEL_ITEM_HEIGHT },
+  wheelSelection: { position: 'absolute', left: 4, right: 4, top: WHEEL_ITEM_HEIGHT, height: WHEEL_ITEM_HEIGHT, backgroundColor: palette.sky, borderRadius: 8, zIndex: 0 },
+  wheelItem: { height: WHEEL_ITEM_HEIGHT, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
+  wheelText: { color: palette.smoke, fontFamily: 'monospace', fontSize: 15 },
+  wheelTextSelected: { color: palette.ink, fontSize: 18, fontWeight: '900' },
+  timeColon: { color: palette.ink, fontFamily: 'monospace', fontSize: 22, fontWeight: '900', marginHorizontal: 6 },
+  timeError: { color: palette.danger, fontSize: 10, textAlign: 'center', marginTop: 4 },
   actions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 },
   clearButton: { minWidth: 72, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   clearText: { color: palette.slate, fontSize: 14, fontWeight: '700' },

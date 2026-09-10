@@ -20,8 +20,12 @@ const KINDS: { value: BookingKind; label: string; short: string; icon: string }[
 
 type Draft = Pick<Booking, 'kind' | 'title' | 'detail' | 'origin' | 'originCode' | 'destination' | 'destinationCode' | 'day' | 'time' | 'endDay' | 'endTime' | 'confirmationCode' | 'note'>;
 
-function blankDraft(day: string): Draft {
-  return { kind: 'flight', title: '', detail: '', origin: '', originCode: '', destination: '', destinationCode: '', day, time: '', endDay: day, endTime: '', confirmationCode: '', note: '' };
+function blankDraft(day: string, kind: BookingKind = 'flight'): Draft {
+  const defaults: Record<BookingKind, [string, string]> = {
+    flight: ['10:00', '12:00'], hotel: ['15:00', '11:00'], train: ['09:00', '11:00'], car: ['09:00', '18:00'],
+    restaurant: ['19:00', '19:00'], ticket: ['10:00', '10:00'], other: ['10:00', '10:00'],
+  };
+  return { kind, title: '', detail: '', origin: '', originCode: '', destination: '', destinationCode: '', day, time: defaults[kind][0], endDay: day, endTime: defaults[kind][1], confirmationCode: '', note: '' };
 }
 
 export default function BookingsScreen() {
@@ -162,7 +166,7 @@ export default function BookingsScreen() {
 
               <Text style={styles.label}>種類</Text>
               <View style={styles.kindList}>
-                {KINDS.map((kind) => <Pressable key={kind.value} onPress={() => setDraft((current) => ({ ...blankDraft(current.day || selectedTrip?.startsOn || ''), kind: kind.value }))} style={[styles.kindButton, draft.kind === kind.value && styles.kindSelected]}><Text style={[styles.kindText, draft.kind === kind.value && styles.kindTextSelected]}>{kind.label}</Text></Pressable>)}
+                {KINDS.map((kind) => <Pressable key={kind.value} onPress={() => setDraft((current) => blankDraft(current.day || selectedTrip?.startsOn || '', kind.value))} style={[styles.kindButton, draft.kind === kind.value && styles.kindSelected]}><Text style={[styles.kindText, draft.kind === kind.value && styles.kindTextSelected]}>{kind.label}</Text></Pressable>)}
               </View>
 
               <BookingFormFields draft={draft} setDraft={setDraft} />
@@ -183,13 +187,30 @@ export default function BookingsScreen() {
 
 function BookingFormFields({ draft, setDraft }: { draft: Draft; setDraft: Dispatch<SetStateAction<Draft>> }) {
   const set = <Key extends keyof Draft>(key: Key, value: Draft[Key]) => setDraft((current) => ({ ...current, [key]: value }));
-  const date = (label: string, key: 'day' | 'endDay') => (
-    <DateRangePicker label={label} mode="single" startDate={draft[key]} endDate={draft[key]} onChange={({ startDate }) => setDraft((current) => key === 'day'
-      ? { ...current, day: startDate, endDay: !current.endDay || current.endDay < startDate ? startDate : current.endDay }
-      : { ...current, endDay: startDate })} />
+  const dateTimeRange = (label: string, startLabel: string, endLabel: string) => (
+    <DateRangePicker
+      endDate={draft.endDay}
+      endLabel={endLabel}
+      endTime={draft.endTime}
+      label={label}
+      showTime
+      startDate={draft.day}
+      startLabel={startLabel}
+      startTime={draft.time}
+      onChange={({ startDate, endDate, startTime, endTime }) => setDraft((current) => ({ ...current, day: startDate, endDay: endDate, time: startTime, endTime }))}
+    />
   );
-  const time = (label: string, key: 'time' | 'endTime', placeholder: string) => (
-    <Field label={label} keyboardType="numbers-and-punctuation" placeholder={placeholder} value={draft[key]} onChangeText={(value) => set(key, value)} />
+  const singleDateTime = (label: string, dateLabel: string, timeValue = draft.time) => (
+    <DateRangePicker
+      endDate={draft.day}
+      label={label}
+      mode="single"
+      showTime
+      startDate={draft.day}
+      startLabel={dateLabel}
+      startTime={timeValue}
+      onChange={({ startDate, startTime }) => setDraft((current) => ({ ...current, day: startDate, endDay: startDate, time: startTime, endTime: startTime }))}
+    />
   );
   const confirmation = (label = '予約・確認番号') => (
     <Field autoCapitalize="characters" label={label} placeholder="任意" value={draft.confirmationCode} onChangeText={(value) => set('confirmationCode', value)} />
@@ -199,16 +220,14 @@ function BookingFormFields({ draft, setDraft }: { draft: Draft; setDraft: Dispat
     <Field label="便名・航空会社" placeholder="例：ANA 257便" value={draft.title} onChangeText={(value) => set('title', value)} />
     <AirportField label="出発空港" placeholder="空港名・都市・HND" value={draft.origin} code={draft.originCode} onChange={(airport) => setDraft((current) => ({ ...current, origin: airport.name, originCode: airport.code }))} onChangeText={(value) => setDraft((current) => ({ ...current, origin: value, originCode: '' }))} />
     <AirportField label="到着空港" placeholder="空港名・都市・VIE" value={draft.destination} code={draft.destinationCode} onChange={(airport) => setDraft((current) => ({ ...current, destination: airport.name, destinationCode: airport.code }))} onChangeText={(value) => setDraft((current) => ({ ...current, destination: value, destinationCode: '' }))} />
-    <View style={styles.twoColumns}><View style={styles.flexField}>{date('出発日', 'day')}</View><View style={styles.flexField}>{time('出発時刻', 'time', '例：10:30')}</View></View>
-    <View style={styles.twoColumns}><View style={styles.flexField}>{date('到着日', 'endDay')}</View><View style={styles.flexField}>{time('到着時刻', 'endTime', '例：12:25')}</View></View>
+    {dateTimeRange('フライト日時', '出発', '到着')}
     {confirmation('予約番号')}
   </>;
 
   if (draft.kind === 'hotel') return <>
     <Field label="ホテル名" placeholder="例：Hotel Astoria Vienna" value={draft.title} onChangeText={(value) => set('title', value)} />
     <Field label="住所・エリア" placeholder="例：ウィーン旧市街" value={draft.detail} onChangeText={(value) => set('detail', value)} />
-    <View style={styles.twoColumns}><View style={styles.flexField}>{date('チェックイン日', 'day')}</View><View style={styles.flexField}>{time('時刻', 'time', '例：15:00')}</View></View>
-    <View style={styles.twoColumns}><View style={styles.flexField}>{date('チェックアウト日', 'endDay')}</View><View style={styles.flexField}>{time('時刻', 'endTime', '例：11:00')}</View></View>
+    {dateTimeRange('宿泊期間', 'チェックイン', 'チェックアウト')}
     {confirmation()}
   </>;
 
@@ -218,8 +237,7 @@ function BookingFormFields({ draft, setDraft }: { draft: Draft; setDraft: Dispat
       <Field label={car ? 'レンタカー会社・プラン' : '列車名・便名'} placeholder={car ? '例：トヨタレンタカー' : '例：のぞみ25号'} value={draft.title} onChangeText={(value) => set('title', value)} />
       <Field label={car ? '受取場所' : '乗車駅'} placeholder={car ? '例：博多駅前店' : '例：東京駅'} value={draft.origin} onChangeText={(value) => setDraft((current) => ({ ...current, origin: value, originCode: '' }))} />
       <Field label={car ? '返却場所' : '降車駅'} placeholder={car ? '例：福岡空港店' : '例：京都駅'} value={draft.destination} onChangeText={(value) => setDraft((current) => ({ ...current, destination: value, destinationCode: '' }))} />
-      <View style={styles.twoColumns}><View style={styles.flexField}>{date(car ? '受取日' : '出発日', 'day')}</View><View style={styles.flexField}>{time(car ? '受取時刻' : '出発時刻', 'time', '例：09:00')}</View></View>
-      <View style={styles.twoColumns}><View style={styles.flexField}>{date(car ? '返却日' : '到着日', 'endDay')}</View><View style={styles.flexField}>{time(car ? '返却時刻' : '到着時刻', 'endTime', '例：18:00')}</View></View>
+      {dateTimeRange(car ? '利用期間' : '乗車日時', car ? '受取' : '出発', car ? '返却' : '到着')}
       {confirmation()}
     </>;
   }
@@ -232,7 +250,7 @@ function BookingFormFields({ draft, setDraft }: { draft: Draft; setDraft: Dispat
   return <>
     <Field label={config.title} placeholder={config.titlePlaceholder} value={draft.title} onChangeText={(value) => set('title', value)} />
     <Field label={config.detail} placeholder={config.detailPlaceholder} value={draft.detail} onChangeText={(value) => set('detail', value)} />
-    <View style={styles.twoColumns}><View style={styles.flexField}>{date(config.date, 'day')}</View><View style={styles.flexField}>{time(config.time, 'time', '例：19:30')}</View></View>
+    {singleDateTime(`${config.date}・${config.time}`, config.date)}
     {confirmation()}
   </>;
 }
