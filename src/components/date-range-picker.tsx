@@ -34,7 +34,10 @@ export function DateRangePicker({ startDate, endDate, disabled, label = '期間'
         disabled={disabled}
         onPress={() => setOpen(true)}
         style={({ pressed }) => [styles.trigger, disabled && styles.disabled, pressed && styles.pressed]}>
-        <Text style={styles.calendarIcon}>□</Text>
+        <View accessibilityElementsHidden style={styles.calendarIcon}>
+          <View style={styles.calendarTop} />
+          <View style={styles.calendarDots}><View style={styles.calendarDot} /><View style={styles.calendarDot} /></View>
+        </View>
         {mode === 'single' ? (
           <View style={styles.triggerPart}><Text style={styles.triggerMeta}>日付</Text><Text style={styles.triggerValue}>{displayDate(startDate)}</Text></View>
         ) : (
@@ -164,21 +167,29 @@ function DateRangeHighlight({ anchorDate, days, gridWidth, range }: { anchorDate
   const rows = rangeRows(days, range);
   return (
     <View pointerEvents="none" style={styles.highlights}>
-      {rows.map((segment, row) => <RangeBand anchorRow={anchorRow} gridWidth={gridWidth} key={row} row={row} segment={segment} />)}
+      {rows.map((segment, row) => {
+        const origin = anchor < 0 ? (anchorRow === 0 ? 0 : 6) : Math.max(0, Math.min(6, anchor - row * 7));
+        return <RangeBand gridWidth={gridWidth} key={row} origin={origin} row={row} segment={segment} />;
+      })}
       <DateMarker gridWidth={gridWidth} index={days.indexOf(range.startDate)} />
       <DateMarker gridWidth={gridWidth} index={range.endDate !== range.startDate ? days.indexOf(range.endDate) : -1} origin={anchor} />
     </View>
   );
 }
 
-function RangeBand({ anchorRow, gridWidth, row, segment }: { anchorRow: number; gridWidth: number; row: number; segment: { first: number; last: number } | null }) {
-  const [progress] = useState(() => new Animated.Value(segment ? 1 : 0));
-  useEffect(() => {
-    Animated.timing(progress, { toValue: segment ? 1 : 0, duration: 220, delay: segment ? Math.abs(row - anchorRow) * 55 : 0, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
-  }, [anchorRow, progress, row, segment]);
-  if (!segment) return null;
+function RangeBand({ gridWidth, origin, row, segment }: { gridWidth: number; origin: number; row: number; segment: { first: number; last: number } | null }) {
   const cell = gridWidth / 7;
-  return <Animated.View style={[styles.band, { left: segment.first * cell + 5, top: WEEKDAY_HEIGHT + row * ROW_HEIGHT + 5, width: (segment.last - segment.first + 1) * cell - 10, opacity: progress, transform: [{ scaleX: progress }] }]} />;
+  const [left] = useState(() => new Animated.Value((segment?.first ?? origin) * cell + 5));
+  const [width] = useState(() => new Animated.Value(segment ? (segment.last - segment.first + 1) * cell - 10 : 0));
+  const [opacity] = useState(() => new Animated.Value(segment ? 1 : 0));
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(left, { toValue: (segment?.first ?? origin) * cell + 5, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
+      Animated.timing(width, { toValue: segment ? (segment.last - segment.first + 1) * cell - 10 : 0, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
+      Animated.timing(opacity, { toValue: segment ? 1 : 0, duration: 160, useNativeDriver: false }),
+    ]).start();
+  }, [cell, left, opacity, origin, segment, width]);
+  return <Animated.View style={[styles.band, { left, top: WEEKDAY_HEIGHT + row * ROW_HEIGHT + 5, width, opacity }]} />;
 }
 
 function DateMarker({ gridWidth, index, origin = -1 }: { gridWidth: number; index: number; origin?: number }) {
@@ -208,7 +219,10 @@ const styles = StyleSheet.create({
   field: { gap: 8 },
   label: { color: palette.slate, fontFamily: 'monospace', fontSize: 11 },
   trigger: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: palette.paper, borderRadius: 8, paddingHorizontal: 14 },
-  calendarIcon: { width: 24, height: 24, borderWidth: 1.5, borderColor: palette.ocean, borderRadius: 6, color: palette.ocean, fontSize: 0 },
+  calendarIcon: { width: 24, height: 24, borderWidth: 1.5, borderColor: palette.ocean, borderRadius: 6, overflow: 'hidden' },
+  calendarTop: { height: 6, borderBottomWidth: 1.5, borderBottomColor: palette.ocean, backgroundColor: palette.sky },
+  calendarDots: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  calendarDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: palette.ocean },
   triggerPart: { flex: 1, minWidth: 0 },
   triggerMeta: { color: palette.smoke, fontFamily: 'monospace', fontSize: 9 },
   triggerValue: { color: palette.ink, fontSize: 13, fontWeight: '700', marginTop: 3 },
