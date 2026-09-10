@@ -4,6 +4,7 @@ import { Alert, Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TripTicket } from '@/components/trip-ticket';
+import { palette } from '@/constants/design';
 import { useTravel } from '@/data/travel-provider';
 
 const today = new Date().toISOString().slice(0, 10);
@@ -118,12 +119,37 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#FAF9F6' }, content: { padding: 20, paddingBottom: 120, gap: 18 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, brand: { color: '#17191C', fontSize: 31, fontWeight: '500', letterSpacing: -1 }, sync: { color: '#777B86', fontSize: 12, marginTop: 2 },
-  addButton: { backgroundColor: '#17191C', borderRadius: 9999, paddingHorizontal: 18, paddingVertical: 11 }, addButtonText: { color: '#FFF', fontWeight: '500' }, error: { color: '#A13D32', fontSize: 12 },
-  empty: { minHeight: 440, alignItems: 'center', justifyContent: 'center', padding: 32 }, emptyMark: { color: '#5D2A1A', fontSize: 40 }, emptyTitle: { color: '#17191C', fontSize: 23, fontWeight: '500', marginTop: 18 }, emptyBody: { color: '#777B86', fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 8 },
-  primaryButton: { backgroundColor: '#17191C', paddingHorizontal: 22, paddingVertical: 14, borderRadius: 9999, marginTop: 22 }, primaryButtonText: { color: '#FFF', fontWeight: '500' },
-  tripTabs: { gap: 8 }, tripTab: { paddingHorizontal: 15, paddingVertical: 9, borderRadius: 9999, backgroundColor: '#F2F2F3' }, tripTabActive: { backgroundColor: '#17191C' }, tripTabText: { color: '#777B86', fontWeight: '500' }, tripTabTextActive: { color: '#FFF' },
-  actionRow: { flexDirection: 'row', gap: 12 }, actionCard: { flex: 1, backgroundColor: '#F2F2F3', borderRadius: 24, padding: 18, minHeight: 112, justifyContent: 'space-between' }, actionIcon: { color: '#17191C', fontSize: 24, fontWeight: '500' }, actionTitle: { color: '#17191C', fontSize: 15, fontWeight: '500' },
-  modal: { flex: 1, backgroundColor: '#FAF9F6' }, modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#ECECEC' }, cancel: { color: '#777B86' }, modalTitle: { color: '#17191C', fontSize: 17, fontWeight: '500' }, save: { color: '#17191C', fontWeight: '500' }, form: { padding: 20, gap: 9 }, label: { color: '#777B86', fontSize: 12, fontWeight: '500', marginTop: 10 }, input: { backgroundColor: '#FFF', borderWidth: StyleSheet.hairlineWidth, borderColor: '#ECECEC', borderRadius: 16, paddingHorizontal: 15, paddingVertical: 14, color: '#17191C', fontSize: 15 }, dateRow: { flexDirection: 'row', gap: 12 }, dateField: { flex: 1 },
+  safeArea: { flex: 1, backgroundColor: palette.canvas },
+  content: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 20, paddingBottom: 120, gap: 20 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  brand: { color: palette.carbon, fontSize: 40, lineHeight: 40, fontWeight: '900', letterSpacing: -1.8 },
+  sync: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, lineHeight: 16, marginTop: 3 },
+  addButton: { minHeight: 44, backgroundColor: palette.carbon, borderRadius: 8, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center' },
+  addButtonText: { color: palette.paper, fontWeight: '700' },
+  error: { color: palette.danger, fontSize: 12 },
+  empty: { minHeight: 440, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  emptyMark: { color: palette.carbon, fontSize: 48, fontWeight: '900' },
+  emptyTitle: { color: palette.carbon, fontSize: 28, lineHeight: 30, fontWeight: '900', letterSpacing: -0.9, marginTop: 18 },
+  emptyBody: { color: palette.slate, fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 8 },
+  primaryButton: { backgroundColor: palette.carbon, paddingHorizontal: 24, paddingVertical: 15, borderRadius: 8, marginTop: 22 },
+  primaryButtonText: { color: palette.paper, fontWeight: '700' },
+  tripTabs: { gap: 8 },
+  tripTab: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 64, backgroundColor: palette.mist },
+  tripTabActive: { backgroundColor: palette.mint },
+  tripTabText: { color: palette.slate, fontWeight: '500' },
+  tripTabTextActive: { color: palette.carbon, fontWeight: '700' },
+  actionRow: { flexDirection: 'row', gap: 12 },
+  actionCard: { flex: 1, backgroundColor: palette.paper, borderRadius: 28, padding: 20, minHeight: 120, justifyContent: 'space-between' },
+  actionIcon: { color: palette.carbon, fontSize: 28, lineHeight: 30, fontWeight: '900' },
+  actionTitle: { color: palette.carbon, fontSize: 16, fontWeight: '700' },
+  modal: { flex: 1, backgroundColor: palette.canvas },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
+  cancel: { color: palette.slate },
+  modalTitle: { color: palette.carbon, fontSize: 18, fontWeight: '700' },
+  save: { color: palette.carbon, fontWeight: '700' },
+  form: { padding: 20, gap: 9 },
+  label: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, fontWeight: '400', marginTop: 10 },
+  input: { minHeight: 50, backgroundColor: palette.paper, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 14, color: palette.carbon, fontSize: 16 },
+  dateRow: { flexDirection: 'row', gap: 12 },
+  dateField: { flex: 1 },
 });

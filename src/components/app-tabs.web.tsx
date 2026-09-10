@@ -8,6 +8,8 @@ import {
 } from 'expo-router/ui';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { palette } from '@/constants/design';
+
 type TabButtonProps = TabTriggerSlotProps & {
   icon: string;
 };
@@ -76,16 +78,10 @@ const styles = StyleSheet.create({
     minHeight: 70,
     paddingHorizontal: 8,
     paddingVertical: 7,
-    borderRadius: 25,
-    backgroundColor: '#FFFFFF',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#DCD8CF',
+    borderRadius: 48,
+    backgroundColor: palette.paper,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#20332C',
-    shadowOpacity: 0.14,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 7 },
   },
   tabButton: {
     flex: 1,
@@ -93,34 +89,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 3,
-    borderRadius: 18,
+    borderRadius: 32,
     paddingVertical: 3,
   },
   iconWrap: {
     minWidth: 32,
     height: 27,
     paddingHorizontal: 8,
-    borderRadius: 14,
+    borderRadius: 64,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconWrapSelected: {
-    backgroundColor: '#F2DED6',
+    backgroundColor: palette.mint,
   },
   icon: {
-    color: '#747B75',
+    color: palette.smoke,
     fontSize: 18,
     lineHeight: 20,
-    fontWeight: '800',
-  },
-  label: {
-    color: '#747B75',
-    fontSize: 10,
-    lineHeight: 13,
     fontWeight: '700',
   },
+  label: {
+    color: palette.slate,
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '500',
+  },
   selectedText: {
-    color: '#B94F33',
+    color: palette.carbon,
+    fontWeight: '700',
   },
   pressed: {
     opacity: 0.62,

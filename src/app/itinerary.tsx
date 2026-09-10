@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { palette } from '@/constants/design';
 import { useTravel } from '@/data/travel-provider';
 
 export default function ItineraryScreen() {
@@ -32,7 +33,7 @@ export default function ItineraryScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <View><Text style={styles.eyebrow}>{selectedTrip?.name ?? 'tabi'}</Text><Text style={styles.title}>旅の日程</Text></View>
+          <View><Text style={styles.eyebrow}>{selectedTrip?.name ?? 'tabi'}</Text><Text style={styles.title}>日程</Text></View>
           {selectedTrip ? <Pressable onPress={() => { setDay(selectedTrip.startsOn); setAdding(true); }} style={styles.addButton}><Text style={styles.addText}>＋ 予定</Text></Pressable> : null}
         </View>
         {pendingCount ? <Text style={styles.pending}>{pendingCount}件を端末に保存済み · オンライン時に同期</Text> : null}
@@ -83,8 +84,40 @@ export default function ItineraryScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F3F0E9' }, content: { padding: 20, paddingBottom: 120 }, header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, eyebrow: { color: '#C45F43', fontSize: 12, fontWeight: '800' }, title: { color: '#20332C', fontSize: 30, fontWeight: '900', marginTop: 4 }, addButton: { backgroundColor: '#20332C', borderRadius: 15, paddingHorizontal: 15, paddingVertical: 11 }, addText: { color: '#FFF', fontWeight: '800' }, pending: { color: '#8C654D', fontSize: 12, marginTop: 12 },
-  empty: { minHeight: 430, alignItems: 'center', justifyContent: 'center', padding: 32 }, emptyMark: { color: '#C45F43', fontSize: 38 }, emptyTitle: { color: '#20332C', fontSize: 21, fontWeight: '800', marginTop: 14 }, emptyBody: { color: '#717871', textAlign: 'center', marginTop: 7 },
-  dayCard: { flexDirection: 'row', backgroundColor: '#FFF', borderRadius: 22, padding: 18, marginTop: 15 }, dayBadge: { width: 52, height: 62, borderRadius: 16, backgroundColor: '#31594E', alignItems: 'center', justifyContent: 'center', marginRight: 16 }, dayLabel: { color: '#BFD2CB', fontSize: 8, fontWeight: '800' }, dayNumber: { color: '#FFF', fontSize: 23, fontWeight: '900' }, dayContent: { flex: 1 }, date: { color: '#C45F43', fontSize: 12, fontWeight: '800' }, items: { marginTop: 8 }, itemRow: { flexDirection: 'row', paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#DEDAD2' }, time: { color: '#69716B', width: 50, fontSize: 13, fontWeight: '700' }, itemCopy: { flex: 1 }, itemTitle: { color: '#20332C', fontSize: 15, fontWeight: '800' }, note: { color: '#727972', fontSize: 12, lineHeight: 18, marginTop: 3 },
-  modal: { flex: 1, backgroundColor: '#F7F5F0' }, modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#E4E0D8' }, cancel: { color: '#69716B' }, modalTitle: { color: '#20332C', fontSize: 17, fontWeight: '800' }, save: { color: '#C45F43', fontWeight: '800' }, form: { padding: 20, gap: 9 }, label: { color: '#56605A', fontSize: 12, fontWeight: '800', marginTop: 10 }, input: { backgroundColor: '#FFF', borderRadius: 15, paddingHorizontal: 15, paddingVertical: 14, color: '#20332C', fontSize: 15 }, noteInput: { minHeight: 120, textAlignVertical: 'top' }, dateRow: { flexDirection: 'row', gap: 12 }, dateField: { flex: 1 }, timeField: { width: 110 },
+  safeArea: { flex: 1, backgroundColor: palette.canvas },
+  content: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 20, paddingBottom: 120 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  eyebrow: { alignSelf: 'flex-start', color: palette.carbon, backgroundColor: palette.mint, borderRadius: 64, paddingHorizontal: 12, paddingVertical: 5, fontFamily: 'monospace', fontSize: 10, fontWeight: '400' },
+  title: { color: palette.carbon, fontSize: 42, lineHeight: 42, fontWeight: '900', letterSpacing: -1.5, marginTop: 8 },
+  addButton: { minHeight: 44, backgroundColor: palette.carbon, borderRadius: 8, paddingHorizontal: 17, alignItems: 'center', justifyContent: 'center' },
+  addText: { color: palette.paper, fontWeight: '700' },
+  pending: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, marginTop: 12 },
+  empty: { minHeight: 430, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  emptyMark: { color: palette.carbon, fontSize: 42, fontWeight: '900' },
+  emptyTitle: { color: palette.carbon, fontSize: 28, lineHeight: 30, fontWeight: '900', letterSpacing: -0.8, marginTop: 14 },
+  emptyBody: { color: palette.slate, textAlign: 'center', marginTop: 7 },
+  dayCard: { flexDirection: 'row', backgroundColor: palette.paper, borderRadius: 32, padding: 20, marginTop: 16 },
+  dayBadge: { width: 52, height: 52, borderRadius: 26, backgroundColor: palette.mint, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+  dayLabel: { color: palette.carbon, fontFamily: 'monospace', fontSize: 8, fontWeight: '400' },
+  dayNumber: { color: palette.carbon, fontSize: 22, lineHeight: 24, fontWeight: '900' },
+  dayContent: { flex: 1 },
+  date: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, fontWeight: '400' },
+  items: { marginTop: 8 },
+  itemRow: { flexDirection: 'row', paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
+  time: { color: palette.carbon, width: 52, fontFamily: 'monospace', fontSize: 12, fontWeight: '400' },
+  itemCopy: { flex: 1 },
+  itemTitle: { color: palette.carbon, fontSize: 16, fontWeight: '700' },
+  note: { color: palette.slate, fontSize: 12, lineHeight: 18, marginTop: 4 },
+  modal: { flex: 1, backgroundColor: palette.canvas },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
+  cancel: { color: palette.slate },
+  modalTitle: { color: palette.carbon, fontSize: 18, fontWeight: '700' },
+  save: { color: palette.carbon, fontWeight: '700' },
+  form: { padding: 20, gap: 9 },
+  label: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, fontWeight: '400', marginTop: 10 },
+  input: { minHeight: 50, backgroundColor: palette.paper, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 14, color: palette.carbon, fontSize: 16 },
+  noteInput: { minHeight: 120, textAlignVertical: 'top' },
+  dateRow: { flexDirection: 'row', gap: 12 },
+  dateField: { flex: 1 },
+  timeField: { width: 110 },
 });
