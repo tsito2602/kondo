@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   addText: { color: palette.paper, fontWeight: '700' },
   pending: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, marginTop: 12 },
   empty: { minHeight: 430, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  emptyMark: { color: palette.coral, fontSize: 42, fontWeight: '900' },
+  emptyMark: { color: palette.accent, fontSize: 42, fontWeight: '900' },
   emptyTitle: { color: palette.ink, fontSize: 28, lineHeight: 30, fontWeight: '900', letterSpacing: -0.8, marginTop: 14 },
   emptyBody: { color: palette.slate, textAlign: 'center', marginTop: 7 },
   dayCard: { flexDirection: 'row', backgroundColor: palette.paper, borderRadius: 32, padding: 20, marginTop: 16 },
