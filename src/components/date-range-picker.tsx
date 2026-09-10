@@ -23,6 +23,8 @@ const WEEKDAY_HEIGHT = 32;
 const ROW_HEIGHT = 46;
 const MARKER_SIZE = 36;
 const WHEEL_ITEM_HEIGHT = 36;
+const WHEEL_CYCLES = 5;
+const WHEEL_MIDDLE_CYCLE = Math.floor(WHEEL_CYCLES / 2);
 const HOURS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, '0'));
 const MINUTES = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, '0'));
 
@@ -217,11 +219,19 @@ function TimeSelector({ label, onChange, value }: { label: string; onChange: (va
 function TimeWheel({ accessibilityLabel, onChange, selected, values }: { accessibilityLabel: string; onChange: (value: string) => void; selected: string; values: string[] }) {
   const scrollRef = useRef<ScrollView>(null);
   const selectedIndex = Math.max(0, values.indexOf(selected));
+  const loopValues = useMemo(
+    () => Array.from({ length: values.length * WHEEL_CYCLES }, (_, index) => values[index % values.length]),
+    [values],
+  );
+  const middleIndex = WHEEL_MIDDLE_CYCLE * values.length + selectedIndex;
   useEffect(() => {
-    scrollRef.current?.scrollTo({ y: selectedIndex * WHEEL_ITEM_HEIGHT, animated: false });
-  }, [selectedIndex]);
+    scrollRef.current?.scrollTo({ y: middleIndex * WHEEL_ITEM_HEIGHT, animated: false });
+  }, [middleIndex]);
   const selectFromScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = Math.max(0, Math.min(values.length - 1, Math.round(event.nativeEvent.contentOffset.y / WHEEL_ITEM_HEIGHT)));
+    const rawIndex = Math.round(event.nativeEvent.contentOffset.y / WHEEL_ITEM_HEIGHT);
+    const index = ((rawIndex % values.length) + values.length) % values.length;
+    const centeredIndex = WHEEL_MIDDLE_CYCLE * values.length + index;
+    scrollRef.current?.scrollTo({ y: centeredIndex * WHEEL_ITEM_HEIGHT, animated: false });
     onChange(values[index]);
   };
   return <View accessibilityLabel={accessibilityLabel} style={styles.wheelFrame}>
@@ -229,12 +239,12 @@ function TimeWheel({ accessibilityLabel, onChange, selected, values }: { accessi
     <ScrollView
       contentContainerStyle={styles.wheelContent}
       decelerationRate="fast"
+      disableIntervalMomentum
       onMomentumScrollEnd={selectFromScroll}
-      onScrollEndDrag={selectFromScroll}
       ref={scrollRef}
       showsVerticalScrollIndicator={false}
       snapToInterval={WHEEL_ITEM_HEIGHT}>
-      {values.map((entry) => <Pressable key={entry} onPress={() => onChange(entry)} style={styles.wheelItem}><Text style={[styles.wheelText, entry === selected && styles.wheelTextSelected]}>{entry}</Text></Pressable>)}
+      {loopValues.map((entry, index) => <Pressable key={`${entry}-${index}`} onPress={() => onChange(entry)} style={styles.wheelItem}><Text style={[styles.wheelText, entry === selected && styles.wheelTextSelected]}>{entry}</Text></Pressable>)}
     </ScrollView>
   </View>;
 }
