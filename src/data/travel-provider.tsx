@@ -9,7 +9,7 @@ import { Booking, emptyTravelCache, ItineraryItem, PendingMutation, TravelCache,
 
 type TripInput = Pick<Trip, 'name' | 'destination' | 'startsOn' | 'endsOn'>;
 type ItemInput = Pick<ItineraryItem, 'day' | 'time' | 'kind' | 'title' | 'note'>;
-type BookingInput = Pick<Booking, 'kind' | 'title' | 'detail' | 'day' | 'time' | 'confirmationCode' | 'note'>;
+type BookingInput = Pick<Booking, 'kind' | 'title' | 'detail' | 'origin' | 'originCode' | 'destination' | 'destinationCode' | 'day' | 'time' | 'endDay' | 'endTime' | 'confirmationCode' | 'note'>;
 
 type TravelContextValue = {
   ready: boolean;

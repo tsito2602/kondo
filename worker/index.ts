@@ -234,18 +234,32 @@ function bookingFields(body: Record<string, unknown>) {
   const kind = textField(body.kind, 24, true);
   const title = textField(body.title, 160, true);
   const detail = textField(body.detail, 500);
+  const origin = textField(body.origin, 160);
+  const originCode = textField(body.originCode, 8);
+  const destination = textField(body.destination, 160);
+  const destinationCode = textField(body.destinationCode, 8);
   const day = dateField(body.day);
   const time = textField(body.time, 5);
+  const endDay = body.endDay ? dateField(body.endDay) : day;
+  const endTime = textField(body.endTime, 5);
   const confirmationCode = textField(body.confirmationCode, 120);
   const note = textField(body.note, 4000);
-  if (!kind || !bookingKinds.has(kind) || !title || detail === null || !day || time === null || !/^([01]\d|2[0-3]):[0-5]\d$|^$/.test(time) || confirmationCode === null || note === null) return null;
-  return { kind, title, detail, day, time, confirmationCode, note };
+  if (!kind || !bookingKinds.has(kind) || !title || detail === null || origin === null || originCode === null || destination === null || destinationCode === null || !day || !endDay || endDay < day || time === null || endTime === null || !/^([01]\d|2[0-3]):[0-5]\d$|^$/.test(time) || !/^([01]\d|2[0-3]):[0-5]\d$|^$/.test(endTime) || confirmationCode === null || note === null) return null;
+  return { kind, title, detail, origin, originCode: originCode.toUpperCase(), destination, destinationCode: destinationCode.toUpperCase(), day, time, endDay, endTime, confirmationCode, note };
 }
 
 async function listBookings(env: Env, user: User, tripId: string) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
-  const result = await env.DB.prepare(`SELECT id, kind, title, detail, day, time, confirmation_code AS confirmationCode, note, updated_by AS updatedBy, updated_at AS updatedAt FROM bookings WHERE trip_id = ? ORDER BY day, time, id`)
+  const result = await env.DB.prepare(`
+    SELECT b.id, b.kind, b.title, b.detail, b.day, b.time,
+           COALESCE(d.origin, '') AS origin, COALESCE(d.origin_code, '') AS originCode,
+           COALESCE(d.destination, '') AS destination, COALESCE(d.destination_code, '') AS destinationCode,
+           COALESCE(NULLIF(d.end_day, ''), b.day) AS endDay, COALESCE(d.end_time, '') AS endTime,
+           b.confirmation_code AS confirmationCode, b.note, b.updated_by AS updatedBy, b.updated_at AS updatedAt
+    FROM bookings b LEFT JOIN booking_details d ON d.booking_id = b.id
+    WHERE b.trip_id = ? ORDER BY b.day, b.time, b.id
+  `)
     .bind(tripId)
     .all();
   return json({ bookings: result.results });
@@ -258,24 +272,26 @@ async function createBooking(request: Request, env: Env, user: User, tripId: str
   const fields = isObject(body) ? bookingFields(body) : null;
   if (!fields) return json({ error: '正しい予約情報を入力してください' }, 400);
   const id = idField(body?.id) ?? crypto.randomUUID();
-  const result = await env.DB.prepare(`
-    INSERT INTO bookings (id, trip_id, kind, title, detail, day, time, confirmation_code, note, updated_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET
-      kind = excluded.kind,
-      title = excluded.title,
-      detail = excluded.detail,
-      day = excluded.day,
-      time = excluded.time,
-      confirmation_code = excluded.confirmation_code,
-      note = excluded.note,
-      updated_by = excluded.updated_by,
-      updated_at = unixepoch()
-    WHERE bookings.trip_id = excluded.trip_id
-  `)
-    .bind(id, tripId, fields.kind, fields.title, fields.detail, fields.day, fields.time, fields.confirmationCode, fields.note, user.id)
-    .run();
-  if (!result.meta.changes) return json({ error: '予約IDが競合しました' }, 409);
+  const [bookingResult] = await env.DB.batch([
+    env.DB.prepare(`
+      INSERT INTO bookings (id, trip_id, kind, title, detail, day, time, confirmation_code, note, updated_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        kind = excluded.kind, title = excluded.title, detail = excluded.detail,
+        day = excluded.day, time = excluded.time, confirmation_code = excluded.confirmation_code,
+        note = excluded.note, updated_by = excluded.updated_by, updated_at = unixepoch()
+      WHERE bookings.trip_id = excluded.trip_id
+    `).bind(id, tripId, fields.kind, fields.title, fields.detail, fields.day, fields.time, fields.confirmationCode, fields.note, user.id),
+    env.DB.prepare(`
+      INSERT INTO booking_details (booking_id, origin, origin_code, destination, destination_code, end_day, end_time)
+      SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM bookings WHERE id = ? AND trip_id = ?)
+      ON CONFLICT(booking_id) DO UPDATE SET
+        origin = excluded.origin, origin_code = excluded.origin_code,
+        destination = excluded.destination, destination_code = excluded.destination_code,
+        end_day = excluded.end_day, end_time = excluded.end_time
+    `).bind(id, fields.origin, fields.originCode, fields.destination, fields.destinationCode, fields.endDay, fields.endTime, id, tripId),
+  ]);
+  if (!bookingResult.meta.changes) return json({ error: '予約IDが競合しました' }, 409);
   return json({ booking: { id, ...fields, updatedBy: user.id } }, 201);
 }
 
@@ -285,10 +301,19 @@ async function updateBooking(request: Request, env: Env, user: User, tripId: str
   const body = await request.json().catch(() => null);
   const fields = isObject(body) ? bookingFields(body) : null;
   if (!fields) return json({ error: '正しい予約情報を入力してください' }, 400);
-  const result = await env.DB.prepare(`UPDATE bookings SET kind = ?, title = ?, detail = ?, day = ?, time = ?, confirmation_code = ?, note = ?, updated_by = ?, updated_at = unixepoch() WHERE id = ? AND trip_id = ?`)
-    .bind(fields.kind, fields.title, fields.detail, fields.day, fields.time, fields.confirmationCode, fields.note, user.id, bookingId, tripId)
-    .run();
-  return result.meta.changes ? json({ booking: { id: bookingId, ...fields, updatedBy: user.id } }) : json({ error: '予約が見つかりません' }, 404);
+  const [bookingResult] = await env.DB.batch([
+    env.DB.prepare(`UPDATE bookings SET kind = ?, title = ?, detail = ?, day = ?, time = ?, confirmation_code = ?, note = ?, updated_by = ?, updated_at = unixepoch() WHERE id = ? AND trip_id = ?`)
+      .bind(fields.kind, fields.title, fields.detail, fields.day, fields.time, fields.confirmationCode, fields.note, user.id, bookingId, tripId),
+    env.DB.prepare(`
+      INSERT INTO booking_details (booking_id, origin, origin_code, destination, destination_code, end_day, end_time)
+      SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM bookings WHERE id = ? AND trip_id = ?)
+      ON CONFLICT(booking_id) DO UPDATE SET
+        origin = excluded.origin, origin_code = excluded.origin_code,
+        destination = excluded.destination, destination_code = excluded.destination_code,
+        end_day = excluded.end_day, end_time = excluded.end_time
+    `).bind(bookingId, fields.origin, fields.originCode, fields.destination, fields.destinationCode, fields.endDay, fields.endTime, bookingId, tripId),
+  ]);
+  return bookingResult.meta.changes ? json({ booking: { id: bookingId, ...fields, updatedBy: user.id } }) : json({ error: '予約が見つかりません' }, 404);
 }
 
 async function deleteBooking(env: Env, user: User, tripId: string, bookingId: string) {
