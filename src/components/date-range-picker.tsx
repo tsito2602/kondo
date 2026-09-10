@@ -247,7 +247,13 @@ function DateRangeHighlight({ anchorDate, days, gridWidth, range }: { anchorDate
     <View pointerEvents="none" style={styles.highlights}>
       {rows.map((segment, row) => {
         const origin = anchor < 0 ? (anchorRow === 0 ? 0 : 6) : Math.max(0, Math.min(6, anchor - row * 7));
-        return <RangeBand gridWidth={gridWidth} key={row} origin={origin} row={row} segment={segment} />;
+        const firstDate = segment ? days[row * 7 + segment.first] : null;
+        const lastDate = segment ? days[row * 7 + segment.last] : null;
+        const bounds = segment ? {
+          start: segment.first + (firstDate === range.startDate ? 0.5 : 0),
+          end: segment.last + (lastDate === range.endDate ? 0.5 : 1),
+        } : null;
+        return <RangeBand bounds={bounds} gridWidth={gridWidth} key={row} origin={origin} row={row} />;
       })}
       <DateMarker gridWidth={gridWidth} index={days.indexOf(range.startDate)} />
       <DateMarker gridWidth={gridWidth} index={range.endDate !== range.startDate ? days.indexOf(range.endDate) : -1} origin={anchor} />
@@ -255,18 +261,18 @@ function DateRangeHighlight({ anchorDate, days, gridWidth, range }: { anchorDate
   );
 }
 
-function RangeBand({ gridWidth, origin, row, segment }: { gridWidth: number; origin: number; row: number; segment: { first: number; last: number } | null }) {
+function RangeBand({ bounds, gridWidth, origin, row }: { bounds: { start: number; end: number } | null; gridWidth: number; origin: number; row: number }) {
   const cell = gridWidth / 7;
-  const [left] = useState(() => new Animated.Value((segment?.first ?? origin) * cell + 5));
-  const [width] = useState(() => new Animated.Value(segment ? (segment.last - segment.first + 1) * cell - 10 : 0));
-  const [opacity] = useState(() => new Animated.Value(segment ? 1 : 0));
+  const [left] = useState(() => new Animated.Value((bounds?.start ?? origin + 0.5) * cell));
+  const [width] = useState(() => new Animated.Value(bounds ? (bounds.end - bounds.start) * cell : 0));
+  const [opacity] = useState(() => new Animated.Value(bounds && bounds.end > bounds.start ? 1 : 0));
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(left, { toValue: (segment?.first ?? origin) * cell + 5, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
-      Animated.timing(width, { toValue: segment ? (segment.last - segment.first + 1) * cell - 10 : 0, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
-      Animated.timing(opacity, { toValue: segment ? 1 : 0, duration: 160, useNativeDriver: false }),
+      Animated.timing(left, { toValue: (bounds?.start ?? origin + 0.5) * cell, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
+      Animated.timing(width, { toValue: bounds ? Math.max(0, bounds.end - bounds.start) * cell : 0, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
+      Animated.timing(opacity, { toValue: bounds && bounds.end > bounds.start ? 1 : 0, duration: 160, useNativeDriver: false }),
     ]).start();
-  }, [cell, left, opacity, origin, segment, width]);
+  }, [bounds, cell, left, opacity, origin, width]);
   return <Animated.View style={[styles.band, { left, top: WEEKDAY_HEIGHT + row * ROW_HEIGHT + 5, width, opacity }]} />;
 }
 
