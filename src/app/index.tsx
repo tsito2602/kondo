@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { DateRangePicker } from '@/components/date-range-picker';
 import { TripTicket } from '@/components/trip-ticket';
 import { palette } from '@/constants/design';
 import { useTravel } from '@/data/travel-provider';
@@ -107,10 +108,7 @@ export default function HomeScreen() {
             <TextInput value={name} onChangeText={setName} placeholder="ローマ旅行" style={styles.input} autoFocus />
             <Text style={styles.label}>行き先</Text>
             <TextInput value={destination} onChangeText={setDestination} placeholder="Rome, Italy" style={styles.input} />
-            <View style={styles.dateRow}>
-              <View style={styles.dateField}><Text style={styles.label}>出発日</Text><TextInput value={startsOn} onChangeText={setStartsOn} placeholder="2026-11-21" style={styles.input} /></View>
-              <View style={styles.dateField}><Text style={styles.label}>帰着日</Text><TextInput value={endsOn} onChangeText={setEndsOn} placeholder="2026-11-28" style={styles.input} /></View>
-            </View>
+            <DateRangePicker startDate={startsOn} endDate={endsOn} label="旅行期間" onChange={(range) => { setStartsOn(range.startDate); setEndsOn(range.endDate); }} />
           </View>
         </SafeAreaView>
       </Modal>
@@ -150,6 +148,4 @@ const styles = StyleSheet.create({
   form: { padding: 20, gap: 9 },
   label: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, fontWeight: '400', marginTop: 10 },
   input: { minHeight: 50, backgroundColor: palette.paper, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 14, color: palette.ink, fontSize: 16 },
-  dateRow: { flexDirection: 'row', gap: 12 },
-  dateField: { flex: 1 },
 });
