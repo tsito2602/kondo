@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
   dayCell: { width: `${100 / 7}%`, height: ROW_HEIGHT, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   day: { color: palette.ink, fontSize: 14, fontWeight: '600', zIndex: 3 },
   daySelected: { color: palette.paper, fontWeight: '900' },
-  band: { position: 'absolute', height: MARKER_SIZE, borderRadius: MARKER_SIZE / 2, backgroundColor: palette.sky },
+  band: { position: 'absolute', height: MARKER_SIZE, backgroundColor: palette.sky },
   marker: { position: 'absolute', width: MARKER_SIZE, height: MARKER_SIZE, borderRadius: MARKER_SIZE / 2, backgroundColor: palette.ocean },
   hint: { minHeight: 18, color: palette.slate, fontSize: 12, textAlign: 'center', marginTop: 10 },
   timeSection: { backgroundColor: palette.paper, borderRadius: 16, padding: 12, marginTop: 10 },
