@@ -1,6 +1,6 @@
 import { File, Paths } from 'expo-file-system';
 
-import { emptyTravelCache, TravelCache } from './types';
+import { emptyTravelCache, normalizeTravelCache, TravelCache } from './types';
 
 const cacheFile = new File(Paths.document, 'tabi-travel-cache.json');
 
@@ -8,7 +8,7 @@ export async function loadTravelCache(): Promise<TravelCache> {
   if (!cacheFile.exists) return emptyTravelCache();
   try {
     const value = JSON.parse(await cacheFile.text()) as TravelCache;
-    return value.version === 1 ? value : emptyTravelCache();
+    return value.version === 1 ? normalizeTravelCache(value) : emptyTravelCache();
   } catch {
     return emptyTravelCache();
   }
