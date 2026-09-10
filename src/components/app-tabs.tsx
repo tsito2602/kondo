@@ -6,10 +6,10 @@ export default function AppTabs() {
   return (
     <NativeTabs
       backgroundColor={palette.canvas}
-      indicatorColor={palette.mint}
-      tintColor={palette.carbon}
-      iconColor={{ default: palette.smoke, selected: palette.carbon }}
-      labelStyle={{ default: { color: palette.slate }, selected: { color: palette.carbon, fontWeight: '700' } }}>
+      indicatorColor={palette.sky}
+      tintColor={palette.ocean}
+      iconColor={{ default: palette.smoke, selected: palette.ocean }}
+      labelStyle={{ default: { color: palette.slate }, selected: { color: palette.ink, fontWeight: '700' } }}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>旅</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'map', selected: 'map.fill' }} md="map" />

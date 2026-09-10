@@ -1,59 +1,53 @@
 # tabi Design System
 
-> brutalist travel showroom on warm gray
+> travel tickets on an airy coastal canvas
 
-tabiは、旅程・予約票・持ち物をふたりで編集し、海外でもオフラインで使える旅行アプリである。視覚言語は「ブルータリストな旅行編集誌」と「物理的な旅券」。暖色グレーの台紙に、白・黒の平らな券面を大胆な文字組みで置く。
+tabiは、旅程・予約票・持ち物をふたりで編集し、海外でもオフラインで使える旅行アプリである。視覚言語は「旅のチケット」「空と海」「紙の旅行ノート」。アイボリーの台紙に、明るい券面、深いネイビーの文字、空色と夕焼け色の小さなアクセントを置く。
 
 ## 1. Principles
 
 1. **Ticket is structure** — 半券、ミシン目、切り欠き、券面番号、日時欄を情報構造として使う。
-2. **Typography leads** — 装飾ではなく、大きさ・太さ・密度の差で画面に個性を出す。
-3. **Flat and physical** — 影とグラデーションを使わず、面の色と大きな角丸で紙や券の重なりを表す。
-4. **Accent is scarce** — ミントはタグと選択、黄色は点や細線だけに限定する。
+2. **Airy, not heavy** — 濃色は文字と細い線に限定し、大きな黒・濃紺の面を作らない。
+3. **Travel has a horizon** — 空色を選択や分類、コーラルを現在地・進捗・移動方向に使う。
+4. **Flat and physical** — 影とグラデーションを使わず、紙色、罫線、切り取り線で物理感を出す。
 5. **Offline confidence** — オフライン編集は即時反映し、端末保存済み・同期待ちを簡潔に示す。
-6. **No filler copy** — 機能に関係しないキャッチコピーや説明を置かない。
-7. **Native behavior** — iOSとAndroidの戻る、共有、モーダル、ボトムナビを尊重する。
+6. **Native behavior** — iOSとAndroidの戻る、共有、モーダル、ボトムナビを尊重する。
 
 ## 2. Color tokens
 
 | Name | Value | Role |
 | --- | --- | --- |
-| Carbon | `#000000` | 見出し、本文、主要操作、反転面 |
-| Paper | `#FFFFFF` | カード、チケット、反転文字 |
-| Warm Canvas | `#E5E5E5` | 全画面の背景 |
-| Mist | `#F3F3F3` | 入力、ナビ、補助パネル |
-| Ash | `#C6C6C6` | 罫線、無効状態、ミシン目 |
-| Smoke | `#979797` | メタ情報、補助文、未選択アイコン |
-| Slate | `#444444` | 二次本文、ナビラベル |
-| Graphite | `#2F2F2F` | 黒より弱い反転面 |
-| Mint | `#D1FFCA` | タグ、選択状態、チケット半券 |
-| Voltage | `#FFF100` | 状態点、進捗端、極小の注意喚起 |
+| Travel Ink | `#15324A` | 見出し、本文、バーコード。純黒の代わりに使う |
+| Ocean | `#2F7FA3` | 主要操作、時刻、リンク、アクティブな線 |
+| Ticket Paper | `#FFFEFA` | カード、チケット、入力面 |
+| Canvas Ivory | `#F7F4EC` | 全画面の背景。旅行ノートの台紙 |
+| Coastal Mist | `#EAF2F5` | 入力、未選択pill、補助パネル |
+| Ash Blue | `#CCD8DE` | 罫線、無効状態、ミシン目 |
+| Smoke Blue | `#7A8994` | メタ情報、補助文、未選択アイコン |
+| Slate Blue | `#405A6E` | 二次本文、ナビラベル |
+| Sky | `#CBEAF5` | 選択状態、分類タグ、チケット半券 |
+| Sunset Coral | `#F2765E` | 進捗、移動方向、極小の注目点 |
+| Sand | `#F1DFC7` | 宿・食事カテゴリなど、補助的な温色 |
 | Danger | `#B42318` | 削除、重大エラーのみ |
 
-ミントと黄色を大きな背景にしない。航空会社や施設の色は、ユーザーが保存した原本内でのみ許容する。
+- 純黒は使わない。最も濃い色はTravel Inkとする。
+- Oceanを大きな面で使うのは主要ボタンのみ。カード全面を濃色にしない。
+- Skyは小〜中面積、Coralは点・線・進捗など小面積に限定する。
+- 航空会社や施設の色は、ユーザーが保存した原本内でのみ許容する。
 
 ## 3. Typography
 
-### Display
+見出しは幅の狭いsystem sansを太く使い、実用画面では40–48pxを上限とする。日本語は不自然にuppercase化しない。
 
-SuisseIntlCond、Anton、Bebas Neue、Barlow Condensed Boldを候補とし、未導入時は幅の狭いシステムsansを使う。weight 700、line-height 0.90–0.98、tracking `-0.03em`。英字は原則uppercase。日本語は大文字化せず、太字・詰めた行間・強いサイズ差で同じ圧を作る。
-
-| Role | Mobile | Wide | Line height |
+| Role | Mobile | Weight | Line height |
 | --- | ---: | ---: | ---: |
-| Screen title | 40px | 48px | 0.95 |
-| Trip title | 32px | 40px | 0.95 |
-| Section title | 28px | 40px | 1.00–1.10 |
-| Marketing display | 64px | 80–130px | 0.90 |
+| Screen title | 40–42px | 900 | 0.95–1.00 |
+| Trip title | 32px | 900 | 1.00 |
+| Card title | 16–20px | 700–900 | 1.15–1.30 |
+| Body | 14–16px | 400–500 | 1.40–1.50 |
+| Mono meta | 9–12px | 400–700 | 1.30–1.60 |
 
-アプリ内で130pxを常用しない。旅行中の実用画面では40–48pxを上限とする。
-
-### UI sans
-
-SuisseIntl、Inter、Söhne、system-ui。本文16px/400、操作16px/500、補助14px/450。
-
-### Mono
-
-SuisseIntlMono、JetBrains Mono、IBM Plex Mono、ui-monospace。12px/400。券面番号、時刻、予約番号、DAY番号、同期状態に使う。
+Monoは券面番号、時刻、予約番号、DAY番号、同期状態に使う。
 
 ## 4. Spacing and shape
 
@@ -63,14 +57,13 @@ SuisseIntlMono、JetBrains Mono、IBM Plex Mono、ui-monospace。12px/400。券�
 | --- | ---: |
 | Tag | 64px |
 | Card | 24–32px |
-| Large feature card | 64px |
-| Button / input | 4–8px |
+| Ticket | 28px |
+| Button / input | 8px |
 | Bottom nav pill | 48px |
 
 - 画面左右: 20px mobile / 24px wide
-- カードpadding: 24px
-- 要素間: 16–24px
-- コンテンツ最大幅: 800px。紹介ページのみ1200px
+- カードpadding: 20–24px
+- コンテンツ最大幅: 800px
 - 影: 常に0
 - グラデーション: 使用禁止
 
@@ -78,105 +71,59 @@ SuisseIntlMono、JetBrains Mono、IBM Plex Mono、ui-monospace。12px/400。券�
 
 角丸カードだけをチケットと呼ばない。最低4要素を備える。
 
-- 主券と半券
+- 明るい主券と色付きの半券
 - 破線のミシン目
 - ミシン目上下の半円切り欠き
-- `TABI JOURNEY`などの発行者表示
+- `TABI TRIP TICKET`などの発行者表示
 - 券面番号または短い識別子
-- バーコード状の識別表現
+- バーコード状の装飾的な識別表現
 - 出発／帰着、開始／終了など対になる欄
 - 人数、座席、入口など用途固有のメタ情報
 
 ### Trip ticket
 
-ホームの旅行概要。Carbonの主券とMintの半券を標準とする。旅行名、目的地、出発日、帰着日、人数、券面番号を載せる。航空券ではないため、架空の便名、ゲート、QRは載せない。
-
-### Transport ticket
-
-航空・鉄道・バス。会社名、区間、日時、予約番号、座席を優先する。会社ロゴは利用条件を確認できる場合だけ使用する。
-
-### Admission ticket
-
-施設名、利用日、人数、入口情報を優先。QRやバーコードは、保存した原本画像・PDFを表示するときだけ再掲する。tabiが利用不能なコードを生成しない。
+ホームの旅行概要。Ticket Paperの主券とSkyの半券を標準とする。Travel Inkは文字とバーコードに、Oceanは罫線に、Coralは出発点と矢印に使う。旅行名、目的地、出発日、帰着日、人数、券面番号を載せる。航空券ではないため、架空の便名、ゲート、QRは載せない。
 
 ### Booking document
 
-宿、レストラン、ツアー。確認番号はコピー可能にし、スクリーンショット・画像・PDFの原本へ1タップで到達できるようにする。
+航空・鉄道・宿・施設・レストランの予約は、白い主券とMistまたはSkyの半券で表現する。確認番号はコピー可能にし、スクリーンショット・画像・PDFの原本へ1タップで到達できるようにする。tabiが利用不能なQRコードを生成しない。
 
 ## 6. Components
 
-### Filled dark button
+### Primary button
 
-Carbon背景、Paper文字、8px radius、16×24px padding、16px/500、影なし。画面内の最重要操作に使う。
+Ocean背景、Ticket Paper文字、8px radius、16×24px padding、16px/700、影なし。画面内の最重要操作に使う。
 
-### Ghost border button
+### Secondary button
 
-透明背景、1.5px Slate border、4–8px radius。副操作に使う。
-
-### Text action
-
-背景と枠なし。Carbon、16px/500。Webではhover時だけunderline。
+Ticket Paper背景、Oceanの文字または1px枠、8px radius。黒い反転面を副操作に使わない。
 
 ### Nav pill
 
-Paper背景、48px radius、影なし。主要4項目「旅・日程・持ち物・予約」を画面下部に固定する。選択項目はMintの小さなpillで示す。
+Ticket Paper背景、48px radius、影なし。主要4項目「旅・日程・持ち物・予約」を画面下部に固定する。選択項目はSkyの小さなpillとOceanのアイコンで示す。
 
 ### Standard card
 
-Paper背景、24–32px radius、24px padding、枠と影なし。Warm Canvasとの面差だけで分離する。
+Ticket Paper背景、24–32px radius、枠と影なし。Canvas Ivoryとの面差だけで分離する。
 
-### Inverted card
+### Progress card
 
-Carbon背景、Paper文字、32px radius、影なし。1画面の主役となる面に限る。
-
-### Mint tag
-
-Mint背景、Carbon文字、64px radius、8×16px程度、Mono 12px。分類・現在地・選択状態に使う。
-
-### Voltage mark
-
-Voltageの点、短い線、進捗の終端。小面積に限定し、ボタン全面には使わない。
+Sky背景、Travel Ink文字。進捗バーはTicket PaperのtrackとCoralのfillを使う。濃色の反転カードは使わない。
 
 ### Input
 
-Paper背景、8px radius、16px padding、最小48px、枠なし。フォーカスは2px Carbon。派手なグローを使わない。
+Ticket Paper背景、8px radius、16px padding、最小48px、枠なし。フォーカスは2px Ocean。
 
 ## 7. Screen rules
 
-### Login
+- **Login:** Canvas Ivory上に大きなTravel Inkの`TABI`。GoogleログインはOceanのボタン。
+- **Home:** 同期状態、旅行追加、旅行切替、Trip ticket、旅程編集・招待だけを置く。Trip ticketを最大の明るい紙面にする。
+- **Itinerary:** 日付ごとに白い32pxカード。DAY番号はSky、時刻はOcean。
+- **Packing:** 進捗をSkyカードに置き、Coralを進捗に使う。チェック済みはSkyと記号の両方で示す。
+- **Bookings:** 予約ごとに白いチケットを使い、右側を明るい半券として分離する。
+- **Empty state:** 短い見出し、1文、主要操作1つ。
 
-Warm Canvas上に大きな`TABI`。機能説明は1文のみ。GoogleログインはCarbonの矩形ボタン。装飾イラストは置かない。
-
-### Home
-
-同期状態、旅行追加、旅行切替、Trip ticket、旅程編集・招待だけを置く。Trip ticketを最も大きな反転面にする。
-
-### Itinerary
-
-日付ごとに白い32pxカード。DAY番号はMint tag。時刻はMonoの左列、予定は右列。罫線はAsh。
-
-### Packing
-
-進捗をCarbonの反転カードに置き、Voltageを進捗端に使う。チェック済みはMintと記号の両方で示す。
-
-### Bookings
-
-予約ごとに白いチケットを使う。種別をMint tag、券面番号をMono、右側を半券として分離する。原本未保存時に架空QRを表示しない。
-
-### Empty state
-
-短い見出し、1文、主要操作1つ。画像、キャッチコピー、複数ボタンを置かない。
-
-## 8. Motion and feedback
-
-- 画面遷移とモーダルはOS標準
-- 押下はopacityまたはscale、120–180ms
-- 追加・削除は200–240ms
-- 同期完了トーストを連発しない
-- オフライン入力は即時反映し「端末に保存済み」と示す
-- Reduce Motionを尊重する
-
-## 9. Accessibility
+## 8. Accessibility
 
 - WCAG AA以上
 - タップ領域44×44px以上
@@ -185,38 +132,30 @@ Warm Canvas上に大きな`TABI`。機能説明は1文のみ。Googleログイ�
 - 券面番号・予約番号に読み上げラベルを付ける
 - 原本画像のQR・バーコードには説明ラベルを付ける
 
-## 10. Do / Don't
+## 9. Do / Don't
 
 ### Do
 
-- Warm Canvasを全画面背景にする
-- 白／黒の面差と文字サイズで階層を作る
-- 見出しを太く、短く、詰めて組む
-- Mintをタグと選択に、Voltageを極小の状態表現に使う
-- カード24–32px、操作4–8pxの半径差を守る
-- チケット部品を情報の意味と対応させる
+- Canvas Ivoryを全画面背景にする
+- Travel Inkは文字、Oceanは操作、Skyは選択、Coralは小さな強調に使う
+- チケットの紙面、半券、ミシン目、ノッチを意味のある情報構造にする
+- カード24–32px、操作8pxの半径差を守る
 
 ### Don't
 
+- 純黒や濃紺をカード全面に使わない
 - カードやボタンに影を付けない
 - グラデーションを使わない
-- 純白をページ背景にしない
-- ミントや黄色を大面積に使わない
-- 日本語を不自然な英語やuppercaseへ置き換えない
 - 架空のQR、搭乗券番号、企業ロゴを表示しない
 - ボトムナビをコンテンツに重ねない
 
-## 11. Implementation tokens
+## 10. Implementation tokens
 
 ```ts
-export const colors = {
-  carbon: '#000000', paper: '#FFFFFF', canvas: '#E5E5E5', mist: '#F3F3F3',
-  ash: '#C6C6C6', smoke: '#979797', slate: '#444444', graphite: '#2F2F2F',
-  mint: '#D1FFCA', voltage: '#FFF100', danger: '#B42318',
-} as const;
-
-export const radius = {
-  button: 8, card: 32, tag: 64, nav: 48,
+export const palette = {
+  ink: '#15324A', ocean: '#2F7FA3', paper: '#FFFEFA', canvas: '#F7F4EC',
+  mist: '#EAF2F5', ash: '#CCD8DE', smoke: '#7A8994', slate: '#405A6E',
+  sky: '#CBEAF5', coral: '#F2765E', sand: '#F1DFC7', danger: '#B42318',
 } as const;
 ```
 

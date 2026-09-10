@@ -18,7 +18,7 @@ export function TripTicket({ trip }: { trip: Trip }) {
     <View style={styles.ticket} accessibilityLabel={`${trip.name}、${trip.startsOn}から${trip.endsOn}まで`}>
       <View style={styles.main}>
         <View style={styles.issuerRow}>
-          <View style={styles.issuerTag}><Text style={styles.issuer}>TABI JOURNEY</Text></View>
+          <View style={styles.issuerTag}><Text style={styles.issuer}>TABI TRIP TICKET</Text></View>
           <Text style={styles.serial}>NO. {serial}</Text>
         </View>
 
@@ -60,29 +60,29 @@ export function TripTicket({ trip }: { trip: Trip }) {
 }
 
 const styles = StyleSheet.create({
-  ticket: { minHeight: 238, flexDirection: 'row', overflow: 'hidden', position: 'relative', borderRadius: 32, backgroundColor: palette.carbon },
+  ticket: { minHeight: 238, flexDirection: 'row', overflow: 'hidden', position: 'relative', borderRadius: 28, backgroundColor: palette.paper, borderWidth: StyleSheet.hairlineWidth, borderColor: palette.ash },
   main: { flex: 1, minWidth: 0, padding: 24, justifyContent: 'space-between' },
   issuerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
-  issuerTag: { alignSelf: 'flex-start', backgroundColor: palette.mint, borderRadius: 64, paddingHorizontal: 10, paddingVertical: 5 },
-  issuer: { color: palette.carbon, fontSize: 9, lineHeight: 12, fontWeight: '700', letterSpacing: 1.1 },
+  issuerTag: { alignSelf: 'flex-start', backgroundColor: palette.sky, borderRadius: 64, paddingHorizontal: 10, paddingVertical: 5 },
+  issuer: { color: palette.ink, fontSize: 9, lineHeight: 12, fontWeight: '700', letterSpacing: 1.1 },
   serial: { color: palette.smoke, fontFamily: 'monospace', fontSize: 9, lineHeight: 20, letterSpacing: 0.5 },
   titleBlock: { paddingVertical: 20 },
-  destination: { color: palette.smoke, fontSize: 11, lineHeight: 15, fontWeight: '500', letterSpacing: 1.1, textTransform: 'uppercase' },
-  title: { color: palette.paper, fontSize: 32, lineHeight: 32, fontWeight: '900', letterSpacing: -1.1, marginTop: 7 },
+  destination: { color: palette.ocean, fontSize: 11, lineHeight: 15, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase' },
+  title: { color: palette.ink, fontSize: 32, lineHeight: 32, fontWeight: '900', letterSpacing: -1.1, marginTop: 7 },
   route: { flexDirection: 'row', alignItems: 'flex-end' },
   fieldLabel: { color: palette.smoke, fontFamily: 'monospace', fontSize: 9, lineHeight: 13, fontWeight: '400', letterSpacing: 0.8 },
-  date: { color: palette.paper, fontSize: 16, lineHeight: 20, fontWeight: '700', marginTop: 2 },
+  date: { color: palette.ink, fontSize: 16, lineHeight: 20, fontWeight: '700', marginTop: 2 },
   routeLine: { flex: 1, minWidth: 36, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 9, paddingBottom: 5 },
-  routeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: palette.voltage },
-  routeRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: palette.smoke },
-  routeArrow: { color: palette.voltage, fontSize: 15, lineHeight: 17, marginLeft: -2 },
+  routeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: palette.coral },
+  routeRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: palette.ocean },
+  routeArrow: { color: palette.coral, fontSize: 15, lineHeight: 17, marginLeft: -2 },
   arrival: { alignItems: 'flex-end' },
-  stub: { width: 96, borderLeftWidth: 1, borderStyle: 'dashed', borderLeftColor: palette.carbon, backgroundColor: palette.mint, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
-  stubLabel: { color: palette.carbon, fontFamily: 'monospace', fontSize: 8, lineHeight: 12, fontWeight: '400', letterSpacing: 0.7 },
-  memberCount: { color: palette.carbon, fontSize: 42, lineHeight: 46, fontWeight: '900', letterSpacing: -1.6, marginTop: 2 },
+  stub: { width: 96, borderLeftWidth: 1, borderStyle: 'dashed', borderLeftColor: palette.ocean, backgroundColor: palette.sky, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  stubLabel: { color: palette.ink, fontFamily: 'monospace', fontSize: 8, lineHeight: 12, fontWeight: '400', letterSpacing: 0.7 },
+  memberCount: { color: palette.ink, fontSize: 42, lineHeight: 46, fontWeight: '900', letterSpacing: -1.6, marginTop: 2 },
   barcode: { height: 31, width: 60, marginTop: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'stretch' },
-  bar: { height: '100%', backgroundColor: palette.carbon },
-  stubCode: { color: palette.carbon, fontFamily: 'monospace', fontSize: 8, lineHeight: 12, letterSpacing: 2, marginTop: 4 },
+  bar: { height: '100%', backgroundColor: palette.ink },
+  stubCode: { color: palette.ink, fontFamily: 'monospace', fontSize: 8, lineHeight: 12, letterSpacing: 2, marginTop: 4 },
   notch: { position: 'absolute', right: 86, width: 20, height: 20, borderRadius: 10, backgroundColor: palette.canvas, zIndex: 2 },
   notchTop: { top: -10 },
   notchBottom: { bottom: -10 },

@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconWrapSelected: {
-    backgroundColor: palette.mint,
+    backgroundColor: palette.sky,
   },
   icon: {
     color: palette.smoke,
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   selectedText: {
-    color: palette.carbon,
+    color: palette.ink,
     fontWeight: '700',
   },
   pressed: {

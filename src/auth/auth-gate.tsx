@@ -11,7 +11,7 @@ export function AuthGate({ children }: PropsWithChildren) {
   if (loading) {
     return (
       <SafeAreaView style={styles.center}>
-        <ActivityIndicator color={palette.carbon} size="large" />
+        <ActivityIndicator color={palette.ocean} size="large" />
       </SafeAreaView>
     );
   }
@@ -44,12 +44,12 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.canvas },
   content: { width: '100%', maxWidth: 720, alignSelf: 'center', flex: 1, justifyContent: 'center', padding: 28 },
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 },
-  tag: { backgroundColor: palette.mint, borderRadius: 64, paddingHorizontal: 12, paddingVertical: 7 },
-  tagText: { color: palette.carbon, fontFamily: 'monospace', fontSize: 10, fontWeight: '400', letterSpacing: -0.2 },
+  tag: { backgroundColor: palette.sky, borderRadius: 64, paddingHorizontal: 12, paddingVertical: 7 },
+  tagText: { color: palette.ink, fontFamily: 'monospace', fontSize: 10, fontWeight: '400', letterSpacing: -0.2 },
   index: { color: palette.slate, fontFamily: 'monospace', fontSize: 10 },
-  title: { color: palette.carbon, fontSize: 72, lineHeight: 66, fontWeight: '900', letterSpacing: -3 },
+  title: { color: palette.ink, fontSize: 72, lineHeight: 66, fontWeight: '900', letterSpacing: -3 },
   body: { maxWidth: 460, color: palette.slate, fontSize: 16, lineHeight: 24, marginTop: 24, marginBottom: 40 },
-  button: { minHeight: 56, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.carbon },
+  button: { minHeight: 56, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.ocean },
   buttonText: { color: palette.paper, fontSize: 16, fontWeight: '700' },
   pressed: { opacity: 0.82, transform: [{ scale: 0.99 }] },
   disabled: { opacity: 0.65 },
