@@ -249,9 +249,12 @@ function TimeWheel({ accessibilityLabel, onChange, selected, values }: { accessi
     }
     scrollRef.current?.scrollTo({ y: middleIndex * WHEEL_ITEM_HEIGHT, animated: false });
   }, [middleIndex, selectedIndex]);
+  const rawIndexFromScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    return Math.max(0, Math.min(loopValues.length - 1, Math.round(event.nativeEvent.contentOffset.y / WHEEL_ITEM_HEIGHT)));
+  };
   const indexFromScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const rawIndex = Math.round(event.nativeEvent.contentOffset.y / WHEEL_ITEM_HEIGHT);
-    return ((rawIndex % values.length) + values.length) % values.length;
+    const rawIndex = rawIndexFromScroll(event);
+    return rawIndex % values.length;
   };
   const selectFromScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const index = indexFromScroll(event);
@@ -266,17 +269,22 @@ function TimeWheel({ accessibilityLabel, onChange, selected, values }: { accessi
     const centeredIndex = WHEEL_MIDDLE_CYCLE * values.length + index;
     scrollRef.current?.scrollTo({ y: centeredIndex * WHEEL_ITEM_HEIGHT, animated: false });
   };
+  const snapScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const rawIndex = rawIndexFromScroll(event);
+    selectFromScroll(event);
+    scrollRef.current?.scrollTo({ y: rawIndex * WHEEL_ITEM_HEIGHT, animated: true });
+  };
   return <View accessibilityLabel={accessibilityLabel} style={styles.wheelFrame}>
     <View pointerEvents="none" style={styles.wheelSelection} />
     <ScrollView
+      bounces={false}
       contentContainerStyle={styles.wheelContent}
       decelerationRate="fast"
       disableIntervalMomentum
       onMomentumScrollEnd={settleScroll}
-      onScroll={selectFromScroll}
-      onScrollEndDrag={selectFromScroll}
+      onScrollEndDrag={snapScroll}
+      overScrollMode="never"
       ref={scrollRef}
-      scrollEventThrottle={16}
       showsVerticalScrollIndicator={false}
       snapToInterval={WHEEL_ITEM_HEIGHT}>
       {loopValues.map((entry, index) => <Pressable key={`${entry}-${index}`} onPress={() => onChange(entry)} style={styles.wheelItem}><Text style={[styles.wheelText, entry === selected && styles.wheelTextSelected]}>{entry}</Text></Pressable>)}
