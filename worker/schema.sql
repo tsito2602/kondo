@@ -73,6 +73,18 @@ CREATE TABLE IF NOT EXISTS packing_items (
 );
 CREATE INDEX IF NOT EXISTS packing_items_trip ON packing_items(trip_id, packed, category, name);
 
+CREATE TABLE IF NOT EXISTS travel_tasks (
+  id TEXT PRIMARY KEY,
+  trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  due_on TEXT NOT NULL DEFAULT '',
+  assignee TEXT NOT NULL DEFAULT '',
+  done INTEGER NOT NULL DEFAULT 0 CHECK(done IN (0, 1)),
+  updated_by TEXT NOT NULL REFERENCES users(id),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS travel_tasks_trip ON travel_tasks(trip_id, done, due_on, title);
+
 CREATE TABLE IF NOT EXISTS booking_details (
   booking_id TEXT PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
   origin TEXT NOT NULL DEFAULT '',

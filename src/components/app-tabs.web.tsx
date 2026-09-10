@@ -27,7 +27,7 @@ export default function AppTabs() {
             <TabButton icon="≡">日程</TabButton>
           </TabTrigger>
           <TabTrigger name="packing" href="/packing" asChild>
-            <TabButton icon="✓">持ち物</TabButton>
+            <TabButton icon="✓">準備</TabButton>
           </TabTrigger>
           <TabTrigger name="bookings" href="/bookings" asChild>
             <TabButton icon="⌁">予約</TabButton>

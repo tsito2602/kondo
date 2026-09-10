@@ -393,6 +393,76 @@ async function deletePackingItem(env: Env, user: User, tripId: string, itemId: s
   return result.meta.changes ? new Response(null, { status: 204 }) : json({ error: '持ち物が見つかりません' }, 404);
 }
 
+type TaskRow = {
+  id: string;
+  title: string;
+  dueOn: string;
+  assignee: string;
+  done: number;
+  updatedBy: string;
+  updatedAt: number;
+};
+
+function taskFields(body: Record<string, unknown>) {
+  const title = textField(body.title, 160, true);
+  const dueOn = body.dueOn === '' ? '' : dateField(body.dueOn);
+  const assignee = textField(body.assignee, 80);
+  const done = typeof body.done === 'boolean' ? body.done : false;
+  if (!title || dueOn === null || assignee === null) return null;
+  return { title, dueOn, assignee, done };
+}
+
+async function listTasks(env: Env, user: User, tripId: string) {
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  const result = await env.DB.prepare(`
+    SELECT id, title, due_on AS dueOn, assignee, done, updated_by AS updatedBy, updated_at AS updatedAt
+    FROM travel_tasks WHERE trip_id = ? ORDER BY done, CASE WHEN due_on = '' THEN 1 ELSE 0 END, due_on, title, id
+  `).bind(tripId).all<TaskRow>();
+  return json({ tasks: result.results.map((task) => ({ ...task, done: Boolean(task.done) })) });
+}
+
+async function createTask(request: Request, env: Env, user: User, tripId: string) {
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  const body = await request.json().catch(() => null);
+  const fields = isObject(body) ? taskFields(body) : null;
+  if (!fields) return json({ error: '正しいタスク情報を入力してください' }, 400);
+  const id = idField(body?.id) ?? crypto.randomUUID();
+  const result = await env.DB.prepare(`
+    INSERT INTO travel_tasks (id, trip_id, title, due_on, assignee, done, updated_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      title = excluded.title, due_on = excluded.due_on, assignee = excluded.assignee,
+      done = excluded.done, updated_by = excluded.updated_by, updated_at = unixepoch()
+    WHERE travel_tasks.trip_id = excluded.trip_id
+  `).bind(id, tripId, fields.title, fields.dueOn, fields.assignee, fields.done ? 1 : 0, user.id).run();
+  if (!result.meta.changes) return json({ error: 'タスクIDが競合しました' }, 409);
+  return json({ task: { id, ...fields, updatedBy: user.id } }, 201);
+}
+
+async function updateTask(request: Request, env: Env, user: User, tripId: string, taskId: string) {
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  const body = await request.json().catch(() => null);
+  const fields = isObject(body) ? taskFields(body) : null;
+  if (!fields) return json({ error: '正しいタスク情報を入力してください' }, 400);
+  const result = await env.DB.prepare(`
+    UPDATE travel_tasks SET title = ?, due_on = ?, assignee = ?, done = ?, updated_by = ?, updated_at = unixepoch()
+    WHERE id = ? AND trip_id = ?
+  `).bind(fields.title, fields.dueOn, fields.assignee, fields.done ? 1 : 0, user.id, taskId, tripId).run();
+  return result.meta.changes
+    ? json({ task: { id: taskId, ...fields, updatedBy: user.id } })
+    : json({ error: 'タスクが見つかりません' }, 404);
+}
+
+async function deleteTask(env: Env, user: User, tripId: string, taskId: string) {
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  const result = await env.DB.prepare('DELETE FROM travel_tasks WHERE id = ? AND trip_id = ?').bind(taskId, tripId).run();
+  return result.meta.changes ? new Response(null, { status: 204 }) : json({ error: 'タスクが見つかりません' }, 404);
+}
+
 async function createInvite(env: Env, user: User, tripId: string, url: URL) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
@@ -459,6 +529,14 @@ async function api(request: Request, env: Env, url: URL) {
   const packingItemMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/packing\/([^/]+)$/);
   if (packingItemMatch && request.method === 'PATCH') return updatePackingItem(request, env, user, packingItemMatch[1], packingItemMatch[2]);
   if (packingItemMatch && request.method === 'DELETE') return deletePackingItem(env, user, packingItemMatch[1], packingItemMatch[2]);
+
+  const tasksMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/tasks$/);
+  if (tasksMatch && request.method === 'GET') return listTasks(env, user, tasksMatch[1]);
+  if (tasksMatch && request.method === 'POST') return createTask(request, env, user, tasksMatch[1]);
+
+  const taskMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/tasks\/([^/]+)$/);
+  if (taskMatch && request.method === 'PATCH') return updateTask(request, env, user, taskMatch[1], taskMatch[2]);
+  if (taskMatch && request.method === 'DELETE') return deleteTask(env, user, taskMatch[1], taskMatch[2]);
 
   const inviteMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/invites$/);
   if (inviteMatch && request.method === 'POST') return createInvite(env, user, inviteMatch[1], url);

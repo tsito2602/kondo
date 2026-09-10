@@ -2,109 +2,253 @@ import { useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { DateRangePicker } from '@/components/date-range-picker';
 import { palette } from '@/constants/design';
 import { useTravel } from '@/data/travel-provider';
-import { PackingItem } from '@/data/types';
+import { PackingItem, TravelTask } from '@/data/types';
 
 const CATEGORIES = ['衣類', '洗面・衛生', '電子機器', '書類', '薬', 'その他'];
+const TASK_HINTS = ['休暇を申請する', 'eSIMを用意する', '両替する', 'ペットの預け先を決める'];
+const today = new Date().toISOString().slice(0, 10);
 
-type Draft = Pick<PackingItem, 'name' | 'category' | 'quantity' | 'packed'>;
+type Mode = 'tasks' | 'packing';
+type PackingDraft = Pick<PackingItem, 'name' | 'category' | 'quantity' | 'packed'>;
+type TaskDraft = Pick<TravelTask, 'title' | 'dueOn' | 'assignee' | 'done'>;
 
-const blankDraft = (): Draft => ({ name: '', category: CATEGORIES[0], quantity: 1, packed: false });
+const blankPackingDraft = (): PackingDraft => ({ name: '', category: CATEGORIES[0], quantity: 1, packed: false });
+const blankTaskDraft = (): TaskDraft => ({ title: '', dueOn: '', assignee: '', done: false });
 
 export default function PackingScreen() {
-  const { createPackingItem, deletePackingItem, packingItems, pendingCount, selectedTrip, updatePackingItem } = useTravel();
+  const {
+    createPackingItem,
+    createTask,
+    deletePackingItem,
+    deleteTask,
+    packingItems,
+    pendingCount,
+    selectedTrip,
+    tasks,
+    updatePackingItem,
+    updateTask,
+  } = useTravel();
+  const [mode, setMode] = useState<Mode>('tasks');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft>(blankDraft);
+  const [packingDraft, setPackingDraft] = useState<PackingDraft>(blankPackingDraft);
+  const [taskDraft, setTaskDraft] = useState<TaskDraft>(blankTaskDraft);
+  const [hasDueDate, setHasDueDate] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [formError, setFormError] = useState('');
 
+  const isTasks = mode === 'tasks';
   const packedCount = packingItems.filter((item) => item.packed).length;
-  const progress = packingItems.length ? packedCount / packingItems.length : 0;
-  const grouped = useMemo(() => CATEGORIES.map((category) => ({
+  const doneCount = tasks.filter((task) => task.done).length;
+  const activeTotal = isTasks ? tasks.length : packingItems.length;
+  const activeDone = isTasks ? doneCount : packedCount;
+  const progress = activeTotal ? activeDone / activeTotal : 0;
+  const taskGroups = useMemo(() => [
+    { label: '未完了', items: tasks.filter((task) => !task.done) },
+    { label: '完了済み', items: tasks.filter((task) => task.done) },
+  ].filter((group) => group.items.length), [tasks]);
+  const packingGroups = useMemo(() => CATEGORIES.map((category) => ({
     category,
     items: packingItems.filter((item) => item.category === category),
   })).filter((group) => group.items.length), [packingItems]);
+  const availableHints = TASK_HINTS.filter((hint) => !tasks.some((task) => task.title === hint));
+
+  const changeMode = (nextMode: Mode) => {
+    setMode(nextMode);
+    setFormOpen(false);
+    setEditingId(null);
+    setFormError('');
+  };
 
   const openCreate = () => {
     setEditingId(null);
-    setDraft(blankDraft());
+    setPackingDraft(blankPackingDraft());
+    setTaskDraft(blankTaskDraft());
+    setHasDueDate(false);
     setFormError('');
     setFormOpen(true);
   };
 
-  const openEdit = (item: PackingItem) => {
+  const openPackingEdit = (item: PackingItem) => {
     setEditingId(item.id);
-    setDraft({ name: item.name, category: item.category, quantity: item.quantity, packed: item.packed });
+    setPackingDraft({ name: item.name, category: item.category, quantity: item.quantity, packed: item.packed });
+    setFormError('');
+    setFormOpen(true);
+  };
+
+  const openTaskEdit = (task: TravelTask) => {
+    setEditingId(task.id);
+    setTaskDraft({ title: task.title, dueOn: task.dueOn, assignee: task.assignee, done: task.done });
+    setHasDueDate(Boolean(task.dueOn));
     setFormError('');
     setFormOpen(true);
   };
 
   const save = () => {
-    if (!draft.name.trim()) {
-      setFormError('持ち物の名前を入力してください。');
-      return;
+    if (isTasks) {
+      if (!taskDraft.title.trim()) {
+        setFormError('やることを入力してください。');
+        return;
+      }
+      const input = {
+        ...taskDraft,
+        title: taskDraft.title.trim(),
+        dueOn: hasDueDate ? (taskDraft.dueOn || today) : '',
+        assignee: taskDraft.assignee.trim(),
+      };
+      if (editingId) updateTask(editingId, input);
+      else createTask(input);
+    } else {
+      if (!packingDraft.name.trim()) {
+        setFormError('持ち物の名前を入力してください。');
+        return;
+      }
+      const input = { ...packingDraft, name: packingDraft.name.trim() };
+      if (editingId) updatePackingItem(editingId, input);
+      else createPackingItem(input);
     }
-    const input = { ...draft, name: draft.name.trim() };
-    if (editingId) updatePackingItem(editingId, input);
-    else createPackingItem(input);
     setFormOpen(false);
   };
 
   const remove = () => {
     if (!editingId) return;
-    Alert.alert('持ち物を削除しますか？', 'この操作は取り消せません。', [
+    const target = isTasks ? 'やること' : '持ち物';
+    Alert.alert(`${target}を削除しますか？`, 'この操作は取り消せません。', [
       { text: 'キャンセル', style: 'cancel' },
-      { text: '削除', style: 'destructive', onPress: () => { deletePackingItem(editingId); setFormOpen(false); } },
+      {
+        text: '削除',
+        style: 'destructive',
+        onPress: () => {
+          if (isTasks) deleteTask(editingId);
+          else deletePackingItem(editingId);
+          setFormOpen(false);
+        },
+      },
     ]);
   };
 
-  const toggle = (item: PackingItem) => updatePackingItem(item.id, {
+  const togglePacking = (item: PackingItem) => updatePackingItem(item.id, {
     name: item.name,
     category: item.category,
     quantity: item.quantity,
     packed: !item.packed,
   });
 
+  const toggleTask = (task: TravelTask) => updateTask(task.id, {
+    title: task.title,
+    dueOn: task.dueOn,
+    assignee: task.assignee,
+    done: !task.done,
+  });
+
+  const renderTask = (task: TravelTask, index: number) => {
+    const metadata = [task.dueOn ? `期限 ${task.dueOn.replaceAll('-', '/')}` : '', task.assignee]
+      .filter(Boolean)
+      .join(' ・ ');
+    return (
+      <View key={task.id} style={[styles.row, index > 0 && styles.rowBorder]}>
+        <Pressable
+          accessibilityLabel={`${task.title}を${task.done ? '未完了' : '完了'}にする`}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: task.done }}
+          hitSlop={8}
+          onPress={() => toggleTask(task)}
+          style={[styles.check, task.done && styles.checkDone]}>
+          <Text style={[styles.checkText, task.done && styles.checkTextDone]}>{task.done ? '✓' : ''}</Text>
+        </Pressable>
+        <Pressable accessibilityLabel={`${task.title}を編集`} onPress={() => openTaskEdit(task)} style={({ pressed }) => [styles.rowCopy, pressed && styles.pressed]}>
+          <View style={styles.itemCopy}>
+            <Text style={[styles.itemName, task.done && styles.itemDone]}>{task.title}</Text>
+            {metadata ? <Text style={styles.itemMeta}>{metadata}</Text> : null}
+          </View>
+        </Pressable>
+        <Pressable accessibilityLabel={`${task.title}を編集`} hitSlop={8} onPress={() => openTaskEdit(task)}><Text style={styles.editMark}>•••</Text></Pressable>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headingRow}>
-          <View style={styles.tag}><Text style={styles.tagText}>PACKING LIST</Text></View>
-          <Text style={styles.counter}>{pendingCount ? `${pendingCount} SYNCING` : `${String(packedCount).padStart(2, '0')} / ${String(packingItems.length).padStart(2, '0')}`}</Text>
+          <View style={styles.tag}><Text style={styles.tagText}>TRAVEL PREP</Text></View>
+          <Text style={styles.counter}>
+            {pendingCount ? `${pendingCount} SYNCING` : `${String(activeDone).padStart(2, '0')} / ${String(activeTotal).padStart(2, '0')}`}
+          </Text>
         </View>
         <View style={styles.titleRow}>
-          <View>
-            <Text style={styles.title}>持ち物</Text>
+          <View style={styles.titleCopy}>
+            <Text style={styles.title}>旅の準備</Text>
             {selectedTrip ? <Text numberOfLines={1} style={styles.tripName}>{selectedTrip.name}</Text> : null}
           </View>
-          {selectedTrip ? <Pressable accessibilityLabel="持ち物を追加する" onPress={openCreate} style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}><Text style={styles.addButtonText}>＋ 追加</Text></Pressable> : null}
+          {selectedTrip ? (
+            <Pressable accessibilityLabel={isTasks ? 'やることを追加する' : '持ち物を追加する'} onPress={openCreate} style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}>
+              <Text style={styles.addButtonText}>＋ 追加</Text>
+            </Pressable>
+          ) : null}
         </View>
 
-        {selectedTrip ? (
+        <View accessibilityRole="tablist" style={styles.segmented}>
+          <Pressable
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isTasks }}
+            onPress={() => changeMode('tasks')}
+            style={[styles.segment, isTasks && styles.segmentSelected]}>
+            <Text style={[styles.segmentText, isTasks && styles.segmentTextSelected]}>やること {tasks.filter((task) => !task.done).length}</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="tab"
+            accessibilityState={{ selected: !isTasks }}
+            onPress={() => changeMode('packing')}
+            style={[styles.segment, !isTasks && styles.segmentSelected]}>
+            <Text style={[styles.segmentText, !isTasks && styles.segmentTextSelected]}>持ち物 {packingItems.filter((item) => !item.packed).length}</Text>
+          </Pressable>
+        </View>
+
+        {selectedTrip && activeTotal ? (
           <View style={styles.progressCard}>
             <View style={styles.progressCopy}>
-              <Text style={styles.progressLabel}>準備の進み具合</Text>
-              <Text style={styles.progressValue}>{packingItems.length ? `${Math.round(progress * 100)}%` : '0%'}</Text>
+              <Text style={styles.progressLabel}>{isTasks ? '完了したこと' : 'バッグに入れたもの'}</Text>
+              <Text style={styles.progressValue}>{Math.round(progress * 100)}%</Text>
             </View>
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
             </View>
-            <Text style={styles.progressMeta}>{packedCount}個準備済み・残り{packingItems.length - packedCount}個</Text>
+            <Text style={styles.progressMeta}>{activeDone}件完了・残り{activeTotal - activeDone}件</Text>
           </View>
         ) : null}
 
         {!selectedTrip ? (
-          <View style={styles.empty}><Text style={styles.emptyTitle}>旅行を作成してください</Text><Text style={styles.emptyBody}>持ち物は選択中の旅行ごとに保存されます。</Text></View>
-        ) : packingItems.length === 0 ? (
+          <View style={styles.empty}><Text style={styles.emptyTitle}>旅行を作成してください</Text><Text style={styles.emptyBody}>準備は選択中の旅行ごとに保存されます。</Text></View>
+        ) : isTasks && tasks.length === 0 ? (
+          <Pressable onPress={openCreate} style={({ pressed }) => [styles.empty, pressed && styles.pressed]}>
+            <View style={styles.emptyMark}><Text style={styles.emptyMarkText}>＋</Text></View>
+            <Text style={styles.emptyTitle}>やることはまだありません</Text>
+            <Text style={styles.emptyBody}>必要になったときだけ追加できます。</Text>
+          </Pressable>
+        ) : !isTasks && packingItems.length === 0 ? (
           <Pressable onPress={openCreate} style={({ pressed }) => [styles.empty, pressed && styles.pressed]}>
             <View style={styles.emptyMark}><Text style={styles.emptyMarkText}>＋</Text></View>
             <Text style={styles.emptyTitle}>最初の持ち物を追加</Text>
-            <Text style={styles.emptyBody}>服、充電器、パスポートなどを準備していきましょう。</Text>
+            <Text style={styles.emptyBody}>バッグに入れるものを追加してください。</Text>
           </Pressable>
+        ) : isTasks ? (
+          <View style={styles.groups}>
+            {taskGroups.map((group) => (
+              <View key={group.label} style={styles.group}>
+                <View style={styles.groupHeading}>
+                  <Text style={styles.groupTitle}>{group.label}</Text>
+                  <Text style={styles.groupCount}>{group.items.length}</Text>
+                </View>
+                <View style={styles.list}>{group.items.map(renderTask)}</View>
+              </View>
+            ))}
+          </View>
         ) : (
           <View style={styles.groups}>
-            {grouped.map((group) => (
+            {packingGroups.map((group) => (
               <View key={group.category} style={styles.group}>
                 <View style={styles.groupHeading}>
                   <Text style={styles.groupTitle}>{group.category}</Text>
@@ -113,14 +257,14 @@ export default function PackingScreen() {
                 <View style={styles.list}>
                   {group.items.map((item, index) => (
                     <View key={item.id} style={[styles.row, index > 0 && styles.rowBorder]}>
-                      <Pressable accessibilityLabel={`${item.name}を${item.packed ? '未準備' : '準備済み'}にする`} accessibilityRole="checkbox" accessibilityState={{ checked: item.packed }} hitSlop={8} onPress={() => toggle(item)} style={[styles.check, item.packed && styles.checkDone]}>
+                      <Pressable accessibilityLabel={`${item.name}を${item.packed ? '未準備' : '準備済み'}にする`} accessibilityRole="checkbox" accessibilityState={{ checked: item.packed }} hitSlop={8} onPress={() => togglePacking(item)} style={[styles.check, item.packed && styles.checkDone]}>
                         <Text style={[styles.checkText, item.packed && styles.checkTextDone]}>{item.packed ? '✓' : ''}</Text>
                       </Pressable>
-                      <Pressable accessibilityLabel={`${item.name}を編集`} onPress={() => openEdit(item)} style={({ pressed }) => [styles.rowCopy, pressed && styles.pressed]}>
+                      <Pressable accessibilityLabel={`${item.name}を編集`} onPress={() => openPackingEdit(item)} style={({ pressed }) => [styles.rowCopy, pressed && styles.pressed]}>
                         <Text style={[styles.itemName, item.packed && styles.itemDone]}>{item.name}</Text>
                         {item.quantity > 1 ? <Text style={styles.quantity}>× {item.quantity}</Text> : null}
                       </Pressable>
-                      <Pressable accessibilityLabel={`${item.name}を編集`} hitSlop={8} onPress={() => openEdit(item)}><Text style={styles.editMark}>•••</Text></Pressable>
+                      <Pressable accessibilityLabel={`${item.name}を編集`} hitSlop={8} onPress={() => openPackingEdit(item)}><Text style={styles.editMark}>•••</Text></Pressable>
                     </View>
                   ))}
                 </View>
@@ -132,25 +276,63 @@ export default function PackingScreen() {
 
       <Modal animationType="fade" onRequestClose={() => setFormOpen(false)} transparent visible={formOpen}>
         <SafeAreaView style={styles.backdrop}>
-          <Pressable accessibilityLabel="持ち物編集を閉じる" onPress={() => setFormOpen(false)} style={StyleSheet.absoluteFill} />
+          <Pressable accessibilityLabel="準備の編集を閉じる" onPress={() => setFormOpen(false)} style={StyleSheet.absoluteFill} />
           <View accessibilityViewIsModal style={styles.dialog}>
             <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               <View style={styles.dialogHeading}>
-                <Text style={styles.dialogTitle}>{editingId ? '持ち物を編集' : '持ち物を追加'}</Text>
-                <Pressable accessibilityLabel="持ち物編集を閉じる" onPress={() => setFormOpen(false)} style={styles.closeButton}><Text style={styles.close}>×</Text></Pressable>
+                <Text style={styles.dialogTitle}>{editingId ? (isTasks ? 'やることを編集' : '持ち物を編集') : (isTasks ? 'やることを追加' : '持ち物を追加')}</Text>
+                <Pressable accessibilityLabel="準備の編集を閉じる" onPress={() => setFormOpen(false)} style={styles.closeButton}><Text style={styles.close}>×</Text></Pressable>
               </View>
-              <Text style={styles.label}>持ち物</Text>
-              <TextInput autoFocus maxLength={120} onChangeText={(name) => setDraft((current) => ({ ...current, name }))} placeholder="例：モバイルバッテリー" placeholderTextColor={palette.smoke} style={styles.input} value={draft.name} />
-              <Text style={styles.label}>カテゴリー</Text>
-              <View style={styles.categoryList}>
-                {CATEGORIES.map((category) => <Pressable key={category} onPress={() => setDraft((current) => ({ ...current, category }))} style={[styles.categoryButton, draft.category === category && styles.categorySelected]}><Text style={[styles.categoryText, draft.category === category && styles.categoryTextSelected]}>{category}</Text></Pressable>)}
-              </View>
-              <Text style={styles.label}>個数</Text>
-              <View style={styles.stepper}>
-                <Pressable accessibilityLabel="個数を減らす" disabled={draft.quantity <= 1} onPress={() => setDraft((current) => ({ ...current, quantity: Math.max(1, current.quantity - 1) }))} style={({ pressed }) => [styles.stepButton, pressed && styles.pressed]}><Text style={styles.stepText}>−</Text></Pressable>
-                <Text accessibilityLiveRegion="polite" style={styles.stepValue}>{draft.quantity}</Text>
-                <Pressable accessibilityLabel="個数を増やす" disabled={draft.quantity >= 99} onPress={() => setDraft((current) => ({ ...current, quantity: Math.min(99, current.quantity + 1) }))} style={({ pressed }) => [styles.stepButton, pressed && styles.pressed]}><Text style={styles.stepText}>＋</Text></Pressable>
-              </View>
+
+              {isTasks ? (
+                <>
+                  {!editingId && availableHints.length ? (
+                    <>
+                      <Text style={styles.label}>入力候補</Text>
+                      <View style={styles.hints}>
+                        {availableHints.map((hint) => (
+                          <Pressable key={hint} onPress={() => setTaskDraft((current) => ({ ...current, title: hint }))} style={[styles.hint, taskDraft.title === hint && styles.hintSelected]}>
+                            <Text style={[styles.hintText, taskDraft.title === hint && styles.hintTextSelected]}>{hint}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </>
+                  ) : null}
+                  <Text style={styles.label}>やること</Text>
+                  <TextInput autoFocus maxLength={160} onChangeText={(title) => setTaskDraft((current) => ({ ...current, title }))} placeholder="例：eSIMを用意する" placeholderTextColor={palette.smoke} style={styles.input} value={taskDraft.title} />
+                  <Pressable onPress={() => setHasDueDate((current) => !current)} style={styles.optionalToggle}>
+                    <View style={[styles.miniCheck, hasDueDate && styles.miniCheckSelected]}>{hasDueDate ? <Text style={styles.miniCheckText}>✓</Text> : null}</View>
+                    <Text style={styles.optionalToggleText}>期限を設定する</Text>
+                  </Pressable>
+                  {hasDueDate ? (
+                    <DateRangePicker
+                      endDate={taskDraft.dueOn || today}
+                      label="期限"
+                      mode="single"
+                      onChange={(range) => setTaskDraft((current) => ({ ...current, dueOn: range.startDate }))}
+                      startDate={taskDraft.dueOn || today}
+                    />
+                  ) : null}
+                  <Text style={styles.label}>担当（任意）</Text>
+                  <TextInput maxLength={80} onChangeText={(assignee) => setTaskDraft((current) => ({ ...current, assignee }))} placeholder="名前を入力" placeholderTextColor={palette.smoke} style={styles.input} value={taskDraft.assignee} />
+                </>
+              ) : (
+                <>
+                  <Text style={styles.label}>持ち物</Text>
+                  <TextInput autoFocus maxLength={120} onChangeText={(name) => setPackingDraft((current) => ({ ...current, name }))} placeholder="例：モバイルバッテリー" placeholderTextColor={palette.smoke} style={styles.input} value={packingDraft.name} />
+                  <Text style={styles.label}>カテゴリー</Text>
+                  <View style={styles.categoryList}>
+                    {CATEGORIES.map((category) => <Pressable key={category} onPress={() => setPackingDraft((current) => ({ ...current, category }))} style={[styles.categoryButton, packingDraft.category === category && styles.categorySelected]}><Text style={[styles.categoryText, packingDraft.category === category && styles.categoryTextSelected]}>{category}</Text></Pressable>)}
+                  </View>
+                  <Text style={styles.label}>個数</Text>
+                  <View style={styles.stepper}>
+                    <Pressable accessibilityLabel="個数を減らす" disabled={packingDraft.quantity <= 1} onPress={() => setPackingDraft((current) => ({ ...current, quantity: Math.max(1, current.quantity - 1) }))} style={({ pressed }) => [styles.stepButton, pressed && styles.pressed]}><Text style={styles.stepText}>−</Text></Pressable>
+                    <Text accessibilityLiveRegion="polite" style={styles.stepValue}>{packingDraft.quantity}</Text>
+                    <Pressable accessibilityLabel="個数を増やす" disabled={packingDraft.quantity >= 99} onPress={() => setPackingDraft((current) => ({ ...current, quantity: Math.min(99, current.quantity + 1) }))} style={({ pressed }) => [styles.stepButton, pressed && styles.pressed]}><Text style={styles.stepText}>＋</Text></Pressable>
+                  </View>
+                </>
+              )}
+
               {formError ? <Text accessibilityLiveRegion="polite" style={styles.error}>{formError}</Text> : null}
               <View style={styles.actions}>
                 {editingId ? <Pressable onPress={remove} style={styles.deleteButton}><Text style={styles.deleteText}>削除</Text></Pressable> : <View />}
@@ -172,11 +354,17 @@ const styles = StyleSheet.create({
   tagText: { color: palette.ink, fontSize: 11, lineHeight: 14, fontWeight: '800', letterSpacing: 0.5 },
   counter: { color: palette.smoke, fontSize: 11, lineHeight: 14, fontWeight: '800', letterSpacing: 0.5 },
   titleRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginTop: 20 },
+  titleCopy: { flex: 1 },
   title: { color: palette.ink, fontSize: 48, lineHeight: 52, fontWeight: '900', letterSpacing: -2.4 },
   tripName: { maxWidth: 420, color: palette.slate, fontSize: 14, lineHeight: 20, fontWeight: '600', marginTop: 3 },
   addButton: { backgroundColor: palette.ink, borderRadius: 8, paddingHorizontal: 18, paddingVertical: 13 },
   addButtonText: { color: palette.paper, fontSize: 14, lineHeight: 18, fontWeight: '800' },
-  progressCard: { backgroundColor: palette.ocean, borderRadius: 28, padding: 24, marginTop: 28 },
+  segmented: { flexDirection: 'row', backgroundColor: palette.sky, borderRadius: 14, padding: 4, marginTop: 24 },
+  segment: { flex: 1, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  segmentSelected: { backgroundColor: palette.paper },
+  segmentText: { color: palette.slate, fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  segmentTextSelected: { color: palette.ink, fontWeight: '900' },
+  progressCard: { backgroundColor: palette.ocean, borderRadius: 28, padding: 24, marginTop: 18 },
   progressCopy: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   progressLabel: { color: palette.paper, fontSize: 15, lineHeight: 20, fontWeight: '700' },
   progressValue: { color: palette.paper, fontSize: 36, lineHeight: 40, fontWeight: '900', letterSpacing: -1.5 },
@@ -201,19 +389,31 @@ const styles = StyleSheet.create({
   checkText: { color: palette.paper, fontSize: 16, lineHeight: 18, fontWeight: '900' },
   checkTextDone: { color: palette.paper },
   rowCopy: { flex: 1, minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  itemCopy: { flex: 1, paddingVertical: 10 },
   itemName: { flexShrink: 1, color: palette.ink, fontSize: 16, lineHeight: 22, fontWeight: '700' },
   itemDone: { color: palette.smoke, textDecorationLine: 'line-through' },
+  itemMeta: { color: palette.smoke, fontSize: 12, lineHeight: 17, fontWeight: '600', marginTop: 2 },
   quantity: { color: palette.smoke, fontSize: 13, lineHeight: 18, fontWeight: '700' },
   editMark: { color: palette.smoke, fontSize: 13, lineHeight: 20, fontWeight: '900', letterSpacing: 1 },
   backdrop: { flex: 1, backgroundColor: 'rgba(24,42,54,0.48)', justifyContent: 'flex-end', alignItems: 'center' },
   dialog: { width: '100%', maxWidth: 680, maxHeight: '88%', backgroundColor: palette.paper, borderTopLeftRadius: 32, borderTopRightRadius: 32, overflow: 'hidden' },
   form: { paddingHorizontal: 22, paddingTop: 22, paddingBottom: 34 },
-  dialogHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 },
+  dialogHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   dialogTitle: { color: palette.ink, fontSize: 28, lineHeight: 34, fontWeight: '900', letterSpacing: -1 },
   closeButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: palette.mist, alignItems: 'center', justifyContent: 'center' },
   close: { color: palette.ink, fontSize: 26, lineHeight: 28 },
   label: { color: palette.ink, fontSize: 13, lineHeight: 18, fontWeight: '800', marginBottom: 8, marginTop: 17 },
   input: { minHeight: 52, backgroundColor: palette.mist, borderRadius: 14, color: palette.ink, fontSize: 16, lineHeight: 22, paddingHorizontal: 16, paddingVertical: 14 },
+  hints: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  hint: { backgroundColor: palette.mist, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 },
+  hintSelected: { backgroundColor: palette.ocean },
+  hintText: { color: palette.slate, fontSize: 13, lineHeight: 17, fontWeight: '700' },
+  hintTextSelected: { color: palette.paper },
+  optionalToggle: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 18 },
+  miniCheck: { width: 22, height: 22, borderRadius: 7, borderWidth: 2, borderColor: palette.accent, alignItems: 'center', justifyContent: 'center' },
+  miniCheckSelected: { backgroundColor: palette.ocean, borderColor: palette.ocean },
+  miniCheckText: { color: palette.paper, fontSize: 12, lineHeight: 14, fontWeight: '900' },
+  optionalToggleText: { color: palette.slate, fontSize: 14, lineHeight: 19, fontWeight: '700' },
   categoryList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   categoryButton: { backgroundColor: palette.mist, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 },
   categorySelected: { backgroundColor: palette.ocean },
@@ -231,3 +431,4 @@ const styles = StyleSheet.create({
   saveText: { color: palette.paper, fontSize: 15, lineHeight: 19, fontWeight: '800' },
   pressed: { opacity: 0.62 },
 });
+
