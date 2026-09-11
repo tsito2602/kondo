@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { FloatingAddButton } from '@/components/floating-add-button';
 import { palette } from '@/constants/design';
+import { findAirportByCode } from '@/data/airports';
 import type { Booking, BookingKind, ItineraryItem } from '@/data/types';
 import { useTravel } from '@/data/travel-provider';
 
@@ -124,6 +125,18 @@ function bookingDetails(entry: TimelineEntry) {
   }
   const endDate = booking.endDay && booking.endDay !== booking.day ? `${shortDate(booking.endDay)} ` : '';
   return [`${startStage} · ${booking.title}`, booking.endTime ? `${endStage} ${endDate}${booking.endTime}` : ''].filter(Boolean);
+}
+
+function timeZoneLabel(entry: TimelineEntry) {
+  if (entry.booking?.kind !== 'flight') return '現地時刻';
+  const code = entry.bookingEndpoint === 'end' ? entry.booking.destinationCode : entry.booking.originCode;
+  const airport = findAirportByCode(code);
+  if (!airport) return '現地時刻';
+  if (airport.timeZone === 'Asia/Tokyo') return 'JST';
+  const date = new Date(`${entry.day}T12:00:00Z`);
+  return new Intl.DateTimeFormat('en-US', { timeZone: airport.timeZone, timeZoneName: 'shortOffset' })
+    .formatToParts(date)
+    .find((part) => part.type === 'timeZoneName')?.value ?? '現地時刻';
 }
 
 export default function ItineraryScreen() {
@@ -266,16 +279,14 @@ export default function ItineraryScreen() {
           <View style={styles.empty}><Text style={styles.emptyTitle}>旅行がありません</Text><Text style={styles.emptyBody}>旅行一覧から旅行を選択してください。</Text></View>
         ) : <View style={styles.timeline}>{itineraryDates.map((date, dayIndex) => {
           const dateItems = grouped[date] ?? [];
-          const hasBookingAcrossDate = bookings.some((booking) => booking.endTime && booking.day < date && (booking.endDay || booking.day) >= date);
           return (
             <View key={date} onLayout={(event) => { dayOffsets.current[date] = event.nativeEvent.layout.y; }} style={styles.daySection}>
-              <View style={[styles.dateBar, hasBookingAcrossDate && styles.linkedDateBar]}>
-                {hasBookingAcrossDate ? <View style={styles.dateConnector} /> : null}
+              <View style={styles.dateBar}>
                 <Text numberOfLines={1} style={styles.date}>{longDate(date)}</Text>
                 <Text style={styles.dateDay}>DAY {String(dayIndex + 1).padStart(2, '0')}</Text>
               </View>
               {dateItems.length ? <View>
-                  {dateItems.map((entry, entryIndex) => {
+                  {dateItems.map((entry) => {
                     const details = bookingDetails(entry);
                     const isLinkedStart = entry.bookingEndpoint === 'start' && Boolean(entry.booking?.endTime);
                     const isLinkedEnd = entry.bookingEndpoint === 'end';
@@ -288,11 +299,11 @@ export default function ItineraryScreen() {
                       style={({ pressed }) => [styles.itemRow, (isLinkedStart || isLinkedEnd) && styles.linkedBookingRow, pressed && styles.itemPressed]}>
                       <View style={styles.timeColumn}>
                         <Text style={styles.time}>{entry.time || '—'}</Text>
-                        <Text style={styles.timeKind}>{entry.booking ? entry.bookingStage : entry.item?.kind || '予定'}</Text>
+                        <Text style={styles.timeZone}>{timeZoneLabel(entry)}</Text>
                       </View>
                       <View style={styles.railColumn}>
-                        {entryIndex > 0 || isLinkedEnd ? <View style={[styles.rail, styles.railTop, isLinkedEnd && styles.linkedRail]} /> : null}
-                        {entryIndex < dateItems.length - 1 || isLinkedStart ? <View style={[styles.rail, styles.railBottom, isLinkedStart && styles.linkedRail]} /> : null}
+                        {isLinkedEnd ? <View style={[styles.rail, styles.railTop, styles.linkedRail]} /> : null}
+                        {isLinkedStart ? <View style={[styles.rail, styles.railBottom, styles.linkedRail]} /> : null}
                         <View style={[styles.iconCircle, entry.booking && styles.bookingIconCircle, isLinkedEnd && styles.bookingEndIconCircle]}>
                           <SymbolView
                             name={entry.booking ? BOOKING_ICONS[entry.booking.kind] : PLAN_ICON}
@@ -360,17 +371,15 @@ const styles = StyleSheet.create({
   emptyBody: { color: palette.slate, textAlign: 'center', marginTop: 7 },
   timeline: { marginTop: 10, marginHorizontal: -20 },
   daySection: { backgroundColor: palette.paper },
-  dateBar: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: palette.mist, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.ash, paddingHorizontal: 20, position: 'relative' },
-  linkedDateBar: { paddingLeft: 122 },
-  dateConnector: { position: 'absolute', left: 104, top: -1, bottom: -1, width: 2, backgroundColor: palette.ocean },
-  date: { flex: 1, color: palette.ink, fontSize: 14, lineHeight: 20, fontWeight: '800', marginRight: 12 },
+  dateBar: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: palette.mist, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.ash, paddingHorizontal: 20, position: 'relative', zIndex: 2 },
+  date: { flex: 1, color: palette.ink, fontSize: 12, lineHeight: 18, fontWeight: '700', marginRight: 12 },
   dateDay: { color: palette.ocean, fontFamily: 'monospace', fontSize: 10, lineHeight: 14, fontWeight: '700' },
   itemRow: { minHeight: 104, flexDirection: 'row', alignItems: 'stretch', paddingHorizontal: 16 },
   linkedBookingRow: { backgroundColor: palette.soft },
   itemPressed: { opacity: 0.55 },
   timeColumn: { width: 64, alignItems: 'flex-end', paddingTop: 20, paddingRight: 6 },
   time: { color: palette.ink, fontFamily: 'monospace', fontSize: 15, lineHeight: 20, fontWeight: '800' },
-  timeKind: { color: palette.smoke, fontSize: 10, lineHeight: 15, marginTop: 2 },
+  timeZone: { color: palette.smoke, fontFamily: 'monospace', fontSize: 10, lineHeight: 15, marginTop: 2 },
   railColumn: { width: 50, alignItems: 'center', position: 'relative' },
   rail: { position: 'absolute', left: 24, width: 2, backgroundColor: palette.accent },
   linkedRail: { backgroundColor: palette.ocean },
