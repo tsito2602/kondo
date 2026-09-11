@@ -17,7 +17,7 @@ export type FlightConnection = {
   durationMinutes: number;
 };
 
-function localDateTimeToEpoch(day: string, time: string, timeZone: string) {
+function localDateTimeToEpoch(day: string, time: string, timeZone?: string) {
   const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
   const timeMatch = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time);
   if (!dateMatch || !timeMatch) return null;
@@ -29,6 +29,10 @@ function localDateTimeToEpoch(day: string, time: string, timeZone: string) {
     Number(timeMatch[1]),
     Number(timeMatch[2]),
   );
+  // Both sides of a connection are at the same airport, so wall-clock time is
+  // still enough to calculate the layover when an imported IATA code is not in
+  // the bundled airport list yet.
+  if (!timeZone) return wallClockAsUtc;
   const formatter = new Intl.DateTimeFormat('en-CA-u-ca-gregory-nu-latn', {
     timeZone,
     year: 'numeric',
@@ -61,10 +65,9 @@ function localDateTimeToEpoch(day: string, time: string, timeZone: string) {
 function endpointEpoch(booking: FlightConnectionInput, endpoint: 'arrival' | 'departure') {
   const code = endpoint === 'arrival' ? booking.destinationCode : booking.originCode;
   const airport = findAirportByCode(code);
-  if (!airport) return null;
   const day = endpoint === 'arrival' ? booking.endDay : booking.day;
   const time = endpoint === 'arrival' ? booking.endTime : booking.time;
-  return localDateTimeToEpoch(day, time, airport.timeZone);
+  return localDateTimeToEpoch(day, time, airport?.timeZone);
 }
 
 export function findFlightConnections(bookings: readonly FlightConnectionInput[]) {
