@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Modal, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -91,6 +91,8 @@ export default function ItineraryScreen() {
   const [note, setNote] = useState('');
   const scrollRef = useRef<ScrollView>(null);
   const dayOffsets = useRef<Record<string, number>>({});
+  const programmaticScrollDay = useRef<string | null>(null);
+  const scrollTrackingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const timeline = [
     ...items.map<TimelineEntry>((item) => ({ key: `item-${item.id}`, day: item.day, time: item.time, title: item.title, note: item.note, item })),
@@ -107,14 +109,31 @@ export default function ItineraryScreen() {
   const [activeDay, setActiveDay] = useState(selectedTrip?.startsOn ?? '');
   const visibleActiveDay = itineraryDates.includes(activeDay) ? activeDay : itineraryDates[0];
 
+  const resumeScrollTracking = () => {
+    programmaticScrollDay.current = null;
+    if (scrollTrackingTimer.current) clearTimeout(scrollTrackingTimer.current);
+    scrollTrackingTimer.current = null;
+  };
+
+  useEffect(() => () => {
+    if (scrollTrackingTimer.current) clearTimeout(scrollTrackingTimer.current);
+  }, []);
+
   const scrollToDay = (date: string) => {
     const offset = dayOffsets.current[date];
+    resumeScrollTracking();
+    programmaticScrollDay.current = date;
     setActiveDay(date);
-    if (offset === undefined) return;
+    if (offset === undefined) {
+      resumeScrollTracking();
+      return;
+    }
     scrollRef.current?.scrollTo({ y: Math.max(0, offset - 68), animated: true });
+    scrollTrackingTimer.current = setTimeout(resumeScrollTracking, 1000);
   };
 
   const trackVisibleDay = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (programmaticScrollDay.current) return;
     const scrollPosition = event.nativeEvent.contentOffset.y + 76;
     let visibleDay = itineraryDates[0];
     for (const date of itineraryDates) {
@@ -178,7 +197,9 @@ export default function ItineraryScreen() {
     <SafeAreaView style={styles.safeArea} edges={[]}>
       <ScrollView
         contentContainerStyle={styles.content}
+        onMomentumScrollEnd={resumeScrollTracking}
         onScroll={trackVisibleDay}
+        onScrollBeginDrag={resumeScrollTracking}
         ref={scrollRef}
         scrollEventThrottle={32}
         showsVerticalScrollIndicator={false}
