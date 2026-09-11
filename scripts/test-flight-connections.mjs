@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url);
 for (const [name, entry] of [['connections', 'src/data/flight-connections.ts'], ['worker', 'worker/index.ts']]) {
   await build({ entryPoints: [entry], bundle: true, platform: 'node', format: 'cjs', outfile: join(dir, `${name}.cjs`), logLevel: 'silent' });
 }
-const { findFlightConnections, connectionBetween, flightConnectionCandidates } = require(join(dir, 'connections.cjs'));
+const { findFlightConnections, connectionBetween, flightConnectionCandidates, hasLikelyFlightConnection } = require(join(dir, 'connections.cjs'));
 const worker = require(join(dir, 'worker.cjs')).default;
 after(() => rm(dir, { recursive: true, force: true }));
 const flight = (id, extra = {}) => ({ id, kind: 'flight', title: id, origin: '', destination: '', detail: '', confirmationCode: '', note: '', originCode: 'NRT', destinationCode: 'DXB', day: '2026-11-21', time: '22:20', endDay: '2026-11-22', endTime: '05:30', ...extra });
@@ -56,6 +56,18 @@ test('a DST change at the same airport uses elapsed time', () => {
   const arrival = { ...first, destinationCode: 'VIE', endDay: '2026-10-25', endTime: '01:30' };
   const departure = { ...second, originCode: 'VIE', day: '2026-10-25', time: '03:30' };
   assert.equal(connectionBetween(arrival, departure).durationMinutes, 180);
+});
+
+test('connection control excludes absent, distant, incompatible and already assigned flights', () => {
+  assert.equal(hasLikelyFlightConnection(first, [first]), false);
+  assert.equal(hasLikelyFlightConnection(first, [first, second]), true);
+  assert.equal(hasLikelyFlightConnection({ ...first, connectionMode: 'none' }, [first, second]), true);
+  for (const changes of [{ day: '2026-11-27' }, { originCode: 'HND' }, { time: '05:45' }]) {
+    assert.equal(hasLikelyFlightConnection(first, [first, { ...second, ...changes }]), false);
+  }
+  const assigned = { ...first, id: randomUUID(), connectionMode: 'manual', nextFlightId: second.id };
+  assert.equal(hasLikelyFlightConnection(first, [first, second, assigned]), false);
+  assert.equal(hasLikelyFlightConnection(second, [first, second]), false);
 });
 
 async function fixture() {

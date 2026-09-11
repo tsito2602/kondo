@@ -9,9 +9,10 @@ import { FloatingAddButton } from '@/components/floating-add-button';
 import { FlightConnectionLink, FlightConnectionSheet } from '@/components/flight-connection-sheet';
 import { palette } from '@/constants/design';
 import { findAirportByCode } from '@/data/airports';
-import { findFlightConnections, flightConnectionCandidates, formatConnectionDuration, type FlightConnection } from '@/data/flight-connections';
+import { findFlightConnections, hasLikelyFlightConnection, formatConnectionDuration, type FlightConnection } from '@/data/flight-connections';
 import type { Booking, BookingKind, ItineraryItem } from '@/data/types';
 import { useTravel } from '@/data/travel-provider';
+import { confirmDeletion } from '@/utils/confirm-deletion';
 
 const BOOKING_STAGES: Record<BookingKind, [string, string]> = {
   flight: ['出発', '到着'],
@@ -265,17 +266,10 @@ export default function ItineraryScreen() {
 
   const remove = () => {
     if (!editingId) return;
-    Alert.alert('予定を削除しますか？', title, [
-      { text: 'キャンセル', style: 'cancel' },
-      {
-        text: '削除',
-        style: 'destructive',
-        onPress: () => {
-          deleteItem(editingId);
-          closeEditor();
-        },
-      },
-    ]);
+    confirmDeletion('予定を削除しますか？', title, () => {
+      deleteItem(editingId);
+      closeEditor();
+    });
   };
 
   return (
@@ -353,7 +347,7 @@ export default function ItineraryScreen() {
                       <Text style={styles.chevron}>›</Text>
                     </Pressable>
                     {connection ? <ConnectionRow connection={connection} continueRail={connectedDepartures.has(connection.departureBookingId)} nextFlight={bookings.find((flight) => flight.id === connection.departureBookingId)} onPress={() => setConnectionBookingId(connection.arrivalBookingId)} />
-                      : isLinkedEnd && entry.booking?.kind === 'flight' && (entry.booking.connectionMode === 'manual' || entry.booking.connectionMode === 'none' || flightConnectionCandidates(entry.booking, bookings).length > 0)
+                      : isLinkedEnd && entry.booking?.kind === 'flight' && hasLikelyFlightConnection(entry.booking, bookings)
                         ? <View style={styles.connectionAction}><FlightConnectionLink compact booking={entry.booking} onPress={() => setConnectionBookingId(entry.booking!.id)} /></View> : null}
                     </Fragment>
                     );
@@ -401,7 +395,7 @@ function ConnectionRow({ connection, continueRail, nextFlight, onPress }: { conn
         </View>
       </View>
       <View style={styles.connectionCopy}>
-        <View style={styles.connectionHeading}><Text style={styles.connectionTitle}>乗り継ぎ</Text><Text style={styles.connectionDuration}>{formatConnectionDuration(connection.durationMinutes)}</Text><Text style={styles.connectionMode}>{connection.mode === 'auto' ? '自動' : '指定'}</Text></View>
+        <View style={styles.connectionHeading}><Text style={styles.connectionTitle}>乗り継ぎ</Text><Text style={styles.connectionDuration}>{formatConnectionDuration(connection.durationMinutes)}</Text></View>
         {nextFlight ? <Text style={styles.connectionNext}>{nextFlight.title} · {shortDate(nextFlight.day)} {nextFlight.time}発 → {nextFlight.destinationCode || nextFlight.destination}</Text> : null}
       </View>
       <Text style={styles.connectionChevron}>›</Text>
@@ -455,7 +449,6 @@ const styles = StyleSheet.create({
   connectionHeading: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
   connectionTitle: { color: palette.slate, fontSize: 11, lineHeight: 17, fontWeight: '600' },
   connectionDuration: { color: palette.ocean, fontSize: 15, lineHeight: 21, fontWeight: '800' },
-  connectionMode: { color: palette.slate, fontSize: 10 },
   connectionNext: { color: palette.slate, fontSize: 11, lineHeight: 17 },
   connectionChevron: { color: palette.ocean, alignSelf: 'center', fontSize: 22, marginLeft: 8 },
   connectionAction: { paddingLeft: 130, paddingRight: 16, paddingBottom: 12, backgroundColor: palette.soft },

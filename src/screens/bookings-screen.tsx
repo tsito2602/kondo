@@ -3,7 +3,7 @@ import { File } from 'expo-file-system';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { type ComponentProps, type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateRangePicker } from '@/components/date-range-picker';
@@ -14,9 +14,10 @@ import { palette } from '@/constants/design';
 import { findAirports, type Airport } from '@/data/airports';
 import { cacheBookingDocument, getCachedDocumentUri, removeCachedBookingDocument } from '@/data/booking-document-cache';
 import { findMatchingItineraryItem } from '@/data/booking-match';
-import { findFlightConnections } from '@/data/flight-connections';
+import { findFlightConnections, hasLikelyFlightConnection } from '@/data/flight-connections';
 import { useTravel } from '@/data/travel-provider';
 import { Booking, BookingDocument, BookingKind } from '@/data/types';
+import { confirmDeletion } from '@/utils/confirm-deletion';
 
 const KINDS: { value: BookingKind; label: string; short: string; icon: string }[] = [
   { value: 'flight', label: '航空券', short: 'FLIGHT', icon: '✈' },
@@ -140,14 +141,11 @@ function TripBookingsScreen() {
 
   const remove = () => {
     if (!editingId) return;
-    Alert.alert('予約を削除しますか？', 'この操作は取り消せません。', [
-      { text: 'キャンセル', style: 'cancel' },
-      { text: '削除', style: 'destructive', onPress: () => {
-        for (const document of documentsByBooking[editingId] ?? []) removeCachedBookingDocument(document.id, document.filename);
-        deleteBooking(editingId);
-        setFormOpen(false);
-      } },
-    ]);
+    confirmDeletion('予約を削除しますか？', 'この操作は取り消せません。', () => {
+      for (const document of documentsByBooking[editingId] ?? []) removeCachedBookingDocument(document.id, document.filename);
+      deleteBooking(editingId);
+      setFormOpen(false);
+    });
   };
 
   return (
@@ -193,7 +191,7 @@ function TripBookingsScreen() {
                   <View style={[styles.notch, styles.notchTop]} />
                   <View style={[styles.notch, styles.notchBottom]} />
                 </Pressable>
-                {booking.kind === 'flight' ? <FlightConnectionLink booking={booking} connection={connection} nextFlight={bookings.find((flight) => flight.id === connection?.departureBookingId)} onPress={() => setConnectionBookingId(booking.id)} /> : null}
+                {booking.kind === 'flight' && (connection || hasLikelyFlightConnection(booking, bookings)) ? <FlightConnectionLink booking={booking} connection={connection} nextFlight={bookings.find((flight) => flight.id === connection?.departureBookingId)} onPress={() => setConnectionBookingId(booking.id)} /> : null}
                 </View>
               );
             })}
@@ -308,13 +306,10 @@ function BookingDocuments({ bookingId, documents }: { bookingId: string; documen
   };
 
   const removeDocument = (document: BookingDocument) => {
-    Alert.alert('書類を削除しますか？', document.filename, [
-      { text: 'キャンセル', style: 'cancel' },
-      { text: '削除', style: 'destructive', onPress: () => {
-        removeCachedBookingDocument(document.id, document.filename);
-        deleteBookingDocument(bookingId, document.id);
-      } },
-    ]);
+    confirmDeletion('書類を削除しますか？', document.filename, () => {
+      removeCachedBookingDocument(document.id, document.filename);
+      deleteBookingDocument(bookingId, document.id);
+    });
   };
 
   return <View style={styles.documentsSection}>

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateRangePicker } from '@/components/date-range-picker';
@@ -7,6 +7,7 @@ import { FloatingAddButton } from '@/components/floating-add-button';
 import { palette } from '@/constants/design';
 import { useTravel } from '@/data/travel-provider';
 import { PackingItem, TravelTask } from '@/data/types';
+import { confirmDeletion } from '@/utils/confirm-deletion';
 
 const CATEGORIES = ['衣類', '洗面・衛生', '電子機器', '書類', '薬', 'その他'];
 const TASK_HINTS = ['休暇を申請する', 'eSIMを用意する', '両替する', 'ペットの預け先を決める'];
@@ -115,18 +116,11 @@ export default function PackingScreen() {
   const remove = () => {
     if (!editingId) return;
     const target = isTasks ? 'やること' : '持ち物';
-    Alert.alert(`${target}を削除しますか？`, 'この操作は取り消せません。', [
-      { text: 'キャンセル', style: 'cancel' },
-      {
-        text: '削除',
-        style: 'destructive',
-        onPress: () => {
-          if (isTasks) deleteTask(editingId);
-          else deletePackingItem(editingId);
-          setFormOpen(false);
-        },
-      },
-    ]);
+    confirmDeletion(`${target}を削除しますか？`, 'この操作は取り消せません。', () => {
+      if (isTasks) deleteTask(editingId);
+      else deletePackingItem(editingId);
+      setFormOpen(false);
+    });
   };
 
   const togglePacking = (item: PackingItem) => updatePackingItem(item.id, {
@@ -405,4 +399,3 @@ const styles = StyleSheet.create({
   saveText: { color: palette.paper, fontSize: 15, lineHeight: 19, fontWeight: '800' },
   pressed: { opacity: 0.62 },
 });
-

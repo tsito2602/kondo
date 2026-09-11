@@ -109,6 +109,11 @@ export function createsFlightConnectionCycle(bookings: readonly FlightConnection
   return false;
 }
 
+export function hasLikelyFlightConnection(arrival: FlightConnectionInput, bookings: readonly Booking[]) {
+  return flightConnectionCandidates(arrival, bookings).some(({ connection, assigned }) => !assigned
+    && connection.durationMinutes >= MIN_CONNECTION_MINUTES && connection.durationMinutes <= MAX_CONNECTION_MINUTES);
+}
+
 export function findFlightConnections(bookings: readonly FlightConnectionInput[]) {
   const flights = bookings.filter((booking) => booking.kind === 'flight');
   const arrivals = flights.flatMap((booking) => {
