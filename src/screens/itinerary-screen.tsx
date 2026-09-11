@@ -19,6 +19,26 @@ const BOOKING_STAGES: Record<BookingKind, [string, string]> = {
   other: ['予約', '終了'],
 };
 
+const BOOKING_MARKS: Record<BookingKind, string> = {
+  flight: '空',
+  hotel: '宿',
+  train: '鉄',
+  car: '車',
+  restaurant: '食',
+  ticket: '券',
+  other: '予',
+};
+
+const BOOKING_LABELS: Record<BookingKind, string> = {
+  flight: 'フライト',
+  hotel: '宿泊',
+  train: '鉄道',
+  car: 'レンタカー',
+  restaurant: 'レストラン',
+  ticket: 'チケット',
+  other: '予約',
+};
+
 type TimelineEntry = {
   key: string;
   day: string;
@@ -79,6 +99,12 @@ function shortDate(value: string) {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric' }).format(date);
+}
+
+function dayDate(value: string) {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' }).format(date);
 }
 
 export default function ItineraryScreen() {
@@ -146,7 +172,7 @@ export default function ItineraryScreen() {
   const openAdd = () => {
     if (!selectedTrip) return;
     setEditingId(null);
-    setDay(selectedTrip.startsOn);
+    setDay(visibleActiveDay || selectedTrip.startsOn);
     setTime('10:00');
     setTitle('');
     setNote('');
@@ -222,29 +248,56 @@ export default function ItineraryScreen() {
         ) : itineraryDates.map((date, dayIndex) => {
           const dateItems = grouped[date] ?? [];
           return (
-            <View key={date} onLayout={(event) => { dayOffsets.current[date] = event.nativeEvent.layout.y; }} style={styles.dayCard}>
-              <View style={styles.dayBadge}><Text style={styles.dayLabel}>DAY</Text><Text style={styles.dayNumber}>{dayIndex + 1}</Text></View>
-              <View style={styles.dayContent}>
-                <Text style={styles.date}>{date}</Text>
-                {dateItems.length ? <View style={styles.items}>
-                  {dateItems.map((entry) => (
+            <View key={date} onLayout={(event) => { dayOffsets.current[date] = event.nativeEvent.layout.y; }} style={styles.daySection}>
+              <View style={styles.dayHeading}>
+                <View style={styles.dayCount}><Text style={styles.dayCountLabel}>DAY</Text><Text style={styles.dayCountNumber}>{dayIndex + 1}</Text></View>
+                <View style={styles.dayHeadingCopy}>
+                  <Text style={styles.dayDate}>{dayDate(date)}</Text>
+                  <Text style={styles.dayDestination}>{selectedTrip.destination}</Text>
+                </View>
+                <View style={styles.dayHeadingRule} />
+              </View>
+
+              {dateItems.length ? <View style={styles.timeline}>
+                {dateItems.map((entry, entryIndex) => {
+                  const isBooking = Boolean(entry.booking);
+                  const mark = entry.booking ? BOOKING_MARKS[entry.booking.kind] : '•';
+                  return (
                     <Pressable
                       accessibilityHint={entry.booking ? '予約の詳細を開きます' : '予定を編集します'}
                       accessibilityRole="button"
                       key={entry.key}
                       onPress={() => entry.booking && selectedTrip ? router.push({ pathname: '/trips/[tripId]/bookings', params: { tripId: selectedTrip.id, booking: entry.booking.id } }) : openEdit(entry.item!)}
-                      style={({ pressed }) => [styles.itemRow, entry.booking && styles.bookingRow, pressed && styles.itemPressed]}>
-                      <Text style={styles.time}>{entry.time}</Text>
-                      <View style={styles.itemCopy}>
-                        {entry.booking ? <Text style={styles.bookingTag}>予約 · {entry.bookingStage}</Text> : null}
-                        <Text style={styles.itemTitle}>{entry.title}</Text>
-                        {entry.note ? <Text style={styles.note}>{entry.note}</Text> : null}
+                      style={({ pressed }) => [styles.timelineRow, pressed && styles.itemPressed]}>
+                      <View style={styles.timeColumn}>
+                        <Text style={styles.time}>{entry.time || '—'}</Text>
                       </View>
-                      <Text style={styles.chevron}>›</Text>
+                      <View style={styles.railColumn}>
+                        {entryIndex < dateItems.length - 1 ? <View style={styles.rail} /> : null}
+                        <View style={[styles.timelineNode, isBooking && styles.bookingNode]}>
+                          <Text style={[styles.timelineMark, isBooking && styles.bookingMark]}>{mark}</Text>
+                        </View>
+                      </View>
+                      <View style={[styles.entryCard, isBooking && styles.bookingCard]}>
+                        {entry.booking ? <View style={styles.bookingMetaRow}>
+                          <Text style={styles.bookingTag}>{BOOKING_LABELS[entry.booking.kind]} · {entry.bookingStage}</Text>
+                          {entry.booking.confirmationCode ? <Text accessibilityLabel={`予約番号 ${entry.booking.confirmationCode}`} numberOfLines={1} style={styles.confirmation}>NO. {entry.booking.confirmationCode}</Text> : null}
+                        </View> : null}
+                        <View style={styles.entryTitleRow}>
+                          <Text style={styles.itemTitle}>{entry.title}</Text>
+                          <Text style={styles.chevron}>›</Text>
+                        </View>
+                        {entry.note ? <Text style={[styles.note, isBooking && styles.bookingNote]}>{entry.note}</Text> : null}
+                        {entry.booking?.detail && entry.note !== entry.booking.detail ? <Text style={styles.detail} numberOfLines={2}>{entry.booking.detail}</Text> : null}
+                      </View>
                     </Pressable>
-                  ))}
-                </View> : <Text style={styles.emptyDay}>予定はまだありません</Text>}
-              </View>
+                  );
+                })}
+              </View> : <View style={styles.emptyTimelineRow}>
+                <View style={styles.timeColumn}><Text style={styles.emptyTime}>—</Text></View>
+                <View style={styles.railColumn}><View style={styles.emptyNode} /></View>
+                <View style={styles.emptyDayCard}><Text style={styles.emptyDay}>予定はまだありません</Text></View>
+              </View>}
             </View>
           );
         })}
@@ -273,8 +326,8 @@ export default function ItineraryScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.canvas },
-  content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 112 },
-  dayNavSticky: { zIndex: 4, marginHorizontal: -20, paddingHorizontal: 20, paddingBottom: 10, backgroundColor: palette.canvas },
+  content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 128 },
+  dayNavSticky: { zIndex: 4, marginHorizontal: -20, paddingHorizontal: 20, paddingBottom: 10, backgroundColor: palette.canvas, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
   dayTabs: { gap: 8, paddingRight: 20 },
   dayTab: { minWidth: 68, minHeight: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: palette.mist, paddingHorizontal: 12 },
   dayTabSelected: { backgroundColor: palette.ocean },
@@ -282,28 +335,46 @@ const styles = StyleSheet.create({
   dayTabLabelSelected: { color: palette.paper },
   dayTabDate: { color: palette.smoke, fontFamily: 'monospace', fontSize: 9, lineHeight: 13, marginTop: 1 },
   dayTabDateSelected: { color: palette.sky },
-  pending: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, marginTop: 4 },
+  pending: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, marginTop: 12 },
   empty: { minHeight: 430, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  emptyMark: { color: palette.accent, fontSize: 42, fontWeight: '900' },
   emptyTitle: { color: palette.ink, fontSize: 28, lineHeight: 30, fontWeight: '900', letterSpacing: -0.8, marginTop: 14 },
   emptyBody: { color: palette.slate, textAlign: 'center', marginTop: 7 },
-  dayCard: { flexDirection: 'row', backgroundColor: palette.paper, borderRadius: 32, padding: 20, marginTop: 16 },
-  dayBadge: { width: 52, height: 52, borderRadius: 26, backgroundColor: palette.sky, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
-  dayLabel: { color: palette.ink, fontFamily: 'monospace', fontSize: 8, fontWeight: '400' },
-  dayNumber: { color: palette.ink, fontSize: 22, lineHeight: 24, fontWeight: '900' },
-  dayContent: { flex: 1 },
-  date: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, fontWeight: '400' },
-  emptyDay: { color: palette.smoke, fontSize: 13, lineHeight: 19, marginTop: 12 },
-  items: { marginTop: 8 },
-  itemRow: { minHeight: 58, flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
-  bookingRow: { backgroundColor: palette.soft, borderRadius: 12, borderBottomWidth: 0, paddingHorizontal: 10, marginVertical: 3 },
-  itemPressed: { opacity: 0.55 },
-  time: { color: palette.ocean, width: 52, fontFamily: 'monospace', fontSize: 12, fontWeight: '700' },
-  itemCopy: { flex: 1 },
-  bookingTag: { color: palette.ocean, fontFamily: 'monospace', fontSize: 9, lineHeight: 13, fontWeight: '700', marginBottom: 2 },
-  itemTitle: { color: palette.ink, fontSize: 16, fontWeight: '700' },
-  note: { color: palette.slate, fontSize: 12, lineHeight: 18, marginTop: 4 },
+  daySection: { marginTop: 28 },
+  dayHeading: { minHeight: 52, flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  dayCount: { width: 48, height: 48, borderRadius: 24, backgroundColor: palette.sky, alignItems: 'center', justifyContent: 'center' },
+  dayCountLabel: { color: palette.slate, fontFamily: 'monospace', fontSize: 7, lineHeight: 10, fontWeight: '700', letterSpacing: 0.7 },
+  dayCountNumber: { color: palette.ink, fontSize: 20, lineHeight: 21, fontWeight: '900' },
+  dayHeadingCopy: { marginLeft: 13 },
+  dayDate: { color: palette.ink, fontSize: 17, lineHeight: 21, fontWeight: '900' },
+  dayDestination: { color: palette.smoke, fontSize: 11, lineHeight: 16, marginTop: 1 },
+  dayHeadingRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: palette.ash, marginLeft: 16 },
+  timeline: { width: '100%' },
+  timelineRow: { minHeight: 82, flexDirection: 'row', alignItems: 'stretch' },
+  timeColumn: { width: 56, alignItems: 'flex-end', paddingTop: 16, paddingRight: 10 },
+  time: { color: palette.ocean, fontFamily: 'monospace', fontSize: 12, lineHeight: 18, fontWeight: '800' },
+  railColumn: { width: 32, alignItems: 'center', position: 'relative' },
+  rail: { position: 'absolute', top: 32, bottom: -16, width: 1, backgroundColor: palette.ash },
+  timelineNode: { width: 24, height: 24, marginTop: 13, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.canvas, borderWidth: 1, borderColor: palette.ash, zIndex: 1 },
+  bookingNode: { backgroundColor: palette.ocean, borderColor: palette.ocean },
+  timelineMark: { color: palette.slate, fontSize: 13, lineHeight: 16, fontWeight: '900' },
+  bookingMark: { color: palette.paper, fontSize: 10 },
+  entryCard: { flex: 1, minWidth: 0, backgroundColor: palette.paper, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
+  bookingCard: { borderLeftWidth: 3, borderLeftColor: palette.ocean },
+  bookingMetaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 6 },
+  bookingTag: { flexShrink: 0, color: palette.ocean, fontFamily: 'monospace', fontSize: 9, lineHeight: 13, fontWeight: '800', letterSpacing: 0.3 },
+  confirmation: { flex: 1, color: palette.smoke, fontFamily: 'monospace', fontSize: 8, lineHeight: 12, textAlign: 'right' },
+  entryTitleRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  itemTitle: { flex: 1, color: palette.ink, fontSize: 16, lineHeight: 21, fontWeight: '800' },
+  note: { color: palette.slate, fontSize: 12, lineHeight: 18, marginTop: 5 },
+  bookingNote: { color: palette.ocean, fontFamily: 'monospace', fontSize: 13, fontWeight: '800' },
+  detail: { color: palette.slate, fontSize: 11, lineHeight: 17, marginTop: 5 },
   chevron: { color: palette.smoke, fontSize: 22, lineHeight: 22, marginLeft: 12 },
+  itemPressed: { opacity: 0.55 },
+  emptyTimelineRow: { minHeight: 62, flexDirection: 'row' },
+  emptyTime: { color: palette.ash, fontFamily: 'monospace', fontSize: 12 },
+  emptyNode: { width: 10, height: 10, borderRadius: 5, borderWidth: 1, borderColor: palette.ash, backgroundColor: palette.canvas, marginTop: 19 },
+  emptyDayCard: { flex: 1, minHeight: 48, justifyContent: 'center', borderRadius: 16, backgroundColor: palette.soft, paddingHorizontal: 16, marginBottom: 8 },
+  emptyDay: { color: palette.smoke, fontSize: 12, lineHeight: 18 },
   modal: { flex: 1, backgroundColor: palette.canvas },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
   cancel: { color: palette.slate },
