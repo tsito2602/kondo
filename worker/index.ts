@@ -296,6 +296,49 @@ async function gmailJson<T>(url: string, accessToken: string): Promise<T> {
   return result;
 }
 
+type ParsedGmailMessage = Parameters<typeof parseGmailMessage>[0];
+
+async function gmailMessageBatch(messageIds: string[], accessToken: string): Promise<ParsedGmailMessage[]> {
+  if (!messageIds.length) return [];
+  const boundary = `tabi_batch_${crypto.randomUUID().replaceAll('-', '')}`;
+  const body = messageIds.map((messageId, index) => [
+    `--${boundary}`,
+    'Content-Type: application/http',
+    `Content-ID: <message-${index}>`,
+    '',
+    `GET /gmail/v1/users/me/messages/${encodeURIComponent(messageId)}?format=full HTTP/1.1`,
+    '',
+  ].join('\r\n')).join('\r\n') + `\r\n--${boundary}--\r\n`;
+
+  const response = await fetch('https://gmail.googleapis.com/batch/gmail/v1', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+      'content-type': `multipart/mixed; boundary=${boundary}`,
+    },
+    body,
+  });
+  const responseText = await response.text();
+  if (!response.ok) throw new Error('Gmailの一括読み込みに失敗しました');
+  const responseBoundary = /boundary="?([^";]+)"?/i.exec(response.headers.get('content-type') ?? '')?.[1];
+  if (!responseBoundary) throw new Error('Gmailの一括応答を読み取れませんでした');
+
+  const messages: ParsedGmailMessage[] = [];
+  for (const rawPart of responseText.split(`--${responseBoundary}`)) {
+    const part = rawPart.replaceAll('\r\n', '\n');
+    const httpStart = part.search(/HTTP\/1\.[01]\s+\d{3}/);
+    if (httpStart < 0) continue;
+    const status = Number.parseInt(/HTTP\/1\.[01]\s+(\d{3})/.exec(part.slice(httpStart))?.[1] ?? '500', 10);
+    const bodyStart = part.indexOf('\n\n', httpStart);
+    if (bodyStart < 0) throw new Error('Gmailの一括応答を読み取れませんでした');
+    const jsonText = part.slice(bodyStart + 2).trim();
+    const result = JSON.parse(jsonText) as ParsedGmailMessage & { error?: { message?: string } };
+    if (status < 200 || status >= 300) throw new Error(result.error?.message ?? 'Gmailの読み込みに失敗しました');
+    messages.push(result);
+  }
+  return messages;
+}
+
 type ExistingBooking = {
   id: string;
   kind: string;
@@ -330,17 +373,17 @@ async function gmailCandidates(env: Env, user: User, tripId: string) {
   if (!trip) return json({ error: '旅行が見つかりません' }, 404);
   try {
     const accessToken = await gmailAccessToken(env, user);
-    const query = encodeURIComponent('newer_than:2y {予約 reservation booking itinerary e-ticket boarding hotel check-in train rail 新幹線 搭乗 宿泊}');
-    const listed = await gmailJson<{ messages?: { id: string }[] }>(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=35&q=${query}`, accessToken);
+    const query = encodeURIComponent('{予約 reservation booking itinerary e-ticket boarding hotel check-in train rail 新幹線 搭乗 宿泊}');
+    const listed = await gmailJson<{ messages?: { id: string }[] }>(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=500&q=${query}`,
+      accessToken,
+    );
     const messages = listed.messages ?? [];
-    const fetched: unknown[] = [];
-    for (let index = 0; index < messages.length; index += 10) {
-      fetched.push(...await Promise.all(messages.slice(index, index + 10).map(({ id }) => gmailJson(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=full`,
-        accessToken,
-      ))));
+    const fetched: ParsedGmailMessage[] = [];
+    for (let index = 0; index < messages.length; index += 50) {
+      fetched.push(...await gmailMessageBatch(messages.slice(index, index + 50).map(({ id }) => id), accessToken));
     }
-    const candidates = fetched.flatMap((message) => parseGmailMessage(message as Parameters<typeof parseGmailMessage>[0]))
+    const candidates = fetched.flatMap((message) => parseGmailMessage(message))
       .filter((candidate) => isCandidateNearTrip(candidate, trip.startsOn, trip.endsOn));
     const [bookingsResult, importsResult] = await Promise.all([
       env.DB.prepare(`
