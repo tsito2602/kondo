@@ -10,6 +10,7 @@ import { DateRangePicker } from '@/components/date-range-picker';
 import { palette } from '@/constants/design';
 import { findAirports, type Airport } from '@/data/airports';
 import { cacheBookingDocument, getCachedDocumentUri, removeCachedBookingDocument } from '@/data/booking-document-cache';
+import { findMatchingItineraryItem } from '@/data/booking-match';
 import { useTravel } from '@/data/travel-provider';
 import { Booking, BookingDocument, BookingKind } from '@/data/types';
 
@@ -35,16 +36,20 @@ function blankDraft(day: string, kind: BookingKind = 'flight'): Draft {
 
 export default function BookingsScreen() {
   const { booking: requestedBooking } = useLocalSearchParams<{ booking?: string | string[] }>();
-  const { bookings, createBooking, deleteBooking, documentsByBooking, pendingCount, selectedTrip, updateBooking } = useTravel();
+  const { bookings, createBooking, deleteBooking, deleteItem, documentsByBooking, items, pendingCount, selectedTrip, updateBooking } = useTravel();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(() => blankDraft(selectedTrip?.startsOn ?? ''));
   const [formOpen, setFormOpen] = useState(false);
   const [formError, setFormError] = useState('');
+  const [mergeItemId, setMergeItemId] = useState<string | null>(null);
+  const matchingCandidate = findMatchingItineraryItem(items, draft);
+  const selectedMergeItem = matchingCandidate?.item.id === mergeItemId ? matchingCandidate.item : null;
 
   const openCreate = () => {
     setEditingId(null);
     setDraft(blankDraft(selectedTrip?.startsOn ?? ''));
     setFormError('');
+    setMergeItemId(null);
     setFormOpen(true);
   };
 
@@ -66,6 +71,7 @@ export default function BookingsScreen() {
       note: booking.note,
     });
     setFormError('');
+    setMergeItemId(null);
     setFormOpen(true);
   }, []);
 
@@ -104,8 +110,15 @@ export default function BookingsScreen() {
       confirmationCode: draft.confirmationCode.trim(),
       note: draft.note.trim(),
     };
-    if (editingId) updateBooking(editingId, input);
-    else createBooking(input);
+    const mergedContext = selectedMergeItem
+      ? [selectedMergeItem.title.trim() !== input.title ? selectedMergeItem.title.trim() : '', selectedMergeItem.note.trim()].filter(Boolean).join(' — ')
+      : '';
+    const savedInput = mergedContext
+      ? { ...input, note: [input.note, `日程から：${mergedContext}`].filter(Boolean).join('\n') }
+      : input;
+    if (editingId) updateBooking(editingId, savedInput);
+    else createBooking(savedInput);
+    if (selectedMergeItem) deleteItem(selectedMergeItem.id);
     setFormOpen(false);
   };
 
@@ -193,6 +206,16 @@ export default function BookingsScreen() {
               </View>
 
               <BookingFormFields draft={draft} setDraft={setDraft} />
+              {matchingCandidate ? <View style={[styles.matchCard, selectedMergeItem && styles.matchCardSelected]}>
+                <View style={styles.matchCopy}>
+                  <Text style={styles.matchEyebrow}>{matchingCandidate.reason}</Text>
+                  <Text numberOfLines={1} style={styles.matchTitle}>{matchingCandidate.item.time}　{matchingCandidate.item.title}</Text>
+                  <Text style={styles.matchHelp}>{selectedMergeItem ? '保存すると、この予定の内容を予約へ移して1件にまとめます。' : '選ばなければ、予定と予約は別々に残ります。'}</Text>
+                </View>
+                <Pressable accessibilityRole="button" onPress={() => setMergeItemId(selectedMergeItem ? null : matchingCandidate.item.id)} style={[styles.matchButton, selectedMergeItem && styles.matchButtonSelected]}>
+                  <Text style={[styles.matchButtonText, selectedMergeItem && styles.matchButtonTextSelected]}>{selectedMergeItem ? '✓ まとめる' : 'まとめる'}</Text>
+                </Pressable>
+              </View> : null}
               {editingId ? <BookingDocuments bookingId={editingId} documents={documentsByBooking[editingId] ?? []} /> : <Text style={styles.documentNotice}>書類は予約を保存したあとに追加できます。</Text>}
               <Field label="メモ" multiline placeholder="任意" value={draft.note} onChangeText={(note) => setDraft((current) => ({ ...current, note }))} />
               {formError ? <Text accessibilityLiveRegion="polite" style={styles.error}>{formError}</Text> : null}
@@ -454,6 +477,16 @@ const styles = StyleSheet.create({
   suggestionName: { color: palette.ink, fontSize: 13, fontWeight: '700' },
   suggestionCity: { color: palette.smoke, fontSize: 10, marginTop: 2 },
   suggestionCode: { color: palette.ocean, fontFamily: 'monospace', fontSize: 15, fontWeight: '900', letterSpacing: 1 },
+  matchCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, backgroundColor: palette.paper, padding: 14 },
+  matchCardSelected: { backgroundColor: palette.sky },
+  matchCopy: { flex: 1, minWidth: 0 },
+  matchEyebrow: { color: palette.ocean, fontFamily: 'monospace', fontSize: 9, fontWeight: '800' },
+  matchTitle: { color: palette.ink, fontSize: 14, fontWeight: '800', marginTop: 4 },
+  matchHelp: { color: palette.slate, fontSize: 10, lineHeight: 15, marginTop: 4 },
+  matchButton: { minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: palette.sky, paddingHorizontal: 13 },
+  matchButtonSelected: { backgroundColor: palette.ocean },
+  matchButtonText: { color: palette.ocean, fontSize: 11, fontWeight: '800' },
+  matchButtonTextSelected: { color: palette.paper },
   documentNotice: { color: palette.smoke, fontSize: 11, lineHeight: 17 },
   documentsSection: { gap: 10 },
   documentsHeading: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
