@@ -331,7 +331,7 @@ async function gmailCandidates(env: Env, user: User, tripId: string) {
   try {
     const accessToken = await gmailAccessToken(env, user);
     const query = encodeURIComponent('newer_than:2y {予約 reservation booking itinerary e-ticket boarding hotel check-in train rail 新幹線 搭乗 宿泊}');
-    const listed = await gmailJson<{ messages?: { id: string }[] }>(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=100&q=${query}`, accessToken);
+    const listed = await gmailJson<{ messages?: { id: string }[] }>(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=35&q=${query}`, accessToken);
     const messages = listed.messages ?? [];
     const fetched: unknown[] = [];
     for (let index = 0; index < messages.length; index += 10) {
