@@ -3,6 +3,7 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 import { candidateFingerprint, GmailImportCandidate, isCandidateNearTrip, parseGmailMessage } from './gmail-import';
+import { GMAIL_INTERVAL_MS, GMAIL_PAGE_SIZE, GmailReadError, gmailJson, gmailMessageBatch, gmailSearchQuery, type GmailParsedMessage, type GmailReviewMessage } from './gmail-search';
 
 type Env = {
   DB: D1Database;
@@ -229,6 +230,7 @@ async function gmailCallback(request: Request, env: Env, url: URL) {
         ? await encryptGmailToken(env, token.refresh_token)
         : existing;
       if (!encrypted) throw new Error('refresh token missing');
+      await env.DB.prepare('DELETE FROM gmail_message_cache WHERE user_id = ?').bind(stored.userId).run();
       const profileResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
         headers: { authorization: `Bearer ${token.access_token}` },
       });
@@ -250,6 +252,7 @@ async function gmailCallback(request: Request, env: Env, url: URL) {
 }
 
 async function disconnectGmail(env: Env, user: User) {
+  await env.DB.prepare('DELETE FROM gmail_message_cache WHERE user_id = ?').bind(user.id).run();
   const connection = await env.DB.prepare('DELETE FROM gmail_connections WHERE user_id = ? RETURNING encrypted_refresh_token AS encryptedToken, token_iv AS iv')
     .bind(user.id)
     .first<{ encryptedToken: string; iv: string }>();
@@ -269,9 +272,9 @@ async function disconnectGmail(env: Env, user: User) {
 
 async function gmailAccessToken(env: Env, user: User) {
   if (!gmailConfigured(env)) throw new Error('Gmail連携のサーバー設定が完了していません');
-  const connection = await env.DB.prepare('SELECT encrypted_refresh_token AS encryptedToken, token_iv AS iv FROM gmail_connections WHERE user_id = ?')
+  const connection = await env.DB.prepare('SELECT encrypted_refresh_token AS encryptedToken, token_iv AS iv, email, updated_at AS updatedAt FROM gmail_connections WHERE user_id = ?')
     .bind(user.id)
-    .first<{ encryptedToken: string; iv: string }>();
+    .first<{ encryptedToken: string; iv: string; email: string; updatedAt: number }>();
   if (!connection) throw new Error('Gmailを連携してください');
   const refreshToken = await decryptGmailToken(env, connection.encryptedToken, connection.iv);
   const response = await fetch('https://oauth2.googleapis.com/token', {
@@ -286,57 +289,7 @@ async function gmailAccessToken(env: Env, user: User) {
   });
   const result = await response.json() as { access_token?: string; error?: string };
   if (!response.ok || !result.access_token) throw new Error(result.error === 'invalid_grant' ? 'Gmailをもう一度連携してください' : 'Gmailへ接続できませんでした');
-  return result.access_token;
-}
-
-async function gmailJson<T>(url: string, accessToken: string): Promise<T> {
-  const response = await fetch(url, { headers: { authorization: `Bearer ${accessToken}` } });
-  const result = await response.json() as T & { error?: { message?: string } };
-  if (!response.ok) throw new Error(result.error?.message ?? 'Gmailの読み込みに失敗しました');
-  return result;
-}
-
-type ParsedGmailMessage = Parameters<typeof parseGmailMessage>[0];
-
-async function gmailMessageBatch(messageIds: string[], accessToken: string): Promise<ParsedGmailMessage[]> {
-  if (!messageIds.length) return [];
-  const boundary = `tabi_batch_${crypto.randomUUID().replaceAll('-', '')}`;
-  const body = messageIds.map((messageId, index) => [
-    `--${boundary}`,
-    'Content-Type: application/http',
-    `Content-ID: <message-${index}>`,
-    '',
-    `GET /gmail/v1/users/me/messages/${encodeURIComponent(messageId)}?format=full HTTP/1.1`,
-    '',
-  ].join('\r\n')).join('\r\n') + `\r\n--${boundary}--\r\n`;
-
-  const response = await fetch('https://gmail.googleapis.com/batch/gmail/v1', {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${accessToken}`,
-      'content-type': `multipart/mixed; boundary=${boundary}`,
-    },
-    body,
-  });
-  const responseText = await response.text();
-  if (!response.ok) throw new Error('Gmailの一括読み込みに失敗しました');
-  const responseBoundary = /boundary="?([^";]+)"?/i.exec(response.headers.get('content-type') ?? '')?.[1];
-  if (!responseBoundary) throw new Error('Gmailの一括応答を読み取れませんでした');
-
-  const messages: ParsedGmailMessage[] = [];
-  for (const rawPart of responseText.split(`--${responseBoundary}`)) {
-    const part = rawPart.replaceAll('\r\n', '\n');
-    const httpStart = part.search(/HTTP\/1\.[01]\s+\d{3}/);
-    if (httpStart < 0) continue;
-    const status = Number.parseInt(/HTTP\/1\.[01]\s+(\d{3})/.exec(part.slice(httpStart))?.[1] ?? '500', 10);
-    const bodyStart = part.indexOf('\n\n', httpStart);
-    if (bodyStart < 0) throw new Error('Gmailの一括応答を読み取れませんでした');
-    const jsonText = part.slice(bodyStart + 2).trim();
-    const result = JSON.parse(jsonText) as ParsedGmailMessage & { error?: { message?: string } };
-    if (status < 200 || status >= 300) throw new Error(result.error?.message ?? 'Gmailの読み込みに失敗しました');
-    messages.push(result);
-  }
-  return messages;
+  return { accessToken: result.access_token, cachePrefix: `${connection.email}|${connection.updatedAt}|` };
 }
 
 type ExistingBooking = {
@@ -372,24 +325,101 @@ async function gmailCandidates(request: Request, env: Env, user: User, tripId: s
     .bind(tripId).first<{ startsOn: string; endsOn: string }>();
   if (!trip) return json({ error: '旅行が見つかりません' }, 404);
   const body = await request.json().catch(() => null);
-  const pageToken = isObject(body) && typeof body.pageToken === 'string' && body.pageToken.length <= 2048
-    ? body.pageToken
-    : '';
+  if (!isObject(body)) return json({ error: '検索条件が必要です' }, 400);
+  const query = textField(body.query, 500);
+  const pageToken = textField(body.pageToken, 2048);
+  const pendingIds = body.pendingIds ?? [];
+  if (query === null || pageToken === null || !Array.isArray(pendingIds) || pendingIds.length > GMAIL_PAGE_SIZE
+    || pendingIds.some((id) => typeof id !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(id))) {
+    return json({ error: '検索条件が正しくありません' }, 400);
+  }
+  const nextPage = { candidates: [] as GmailImportCandidate[], reviewMessages: [] as GmailReviewMessage[],
+    nextPageToken: pageToken || null, pendingIds: [...new Set(pendingIds)] as string[], scanned: 0,
+    retryAfterSeconds: 0, nextRequestAfterMs: 0, error: '' };
   try {
-    const accessToken = await gmailAccessToken(env, user);
-    const query = encodeURIComponent('{予約 reservation booking itinerary e-ticket boarding hotel check-in train rail 新幹線 搭乗 宿泊}');
-    const page = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '';
-    const listed = await gmailJson<{ messages?: { id: string }[]; nextPageToken?: string }>(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=75&q=${query}${page}`,
-      accessToken,
-    );
-    const messages = listed.messages ?? [];
-    const fetched: ParsedGmailMessage[] = [];
-    for (let index = 0; index < messages.length; index += 10) {
-      fetched.push(...await gmailMessageBatch(messages.slice(index, index + 10).map(({ id }) => id), accessToken));
+    // A shared account-level lease keeps multiple tabs/trips inside the same Gmail quota.
+    const now = Date.now();
+    const lease = await env.DB.prepare(`INSERT INTO gmail_scan_limits (user_id, next_allowed_at) VALUES (?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET next_allowed_at = excluded.next_allowed_at
+      WHERE gmail_scan_limits.next_allowed_at <= ? RETURNING next_allowed_at AS nextAllowedAt`)
+      .bind(user.id, now + GMAIL_INTERVAL_MS, now).first<{ nextAllowedAt: number }>();
+    if (!lease) {
+      const limit = await env.DB.prepare('SELECT next_allowed_at AS nextAllowedAt FROM gmail_scan_limits WHERE user_id = ?')
+        .bind(user.id).first<{ nextAllowedAt: number }>();
+      return json({ ...nextPage, retryAfterSeconds: Math.max(1, Math.ceil(((limit?.nextAllowedAt ?? now + 1000) - now) / 1000)) });
     }
-    const candidates = fetched.flatMap((message) => parseGmailMessage(message))
+    const { accessToken, cachePrefix } = await gmailAccessToken(env, user);
+    let ids = nextPage.pendingIds;
+    if (!ids.length) {
+      const params = new URLSearchParams({ maxResults: String(GMAIL_PAGE_SIZE), q: gmailSearchQuery(query) });
+      if (pageToken) params.set('pageToken', pageToken);
+      const listed = await gmailJson<{ messages?: { id: string }[]; nextPageToken?: string }>(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`, accessToken);
+      ids = (listed.messages ?? []).map(({ id }) => id);
+      nextPage.nextPageToken = listed.nextPageToken ?? null;
+    }
+    nextPage.pendingIds = ids;
+    const parsed: GmailParsedMessage[] = [];
+    // Cache parsed fields only, encrypted, including negative results. Never retain email bodies.
+    // A versioned key invalidates negative results when the parser is improved.
+    if (ids.length) {
+      const cached = await env.DB.prepare(`SELECT message_id AS id, encrypted_result AS encryptedResult, token_iv AS iv
+        FROM gmail_message_cache WHERE user_id = ? AND parser_version = 1 AND expires_at > unixepoch()
+        AND message_id IN (${ids.map(() => '?').join(',')})`).bind(user.id, ...ids.map((id) => cachePrefix + id))
+        .all<{ id: string; encryptedResult: string; iv: string }>();
+      for (const entry of cached.results) {
+        try { parsed.push(JSON.parse(await decryptGmailToken(env, entry.encryptedResult, entry.iv)) as GmailParsedMessage); }
+        catch { /* Refetch a cache entry after key rotation or corruption. */ }
+      }
+    }
+    const cachedIds = new Set(parsed.map((message) => message.id));
+    nextPage.scanned = cachedIds.size;
+    nextPage.pendingIds = ids.filter((id) => !cachedIds.has(id));
+    const fetchedIds = [...nextPage.pendingIds];
+    for (let index = 0; index < fetchedIds.length; index += 10) {
+      let batch;
+      try { batch = await gmailMessageBatch(fetchedIds.slice(index, index + 10), accessToken); }
+      catch (cause) {
+        if (cause instanceof GmailReadError && !cause.retryAfterSeconds) nextPage.error = cause.message;
+        else nextPage.retryAfterSeconds = cause instanceof GmailReadError ? cause.retryAfterSeconds : 5;
+        break;
+      }
+      const unfinished = new Set(batch.pendingIds);
+      const done = fetchedIds.slice(index, index + 10).filter((id) => !unfinished.has(id));
+      nextPage.pendingIds = nextPage.pendingIds.filter((id) => !done.includes(id));
+      nextPage.scanned += batch.scanned;
+      const writes: D1PreparedStatement[] = [];
+      for (const message of batch.messages) {
+        const headers = message.payload?.headers ?? [];
+        const entry: GmailParsedMessage = { id: message.id!,
+          subject: headers.find((header) => header.name?.toLowerCase() === 'subject')?.value ?? '(件名なし)',
+          sender: headers.find((header) => header.name?.toLowerCase() === 'from')?.value ?? '', candidates: [] };
+        try { entry.candidates = parseGmailMessage(message); } catch { /* Keep unparseable mail visible for review. */ }
+        parsed.push(entry);
+        const encrypted = await encryptGmailToken(env, JSON.stringify(entry));
+        writes.push(env.DB.prepare(`INSERT INTO gmail_message_cache (user_id, message_id, parser_version, encrypted_result, token_iv, expires_at)
+          VALUES (?, ?, 1, ?, ?, unixepoch() + 86400) ON CONFLICT(user_id, message_id) DO UPDATE SET
+          parser_version = 1, encrypted_result = excluded.encrypted_result, token_iv = excluded.token_iv, expires_at = excluded.expires_at`)
+          .bind(user.id, cachePrefix + entry.id, encrypted.encryptedToken, encrypted.iv));
+      }
+      if (writes.length) await env.DB.batch(writes).catch(() => undefined);
+      if (batch.pendingIds.length) {
+        nextPage.retryAfterSeconds = batch.retryAfterSeconds;
+        nextPage.error = batch.error;
+        break;
+      }
+    }
+    const candidates = parsed.flatMap((message) => message.candidates)
       .filter((candidate) => isCandidateNearTrip(candidate, trip.startsOn, trip.endsOn));
+    nextPage.reviewMessages = parsed.filter((message) => !message.candidates.some((candidate) => isCandidateNearTrip(candidate, trip.startsOn, trip.endsOn)))
+      .map((message) => ({ sourceMessageId: message.id, subject: message.subject, sender: message.sender,
+        reason: message.candidates.length ? 'outside-trip' : 'unparsed' }));
+    const nextAllowedAt = nextPage.retryAfterSeconds ? Date.now() + nextPage.retryAfterSeconds * 1000
+      : fetchedIds.length ? Math.max(now + GMAIL_INTERVAL_MS, Date.now() + 1000) : Date.now() + 250;
+    await env.DB.prepare('UPDATE gmail_scan_limits SET next_allowed_at = ? WHERE user_id = ? AND next_allowed_at = ?')
+      .bind(nextAllowedAt, user.id, lease.nextAllowedAt).run();
+    nextPage.nextRequestAfterMs = Math.max(0, nextAllowedAt - Date.now());
+    await env.DB.prepare('DELETE FROM gmail_message_cache WHERE user_id = ? AND expires_at <= unixepoch()').bind(user.id).run();
     const [bookingsResult, importsResult] = await Promise.all([
       env.DB.prepare(`
         SELECT b.id, b.kind, b.title, b.day, b.time, b.confirmation_code AS confirmationCode,
@@ -400,7 +430,9 @@ async function gmailCandidates(request: Request, env: Env, user: User, tripId: s
         .bind(tripId).all<{ externalId: string; bookingId: string }>(),
     ]);
     const imports = new Map(importsResult.results.map((entry) => [entry.externalId, entry.bookingId]));
+    nextPage.reviewMessages = nextPage.reviewMessages.filter((message) => !imports.has(message.sourceMessageId));
     return json({
+      ...nextPage,
       candidates: candidates.map((candidate) => {
         const importedBookingId = imports.get(candidate.sourceMessageId);
         const duplicate = matchingBooking(candidate, bookingsResult.results);
@@ -410,13 +442,12 @@ async function gmailCandidates(request: Request, env: Env, user: User, tripId: s
           alreadyImported: Boolean(importedBookingId),
         };
       }),
-      nextPageToken: listed.nextPageToken ?? null,
-      scanned: messages.length,
     });
   } catch (cause) {
-    const message = cause instanceof Error ? cause.message : 'Gmailを読み込めませんでした';
-    const limited = /quota exceeded|rate limit|too many concurrent/i.test(message);
-    return json({ error: limited ? 'Gmailの利用上限に近づきました。1分ほど待ってから、続きを探してください。' : message }, 502);
+    if (cause instanceof GmailReadError && cause.retryAfterSeconds) {
+      return json({ ...nextPage, retryAfterSeconds: cause.retryAfterSeconds });
+    }
+    return json({ error: cause instanceof Error ? cause.message : 'Gmailを読み込めませんでした' }, 502);
   }
 }
 
@@ -1050,3 +1081,4 @@ const worker = {
 };
 
 export default worker;
+

@@ -50,7 +50,8 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
-    "check": "npm run typecheck && npm run lint && npx expo export --platform web"
+    "test:gmail": "node scripts/test-gmail-search.mjs",
+    "check": "npm run typecheck && npm run lint && npm run test:gmail && npx expo export --platform web"
   },
   "private": true
 }

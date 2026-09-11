@@ -158,3 +158,19 @@ CREATE TABLE IF NOT EXISTS attachments (
   uploaded_by TEXT NOT NULL REFERENCES users(id),
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
+
+
+CREATE TABLE IF NOT EXISTS gmail_scan_limits (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  next_allowed_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS gmail_message_cache (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  message_id TEXT NOT NULL,
+  parser_version INTEGER NOT NULL,
+  encrypted_result TEXT NOT NULL,
+  token_iv TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, message_id)
+);
+CREATE INDEX IF NOT EXISTS gmail_message_cache_expiry ON gmail_message_cache(user_id, expires_at);
