@@ -108,6 +108,18 @@ CREATE TABLE IF NOT EXISTS booking_documents (
 );
 CREATE INDEX IF NOT EXISTS booking_documents_trip ON booking_documents(trip_id, booking_id, created_at);
 
+CREATE TABLE IF NOT EXISTS flight_connection_preferences (
+  arrival_booking_id TEXT PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
+  departure_booking_id TEXT REFERENCES bookings(id) ON DELETE SET NULL,
+  mode TEXT NOT NULL CHECK(mode IN ('manual', 'none')),
+  updated_by TEXT NOT NULL REFERENCES users(id),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  CHECK(arrival_booking_id != departure_booking_id),
+  CHECK(mode = 'manual' OR departure_booking_id IS NULL)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS flight_connection_departure
+  ON flight_connection_preferences(departure_booking_id) WHERE departure_booking_id IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS invites (
   token_hash TEXT PRIMARY KEY,
   trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,

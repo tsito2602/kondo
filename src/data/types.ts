@@ -22,6 +22,8 @@ export type ItineraryItem = {
 
 export type BookingKind = 'flight' | 'hotel' | 'train' | 'car' | 'restaurant' | 'ticket' | 'other';
 
+export type FlightConnectionMode = 'auto' | 'manual' | 'none';
+
 export type Booking = {
   id: string;
   kind: BookingKind;
@@ -37,6 +39,8 @@ export type Booking = {
   endTime: string;
   confirmationCode: string;
   note: string;
+  connectionMode?: FlightConnectionMode;
+  nextFlightId?: string | null;
   updatedBy?: string;
   updatedAt?: number;
 };

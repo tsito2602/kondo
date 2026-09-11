@@ -42,7 +42,7 @@ async function api<T>(path: string, init: RequestInit = {}, token?: string | nul
   const response = await apiResponse(path, init, token);
   if (response.status === 204) return undefined as T;
   const result = (await response.json()) as T & { error?: string };
-  if (!response.ok) throw new Error(result.error ?? '通信に失敗しました');
+  if (!response.ok) throw Object.assign(new Error(result.error ?? '通信に失敗しました'), { status: response.status });
   return result;
 }
 

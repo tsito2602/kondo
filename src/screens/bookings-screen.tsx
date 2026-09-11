@@ -2,17 +2,19 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { type ComponentProps, type Dispatch, type SetStateAction, useCallback, useEffect, useState } from 'react';
+import { type ComponentProps, type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateRangePicker } from '@/components/date-range-picker';
 import { useAuth } from '@/auth/auth-provider';
 import { FloatingAddButton } from '@/components/floating-add-button';
+import { FlightConnectionLink, FlightConnectionSheet } from '@/components/flight-connection-sheet';
 import { palette } from '@/constants/design';
 import { findAirports, type Airport } from '@/data/airports';
 import { cacheBookingDocument, getCachedDocumentUri, removeCachedBookingDocument } from '@/data/booking-document-cache';
 import { findMatchingItineraryItem } from '@/data/booking-match';
+import { findFlightConnections } from '@/data/flight-connections';
 import { useTravel } from '@/data/travel-provider';
 import { Booking, BookingDocument, BookingKind } from '@/data/types';
 
@@ -50,6 +52,8 @@ function TripBookingsScreen() {
   const [formOpen, setFormOpen] = useState(false);
   const [formError, setFormError] = useState('');
   const [mergeItemId, setMergeItemId] = useState<string | null>(null);
+  const [connectionBookingId, setConnectionBookingId] = useState<string | null>(null);
+  const connections = useMemo(() => new Map(findFlightConnections(bookings).map((connection) => [connection.arrivalBookingId, connection])), [bookings]);
   const matchingCandidate = findMatchingItineraryItem(items, draft);
   const selectedMergeItem = matchingCandidate?.item.id === mergeItemId ? matchingCandidate.item : null;
 
@@ -167,8 +171,10 @@ function TripBookingsScreen() {
                 ? ` → ${booking.endDay.replaceAll('-', '.')}${booking.endTime ? ` ${booking.endTime}` : ''}`
                 : '';
               const documentCount = documentsByBooking[booking.id]?.length ?? 0;
+              const connection = connections.get(booking.id);
               return (
-                <Pressable key={booking.id} onPress={() => openEdit(booking)} style={({ pressed }) => [styles.ticket, pressed && styles.pressed]} accessibilityLabel={`${booking.title}を編集`}>
+                <View key={booking.id}>
+                <Pressable onPress={() => openEdit(booking)} style={({ pressed }) => [styles.ticket, pressed && styles.pressed]} accessibilityLabel={`${booking.title}を編集`}>
                   <View style={styles.copy}>
                     <View style={styles.ticketTop}>
                       <View style={styles.typeTag}><Text style={styles.type}>{kind.short}</Text></View>
@@ -187,6 +193,8 @@ function TripBookingsScreen() {
                   <View style={[styles.notch, styles.notchTop]} />
                   <View style={[styles.notch, styles.notchBottom]} />
                 </Pressable>
+                {booking.kind === 'flight' ? <FlightConnectionLink booking={booking} connection={connection} nextFlight={bookings.find((flight) => flight.id === connection?.departureBookingId)} onPress={() => setConnectionBookingId(booking.id)} /> : null}
+                </View>
               );
             })}
           </View>
@@ -194,6 +202,7 @@ function TripBookingsScreen() {
       </ScrollView>
 
       {selectedTrip ? <FloatingAddButton label="予約を追加する" onPress={openCreate} /> : null}
+      {connectionBookingId ? <FlightConnectionSheet bookingId={connectionBookingId} onClose={() => setConnectionBookingId(null)} /> : null}
 
       <Modal animationType="fade" onRequestClose={() => setFormOpen(false)} transparent visible={formOpen}>
         <SafeAreaView style={styles.backdrop}>
@@ -511,4 +520,3 @@ const styles = StyleSheet.create({
   saveText: { color: palette.paper, fontSize: 15, fontWeight: '800' },
   pressed: { opacity: 0.62 },
 });
-

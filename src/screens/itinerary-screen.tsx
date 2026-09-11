@@ -6,9 +6,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateRangePicker } from '@/components/date-range-picker';
 import { FloatingAddButton } from '@/components/floating-add-button';
+import { FlightConnectionLink, FlightConnectionSheet } from '@/components/flight-connection-sheet';
 import { palette } from '@/constants/design';
 import { findAirportByCode } from '@/data/airports';
-import { findFlightConnections, formatConnectionDuration, type FlightConnection } from '@/data/flight-connections';
+import { findFlightConnections, flightConnectionCandidates, formatConnectionDuration, type FlightConnection } from '@/data/flight-connections';
 import type { Booking, BookingKind, ItineraryItem } from '@/data/types';
 import { useTravel } from '@/data/travel-provider';
 
@@ -111,6 +112,12 @@ function longDate(value: string) {
 
 function entryTitle(entry: TimelineEntry) {
   const booking = entry.booking;
+  if (booking?.kind === 'flight') {
+    const code = entry.bookingEndpoint === 'end' ? booking.destinationCode : booking.originCode;
+    const airport = findAirportByCode(code);
+    const name = airport?.city || (entry.bookingEndpoint === 'end' ? booking.destination : booking.origin);
+    return [name, code].filter(Boolean).join('  ');
+  }
   if (!booking || (!booking.origin && !booking.destination)) return entry.title;
   const origin = booking.originCode || booking.origin;
   const destination = booking.destinationCode || booking.destination;
@@ -121,6 +128,14 @@ function bookingDetails(entry: TimelineEntry) {
   if (!entry.booking) return [];
   const booking = entry.booking;
   const [startStage, endStage] = BOOKING_STAGES[booking.kind];
+  if (booking.kind === 'flight') {
+    const endDate = booking.endDay !== booking.day ? `${shortDate(booking.endDay)} ` : '';
+    const origin = findAirportByCode(booking.originCode)?.city || booking.originCode || booking.origin;
+    const destination = findAirportByCode(booking.destinationCode)?.city || booking.destinationCode || booking.destination;
+    return entry.bookingEndpoint === 'end'
+      ? [`到着 · ${booking.title}`, `${origin}から`]
+      : [`出発 · ${booking.title}`, `${destination}へ${booking.endTime ? ` · ${endDate}${booking.endTime} 着` : ''}`];
+  }
   if (entry.bookingEndpoint === 'end') {
     return [`${endStage} · ${booking.title}`, `${startStage} ${shortDate(booking.day)} ${booking.time}`].filter(Boolean);
   }
@@ -144,6 +159,7 @@ export default function ItineraryScreen() {
   const { selectedTrip, items, bookings, createItem, updateItem, deleteItem, pendingCount } = useTravel();
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [connectionBookingId, setConnectionBookingId] = useState<string | null>(null);
   const [day, setDay] = useState(selectedTrip?.startsOn ?? '');
   const [time, setTime] = useState('10:00');
   const [title, setTitle] = useState('');
@@ -313,7 +329,9 @@ export default function ItineraryScreen() {
                         {connection ? <View style={[styles.connectionRail, styles.railBottom]} /> : null}
                         <View style={[styles.iconCircle, entry.booking && styles.bookingIconCircle, isLinkedEnd && styles.bookingEndIconCircle]}>
                           <SymbolView
-                            name={entry.booking ? BOOKING_ICONS[entry.booking.kind] : PLAN_ICON}
+                            name={entry.booking?.kind === 'flight'
+                              ? isLinkedEnd ? { ios: 'airplane.arrival', android: 'flight_land', web: 'flight_land' } : { ios: 'airplane.departure', android: 'flight_takeoff', web: 'flight_takeoff' }
+                              : entry.booking ? BOOKING_ICONS[entry.booking.kind] : PLAN_ICON}
                             size={21}
                             weight="semibold"
                             tintColor={entry.booking && !isLinkedEnd ? palette.paper : palette.ocean}
@@ -327,7 +345,9 @@ export default function ItineraryScreen() {
                       </View>
                       <Text style={styles.chevron}>›</Text>
                     </Pressable>
-                    {connection ? <ConnectionRow connection={connection} /> : null}
+                    {connection ? <ConnectionRow connection={connection} nextFlight={bookings.find((flight) => flight.id === connection.departureBookingId)} onPress={() => setConnectionBookingId(connection.arrivalBookingId)} />
+                      : isLinkedEnd && entry.booking?.kind === 'flight' && (entry.booking.connectionMode === 'manual' || entry.booking.connectionMode === 'none' || flightConnectionCandidates(entry.booking, bookings).length > 0)
+                        ? <View style={styles.connectionAction}><FlightConnectionLink compact booking={entry.booking} onPress={() => setConnectionBookingId(entry.booking!.id)} /></View> : null}
                     </Fragment>
                     );
                   })}
@@ -342,6 +362,7 @@ export default function ItineraryScreen() {
       </ScrollView>
 
       {selectedTrip ? <FloatingAddButton label="予定を追加する" onPress={openAdd} /> : null}
+      {connectionBookingId ? <FlightConnectionSheet bookingId={connectionBookingId} onClose={() => setConnectionBookingId(null)} /> : null}
 
       <Modal visible={adding} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeEditor}>
         <SafeAreaView style={styles.modal}>
@@ -362,21 +383,22 @@ export default function ItineraryScreen() {
   );
 }
 
-function ConnectionRow({ connection }: { connection: FlightConnection }) {
+function ConnectionRow({ connection, nextFlight, onPress }: { connection: FlightConnection; nextFlight?: Booking; onPress: () => void }) {
   return (
-    <View accessibilityLabel={`${connection.airportName}で${formatConnectionDuration(connection.durationMinutes)}の乗り継ぎ`} style={styles.connectionRow}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${connection.airportName}で${formatConnectionDuration(connection.durationMinutes)}の乗り継ぎ、${nextFlight?.title ?? '次便'}への紐づけを変更`} onPress={onPress} style={({ pressed }) => [styles.connectionRow, pressed && styles.itemPressed]}>
       <View style={styles.connectionTimeColumn} />
       <View style={styles.connectionRailColumn}>
         <View style={styles.connectionRailFull} />
         <View style={styles.connectionIconCircle}>
-          <SymbolView name={CONNECTION_ICON} size={18} weight="semibold" tintColor={palette.slate} />
+          <SymbolView name={CONNECTION_ICON} size={15} tintColor={palette.ocean} />
         </View>
       </View>
       <View style={styles.connectionCopy}>
-        <Text style={styles.connectionTitle}>{connection.airportName}で乗り継ぎ</Text>
-        <Text style={styles.connectionDuration}>{formatConnectionDuration(connection.durationMinutes)}</Text>
+        <View style={styles.connectionHeading}><Text style={styles.connectionTitle}>乗り継ぎ</Text><Text style={styles.connectionDuration}>{formatConnectionDuration(connection.durationMinutes)}</Text><Text style={styles.connectionMode}>{connection.mode === 'auto' ? '自動' : '指定'}</Text></View>
+        {nextFlight ? <Text style={styles.connectionNext}>{nextFlight.title} · {nextFlight.originCode} → {nextFlight.destinationCode || nextFlight.destination}</Text> : null}
       </View>
-    </View>
+      <Text style={styles.connectionChevron}>›</Text>
+    </Pressable>
   );
 }
 
@@ -416,14 +438,19 @@ const styles = StyleSheet.create({
   iconCircle: { width: 42, height: 42, borderRadius: 21, marginTop: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.soft, borderWidth: 2, borderColor: palette.accent, zIndex: 1 },
   bookingIconCircle: { backgroundColor: palette.ocean, borderColor: palette.ocean },
   bookingEndIconCircle: { backgroundColor: palette.paper, borderColor: palette.ocean },
-  connectionRow: { minHeight: 68, flexDirection: 'row', alignItems: 'stretch', paddingHorizontal: 16, backgroundColor: palette.paper },
+  connectionRow: { minHeight: 76, flexDirection: 'row', alignItems: 'stretch', paddingHorizontal: 16, backgroundColor: palette.mist },
   connectionTimeColumn: { width: 64 },
   connectionRailColumn: { width: 50, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   connectionRailFull: { position: 'absolute', top: 0, bottom: 0, left: 24, width: 0, borderLeftWidth: 2, borderColor: palette.smoke, borderStyle: 'dashed' },
-  connectionIconCircle: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.paper, borderWidth: 2, borderColor: palette.smoke, zIndex: 1 },
-  connectionCopy: { flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, paddingLeft: 8, paddingVertical: 14 },
-  connectionTitle: { color: palette.ink, fontSize: 14, lineHeight: 19, fontWeight: '700' },
-  connectionDuration: { color: palette.slate, fontFamily: 'monospace', fontSize: 12, lineHeight: 17 },
+  connectionIconCircle: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.mist, zIndex: 1 },
+  connectionCopy: { flex: 1, justifyContent: 'center', paddingLeft: 8, paddingVertical: 14, gap: 5 },
+  connectionHeading: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  connectionTitle: { color: palette.slate, fontSize: 11, lineHeight: 17, fontWeight: '600' },
+  connectionDuration: { color: palette.ocean, fontSize: 15, lineHeight: 21, fontWeight: '800' },
+  connectionMode: { color: palette.slate, fontSize: 10 },
+  connectionNext: { color: palette.slate, fontSize: 11, lineHeight: 17 },
+  connectionChevron: { color: palette.ocean, alignSelf: 'center', fontSize: 22, marginLeft: 8 },
+  connectionAction: { paddingLeft: 130, paddingRight: 16, paddingBottom: 12, backgroundColor: palette.soft },
   itemCopy: { flex: 1, justifyContent: 'center', paddingVertical: 18, paddingLeft: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
   bookingTag: { color: palette.ocean, fontWeight: '700' },
   itemTitle: { color: palette.ink, fontSize: 17, lineHeight: 22, fontWeight: '800' },

@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { connectionBetween, createsFlightConnectionCycle, type FlightConnectionInput } from '../src/data/flight-connections';
 
 type Env = {
   DB: D1Database;
@@ -251,18 +252,62 @@ function bookingFields(body: Record<string, unknown>) {
 async function listBookings(env: Env, user: User, tripId: string) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
+  return json({ bookings: await readBookings(env, tripId) });
+}
+
+async function readBookings(env: Env, tripId: string) {
   const result = await env.DB.prepare(`
     SELECT b.id, b.kind, b.title, b.detail, b.day, b.time,
            COALESCE(d.origin, '') AS origin, COALESCE(d.origin_code, '') AS originCode,
            COALESCE(d.destination, '') AS destination, COALESCE(d.destination_code, '') AS destinationCode,
            COALESCE(NULLIF(d.end_day, ''), b.day) AS endDay, COALESCE(d.end_time, '') AS endTime,
-           b.confirmation_code AS confirmationCode, b.note, b.updated_by AS updatedBy, b.updated_at AS updatedAt
+           b.confirmation_code AS confirmationCode, b.note, b.updated_by AS updatedBy, b.updated_at AS updatedAt,
+           COALESCE(c.mode, 'auto') AS connectionMode, c.departure_booking_id AS nextFlightId
     FROM bookings b LEFT JOIN booking_details d ON d.booking_id = b.id
+    LEFT JOIN flight_connection_preferences c ON c.arrival_booking_id = b.id
     WHERE b.trip_id = ? ORDER BY b.day, b.time, b.id
   `)
     .bind(tripId)
-    .all();
-  return json({ bookings: result.results });
+    .all<FlightConnectionInput>();
+  return result.results;
+}
+
+async function updateFlightConnection(request: Request, env: Env, user: User, tripId: string, bookingId: string) {
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  const body = await request.json().catch(() => null);
+  if (!isObject(body) || !['auto', 'manual', 'none'].includes(String(body.mode))) return json({ error: '乗り継ぎの設定を確認してください' }, 400);
+  const bookings = await readBookings(env, tripId);
+  const arrival = bookings.find((booking) => booking.id === bookingId && booking.kind === 'flight');
+  if (!arrival) return json({ error: '航空便が見つかりません' }, 404);
+  const mode = body.mode as 'auto' | 'manual' | 'none';
+  const nextFlightId = mode === 'manual' ? idField(body.nextFlightId) : null;
+  if (mode === 'manual') {
+    const departure = bookings.find((booking) => booking.id === nextFlightId);
+    if (!departure || !connectionBetween(arrival, departure)) return json({ error: '同じ空港から到着後に出発する便を選んでください' }, 400);
+    if (bookings.some((booking) => booking.id !== bookingId && booking.connectionMode === 'manual' && booking.nextFlightId === nextFlightId)) {
+      return json({ error: 'この便は別の便の乗り継ぎ先です。先にそちらの紐づけを変更してください' }, 409);
+    }
+    if (createsFlightConnectionCycle(bookings, bookingId, departure.id)) {
+      return json({ error: '便が循環するため紐づけできません。日時を確認してください' }, 400);
+    }
+  }
+  if (mode === 'auto') {
+    await env.DB.prepare('DELETE FROM flight_connection_preferences WHERE arrival_booking_id = ?').bind(bookingId).run();
+  } else {
+    try {
+      await env.DB.prepare(`
+        INSERT INTO flight_connection_preferences (arrival_booking_id, departure_booking_id, mode, updated_by)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(arrival_booking_id) DO UPDATE SET departure_booking_id = excluded.departure_booking_id,
+          mode = excluded.mode, updated_by = excluded.updated_by, updated_at = unixepoch()
+      `).bind(bookingId, nextFlightId, mode, user.id).run();
+    } catch (cause) {
+      if (cause instanceof Error && /UNIQUE|FOREIGN KEY/.test(cause.message)) return json({ error: '便の情報が変更されました。もう一度選び直してください' }, 409);
+      throw cause;
+    }
+  }
+  return json({ connectionMode: mode, nextFlightId });
 }
 
 async function createBooking(request: Request, env: Env, user: User, tripId: string) {
@@ -625,6 +670,9 @@ async function api(request: Request, env: Env, url: URL) {
   if (bookingMatch && request.method === 'PATCH') return updateBooking(request, env, user, bookingMatch[1], bookingMatch[2]);
   if (bookingMatch && request.method === 'DELETE') return deleteBooking(env, user, bookingMatch[1], bookingMatch[2]);
 
+  const connectionMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/bookings\/([^/]+)\/connection$/);
+  if (connectionMatch && request.method === 'PATCH') return updateFlightConnection(request, env, user, connectionMatch[1], connectionMatch[2]);
+
   const bookingDocumentsMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/booking-documents$/);
   if (bookingDocumentsMatch && request.method === 'GET') return listBookingDocuments(env, user, bookingDocumentsMatch[1]);
 
@@ -673,4 +721,3 @@ const worker = {
 };
 
 export default worker;
-

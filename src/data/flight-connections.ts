@@ -1,12 +1,12 @@
-import { findAirportByCode } from '@/data/airports';
-import type { Booking } from '@/data/types';
+import { findAirportByCode } from './airports';
+import type { Booking } from './types';
 
 const MIN_CONNECTION_MINUTES = 30;
 const MAX_CONNECTION_MINUTES = 24 * 60;
 
-type FlightConnectionInput = Pick<
+export type FlightConnectionInput = Pick<
   Booking,
-  'id' | 'kind' | 'day' | 'time' | 'endDay' | 'endTime' | 'originCode' | 'destinationCode'
+  'id' | 'kind' | 'day' | 'time' | 'endDay' | 'endTime' | 'originCode' | 'destinationCode' | 'connectionMode' | 'nextFlightId'
 >;
 
 export type FlightConnection = {
@@ -15,6 +15,7 @@ export type FlightConnection = {
   airportCode: string;
   airportName: string;
   durationMinutes: number;
+  mode: 'auto' | 'manual';
 };
 
 function localDateTimeToEpoch(day: string, time: string, timeZone?: string) {
@@ -29,6 +30,7 @@ function localDateTimeToEpoch(day: string, time: string, timeZone?: string) {
     Number(timeMatch[1]),
     Number(timeMatch[2]),
   );
+  if (new Date(wallClockAsUtc).toISOString().slice(0, 10) !== day) return null;
   // Both sides of a connection are at the same airport, so wall-clock time is
   // still enough to calculate the layover when an imported IATA code is not in
   // the bundled airport list yet.
@@ -59,7 +61,8 @@ function localDateTimeToEpoch(day: string, time: string, timeZone?: string) {
     if (Math.abs(nextEpoch - epoch) < 1000) return nextEpoch;
     epoch = nextEpoch;
   }
-  return epoch;
+  // A nonexistent local time during a DST jump must not become a false link.
+  return null;
 }
 
 function endpointEpoch(booking: FlightConnectionInput, endpoint: 'arrival' | 'departure') {
@@ -68,6 +71,42 @@ function endpointEpoch(booking: FlightConnectionInput, endpoint: 'arrival' | 'de
   const day = endpoint === 'arrival' ? booking.endDay : booking.day;
   const time = endpoint === 'arrival' ? booking.endTime : booking.time;
   return localDateTimeToEpoch(day, time, airport?.timeZone);
+}
+
+export function connectionBetween(arrival: FlightConnectionInput, departure: FlightConnectionInput): FlightConnection | null {
+  const airportCode = arrival.destinationCode.trim().toUpperCase();
+  if (arrival.kind !== 'flight' || departure.kind !== 'flight' || arrival.id === departure.id
+    || !airportCode || airportCode !== departure.originCode.trim().toUpperCase()) return null;
+  const arrivalEpoch = endpointEpoch(arrival, 'arrival');
+  const departureEpoch = endpointEpoch(departure, 'departure');
+  if (arrivalEpoch === null || departureEpoch === null || departureEpoch <= arrivalEpoch) return null;
+  const airport = findAirportByCode(airportCode);
+  return {
+    arrivalBookingId: arrival.id, departureBookingId: departure.id,
+    airportCode, airportName: airport?.city || airport?.name || airportCode,
+    durationMinutes: Math.round((departureEpoch - arrivalEpoch) / 60000), mode: 'manual',
+  };
+}
+
+export function flightConnectionCandidates(arrival: FlightConnectionInput, bookings: readonly Booking[]) {
+  return bookings.flatMap((booking) => {
+    const connection = connectionBetween(arrival, booking);
+    if (!connection) return [];
+    const assigned = bookings.find((other) => other.id !== arrival.id && other.connectionMode === 'manual' && other.nextFlightId === booking.id);
+    return [{ booking, connection, assigned }];
+  }).sort((a, b) => a.connection.durationMinutes - b.connection.durationMinutes || a.booking.id.localeCompare(b.booking.id));
+}
+
+export function createsFlightConnectionCycle(bookings: readonly FlightConnectionInput[], arrivalId: string, departureId: string) {
+  const visited = new Set([arrivalId]);
+  let id: string | null | undefined = departureId;
+  while (id) {
+    if (visited.has(id)) return true;
+    visited.add(id);
+    const flight = bookings.find((booking) => booking.id === id);
+    id = flight?.connectionMode === 'manual' ? flight.nextFlightId : null;
+  }
+  return false;
 }
 
 export function findFlightConnections(bookings: readonly FlightConnectionInput[]) {
@@ -84,12 +123,38 @@ export function findFlightConnections(bookings: readonly FlightConnectionInput[]
   }).sort((left, right) => left.epoch - right.epoch);
 
   const usedArrivals = new Set<string>();
+  const usedDepartures = new Set<string>();
   const connections: FlightConnection[] = [];
+  const wouldCycle = (from: string, to: string) => {
+    const visited = new Set([from]);
+    let current: string | undefined = to;
+    while (current) {
+      if (visited.has(current)) return true;
+      visited.add(current);
+      current = connections.find((connection) => connection.arrivalBookingId === current)?.departureBookingId;
+    }
+    return false;
+  };
+
+  // Explicit choices win over automatic matching. An invalid/deleted manual
+  // target remains unlinked until the user chooses again, never reassigned.
+  for (const arrival of [...flights].sort((a, b) => a.id.localeCompare(b.id))) {
+    if (arrival.connectionMode === 'none' || arrival.connectionMode === 'manual') usedArrivals.add(arrival.id);
+    if (arrival.connectionMode !== 'manual' || !arrival.nextFlightId) continue;
+    const departure = flights.find((booking) => booking.id === arrival.nextFlightId);
+    if (!departure || usedDepartures.has(departure.id) || wouldCycle(arrival.id, departure.id)) continue;
+    const connection = connectionBetween(arrival, departure);
+    if (!connection) continue;
+    usedDepartures.add(departure.id);
+    connections.push(connection);
+  }
 
   for (const departure of departures) {
+    if (usedDepartures.has(departure.booking.id)) continue;
     const candidate = arrivals
       .filter((arrival) => arrival.booking.id !== departure.booking.id
         && !usedArrivals.has(arrival.booking.id)
+        && !wouldCycle(arrival.booking.id, departure.booking.id)
         && arrival.airportCode === departure.airportCode)
       .map((arrival) => ({ arrival, durationMinutes: Math.round((departure.epoch - arrival.epoch) / 60000) }))
       .filter(({ durationMinutes }) => durationMinutes >= MIN_CONNECTION_MINUTES && durationMinutes <= MAX_CONNECTION_MINUTES)
@@ -97,6 +162,7 @@ export function findFlightConnections(bookings: readonly FlightConnectionInput[]
 
     if (!candidate) continue;
     usedArrivals.add(candidate.arrival.booking.id);
+    usedDepartures.add(departure.booking.id);
     const airport = findAirportByCode(departure.airportCode);
     connections.push({
       arrivalBookingId: candidate.arrival.booking.id,
@@ -104,6 +170,7 @@ export function findFlightConnections(bookings: readonly FlightConnectionInput[]
       airportCode: departure.airportCode,
       airportName: airport?.city || airport?.name || departure.airportCode,
       durationMinutes: candidate.durationMinutes,
+      mode: 'auto',
     });
   }
 

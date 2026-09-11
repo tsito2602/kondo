@@ -1,10 +1,11 @@
 import * as Crypto from 'expo-crypto';
 import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { Alert, AppState, Platform } from 'react-native';
 
 import { useAuth } from '@/auth/auth-provider';
 
 import { loadTravelCache, saveTravelCache } from './cache';
+import { connectionBetween, createsFlightConnectionCycle } from './flight-connections';
 import { Booking, BookingDocument, emptyTravelCache, ItineraryItem, PackingItem, PendingMutation, TravelCache, TravelTask, Trip } from './types';
 
 type TripInput = Pick<Trip, 'name' | 'destination' | 'startsOn' | 'endsOn'>;
@@ -35,6 +36,7 @@ type TravelContextValue = {
   deleteItem: (id: string) => void;
   createBooking: (input: BookingInput) => string;
   updateBooking: (id: string, input: BookingInput) => void;
+  setFlightConnection: (id: string, mode: NonNullable<Booking['connectionMode']>, nextFlightId?: string | null) => void;
   deleteBooking: (id: string) => void;
   uploadBookingDocument: (bookingId: string, input: BookingDocumentInput) => Promise<BookingDocument>;
   deleteBookingDocument: (bookingId: string, documentId: string) => void;
@@ -76,10 +78,20 @@ export function TravelProvider({ children }: PropsWithChildren) {
     try {
       while (cacheRef.current.pending.length) {
         const mutation = cacheRef.current.pending[0];
-        await request(mutation.path, {
-          method: mutation.method,
-          ...(mutation.body ? { body: JSON.stringify(mutation.body) } : {}),
-        });
+        try {
+          await request(mutation.path, {
+            method: mutation.method,
+            ...(mutation.body ? { body: JSON.stringify(mutation.body) } : {}),
+          });
+        } catch (cause) {
+          const status = cause instanceof Error && 'status' in cause ? cause.status : null;
+          if (!mutation.path.endsWith('/connection') || ![400, 403, 404, 409].includes(Number(status))) throw cause;
+          // Discard only a permanently rejected link, then reload the server's
+          // choices. Network/auth failures keep their queued mutation for retry.
+          const message = cause instanceof Error ? cause.message : '便を選び直してください';
+          if (Platform.OS === 'web') globalThis.alert(`乗り継ぎを保存できませんでした\n${message}`);
+          else Alert.alert('乗り継ぎを保存できませんでした', message);
+        }
         commit((current) => ({ ...current, pending: current.pending.filter((item) => item.id !== mutation.id) }));
       }
 
@@ -230,6 +242,30 @@ export function TravelProvider({ children }: PropsWithChildren) {
     enqueue({ method: 'PATCH', path: `/v1/trips/${tripId}/bookings/${id}`, body: input });
   }, [commit, enqueue]);
 
+  const setFlightConnection = useCallback((id: string, mode: NonNullable<Booking['connectionMode']>, nextFlightId?: string | null) => {
+    const tripId = cacheRef.current.selectedTripId;
+    if (!tripId) throw new Error('旅行を選択してください');
+    const bookings = cacheRef.current.bookingsByTrip[tripId] ?? [];
+    const arrival = bookings.find((booking) => booking.id === id && booking.kind === 'flight');
+    if (!arrival) throw new Error('航空便が見つかりません');
+    const target = mode === 'manual' ? nextFlightId ?? null : null;
+    if (mode === 'manual') {
+      const departure = bookings.find((booking) => booking.id === target);
+      if (!departure || !connectionBetween(arrival, departure)) throw new Error('同じ空港から到着後に出発する便を選んでください');
+      if (bookings.some((booking) => booking.id !== id && booking.connectionMode === 'manual' && booking.nextFlightId === target)) {
+        throw new Error('この便は別の便の乗り継ぎ先です');
+      }
+      if (createsFlightConnectionCycle(bookings, id, departure.id)) {
+        throw new Error('便が循環するため紐づけできません。日時を確認してください');
+      }
+    }
+    commit((current) => ({ ...current, bookingsByTrip: {
+      ...current.bookingsByTrip,
+      [tripId]: (current.bookingsByTrip[tripId] ?? []).map((booking) => booking.id === id ? { ...booking, connectionMode: mode, nextFlightId: target } : booking),
+    } }));
+    enqueue({ method: 'PATCH', path: `/v1/trips/${tripId}/bookings/${id}/connection`, body: { mode, nextFlightId: target } });
+  }, [commit, enqueue]);
+
   const uploadBookingDocument = useCallback(async (bookingId: string, input: BookingDocumentInput) => {
     const tripId = cacheRef.current.selectedTripId;
     if (!tripId) throw new Error('旅行を選択してください');
@@ -280,7 +316,8 @@ export function TravelProvider({ children }: PropsWithChildren) {
       ...current,
       bookingsByTrip: {
         ...current.bookingsByTrip,
-        [tripId]: (current.bookingsByTrip[tripId] ?? []).filter((booking) => booking.id !== id),
+        [tripId]: (current.bookingsByTrip[tripId] ?? []).filter((booking) => booking.id !== id)
+          .map((booking) => booking.nextFlightId === id ? { ...booking, nextFlightId: null } : booking),
       },
       documentsByBooking: Object.fromEntries(Object.entries(current.documentsByBooking).filter(([bookingId]) => bookingId !== id)),
     }));
@@ -409,6 +446,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     deleteItem,
     createBooking,
     updateBooking,
+    setFlightConnection,
     deleteBooking,
     uploadBookingDocument,
     deleteBookingDocument,
@@ -421,7 +459,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     deleteTask,
     createInvite,
     acceptInvite,
-  }), [acceptInvite, bookings, cache.documentsByBooking, cache.pending.length, cache.trips, createBooking, createInvite, createItem, createPackingItem, createTask, createTrip, deleteBooking, deleteBookingDocument, deleteItem, deletePackingItem, deleteTask, downloadBookingDocument, error, items, packingItems, ready, selectTrip, selectedTrip, sync, syncing, tasks, updateBooking, updateItem, updatePackingItem, updateTask, updateTrip, uploadBookingDocument]);
+  }), [acceptInvite, bookings, cache.documentsByBooking, cache.pending.length, cache.trips, createBooking, createInvite, createItem, createPackingItem, createTask, createTrip, deleteBooking, deleteBookingDocument, deleteItem, deletePackingItem, deleteTask, downloadBookingDocument, error, items, packingItems, ready, selectTrip, selectedTrip, setFlightConnection, sync, syncing, tasks, updateBooking, updateItem, updatePackingItem, updateTask, updateTrip, uploadBookingDocument]);
 
   return <TravelContext.Provider value={value}>{children}</TravelContext.Provider>;
 }
