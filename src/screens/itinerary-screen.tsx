@@ -233,3 +233,4 @@ const styles = StyleSheet.create({
   deleteButton: { minHeight: 50, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
   deleteText: { color: palette.danger, fontSize: 15, fontWeight: '700' },
 });
+

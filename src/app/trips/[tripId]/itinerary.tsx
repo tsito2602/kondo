@@ -1,1 +1,1 @@
-export { default } from '../../itinerary';
+export { default } from '@/screens/itinerary-screen';
