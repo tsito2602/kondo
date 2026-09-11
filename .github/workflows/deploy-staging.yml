@@ -1,4 +1,5 @@
 name: Deploy staging
+run-name: Deploy staging · ${{ github.sha }}
 
 on:
   push:
