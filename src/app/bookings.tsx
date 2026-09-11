@@ -1,12 +1,16 @@
+import * as DocumentPicker from 'expo-document-picker';
+import { File } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { type ComponentProps, type Dispatch, type SetStateAction, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateRangePicker } from '@/components/date-range-picker';
 import { palette } from '@/constants/design';
 import { findAirports, type Airport } from '@/data/airports';
+import { cacheBookingDocument, getCachedDocumentUri, removeCachedBookingDocument } from '@/data/booking-document-cache';
 import { useTravel } from '@/data/travel-provider';
-import { Booking, BookingKind } from '@/data/types';
+import { Booking, BookingDocument, BookingKind } from '@/data/types';
 
 const KINDS: { value: BookingKind; label: string; short: string; icon: string }[] = [
   { value: 'flight', label: '航空券', short: 'FLIGHT', icon: '✈' },
@@ -29,7 +33,7 @@ function blankDraft(day: string, kind: BookingKind = 'flight'): Draft {
 }
 
 export default function BookingsScreen() {
-  const { bookings, createBooking, deleteBooking, pendingCount, selectedTrip, updateBooking } = useTravel();
+  const { bookings, createBooking, deleteBooking, documentsByBooking, pendingCount, selectedTrip, updateBooking } = useTravel();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(() => blankDraft(selectedTrip?.startsOn ?? ''));
   const [formOpen, setFormOpen] = useState(false);
@@ -95,7 +99,11 @@ export default function BookingsScreen() {
     if (!editingId) return;
     Alert.alert('予約を削除しますか？', 'この操作は取り消せません。', [
       { text: 'キャンセル', style: 'cancel' },
-      { text: '削除', style: 'destructive', onPress: () => { deleteBooking(editingId); setFormOpen(false); } },
+      { text: '削除', style: 'destructive', onPress: () => {
+        for (const document of documentsByBooking[editingId] ?? []) removeCachedBookingDocument(document.id, document.filename);
+        deleteBooking(editingId);
+        setFormOpen(false);
+      } },
     ]);
   };
 
@@ -128,12 +136,13 @@ export default function BookingsScreen() {
               const end = booking.endDay && (booking.endDay !== booking.day || booking.endTime)
                 ? ` → ${booking.endDay.replaceAll('-', '.')}${booking.endTime ? ` ${booking.endTime}` : ''}`
                 : '';
+              const documentCount = documentsByBooking[booking.id]?.length ?? 0;
               return (
                 <Pressable key={booking.id} onPress={() => openEdit(booking)} style={({ pressed }) => [styles.ticket, pressed && styles.pressed]} accessibilityLabel={`${booking.title}を編集`}>
                   <View style={styles.copy}>
                     <View style={styles.ticketTop}>
                       <View style={styles.typeTag}><Text style={styles.type}>{kind.short}</Text></View>
-                      <Text style={styles.serial}>TABI/{String(index + 1).padStart(2, '0')}</Text>
+                      <View style={styles.ticketTopMeta}>{documentCount ? <Text style={styles.documentCount}>書類 {documentCount}</Text> : null}<Text style={styles.serial}>TABI/{String(index + 1).padStart(2, '0')}</Text></View>
                     </View>
                     <Text numberOfLines={2} style={styles.cardTitle}>{booking.title}</Text>
                     {route ? <Text numberOfLines={2} style={styles.route}>{route}</Text> : null}
@@ -170,6 +179,7 @@ export default function BookingsScreen() {
               </View>
 
               <BookingFormFields draft={draft} setDraft={setDraft} />
+              {editingId ? <BookingDocuments bookingId={editingId} documents={documentsByBooking[editingId] ?? []} /> : <Text style={styles.documentNotice}>書類は予約を保存したあとに追加できます。</Text>}
               <Field label="メモ" multiline placeholder="任意" value={draft.note} onChangeText={(note) => setDraft((current) => ({ ...current, note }))} />
               {formError ? <Text accessibilityLiveRegion="polite" style={styles.error}>{formError}</Text> : null}
 
@@ -183,6 +193,95 @@ export default function BookingsScreen() {
       </Modal>
     </SafeAreaView>
   );
+}
+
+function BookingDocuments({ bookingId, documents }: { bookingId: string; documents: BookingDocument[] }) {
+  const { deleteBookingDocument, downloadBookingDocument, uploadBookingDocument } = useTravel();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState('');
+
+  const addDocuments = async () => {
+    setError('');
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['image/*', 'application/pdf'],
+      multiple: true,
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled) return;
+    setBusy('upload');
+    try {
+      for (const asset of result.assets) {
+        const bytes = asset.file ? await asset.file.arrayBuffer() : await new File(asset.uri).arrayBuffer();
+        const size = asset.size ?? bytes.byteLength;
+        if (size > 20 * 1024 * 1024) throw new Error(`${asset.name}は20MBを超えています`);
+        const extension = asset.name.split('.').pop()?.toLowerCase();
+        const fallbackTypes: Record<string, string> = { pdf: 'application/pdf', gif: 'image/gif', heic: 'image/heic', heif: 'image/heif', jpeg: 'image/jpeg', jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
+        const contentType = asset.mimeType || (extension ? fallbackTypes[extension] : '');
+        if (!contentType) throw new Error(`${asset.name}の形式には対応していません`);
+        const document = await uploadBookingDocument(bookingId, { filename: asset.name, contentType, size, bytes });
+        cacheBookingDocument(document.id, document.filename, bytes);
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '書類を追加できませんでした');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const openDocument = async (document: BookingDocument) => {
+    setError('');
+    setBusy(document.id);
+    try {
+      let uri = getCachedDocumentUri(document.id, document.filename);
+      let bytes: ArrayBuffer | null = null;
+      if (!uri) {
+        bytes = await downloadBookingDocument(bookingId, document.id);
+        uri = cacheBookingDocument(document.id, document.filename, bytes);
+      }
+      if (Platform.OS === 'web') {
+        bytes ??= await downloadBookingDocument(bookingId, document.id);
+        const objectUrl = URL.createObjectURL(new Blob([bytes], { type: document.contentType }));
+        window.open(objectUrl, '_blank', 'noopener,noreferrer');
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+      } else if (uri && await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { dialogTitle: document.filename, mimeType: document.contentType });
+      } else {
+        throw new Error('この端末では書類を開けません');
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '書類を開けませんでした');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const removeDocument = (document: BookingDocument) => {
+    Alert.alert('書類を削除しますか？', document.filename, [
+      { text: 'キャンセル', style: 'cancel' },
+      { text: '削除', style: 'destructive', onPress: () => {
+        removeCachedBookingDocument(document.id, document.filename);
+        deleteBookingDocument(bookingId, document.id);
+      } },
+    ]);
+  };
+
+  return <View style={styles.documentsSection}>
+    <View style={styles.documentsHeading}><Text style={styles.label}>書類</Text><Pressable accessibilityRole="button" disabled={Boolean(busy)} onPress={addDocuments} style={({ pressed }) => [styles.documentAddButton, pressed && styles.pressed]}><Text style={styles.documentAddText}>＋ 画像・PDF</Text></Pressable></View>
+    {documents.length ? <View style={styles.documentList}>{documents.map((document) => <View key={document.id} style={styles.documentRow}>
+      <View style={styles.documentIcon}><Text style={styles.documentIconText}>{document.contentType === 'application/pdf' ? 'PDF' : 'IMG'}</Text></View>
+      <Pressable accessibilityLabel={`${document.filename}を開く`} disabled={Boolean(busy)} onPress={() => openDocument(document)} style={({ pressed }) => [styles.documentCopy, pressed && styles.pressed]}>
+        <Text numberOfLines={1} style={styles.documentName}>{document.filename}</Text><Text style={styles.documentMeta}>{formatFileSize(document.size)} · {getCachedDocumentUri(document.id, document.filename) ? '端末に保存済み' : 'タップして開く'}</Text>
+      </Pressable>
+      {busy === document.id ? <ActivityIndicator color={palette.ocean} size="small" /> : <Pressable accessibilityLabel={`${document.filename}を削除`} disabled={Boolean(busy)} onPress={() => removeDocument(document)} style={styles.documentDelete}><Text style={styles.documentDeleteText}>×</Text></Pressable>}
+    </View>)}</View> : <View style={styles.documentEmpty}><Text style={styles.documentEmptyText}>画像やPDFを追加できます</Text></View>}
+    {busy === 'upload' ? <View style={styles.uploading}><ActivityIndicator color={palette.ocean} size="small" /><Text style={styles.uploadingText}>アップロード中</Text></View> : null}
+    {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
+  </View>;
+}
+
+function formatFileSize(size: number) {
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
+  return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function BookingFormFields({ draft, setDraft }: { draft: Draft; setDraft: Dispatch<SetStateAction<Draft>> }) {
@@ -297,6 +396,8 @@ const styles = StyleSheet.create({
   ticket: { minHeight: 174, flexDirection: 'row', position: 'relative', overflow: 'hidden', borderRadius: 28, backgroundColor: palette.paper },
   copy: { flex: 1, minWidth: 0, padding: 20 },
   ticketTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  ticketTopMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  documentCount: { color: palette.ocean, fontSize: 9, fontWeight: '800' },
   typeTag: { alignSelf: 'flex-start', backgroundColor: palette.sky, borderRadius: 64, paddingHorizontal: 10, paddingVertical: 5 },
   type: { color: palette.ink, fontFamily: 'monospace', fontSize: 9, letterSpacing: 0.8 },
   serial: { color: palette.smoke, fontFamily: 'monospace', fontSize: 9 },
@@ -339,6 +440,24 @@ const styles = StyleSheet.create({
   suggestionName: { color: palette.ink, fontSize: 13, fontWeight: '700' },
   suggestionCity: { color: palette.smoke, fontSize: 10, marginTop: 2 },
   suggestionCode: { color: palette.ocean, fontFamily: 'monospace', fontSize: 15, fontWeight: '900', letterSpacing: 1 },
+  documentNotice: { color: palette.smoke, fontSize: 11, lineHeight: 17 },
+  documentsSection: { gap: 10 },
+  documentsHeading: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  documentAddButton: { minHeight: 36, justifyContent: 'center', borderRadius: 18, backgroundColor: palette.sky, paddingHorizontal: 13 },
+  documentAddText: { color: palette.ocean, fontSize: 11, fontWeight: '800' },
+  documentList: { overflow: 'hidden', borderRadius: 12, backgroundColor: palette.paper },
+  documentRow: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash, paddingLeft: 10, paddingRight: 6 },
+  documentIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: palette.sky },
+  documentIconText: { color: palette.ocean, fontFamily: 'monospace', fontSize: 9, fontWeight: '900' },
+  documentCopy: { flex: 1, minWidth: 0, paddingVertical: 10 },
+  documentName: { color: palette.ink, fontSize: 13, fontWeight: '800' },
+  documentMeta: { color: palette.smoke, fontSize: 9, marginTop: 4 },
+  documentDelete: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  documentDeleteText: { color: palette.smoke, fontSize: 22, lineHeight: 24 },
+  documentEmpty: { minHeight: 64, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: palette.paper },
+  documentEmptyText: { color: palette.smoke, fontSize: 11 },
+  uploading: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  uploadingText: { color: palette.slate, fontSize: 11 },
   error: { color: palette.danger, fontSize: 12 },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   deleteButton: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 8 },

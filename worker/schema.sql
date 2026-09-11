@@ -95,6 +95,19 @@ CREATE TABLE IF NOT EXISTS booking_details (
   end_time TEXT NOT NULL DEFAULT ''
 );
 
+CREATE TABLE IF NOT EXISTS booking_documents (
+  id TEXT PRIMARY KEY,
+  trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  booking_id TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  object_key TEXT NOT NULL UNIQUE,
+  filename TEXT NOT NULL,
+  content_type TEXT NOT NULL,
+  size INTEGER NOT NULL CHECK(size >= 1 AND size <= 20971520),
+  uploaded_by TEXT NOT NULL REFERENCES users(id),
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS booking_documents_trip ON booking_documents(trip_id, booking_id, created_at);
+
 CREATE TABLE IF NOT EXISTS invites (
   token_hash TEXT PRIMARY KEY,
   trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,

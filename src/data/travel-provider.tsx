@@ -5,13 +5,14 @@ import { AppState } from 'react-native';
 import { useAuth } from '@/auth/auth-provider';
 
 import { loadTravelCache, saveTravelCache } from './cache';
-import { Booking, emptyTravelCache, ItineraryItem, PackingItem, PendingMutation, TravelCache, TravelTask, Trip } from './types';
+import { Booking, BookingDocument, emptyTravelCache, ItineraryItem, PackingItem, PendingMutation, TravelCache, TravelTask, Trip } from './types';
 
 type TripInput = Pick<Trip, 'name' | 'destination' | 'startsOn' | 'endsOn'>;
 type ItemInput = Pick<ItineraryItem, 'day' | 'time' | 'kind' | 'title' | 'note'>;
 type BookingInput = Pick<Booking, 'kind' | 'title' | 'detail' | 'origin' | 'originCode' | 'destination' | 'destinationCode' | 'day' | 'time' | 'endDay' | 'endTime' | 'confirmationCode' | 'note'>;
 type PackingInput = Pick<PackingItem, 'name' | 'category' | 'quantity' | 'packed'>;
 type TaskInput = Pick<TravelTask, 'title' | 'dueOn' | 'assignee' | 'done'>;
+type BookingDocumentInput = { filename: string; contentType: string; size: number; bytes: ArrayBuffer };
 
 type TravelContextValue = {
   ready: boolean;
@@ -21,6 +22,7 @@ type TravelContextValue = {
   selectedTrip: Trip | null;
   items: ItineraryItem[];
   bookings: Booking[];
+  documentsByBooking: Record<string, BookingDocument[]>;
   packingItems: PackingItem[];
   tasks: TravelTask[];
   pendingCount: number;
@@ -34,6 +36,9 @@ type TravelContextValue = {
   createBooking: (input: BookingInput) => string;
   updateBooking: (id: string, input: BookingInput) => void;
   deleteBooking: (id: string) => void;
+  uploadBookingDocument: (bookingId: string, input: BookingDocumentInput) => Promise<BookingDocument>;
+  deleteBookingDocument: (bookingId: string, documentId: string) => void;
+  downloadBookingDocument: (bookingId: string, documentId: string) => Promise<ArrayBuffer>;
   createPackingItem: (input: PackingInput) => string;
   updatePackingItem: (id: string, input: PackingInput) => void;
   deletePackingItem: (id: string) => void;
@@ -47,7 +52,7 @@ type TravelContextValue = {
 const TravelContext = createContext<TravelContextValue | null>(null);
 
 export function TravelProvider({ children }: PropsWithChildren) {
-  const { request } = useAuth();
+  const { request, requestRaw } = useAuth();
   const [cache, setCache] = useState<TravelCache>(emptyTravelCache);
   const [ready, setReady] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -81,13 +86,14 @@ export function TravelProvider({ children }: PropsWithChildren) {
       const { trips } = await request<{ trips: Trip[] }>('/v1/trips');
       const tripEntries = await Promise.all(
         trips.map(async (trip) => {
-          const [itemResult, bookingResult, packingResult, taskResult] = await Promise.all([
+          const [itemResult, bookingResult, packingResult, taskResult, documentResult] = await Promise.all([
             request<{ items: ItineraryItem[] }>(`/v1/trips/${trip.id}/items`),
             request<{ bookings: Booking[] }>(`/v1/trips/${trip.id}/bookings`),
             request<{ items: PackingItem[] }>(`/v1/trips/${trip.id}/packing`),
             request<{ tasks: TravelTask[] }>(`/v1/trips/${trip.id}/tasks`),
+            request<{ documents: BookingDocument[] }>(`/v1/trips/${trip.id}/booking-documents`),
           ]);
-          return [trip.id, itemResult.items, bookingResult.bookings, packingResult.items, taskResult.tasks] as const;
+          return [trip.id, itemResult.items, bookingResult.bookings, packingResult.items, taskResult.tasks, documentResult.documents] as const;
         }),
       );
       commit((current) => {
@@ -95,6 +101,12 @@ export function TravelProvider({ children }: PropsWithChildren) {
         const selectedTripId = trips.some((trip) => trip.id === current.selectedTripId)
           ? current.selectedTripId
           : (trips[0]?.id ?? null);
+        const documentsByBooking: Record<string, BookingDocument[]> = {};
+        for (const [, , , , , documents] of tripEntries) {
+          for (const document of documents) {
+            documentsByBooking[document.bookingId] = [...(documentsByBooking[document.bookingId] ?? []), document];
+          }
+        }
         return {
           ...current,
           trips,
@@ -103,6 +115,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
           bookingsByTrip: Object.fromEntries(tripEntries.map(([tripId, , bookings]) => [tripId, bookings])),
           packingByTrip: Object.fromEntries(tripEntries.map(([tripId, , , packingItems]) => [tripId, packingItems])),
           tasksByTrip: Object.fromEntries(tripEntries.map(([tripId, , , , tasks]) => [tripId, tasks])),
+          documentsByBooking,
         };
       });
       setError(null);
@@ -217,6 +230,49 @@ export function TravelProvider({ children }: PropsWithChildren) {
     enqueue({ method: 'PATCH', path: `/v1/trips/${tripId}/bookings/${id}`, body: input });
   }, [commit, enqueue]);
 
+  const uploadBookingDocument = useCallback(async (bookingId: string, input: BookingDocumentInput) => {
+    const tripId = cacheRef.current.selectedTripId;
+    if (!tripId) throw new Error('旅行を選択してください');
+    const response = await requestRaw(`/v1/trips/${tripId}/bookings/${bookingId}/documents`, {
+      method: 'POST',
+      headers: {
+        'content-type': input.contentType,
+        'x-filename': encodeURIComponent(input.filename),
+        'x-file-size': String(input.size),
+      },
+      body: input.bytes,
+    });
+    const { document } = await response.json() as { document: BookingDocument };
+    commit((current) => ({
+      ...current,
+      documentsByBooking: {
+        ...current.documentsByBooking,
+        [bookingId]: [...(current.documentsByBooking[bookingId] ?? []), document],
+      },
+    }));
+    return document;
+  }, [commit, requestRaw]);
+
+  const deleteBookingDocument = useCallback((bookingId: string, documentId: string) => {
+    const tripId = cacheRef.current.selectedTripId;
+    if (!tripId) return;
+    commit((current) => ({
+      ...current,
+      documentsByBooking: {
+        ...current.documentsByBooking,
+        [bookingId]: (current.documentsByBooking[bookingId] ?? []).filter((document) => document.id !== documentId),
+      },
+    }));
+    enqueue({ method: 'DELETE', path: `/v1/trips/${tripId}/bookings/${bookingId}/documents/${documentId}` });
+  }, [commit, enqueue]);
+
+  const downloadBookingDocument = useCallback(async (bookingId: string, documentId: string) => {
+    const tripId = cacheRef.current.selectedTripId;
+    if (!tripId) throw new Error('旅行を選択してください');
+    const response = await requestRaw(`/v1/trips/${tripId}/bookings/${bookingId}/documents/${documentId}`);
+    return response.arrayBuffer();
+  }, [requestRaw]);
+
   const deleteBooking = useCallback((id: string) => {
     const tripId = cacheRef.current.selectedTripId;
     if (!tripId) return;
@@ -226,6 +282,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
         ...current.bookingsByTrip,
         [tripId]: (current.bookingsByTrip[tripId] ?? []).filter((booking) => booking.id !== id),
       },
+      documentsByBooking: Object.fromEntries(Object.entries(current.documentsByBooking).filter(([bookingId]) => bookingId !== id)),
     }));
     enqueue({ method: 'DELETE', path: `/v1/trips/${tripId}/bookings/${id}` });
   }, [commit, enqueue]);
@@ -339,6 +396,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     selectedTrip,
     items,
     bookings,
+    documentsByBooking: cache.documentsByBooking,
     packingItems,
     tasks,
     pendingCount: cache.pending.length,
@@ -352,6 +410,9 @@ export function TravelProvider({ children }: PropsWithChildren) {
     createBooking,
     updateBooking,
     deleteBooking,
+    uploadBookingDocument,
+    deleteBookingDocument,
+    downloadBookingDocument,
     createPackingItem,
     updatePackingItem,
     deletePackingItem,
@@ -360,7 +421,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     deleteTask,
     createInvite,
     acceptInvite,
-  }), [acceptInvite, bookings, cache.pending.length, cache.trips, createBooking, createInvite, createItem, createPackingItem, createTask, createTrip, deleteBooking, deleteItem, deletePackingItem, deleteTask, error, items, packingItems, ready, selectTrip, selectedTrip, sync, syncing, tasks, updateBooking, updateItem, updatePackingItem, updateTask, updateTrip]);
+  }), [acceptInvite, bookings, cache.documentsByBooking, cache.pending.length, cache.trips, createBooking, createInvite, createItem, createPackingItem, createTask, createTrip, deleteBooking, deleteBookingDocument, deleteItem, deletePackingItem, deleteTask, downloadBookingDocument, error, items, packingItems, ready, selectTrip, selectedTrip, sync, syncing, tasks, updateBooking, updateItem, updatePackingItem, updateTask, updateTrip, uploadBookingDocument]);
 
   return <TravelContext.Provider value={value}>{children}</TravelContext.Provider>;
 }

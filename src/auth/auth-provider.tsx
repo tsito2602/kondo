@@ -14,6 +14,7 @@ type AuthContextValue = {
   user: User | null;
   error: string | null;
   request: <T>(path: string, init?: RequestInit) => Promise<T>;
+  requestRaw: (path: string, init?: RequestInit) => Promise<Response>;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -38,18 +39,22 @@ async function writeToken(token: string | null) {
 }
 
 async function api<T>(path: string, init: RequestInit = {}, token?: string | null): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      'content-type': 'application/json',
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
-      ...init.headers,
-    },
-  });
+  const response = await apiResponse(path, init, token);
   if (response.status === 204) return undefined as T;
   const result = (await response.json()) as T & { error?: string };
   if (!response.ok) throw new Error(result.error ?? '通信に失敗しました');
   return result;
+}
+
+async function apiResponse(path: string, init: RequestInit = {}, token?: string | null) {
+  return fetch(`${API_URL}${path}`, {
+    ...init,
+    headers: {
+      ...(typeof init.body === 'string' ? { 'content-type': 'application/json' } : {}),
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...init.headers,
+    },
+  });
 }
 
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -150,9 +155,20 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return api<T>(path, init, token);
   }, []);
 
+  const requestRaw = useCallback(async (path: string, init: RequestInit = {}) => {
+    const token = await readToken();
+    if (!token) throw new Error('ログインが必要です');
+    const response = await apiResponse(path, init, token);
+    if (!response.ok) {
+      const result = await response.json().catch(() => null) as { error?: string } | null;
+      throw new Error(result?.error ?? '通信に失敗しました');
+    }
+    return response;
+  }, []);
+
   const value = useMemo(
-    () => ({ configured, loading, signingIn, user, error, request: requestApi, signIn, signOut }),
-    [configured, error, loading, requestApi, signIn, signOut, signingIn, user],
+    () => ({ configured, loading, signingIn, user, error, request: requestApi, requestRaw, signIn, signOut }),
+    [configured, error, loading, requestApi, requestRaw, signIn, signOut, signingIn, user],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

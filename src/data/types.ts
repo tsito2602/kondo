@@ -41,6 +41,16 @@ export type Booking = {
   updatedAt?: number;
 };
 
+export type BookingDocument = {
+  id: string;
+  bookingId: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  uploadedBy?: string;
+  createdAt: number;
+};
+
 export type PackingItem = {
   id: string;
   name: string;
@@ -74,6 +84,7 @@ export type TravelCache = {
   selectedTripId: string | null;
   itemsByTrip: Record<string, ItineraryItem[]>;
   bookingsByTrip: Record<string, Booking[]>;
+  documentsByBooking: Record<string, BookingDocument[]>;
   packingByTrip: Record<string, PackingItem[]>;
   tasksByTrip: Record<string, TravelTask[]>;
   pending: PendingMutation[];
@@ -85,6 +96,7 @@ export const emptyTravelCache = (): TravelCache => ({
   selectedTripId: null,
   itemsByTrip: {},
   bookingsByTrip: {},
+  documentsByBooking: {},
   packingByTrip: {},
   tasksByTrip: {},
   pending: [],
@@ -92,6 +104,17 @@ export const emptyTravelCache = (): TravelCache => ({
 
 export const normalizeTravelCache = (value: TravelCache): TravelCache => ({
   ...value,
+  documentsByBooking: Object.fromEntries(
+    Object.entries(value.documentsByBooking ?? {}).map(([bookingId, documents]) => [
+      bookingId,
+      documents.map((document) => ({
+        ...document,
+        bookingId: document.bookingId ?? bookingId,
+        size: Math.max(0, document.size ?? 0),
+        createdAt: document.createdAt ?? 0,
+      })),
+    ]),
+  ),
   tasksByTrip: Object.fromEntries(
     Object.entries(value.tasksByTrip ?? {}).map(([tripId, tasks]) => [
       tripId,

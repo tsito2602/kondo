@@ -21,7 +21,7 @@ function json(value: unknown, status = 200, headers?: HeadersInit) {
 function cors(request: Request, env: Env) {
   const origin = request.headers.get('origin');
   const allowed = env.ALLOWED_ORIGINS?.split(',').map((value) => value.trim()) ?? [];
-  const headers = new Headers({ 'access-control-allow-headers': 'authorization, content-type', 'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS' });
+  const headers = new Headers({ 'access-control-allow-headers': 'authorization, content-type, x-filename, x-file-size', 'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS' });
   if (origin && allowed.includes(origin)) headers.set('access-control-allow-origin', origin);
   return headers;
 }
@@ -319,8 +319,111 @@ async function updateBooking(request: Request, env: Env, user: User, tripId: str
 async function deleteBooking(env: Env, user: User, tripId: string, bookingId: string) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
+  const documents = await env.DB.prepare('SELECT object_key AS objectKey FROM booking_documents WHERE booking_id = ? AND trip_id = ?')
+    .bind(bookingId, tripId)
+    .all<{ objectKey: string }>();
   const result = await env.DB.prepare('DELETE FROM bookings WHERE id = ? AND trip_id = ?').bind(bookingId, tripId).run();
+  if (result.meta.changes && documents.results.length) await env.BUCKET.delete(documents.results.map((document) => document.objectKey));
   return result.meta.changes ? new Response(null, { status: 204 }) : json({ error: '予約が見つかりません' }, 404);
+}
+
+type BookingDocumentRow = {
+  id: string;
+  bookingId: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  uploadedBy: string;
+  createdAt: number;
+  objectKey?: string;
+};
+
+const bookingDocumentTypes = new Set([
+  'application/pdf',
+  'image/gif',
+  'image/heic',
+  'image/heif',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]);
+
+async function listBookingDocuments(env: Env, user: User, tripId: string) {
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  const result = await env.DB.prepare(`
+    SELECT id, booking_id AS bookingId, filename, content_type AS contentType, size,
+           uploaded_by AS uploadedBy, created_at AS createdAt
+    FROM booking_documents WHERE trip_id = ? ORDER BY created_at, id
+  `).bind(tripId).all<BookingDocumentRow>();
+  return json({ documents: result.results });
+}
+
+async function uploadBookingDocument(request: Request, env: Env, user: User, tripId: string, bookingId: string) {
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  const booking = await env.DB.prepare('SELECT id FROM bookings WHERE id = ? AND trip_id = ?').bind(bookingId, tripId).first();
+  if (!booking) return json({ error: '予約が見つかりません' }, 404);
+
+  const contentType = (request.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+  if (!bookingDocumentTypes.has(contentType)) return json({ error: 'JPEG、PNG、WebP、HEIC、GIF、PDFのいずれかを選択してください' }, 400);
+  const declaredSize = Number(request.headers.get('x-file-size') ?? 0);
+  if (!Number.isFinite(declaredSize) || declaredSize < 1 || declaredSize > 20 * 1024 * 1024) return json({ error: 'ファイルは20MB以下にしてください' }, 400);
+
+  let decodedFilename = '';
+  try {
+    decodedFilename = decodeURIComponent(request.headers.get('x-filename') ?? '');
+  } catch {
+    return json({ error: 'ファイル名を確認してください' }, 400);
+  }
+  const filename = textField(decodedFilename, 180, true);
+  if (!filename) return json({ error: 'ファイル名を確認してください' }, 400);
+  const bytes = await request.arrayBuffer();
+  if (bytes.byteLength < 1 || bytes.byteLength > 20 * 1024 * 1024 || bytes.byteLength !== declaredSize) return json({ error: 'ファイルサイズを確認してください' }, 400);
+
+  const id = crypto.randomUUID();
+  const objectKey = `trips/${tripId}/bookings/${bookingId}/${id}`;
+  await env.BUCKET.put(objectKey, bytes, { httpMetadata: { contentType } });
+  try {
+    await env.DB.prepare(`
+      INSERT INTO booking_documents (id, trip_id, booking_id, object_key, filename, content_type, size, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(id, tripId, bookingId, objectKey, filename, contentType, bytes.byteLength, user.id).run();
+  } catch (cause) {
+    await env.BUCKET.delete(objectKey);
+    throw cause;
+  }
+  return json({ document: { id, bookingId, filename, contentType, size: bytes.byteLength, uploadedBy: user.id, createdAt: Math.floor(Date.now() / 1000) } }, 201);
+}
+
+async function getBookingDocument(env: Env, user: User, tripId: string, bookingId: string, documentId: string) {
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  const document = await env.DB.prepare(`
+    SELECT object_key AS objectKey, filename, content_type AS contentType
+    FROM booking_documents WHERE id = ? AND booking_id = ? AND trip_id = ?
+  `).bind(documentId, bookingId, tripId).first<BookingDocumentRow>();
+  if (!document?.objectKey) return json({ error: '書類が見つかりません' }, 404);
+  const object = await env.BUCKET.get(document.objectKey);
+  if (!object) return json({ error: '書類の原本が見つかりません' }, 404);
+  return new Response(object.body, { headers: {
+    'content-type': document.contentType,
+    'content-length': String(object.size),
+    'content-disposition': `inline; filename*=UTF-8''${encodeURIComponent(document.filename)}`,
+    'cache-control': 'private, no-store',
+  } });
+}
+
+async function deleteBookingDocument(env: Env, user: User, tripId: string, bookingId: string, documentId: string) {
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  const document = await env.DB.prepare(`
+    DELETE FROM booking_documents WHERE id = ? AND booking_id = ? AND trip_id = ?
+    RETURNING object_key AS objectKey
+  `).bind(documentId, bookingId, tripId).first<{ objectKey: string }>();
+  if (!document) return json({ error: '書類が見つかりません' }, 404);
+  await env.BUCKET.delete(document.objectKey);
+  return new Response(null, { status: 204 });
 }
 
 type PackingRow = {
@@ -521,6 +624,16 @@ async function api(request: Request, env: Env, url: URL) {
   const bookingMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/bookings\/([^/]+)$/);
   if (bookingMatch && request.method === 'PATCH') return updateBooking(request, env, user, bookingMatch[1], bookingMatch[2]);
   if (bookingMatch && request.method === 'DELETE') return deleteBooking(env, user, bookingMatch[1], bookingMatch[2]);
+
+  const bookingDocumentsMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/booking-documents$/);
+  if (bookingDocumentsMatch && request.method === 'GET') return listBookingDocuments(env, user, bookingDocumentsMatch[1]);
+
+  const bookingDocumentCollectionMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/bookings\/([^/]+)\/documents$/);
+  if (bookingDocumentCollectionMatch && request.method === 'POST') return uploadBookingDocument(request, env, user, bookingDocumentCollectionMatch[1], bookingDocumentCollectionMatch[2]);
+
+  const bookingDocumentMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/bookings\/([^/]+)\/documents\/([^/]+)$/);
+  if (bookingDocumentMatch && request.method === 'GET') return getBookingDocument(env, user, bookingDocumentMatch[1], bookingDocumentMatch[2], bookingDocumentMatch[3]);
+  if (bookingDocumentMatch && request.method === 'DELETE') return deleteBookingDocument(env, user, bookingDocumentMatch[1], bookingDocumentMatch[2], bookingDocumentMatch[3]);
 
   const packingItemsMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/packing$/);
   if (packingItemsMatch && request.method === 'GET') return listPacking(env, user, packingItemsMatch[1]);
