@@ -226,7 +226,7 @@ export default function BookingsScreen() {
     <SafeAreaView style={styles.safeArea} edges={[]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {selectedTrip ? <View style={styles.importBar}>
-          <View style={styles.importCopy}><Text style={styles.importTitle}>Gmailから予約を取り込む</Text><Text style={styles.importMeta}>航空・鉄道・ホテル</Text></View>
+          <View style={styles.importCopy}><Text style={styles.importTitle}>Gmailから予約を取り込む</Text><Text style={styles.importMeta}>航空・鉄道・ホテルの予約メール</Text></View>
           <Pressable accessibilityRole="button" onPress={openGmail} style={({ pressed }) => [styles.importButton, pressed && styles.pressed]}><Text style={styles.importButtonText}>確認</Text></Pressable>
         </View> : null}
         {!selectedTrip ? (
