@@ -1,4 +1,6 @@
 import { router } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
+import type { ComponentProps } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Modal, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,25 +21,20 @@ const BOOKING_STAGES: Record<BookingKind, [string, string]> = {
   other: ['予約', '終了'],
 };
 
-const BOOKING_MARKS: Record<BookingKind, string> = {
-  flight: '空',
-  hotel: '宿',
-  train: '鉄',
-  car: '車',
-  restaurant: '食',
-  ticket: '券',
-  other: '予',
+type SymbolName = ComponentProps<typeof SymbolView>['name'];
+
+const BOOKING_ICONS: Record<BookingKind, SymbolName> = {
+  flight: { ios: 'airplane', android: 'flight', web: 'flight' },
+  hotel: { ios: 'bed.double.fill', android: 'hotel', web: 'hotel' },
+  train: { ios: 'train.side.front.car', android: 'train', web: 'train' },
+  car: { ios: 'car.fill', android: 'directions_car', web: 'directions_car' },
+  restaurant: { ios: 'fork.knife', android: 'restaurant', web: 'restaurant' },
+  ticket: { ios: 'ticket.fill', android: 'confirmation_number', web: 'confirmation_number' },
+  other: { ios: 'bookmark.fill', android: 'bookmark', web: 'bookmark' },
 };
 
-const BOOKING_LABELS: Record<BookingKind, string> = {
-  flight: 'フライト',
-  hotel: '宿泊',
-  train: '鉄道',
-  car: 'レンタカー',
-  restaurant: 'レストラン',
-  ticket: 'チケット',
-  other: '予約',
-};
+const PLAN_ICON: SymbolName = { ios: 'mappin', android: 'location_on', web: 'location_on' };
+const EMPTY_ICON: SymbolName = { ios: 'calendar', android: 'calendar_today', web: 'calendar_today' };
 
 type TimelineEntry = {
   key: string;
@@ -101,10 +98,29 @@ function shortDate(value: string) {
   return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric' }).format(date);
 }
 
-function dayDate(value: string) {
+function longDate(value: string) {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' }).format(date);
+  return new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }).format(date);
+}
+
+function entryTitle(entry: TimelineEntry) {
+  const booking = entry.booking;
+  if (!booking || (!booking.origin && !booking.destination)) return entry.title;
+  const origin = booking.originCode || booking.origin;
+  const destination = booking.destinationCode || booking.destination;
+  return [origin, destination].filter(Boolean).join(' → ');
+}
+
+function bookingDetails(entry: TimelineEntry) {
+  if (!entry.booking) return [];
+  const booking = entry.booking;
+  return [
+    `${entry.bookingStage} · ${booking.title}`,
+    booking.detail,
+    booking.confirmationCode ? `確認番号 ${booking.confirmationCode}` : '',
+    booking.note,
+  ].filter(Boolean);
 }
 
 export default function ItineraryScreen() {
@@ -245,62 +261,57 @@ export default function ItineraryScreen() {
 
         {!selectedTrip ? (
           <View style={styles.empty}><Text style={styles.emptyTitle}>旅行がありません</Text><Text style={styles.emptyBody}>旅行一覧から旅行を選択してください。</Text></View>
-        ) : itineraryDates.map((date, dayIndex) => {
+        ) : <View style={styles.timeline}>{itineraryDates.map((date, dayIndex) => {
           const dateItems = grouped[date] ?? [];
           return (
             <View key={date} onLayout={(event) => { dayOffsets.current[date] = event.nativeEvent.layout.y; }} style={styles.daySection}>
-              <View style={styles.dayHeading}>
-                <View style={styles.dayCount}><Text style={styles.dayCountLabel}>DAY</Text><Text style={styles.dayCountNumber}>{dayIndex + 1}</Text></View>
-                <View style={styles.dayHeadingCopy}>
-                  <Text style={styles.dayDate}>{dayDate(date)}</Text>
-                  <Text style={styles.dayDestination}>{selectedTrip.destination}</Text>
-                </View>
-                <View style={styles.dayHeadingRule} />
+              <View style={styles.dateBar}>
+                <Text style={styles.date}>{longDate(date)}</Text>
+                <Text style={styles.dateDay}>DAY {String(dayIndex + 1).padStart(2, '0')}</Text>
               </View>
-
-              {dateItems.length ? <View style={styles.timeline}>
-                {dateItems.map((entry, entryIndex) => {
-                  const isBooking = Boolean(entry.booking);
-                  const mark = entry.booking ? BOOKING_MARKS[entry.booking.kind] : '•';
-                  return (
+              {dateItems.length ? <View>
+                  {dateItems.map((entry, entryIndex) => {
+                    const details = bookingDetails(entry);
+                    return (
                     <Pressable
                       accessibilityHint={entry.booking ? '予約の詳細を開きます' : '予定を編集します'}
                       accessibilityRole="button"
                       key={entry.key}
                       onPress={() => entry.booking && selectedTrip ? router.push({ pathname: '/trips/[tripId]/bookings', params: { tripId: selectedTrip.id, booking: entry.booking.id } }) : openEdit(entry.item!)}
-                      style={({ pressed }) => [styles.timelineRow, pressed && styles.itemPressed]}>
+                      style={({ pressed }) => [styles.itemRow, pressed && styles.itemPressed]}>
                       <View style={styles.timeColumn}>
                         <Text style={styles.time}>{entry.time || '—'}</Text>
+                        <Text style={styles.timeKind}>{entry.booking ? entry.bookingStage : entry.item?.kind || '予定'}</Text>
                       </View>
                       <View style={styles.railColumn}>
-                        {entryIndex < dateItems.length - 1 ? <View style={styles.rail} /> : null}
-                        <View style={[styles.timelineNode, isBooking && styles.bookingNode]}>
-                          <Text style={[styles.timelineMark, isBooking && styles.bookingMark]}>{mark}</Text>
+                        {entryIndex > 0 ? <View style={[styles.rail, styles.railTop]} /> : null}
+                        {entryIndex < dateItems.length - 1 ? <View style={[styles.rail, styles.railBottom]} /> : null}
+                        <View style={[styles.iconCircle, entry.booking && styles.bookingIconCircle]}>
+                          <SymbolView
+                            name={entry.booking ? BOOKING_ICONS[entry.booking.kind] : PLAN_ICON}
+                            size={21}
+                            weight="semibold"
+                            tintColor={entry.booking ? palette.paper : palette.ocean}
+                          />
                         </View>
                       </View>
-                      <View style={[styles.entryCard, isBooking && styles.bookingCard]}>
-                        {entry.booking ? <View style={styles.bookingMetaRow}>
-                          <Text style={styles.bookingTag}>{BOOKING_LABELS[entry.booking.kind]} · {entry.bookingStage}</Text>
-                          {entry.booking.confirmationCode ? <Text accessibilityLabel={`予約番号 ${entry.booking.confirmationCode}`} numberOfLines={1} style={styles.confirmation}>NO. {entry.booking.confirmationCode}</Text> : null}
-                        </View> : null}
-                        <View style={styles.entryTitleRow}>
-                          <Text style={styles.itemTitle}>{entry.title}</Text>
-                          <Text style={styles.chevron}>›</Text>
-                        </View>
-                        {entry.note ? <Text style={[styles.note, isBooking && styles.bookingNote]}>{entry.note}</Text> : null}
-                        {entry.booking?.detail && entry.note !== entry.booking.detail ? <Text style={styles.detail} numberOfLines={2}>{entry.booking.detail}</Text> : null}
+                      <View style={styles.itemCopy}>
+                        <Text style={styles.itemTitle}>{entryTitle(entry)}</Text>
+                        {details.map((detail, index) => <Text key={`${entry.key}-detail-${index}`} style={[styles.note, index === 0 && styles.bookingTag]}>{detail}</Text>)}
+                        {!entry.booking && entry.note ? <Text style={styles.note}>{entry.note}</Text> : null}
                       </View>
+                      <Text style={styles.chevron}>›</Text>
                     </Pressable>
-                  );
-                })}
-              </View> : <View style={styles.emptyTimelineRow}>
-                <View style={styles.timeColumn}><Text style={styles.emptyTime}>—</Text></View>
-                <View style={styles.railColumn}><View style={styles.emptyNode} /></View>
-                <View style={styles.emptyDayCard}><Text style={styles.emptyDay}>予定はまだありません</Text></View>
-              </View>}
+                    );
+                  })}
+                </View> : <View style={styles.emptyRow}>
+                  <View style={styles.timeColumn}><Text style={styles.emptyTime}>—</Text></View>
+                  <View style={styles.railColumn}><View style={styles.emptyIconCircle}><SymbolView name={EMPTY_ICON} size={18} tintColor={palette.smoke} /></View></View>
+                  <Text style={styles.emptyDay}>予定はまだありません</Text>
+                </View>}
             </View>
           );
-        })}
+        })}</View>}
       </ScrollView>
 
       {selectedTrip ? <FloatingAddButton label="予定を追加する" onPress={openAdd} /> : null}
@@ -335,46 +346,36 @@ const styles = StyleSheet.create({
   dayTabLabelSelected: { color: palette.paper },
   dayTabDate: { color: palette.smoke, fontFamily: 'monospace', fontSize: 9, lineHeight: 13, marginTop: 1 },
   dayTabDateSelected: { color: palette.sky },
-  pending: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, marginTop: 12 },
+  pending: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, marginTop: 4 },
   empty: { minHeight: 430, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  emptyMark: { color: palette.accent, fontSize: 42, fontWeight: '900' },
   emptyTitle: { color: palette.ink, fontSize: 28, lineHeight: 30, fontWeight: '900', letterSpacing: -0.8, marginTop: 14 },
   emptyBody: { color: palette.slate, textAlign: 'center', marginTop: 7 },
-  daySection: { marginTop: 28 },
-  dayHeading: { minHeight: 52, flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
-  dayCount: { width: 48, height: 48, borderRadius: 24, backgroundColor: palette.sky, alignItems: 'center', justifyContent: 'center' },
-  dayCountLabel: { color: palette.slate, fontFamily: 'monospace', fontSize: 7, lineHeight: 10, fontWeight: '700', letterSpacing: 0.7 },
-  dayCountNumber: { color: palette.ink, fontSize: 20, lineHeight: 21, fontWeight: '900' },
-  dayHeadingCopy: { marginLeft: 13 },
-  dayDate: { color: palette.ink, fontSize: 17, lineHeight: 21, fontWeight: '900' },
-  dayDestination: { color: palette.smoke, fontSize: 11, lineHeight: 16, marginTop: 1 },
-  dayHeadingRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: palette.ash, marginLeft: 16 },
-  timeline: { width: '100%' },
-  timelineRow: { minHeight: 82, flexDirection: 'row', alignItems: 'stretch' },
-  timeColumn: { width: 56, alignItems: 'flex-end', paddingTop: 16, paddingRight: 10 },
-  time: { color: palette.ocean, fontFamily: 'monospace', fontSize: 12, lineHeight: 18, fontWeight: '800' },
-  railColumn: { width: 32, alignItems: 'center', position: 'relative' },
-  rail: { position: 'absolute', top: 32, bottom: -16, width: 1, backgroundColor: palette.ash },
-  timelineNode: { width: 24, height: 24, marginTop: 13, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.canvas, borderWidth: 1, borderColor: palette.ash, zIndex: 1 },
-  bookingNode: { backgroundColor: palette.ocean, borderColor: palette.ocean },
-  timelineMark: { color: palette.slate, fontSize: 13, lineHeight: 16, fontWeight: '900' },
-  bookingMark: { color: palette.paper, fontSize: 10 },
-  entryCard: { flex: 1, minWidth: 0, backgroundColor: palette.paper, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
-  bookingCard: { borderLeftWidth: 3, borderLeftColor: palette.ocean },
-  bookingMetaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 6 },
-  bookingTag: { flexShrink: 0, color: palette.ocean, fontFamily: 'monospace', fontSize: 9, lineHeight: 13, fontWeight: '800', letterSpacing: 0.3 },
-  confirmation: { flex: 1, color: palette.smoke, fontFamily: 'monospace', fontSize: 8, lineHeight: 12, textAlign: 'right' },
-  entryTitleRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  itemTitle: { flex: 1, color: palette.ink, fontSize: 16, lineHeight: 21, fontWeight: '800' },
-  note: { color: palette.slate, fontSize: 12, lineHeight: 18, marginTop: 5 },
-  bookingNote: { color: palette.ocean, fontFamily: 'monospace', fontSize: 13, fontWeight: '800' },
-  detail: { color: palette.slate, fontSize: 11, lineHeight: 17, marginTop: 5 },
-  chevron: { color: palette.smoke, fontSize: 22, lineHeight: 22, marginLeft: 12 },
+  timeline: { marginTop: 10, marginHorizontal: -20 },
+  daySection: { backgroundColor: palette.paper },
+  dateBar: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: palette.mist, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.ash, paddingHorizontal: 20 },
+  date: { color: palette.ink, fontSize: 14, lineHeight: 20, fontWeight: '800' },
+  dateDay: { color: palette.ocean, fontFamily: 'monospace', fontSize: 10, lineHeight: 14, fontWeight: '700' },
+  itemRow: { minHeight: 104, flexDirection: 'row', alignItems: 'stretch', paddingHorizontal: 16 },
   itemPressed: { opacity: 0.55 },
-  emptyTimelineRow: { minHeight: 62, flexDirection: 'row' },
-  emptyTime: { color: palette.ash, fontFamily: 'monospace', fontSize: 12 },
-  emptyNode: { width: 10, height: 10, borderRadius: 5, borderWidth: 1, borderColor: palette.ash, backgroundColor: palette.canvas, marginTop: 19 },
-  emptyDayCard: { flex: 1, minHeight: 48, justifyContent: 'center', borderRadius: 16, backgroundColor: palette.soft, paddingHorizontal: 16, marginBottom: 8 },
-  emptyDay: { color: palette.smoke, fontSize: 12, lineHeight: 18 },
+  timeColumn: { width: 64, alignItems: 'flex-end', paddingTop: 20, paddingRight: 6 },
+  time: { color: palette.ink, fontFamily: 'monospace', fontSize: 15, lineHeight: 20, fontWeight: '800' },
+  timeKind: { color: palette.smoke, fontSize: 10, lineHeight: 15, marginTop: 2 },
+  railColumn: { width: 50, alignItems: 'center', position: 'relative' },
+  rail: { position: 'absolute', left: 24, width: 2, backgroundColor: palette.accent },
+  railTop: { top: 0, height: 22 },
+  railBottom: { top: 62, bottom: 0 },
+  iconCircle: { width: 42, height: 42, borderRadius: 21, marginTop: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.soft, borderWidth: 2, borderColor: palette.accent, zIndex: 1 },
+  bookingIconCircle: { backgroundColor: palette.ocean, borderColor: palette.ocean },
+  itemCopy: { flex: 1, justifyContent: 'center', paddingVertical: 18, paddingLeft: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
+  bookingTag: { color: palette.ocean, fontWeight: '700' },
+  itemTitle: { color: palette.ink, fontSize: 17, lineHeight: 22, fontWeight: '800' },
+  note: { color: palette.slate, fontSize: 12, lineHeight: 17, marginTop: 3 },
+  chevron: { color: palette.smoke, alignSelf: 'center', fontSize: 22, lineHeight: 22, marginLeft: 8 },
+  emptyRow: { minHeight: 82, flexDirection: 'row', alignItems: 'stretch', paddingHorizontal: 16 },
+  emptyTime: { color: palette.smoke, fontFamily: 'monospace', fontSize: 14 },
+  emptyIconCircle: { width: 36, height: 36, borderRadius: 18, marginTop: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.mist },
+  emptyDay: { flex: 1, alignSelf: 'center', color: palette.smoke, fontSize: 13, lineHeight: 19, paddingLeft: 8 },
   modal: { flex: 1, backgroundColor: palette.canvas },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
   cancel: { color: palette.slate },
