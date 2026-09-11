@@ -2,11 +2,17 @@
 
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 
+import { candidateFingerprint, GmailImportCandidate, isCandidateNearTrip, parseGmailMessage } from './gmail-import';
+
 type Env = {
   DB: D1Database;
   BUCKET: R2Bucket;
   ASSETS: Fetcher;
   GOOGLE_CLIENT_IDS: string;
+  GOOGLE_GMAIL_CLIENT_ID?: string;
+  GOOGLE_GMAIL_CLIENT_SECRET?: string;
+  GOOGLE_GMAIL_REDIRECT_URI?: string;
+  GMAIL_TOKEN_ENCRYPTION_KEY?: string;
   ALLOWED_ORIGINS?: string;
 };
 
@@ -63,6 +69,38 @@ async function hashToken(token: string) {
   return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, '0')).join('');
 }
 
+function base64Url(bytes: Uint8Array) {
+  return btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+}
+
+function fromBase64Url(value: string) {
+  const normalized = value.replaceAll('-', '+').replaceAll('_', '/');
+  const binary = atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '='));
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+async function gmailEncryptionKey(env: Env) {
+  if (!env.GMAIL_TOKEN_ENCRYPTION_KEY) throw new Error('Gmail暗号化設定がありません');
+  const raw = fromBase64Url(env.GMAIL_TOKEN_ENCRYPTION_KEY);
+  if (raw.byteLength !== 32) throw new Error('Gmail暗号化キーは32 byte必要です');
+  return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+}
+
+async function encryptGmailToken(env: Env, token: string) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await gmailEncryptionKey(env), encoder.encode(token));
+  return { encryptedToken: base64Url(new Uint8Array(encrypted)), iv: base64Url(iv) };
+}
+
+async function decryptGmailToken(env: Env, encryptedToken: string, iv: string) {
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: fromBase64Url(iv) },
+    await gmailEncryptionKey(env),
+    fromBase64Url(encryptedToken),
+  );
+  return new TextDecoder().decode(decrypted);
+}
+
 function randomToken() {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   return btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
@@ -99,6 +137,228 @@ async function googleLogin(request: Request, env: Env) {
     return json({ token, user });
   } catch {
     return json({ error: 'Googleログインを確認できませんでした' }, 401);
+  }
+}
+
+function gmailConfigured(env: Env) {
+  return Boolean(env.GOOGLE_GMAIL_CLIENT_ID && env.GOOGLE_GMAIL_CLIENT_SECRET && env.GOOGLE_GMAIL_REDIRECT_URI && env.GMAIL_TOKEN_ENCRYPTION_KEY);
+}
+
+function allowedGmailReturnUrl(value: string, env: Env) {
+  try {
+    const url = new URL(value);
+    if (url.protocol === 'tabi:') return value;
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    const allowed = env.ALLOWED_ORIGINS?.split(',').map((origin) => origin.trim()).filter(Boolean) ?? [];
+    return allowed.includes(url.origin) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+async function gmailStatus(env: Env, user: User) {
+  const connection = await env.DB.prepare('SELECT email, updated_at AS updatedAt FROM gmail_connections WHERE user_id = ?')
+    .bind(user.id)
+    .first<{ email: string; updatedAt: number }>();
+  return json({ configured: gmailConfigured(env), connected: Boolean(connection), email: connection?.email ?? null, updatedAt: connection?.updatedAt ?? null });
+}
+
+async function beginGmailAuthorization(request: Request, env: Env, user: User) {
+  if (!gmailConfigured(env)) return json({ error: 'Gmail連携のサーバー設定が完了していません' }, 503);
+  const body = await request.json().catch(() => null);
+  const returnUrl = isObject(body) && typeof body.returnUrl === 'string' ? allowedGmailReturnUrl(body.returnUrl, env) : null;
+  if (!returnUrl) return json({ error: 'Gmail連携後の戻り先が正しくありません' }, 400);
+  const state = randomToken();
+  await env.DB.prepare('INSERT INTO gmail_oauth_states (state_hash, user_id, return_url, expires_at) VALUES (?, ?, ?, unixepoch() + 600)')
+    .bind(await hashToken(state), user.id, returnUrl)
+    .run();
+  const authorization = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  authorization.searchParams.set('client_id', env.GOOGLE_GMAIL_CLIENT_ID!);
+  authorization.searchParams.set('redirect_uri', env.GOOGLE_GMAIL_REDIRECT_URI!);
+  authorization.searchParams.set('response_type', 'code');
+  authorization.searchParams.set('scope', 'https://www.googleapis.com/auth/gmail.readonly');
+  authorization.searchParams.set('access_type', 'offline');
+  authorization.searchParams.set('prompt', 'consent');
+  authorization.searchParams.set('include_granted_scopes', 'true');
+  authorization.searchParams.set('login_hint', user.email);
+  authorization.searchParams.set('state', state);
+  return json({ authorizationUrl: authorization.toString() });
+}
+
+function appendResult(returnUrl: string, result: 'connected' | 'denied' | 'failed') {
+  const url = new URL(returnUrl);
+  url.searchParams.set('gmail', result);
+  return url.toString();
+}
+
+async function gmailCallback(request: Request, env: Env, url: URL) {
+  const state = url.searchParams.get('state');
+  if (!state) return json({ error: 'Gmail連携情報がありません' }, 400);
+  const stateHash = await hashToken(state);
+  const stored = await env.DB.prepare(`
+    DELETE FROM gmail_oauth_states
+    WHERE state_hash = ? AND expires_at > unixepoch()
+    RETURNING user_id AS userId, return_url AS returnUrl
+  `).bind(stateHash).first<{ userId: string; returnUrl: string }>();
+  if (!stored) return json({ error: 'Gmail連携の有効期限が切れました' }, 400);
+  if (url.searchParams.get('error')) return Response.redirect(appendResult(stored.returnUrl, 'denied'), 302);
+  const code = url.searchParams.get('code');
+  if (!code || !gmailConfigured(env)) return Response.redirect(appendResult(stored.returnUrl, 'failed'), 302);
+
+  try {
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: env.GOOGLE_GMAIL_CLIENT_ID!,
+        client_secret: env.GOOGLE_GMAIL_CLIENT_SECRET!,
+        redirect_uri: env.GOOGLE_GMAIL_REDIRECT_URI!,
+        grant_type: 'authorization_code',
+      }),
+    });
+    const token = await tokenResponse.json() as { access_token?: string; refresh_token?: string; scope?: string; error?: string };
+    if (!tokenResponse.ok || !token.access_token) throw new Error(token.error ?? 'token exchange failed');
+    const existing = await env.DB.prepare('SELECT encrypted_refresh_token AS encryptedToken, token_iv AS iv FROM gmail_connections WHERE user_id = ?')
+      .bind(stored.userId)
+      .first<{ encryptedToken: string; iv: string }>();
+    const encrypted = token.refresh_token
+      ? await encryptGmailToken(env, token.refresh_token)
+      : existing;
+    if (!encrypted) throw new Error('refresh token missing');
+    const profileResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+      headers: { authorization: `Bearer ${token.access_token}` },
+    });
+    const profile = await profileResponse.json() as { emailAddress?: string };
+    await env.DB.prepare(`
+      INSERT INTO gmail_connections (user_id, email, encrypted_refresh_token, token_iv, scope, updated_at)
+      VALUES (?, ?, ?, ?, ?, unixepoch())
+      ON CONFLICT(user_id) DO UPDATE SET
+        email = excluded.email, encrypted_refresh_token = excluded.encrypted_refresh_token,
+        token_iv = excluded.token_iv, scope = excluded.scope, updated_at = unixepoch()
+    `).bind(stored.userId, profile.emailAddress ?? '', encrypted.encryptedToken, encrypted.iv, token.scope ?? '').run();
+    return Response.redirect(appendResult(stored.returnUrl, 'connected'), 302);
+  } catch {
+    return Response.redirect(appendResult(stored.returnUrl, 'failed'), 302);
+  }
+}
+
+async function disconnectGmail(env: Env, user: User) {
+  const connection = await env.DB.prepare('DELETE FROM gmail_connections WHERE user_id = ? RETURNING encrypted_refresh_token AS encryptedToken, token_iv AS iv')
+    .bind(user.id)
+    .first<{ encryptedToken: string; iv: string }>();
+  if (connection && gmailConfigured(env)) {
+    try {
+      const refreshToken = await decryptGmailToken(env, connection.encryptedToken, connection.iv);
+      await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(refreshToken)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      });
+    } catch {
+      // The local connection is already removed; a failed remote revoke is harmless.
+    }
+  }
+  return new Response(null, { status: 204 });
+}
+
+async function gmailAccessToken(env: Env, user: User) {
+  if (!gmailConfigured(env)) throw new Error('Gmail連携のサーバー設定が完了していません');
+  const connection = await env.DB.prepare('SELECT encrypted_refresh_token AS encryptedToken, token_iv AS iv FROM gmail_connections WHERE user_id = ?')
+    .bind(user.id)
+    .first<{ encryptedToken: string; iv: string }>();
+  if (!connection) throw new Error('Gmailを連携してください');
+  const refreshToken = await decryptGmailToken(env, connection.encryptedToken, connection.iv);
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: env.GOOGLE_GMAIL_CLIENT_ID!,
+      client_secret: env.GOOGLE_GMAIL_CLIENT_SECRET!,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  });
+  const result = await response.json() as { access_token?: string; error?: string };
+  if (!response.ok || !result.access_token) throw new Error(result.error === 'invalid_grant' ? 'Gmailをもう一度連携してください' : 'Gmailへ接続できませんでした');
+  return result.access_token;
+}
+
+async function gmailJson<T>(url: string, accessToken: string): Promise<T> {
+  const response = await fetch(url, { headers: { authorization: `Bearer ${accessToken}` } });
+  const result = await response.json() as T & { error?: { message?: string } };
+  if (!response.ok) throw new Error(result.error?.message ?? 'Gmailの読み込みに失敗しました');
+  return result;
+}
+
+type ExistingBooking = {
+  id: string;
+  kind: string;
+  title: string;
+  day: string;
+  time: string;
+  confirmationCode: string;
+  originCode: string;
+  destinationCode: string;
+};
+
+function normalized(value: string) {
+  return value.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+function matchingBooking(candidate: GmailImportCandidate, bookings: ExistingBooking[]) {
+  return bookings.find((booking) => {
+    if (booking.kind !== candidate.kind || booking.day !== candidate.day) return false;
+    if (candidate.confirmationCode && normalized(booking.confirmationCode) === normalized(candidate.confirmationCode)) return true;
+    if (booking.time !== candidate.time) return false;
+    if (candidate.kind === 'hotel') return normalized(booking.title) === normalized(candidate.title);
+    return Boolean(candidate.originCode && candidate.destinationCode
+      && booking.originCode === candidate.originCode && booking.destinationCode === candidate.destinationCode);
+  });
+}
+
+async function gmailCandidates(env: Env, user: User, tripId: string) {
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  const trip = await env.DB.prepare('SELECT starts_on AS startsOn, ends_on AS endsOn FROM trips WHERE id = ?')
+    .bind(tripId).first<{ startsOn: string; endsOn: string }>();
+  if (!trip) return json({ error: '旅行が見つかりません' }, 404);
+  try {
+    const accessToken = await gmailAccessToken(env, user);
+    const query = encodeURIComponent('newer_than:2y {予約 reservation booking itinerary e-ticket boarding hotel check-in train rail 新幹線 搭乗 宿泊}');
+    const listed = await gmailJson<{ messages?: { id: string }[] }>(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=100&q=${query}`, accessToken);
+    const messages = listed.messages ?? [];
+    const fetched: unknown[] = [];
+    for (let index = 0; index < messages.length; index += 10) {
+      fetched.push(...await Promise.all(messages.slice(index, index + 10).map(({ id }) => gmailJson(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=full`,
+        accessToken,
+      ))));
+    }
+    const candidates = fetched.flatMap((message) => parseGmailMessage(message as Parameters<typeof parseGmailMessage>[0]))
+      .filter((candidate) => isCandidateNearTrip(candidate, trip.startsOn, trip.endsOn));
+    const [bookingsResult, importsResult] = await Promise.all([
+      env.DB.prepare(`
+        SELECT b.id, b.kind, b.title, b.day, b.time, b.confirmation_code AS confirmationCode,
+               COALESCE(d.origin_code, '') AS originCode, COALESCE(d.destination_code, '') AS destinationCode
+        FROM bookings b LEFT JOIN booking_details d ON d.booking_id = b.id WHERE b.trip_id = ?
+      `).bind(tripId).all<ExistingBooking>(),
+      env.DB.prepare("SELECT external_id AS externalId, booking_id AS bookingId FROM booking_imports WHERE trip_id = ? AND provider = 'gmail'")
+        .bind(tripId).all<{ externalId: string; bookingId: string }>(),
+    ]);
+    const imports = new Map(importsResult.results.map((entry) => [entry.externalId, entry.bookingId]));
+    return json({
+      candidates: candidates.map((candidate) => {
+        const importedBookingId = imports.get(candidate.sourceMessageId);
+        const duplicate = matchingBooking(candidate, bookingsResult.results);
+        return {
+          ...candidate,
+          ...(importedBookingId || duplicate ? { duplicateBookingId: importedBookingId ?? duplicate?.id } : {}),
+          alreadyImported: Boolean(importedBookingId),
+        };
+      }),
+    });
+  } catch (cause) {
+    return json({ error: cause instanceof Error ? cause.message : 'Gmailを読み込めませんでした' }, 502);
   }
 }
 
@@ -292,6 +552,55 @@ async function createBooking(request: Request, env: Env, user: User, tripId: str
     `).bind(id, fields.origin, fields.originCode, fields.destination, fields.destinationCode, fields.endDay, fields.endTime, id, tripId),
   ]);
   if (!bookingResult.meta.changes) return json({ error: '予約IDが競合しました' }, 409);
+  return json({ booking: { id, ...fields, updatedBy: user.id } }, 201);
+}
+
+async function importGmailBooking(request: Request, env: Env, user: User, tripId: string) {
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  const body = await request.json().catch(() => null);
+  const fields = isObject(body) ? bookingFields(body) : null;
+  const sourceMessageId = isObject(body) ? textField(body.sourceMessageId, 200, true) : null;
+  if (!fields || !sourceMessageId || !['flight', 'hotel', 'train'].includes(fields.kind)) {
+    return json({ error: '正しいGmail予約候補が必要です' }, 400);
+  }
+  const imported = await env.DB.prepare("SELECT booking_id AS bookingId FROM booking_imports WHERE trip_id = ? AND provider = 'gmail' AND external_id = ?")
+    .bind(tripId, sourceMessageId).first<{ bookingId: string }>();
+  if (imported) return json({ error: 'このメールはすでに取り込み済みです', bookingId: imported.bookingId }, 409);
+  const existing = await env.DB.prepare(`
+    SELECT b.id, b.kind, b.title, b.day, b.time, b.confirmation_code AS confirmationCode,
+           COALESCE(d.origin_code, '') AS originCode, COALESCE(d.destination_code, '') AS destinationCode
+    FROM bookings b LEFT JOIN booking_details d ON d.booking_id = b.id WHERE b.trip_id = ?
+  `).bind(tripId).all<ExistingBooking>();
+  const candidate: GmailImportCandidate = {
+    ...fields,
+    kind: fields.kind as GmailImportCandidate['kind'],
+    sourceMessageId,
+    confidence: 'high' as const,
+    sender: '',
+    subject: '',
+    fingerprint: '',
+  };
+  const duplicate = matchingBooking(candidate, existing.results);
+  if (duplicate) return json({ error: '同じ内容の予約がすでにあります', bookingId: duplicate.id }, 409);
+
+  const id = idField(isObject(body) ? body.id : null) ?? crypto.randomUUID();
+  const fingerprint = candidateFingerprint(candidate);
+  const [bookingResult] = await env.DB.batch([
+    env.DB.prepare(`
+      INSERT INTO bookings (id, trip_id, kind, title, detail, day, time, confirmation_code, note, updated_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(id, tripId, fields.kind, fields.title, fields.detail, fields.day, fields.time, fields.confirmationCode, fields.note, user.id),
+    env.DB.prepare(`
+      INSERT INTO booking_details (booking_id, origin, origin_code, destination, destination_code, end_day, end_time)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(id, fields.origin, fields.originCode, fields.destination, fields.destinationCode, fields.endDay, fields.endTime),
+    env.DB.prepare(`
+      INSERT INTO booking_imports (booking_id, trip_id, imported_by, provider, external_id, fingerprint)
+      VALUES (?, ?, ?, 'gmail', ?, ?)
+    `).bind(id, tripId, user.id, sourceMessageId, fingerprint),
+  ]);
+  if (!bookingResult.meta.changes) return json({ error: '予約を追加できませんでした' }, 409);
   return json({ booking: { id, ...fields, updatedBy: user.id } }, 201);
 }
 
@@ -595,6 +904,7 @@ async function acceptInvite(env: Env, user: User, token: string) {
 
 async function api(request: Request, env: Env, url: URL) {
   if (request.method === 'POST' && url.pathname === '/v1/auth/google') return googleLogin(request, env);
+  if (request.method === 'GET' && url.pathname === '/v1/integrations/gmail/callback') return gmailCallback(request, env, url);
   const user = await currentUser(request, env);
   if (!user) return json({ error: 'ログインが必要です' }, 401);
   if (request.method === 'GET' && url.pathname === '/v1/me') return json({ user });
@@ -603,6 +913,9 @@ async function api(request: Request, env: Env, url: URL) {
     if (token) await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await hashToken(token)).run();
     return json({ ok: true });
   }
+  if (request.method === 'GET' && url.pathname === '/v1/integrations/gmail') return gmailStatus(env, user);
+  if (request.method === 'POST' && url.pathname === '/v1/integrations/gmail/authorization') return beginGmailAuthorization(request, env, user);
+  if (request.method === 'DELETE' && url.pathname === '/v1/integrations/gmail') return disconnectGmail(env, user);
   if (request.method === 'GET' && url.pathname === '/v1/trips') return listTrips(env, user);
   if (request.method === 'POST' && url.pathname === '/v1/trips') return createTrip(request, env, user);
 
@@ -620,6 +933,12 @@ async function api(request: Request, env: Env, url: URL) {
   const bookingsMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/bookings$/);
   if (bookingsMatch && request.method === 'GET') return listBookings(env, user, bookingsMatch[1]);
   if (bookingsMatch && request.method === 'POST') return createBooking(request, env, user, bookingsMatch[1]);
+
+  const gmailCandidatesMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/gmail\/candidates$/);
+  if (gmailCandidatesMatch && request.method === 'POST') return gmailCandidates(env, user, gmailCandidatesMatch[1]);
+
+  const gmailImportsMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/gmail\/imports$/);
+  if (gmailImportsMatch && request.method === 'POST') return importGmailBooking(request, env, user, gmailImportsMatch[1]);
 
   const bookingMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/bookings\/([^/]+)$/);
   if (bookingMatch && request.method === 'PATCH') return updateBooking(request, env, user, bookingMatch[1], bookingMatch[2]);

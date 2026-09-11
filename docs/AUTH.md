@@ -27,3 +27,27 @@ Googleから受け取ったID tokenはCloudflare Workerへ送り、次をすべ�
 - iOS OAuth client: bundle ID `com.tsito2602.tabi`
 - Android OAuth client: package `com.tsito2602.tabi` と署名証明書SHA-1
 - Web OAuth client: Cloudflareの本番・staging URL
+
+## Gmail予約取込
+
+通常ログインのOpenID Connect権限とGmail権限は分離する。予約画面で利用者が明示的に開始した場合だけ、
+`https://www.googleapis.com/auth/gmail.readonly`を要求する。
+
+Google CloudでGmail APIを有効化し、OAuth同意画面へGmail read-only scopeを追加する。Web application型の
+OAuth clientに、環境ごとのWorker callbackをAuthorized redirect URIとして登録する。
+
+- staging: `https://tabi-staging.tsito-apps.workers.dev/v1/integrations/gmail/callback`
+- production: 本番originの`/v1/integrations/gmail/callback`
+
+Worker variables:
+
+- `GOOGLE_GMAIL_CLIENT_ID`
+- `GOOGLE_GMAIL_REDIRECT_URI`
+
+Worker secrets:
+
+- `GOOGLE_GMAIL_CLIENT_SECRET`
+- `GMAIL_TOKEN_ENCRYPTION_KEY`（32 byteをbase64url化した値）
+
+暗号鍵は`openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`などで生成し、リポジトリやGitHub Variablesには置かない。
+refresh tokenはAES-GCMで暗号化してD1へ保存する。短命なaccess tokenとメール本文は永続化しない。

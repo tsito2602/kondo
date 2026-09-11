@@ -41,6 +41,26 @@ export type Booking = {
   updatedAt?: number;
 };
 
+export type GmailConnection = {
+  configured: boolean;
+  connected: boolean;
+  email: string | null;
+  updatedAt: number | null;
+};
+
+export type GmailImportCandidate = Pick<Booking,
+  'kind' | 'title' | 'detail' | 'origin' | 'originCode' | 'destination' | 'destinationCode' |
+  'day' | 'time' | 'endDay' | 'endTime' | 'confirmationCode' | 'note'
+> & {
+  sourceMessageId: string;
+  confidence: 'high' | 'medium';
+  sender: string;
+  subject: string;
+  fingerprint: string;
+  duplicateBookingId?: string;
+  alreadyImported?: boolean;
+};
+
 export type BookingDocument = {
   id: string;
   bookingId: string;
