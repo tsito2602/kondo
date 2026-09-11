@@ -3,6 +3,7 @@ import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateRangePicker } from '@/components/date-range-picker';
+import { FloatingAddButton } from '@/components/floating-add-button';
 import { palette } from '@/constants/design';
 import { useTravel } from '@/data/travel-provider';
 import { PackingItem, TravelTask } from '@/data/types';
@@ -25,7 +26,6 @@ export default function PackingScreen() {
     deletePackingItem,
     deleteTask,
     packingItems,
-    pendingCount,
     selectedTrip,
     tasks,
     updatePackingItem,
@@ -172,23 +172,6 @@ export default function PackingScreen() {
   return (
     <SafeAreaView edges={[]} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.headingRow}>
-          <View style={styles.tag}><Text style={styles.tagText}>TRAVEL PREP</Text></View>
-          <Text style={styles.counter}>
-            {pendingCount ? `${pendingCount} SYNCING` : `${String(activeDone).padStart(2, '0')} / ${String(activeTotal).padStart(2, '0')}`}
-          </Text>
-        </View>
-        <View style={styles.titleRow}>
-          <View style={styles.titleCopy}>
-            <Text style={styles.title}>旅の準備</Text>
-          </View>
-          {selectedTrip ? (
-            <Pressable accessibilityLabel={isTasks ? 'やることを追加する' : '持ち物を追加する'} onPress={openCreate} style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}>
-              <Text style={styles.addButtonText}>＋ 追加</Text>
-            </Pressable>
-          ) : null}
-        </View>
-
         <View accessibilityRole="tablist" style={styles.segmented}>
           <Pressable
             accessibilityRole="tab"
@@ -273,6 +256,8 @@ export default function PackingScreen() {
         )}
       </ScrollView>
 
+      {selectedTrip ? <FloatingAddButton label={isTasks ? 'やることを追加する' : '持ち物を追加する'} onPress={openCreate} /> : null}
+
       <Modal animationType="fade" onRequestClose={() => setFormOpen(false)} transparent visible={formOpen}>
         <SafeAreaView style={styles.backdrop}>
           <Pressable accessibilityLabel="準備の編集を閉じる" onPress={() => setFormOpen(false)} style={StyleSheet.absoluteFill} />
@@ -347,17 +332,8 @@ export default function PackingScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.canvas },
-  content: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 48 },
-  headingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  tag: { backgroundColor: palette.sky, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 7 },
-  tagText: { color: palette.ink, fontSize: 11, lineHeight: 14, fontWeight: '800', letterSpacing: 0.5 },
-  counter: { color: palette.smoke, fontSize: 11, lineHeight: 14, fontWeight: '800', letterSpacing: 0.5 },
-  titleRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginTop: 20 },
-  titleCopy: { flex: 1 },
-  title: { color: palette.ink, fontSize: 48, lineHeight: 52, fontWeight: '900', letterSpacing: -2.4 },
-  addButton: { backgroundColor: palette.ink, borderRadius: 8, paddingHorizontal: 18, paddingVertical: 13 },
-  addButtonText: { color: palette.paper, fontSize: 14, lineHeight: 18, fontWeight: '800' },
-  segmented: { flexDirection: 'row', backgroundColor: palette.sky, borderRadius: 14, padding: 4, marginTop: 24 },
+  content: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 112 },
+  segmented: { flexDirection: 'row', backgroundColor: palette.sky, borderRadius: 14, padding: 4 },
   segment: { flex: 1, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   segmentSelected: { backgroundColor: palette.paper },
   segmentText: { color: palette.slate, fontSize: 13, lineHeight: 18, fontWeight: '700' },
@@ -429,5 +405,4 @@ const styles = StyleSheet.create({
   saveText: { color: palette.paper, fontSize: 15, lineHeight: 19, fontWeight: '800' },
   pressed: { opacity: 0.62 },
 });
-
 

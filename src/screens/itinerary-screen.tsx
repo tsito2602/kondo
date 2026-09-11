@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, Modal, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateRangePicker } from '@/components/date-range-picker';
+import { FloatingAddButton } from '@/components/floating-add-button';
 import { palette } from '@/constants/design';
 import type { Booking, BookingKind, ItineraryItem } from '@/data/types';
 import { useTravel } from '@/data/travel-provider';
@@ -62,6 +63,24 @@ function bookingTimelineEntries(booking: Booking): TimelineEntry[] {
   return entries;
 }
 
+function datesBetween(start: string, end: string) {
+  const dates: string[] = [];
+  const cursor = new Date(`${start}T00:00:00Z`);
+  const last = new Date(`${end}T00:00:00Z`);
+  if (Number.isNaN(cursor.getTime()) || Number.isNaN(last.getTime()) || cursor > last) return dates;
+  while (cursor <= last && dates.length < 370) {
+    dates.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return dates;
+}
+
+function shortDate(value: string) {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric' }).format(date);
+}
+
 export default function ItineraryScreen() {
   const { selectedTrip, items, bookings, createItem, updateItem, deleteItem, pendingCount } = useTravel();
   const [adding, setAdding] = useState(false);
@@ -70,6 +89,8 @@ export default function ItineraryScreen() {
   const [time, setTime] = useState('10:00');
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
+  const dayOffsets = useRef<Record<string, number>>({});
 
   const timeline = [
     ...items.map<TimelineEntry>((item) => ({ key: `item-${item.id}`, day: item.day, time: item.time, title: item.title, note: item.note, item })),
@@ -79,6 +100,29 @@ export default function ItineraryScreen() {
     (result[entry.day] ??= []).push(entry);
     return result;
   }, {});
+  const itineraryDates = [...new Set([
+    ...(selectedTrip ? datesBetween(selectedTrip.startsOn, selectedTrip.endsOn) : []),
+    ...Object.keys(grouped),
+  ])].sort();
+  const [activeDay, setActiveDay] = useState(selectedTrip?.startsOn ?? '');
+  const visibleActiveDay = itineraryDates.includes(activeDay) ? activeDay : itineraryDates[0];
+
+  const scrollToDay = (date: string) => {
+    const offset = dayOffsets.current[date];
+    setActiveDay(date);
+    if (offset === undefined) return;
+    scrollRef.current?.scrollTo({ y: Math.max(0, offset - 68), animated: true });
+  };
+
+  const trackVisibleDay = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const scrollPosition = event.nativeEvent.contentOffset.y + 76;
+    let visibleDay = itineraryDates[0];
+    for (const date of itineraryDates) {
+      if ((dayOffsets.current[date] ?? Number.POSITIVE_INFINITY) <= scrollPosition) visibleDay = date;
+      else break;
+    }
+    if (visibleDay && visibleDay !== visibleActiveDay) setActiveDay(visibleDay);
+  };
 
   const openAdd = () => {
     if (!selectedTrip) return;
@@ -132,24 +176,36 @@ export default function ItineraryScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <View><Text style={styles.eyebrow}>ITINERARY</Text><Text style={styles.title}>しおり</Text></View>
-          {selectedTrip ? <Pressable onPress={openAdd} style={styles.addButton}><Text style={styles.addText}>＋ 予定</Text></Pressable> : null}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        onScroll={trackVisibleDay}
+        ref={scrollRef}
+        scrollEventThrottle={32}
+        showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[0]}>
+        <View style={styles.dayNavSticky}>
+          {selectedTrip && itineraryDates.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayTabs}>
+            {itineraryDates.map((date, index) => {
+              const selected = date === visibleActiveDay;
+              return <Pressable accessibilityRole="tab" accessibilityState={{ selected }} key={date} onPress={() => scrollToDay(date)} style={[styles.dayTab, selected && styles.dayTabSelected]}>
+                <Text style={[styles.dayTabLabel, selected && styles.dayTabLabelSelected]}>{index + 1}日目</Text>
+                <Text style={[styles.dayTabDate, selected && styles.dayTabDateSelected]}>{shortDate(date)}</Text>
+              </Pressable>;
+            })}
+          </ScrollView> : null}
         </View>
         {pendingCount ? <Text style={styles.pending}>{pendingCount}件を端末に保存済み · オンライン時に同期</Text> : null}
 
         {!selectedTrip ? (
           <View style={styles.empty}><Text style={styles.emptyTitle}>旅行がありません</Text><Text style={styles.emptyBody}>旅行一覧から旅行を選択してください。</Text></View>
-        ) : !timeline.length ? (
-          <View style={styles.empty}><Text style={styles.emptyMark}>＋</Text><Text style={styles.emptyTitle}>予定を追加</Text><Text style={styles.emptyBody}>移動、食事、観光などを時系列でまとめられます。</Text></View>
-        ) : (
-          Object.entries(grouped).map(([date, dateItems], dayIndex) => (
-            <View key={date} style={styles.dayCard}>
+        ) : itineraryDates.map((date, dayIndex) => {
+          const dateItems = grouped[date] ?? [];
+          return (
+            <View key={date} onLayout={(event) => { dayOffsets.current[date] = event.nativeEvent.layout.y; }} style={styles.dayCard}>
               <View style={styles.dayBadge}><Text style={styles.dayLabel}>DAY</Text><Text style={styles.dayNumber}>{dayIndex + 1}</Text></View>
               <View style={styles.dayContent}>
                 <Text style={styles.date}>{date}</Text>
-                <View style={styles.items}>
+                {dateItems.length ? <View style={styles.items}>
                   {dateItems.map((entry) => (
                     <Pressable
                       accessibilityHint={entry.booking ? '予約の詳細を開きます' : '予定を編集します'}
@@ -166,12 +222,14 @@ export default function ItineraryScreen() {
                       <Text style={styles.chevron}>›</Text>
                     </Pressable>
                   ))}
-                </View>
+                </View> : <Text style={styles.emptyDay}>予定はまだありません</Text>}
               </View>
             </View>
-          ))
-        )}
+          );
+        })}
       </ScrollView>
+
+      {selectedTrip ? <FloatingAddButton label="予定を追加する" onPress={openAdd} /> : null}
 
       <Modal visible={adding} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeEditor}>
         <SafeAreaView style={styles.modal}>
@@ -194,13 +252,16 @@ export default function ItineraryScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.canvas },
-  content: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 20, paddingTop: 10, paddingBottom: 48 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  eyebrow: { alignSelf: 'flex-start', color: palette.ink, backgroundColor: palette.sky, borderRadius: 64, paddingHorizontal: 12, paddingVertical: 5, fontFamily: 'monospace', fontSize: 10, fontWeight: '400' },
-  title: { color: palette.ink, fontSize: 42, lineHeight: 42, fontWeight: '900', letterSpacing: -1.5, marginTop: 8 },
-  addButton: { minHeight: 44, backgroundColor: palette.ocean, borderRadius: 8, paddingHorizontal: 17, alignItems: 'center', justifyContent: 'center' },
-  addText: { color: palette.paper, fontWeight: '700' },
-  pending: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, marginTop: 12 },
+  content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 112 },
+  dayNavSticky: { zIndex: 4, marginHorizontal: -20, paddingHorizontal: 20, paddingBottom: 10, backgroundColor: palette.canvas },
+  dayTabs: { gap: 8, paddingRight: 20 },
+  dayTab: { minWidth: 68, minHeight: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: palette.mist, paddingHorizontal: 12 },
+  dayTabSelected: { backgroundColor: palette.ocean },
+  dayTabLabel: { color: palette.slate, fontSize: 13, lineHeight: 17, fontWeight: '800' },
+  dayTabLabelSelected: { color: palette.paper },
+  dayTabDate: { color: palette.smoke, fontFamily: 'monospace', fontSize: 9, lineHeight: 13, marginTop: 1 },
+  dayTabDateSelected: { color: palette.sky },
+  pending: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, marginTop: 4 },
   empty: { minHeight: 430, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyMark: { color: palette.accent, fontSize: 42, fontWeight: '900' },
   emptyTitle: { color: palette.ink, fontSize: 28, lineHeight: 30, fontWeight: '900', letterSpacing: -0.8, marginTop: 14 },
@@ -211,6 +272,7 @@ const styles = StyleSheet.create({
   dayNumber: { color: palette.ink, fontSize: 22, lineHeight: 24, fontWeight: '900' },
   dayContent: { flex: 1 },
   date: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, fontWeight: '400' },
+  emptyDay: { color: palette.smoke, fontSize: 13, lineHeight: 19, marginTop: 12 },
   items: { marginTop: 8 },
   itemRow: { minHeight: 58, flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
   bookingRow: { backgroundColor: palette.soft, borderRadius: 12, borderBottomWidth: 0, paddingHorizontal: 10, marginVertical: 3 },
@@ -233,4 +295,3 @@ const styles = StyleSheet.create({
   deleteButton: { minHeight: 50, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
   deleteText: { color: palette.danger, fontSize: 15, fontWeight: '700' },
 });
-

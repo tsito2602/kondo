@@ -57,12 +57,12 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
 
 const styles = StyleSheet.create({
   shell: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 10, backgroundColor: palette.canvas },
-  topRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  backButton: { minWidth: 92, minHeight: 44, flexDirection: 'row', alignItems: 'center' },
+  topRow: { minHeight: 48, position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  backButton: { position: 'absolute', left: 0, zIndex: 2, minWidth: 92, minHeight: 44, flexDirection: 'row', alignItems: 'center' },
   backMark: { color: palette.ocean, fontSize: 32, lineHeight: 34, marginRight: 3, marginTop: -2 },
   backText: { color: palette.ocean, fontSize: 14, lineHeight: 20, fontWeight: '700' },
-  tripName: { flex: 1, color: palette.ink, fontSize: 16, lineHeight: 22, fontWeight: '800', textAlign: 'center' },
-  shareButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.paper },
+  tripName: { width: '100%', color: palette.ink, fontSize: 16, lineHeight: 22, fontWeight: '800', textAlign: 'center', paddingHorizontal: 108 },
+  shareButton: { position: 'absolute', right: 0, zIndex: 2, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.paper },
   shareMark: { color: palette.ocean, fontSize: 21, lineHeight: 23, fontWeight: '800' },
   tabs: { minHeight: 52, flexDirection: 'row', padding: 4, borderRadius: 16, backgroundColor: palette.paper },
   tab: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
