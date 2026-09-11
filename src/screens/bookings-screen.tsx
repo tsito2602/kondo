@@ -53,6 +53,8 @@ export default function BookingsScreen() {
   const [gmailError, setGmailError] = useState('');
   const [gmailConnection, setGmailConnection] = useState<GmailConnection | null>(null);
   const [gmailCandidates, setGmailCandidates] = useState<GmailImportCandidate[]>([]);
+  const [gmailPageToken, setGmailPageToken] = useState<string | null>(null);
+  const [gmailScanned, setGmailScanned] = useState(0);
   const matchingCandidate = findMatchingItineraryItem(items, draft);
   const selectedMergeItem = matchingCandidate?.item.id === mergeItemId ? matchingCandidate.item : null;
 
@@ -146,7 +148,7 @@ export default function BookingsScreen() {
     }
   };
 
-  const loadGmailCandidates = useCallback(async () => {
+  const loadGmailCandidates = useCallback(async (nextToken: string | null = null, append = false) => {
     if (!selectedTrip) return;
     setGmailBusy(true);
     setGmailError('');
@@ -155,10 +157,22 @@ export default function BookingsScreen() {
       setGmailConnection(connection);
       if (!connection.connected) {
         setGmailCandidates([]);
+        setGmailPageToken(null);
+        setGmailScanned(0);
         return;
       }
-      const result = await request<{ candidates: GmailImportCandidate[] }>(`/v1/trips/${selectedTrip.id}/gmail/candidates`, { method: 'POST' });
-      setGmailCandidates(result.candidates);
+      const result = await request<{ candidates: GmailImportCandidate[]; nextPageToken: string | null; scanned: number }>(
+        `/v1/trips/${selectedTrip.id}/gmail/candidates`,
+        { method: 'POST', body: JSON.stringify(nextToken ? { pageToken: nextToken } : {}) },
+      );
+      setGmailCandidates((current) => {
+        const combined = append ? [...current, ...result.candidates] : result.candidates;
+        return combined.filter((candidate, index) => combined.findIndex(
+          (entry) => entry.sourceMessageId === candidate.sourceMessageId && entry.fingerprint === candidate.fingerprint,
+        ) === index);
+      });
+      setGmailPageToken(result.nextPageToken);
+      setGmailScanned((current) => append ? current + result.scanned : result.scanned);
     } catch (cause) {
       setGmailError(cause instanceof Error ? cause.message : 'Gmailを読み込めませんでした。');
     } finally {
@@ -329,7 +343,7 @@ export default function BookingsScreen() {
               {gmailBusy ? <View style={styles.gmailLoading}><ActivityIndicator color={palette.ocean} /><Text style={styles.gmailLoadingText}>予約メールを確認しています</Text></View> : null}
               {!gmailBusy && gmailConnection && !gmailConnection.configured ? <View style={styles.gmailState}><Text style={styles.gmailStateTitle}>Gmail連携の設定が必要です</Text><Text style={styles.gmailStateText}>Google CloudでGmail APIとOAuthの設定を完了すると利用できます。</Text></View> : null}
               {!gmailBusy && gmailConnection?.configured && !gmailConnection.connected ? <View style={styles.gmailState}><Text style={styles.gmailStateTitle}>Gmailを連携</Text><Text style={styles.gmailStateText}>予約メールの読み取り権限だけを使用します。メール本文は保存しません。</Text><Pressable onPress={connectGmail} style={({ pressed }) => [styles.gmailPrimaryButton, pressed && styles.pressed]}><Text style={styles.gmailPrimaryText}>Googleで続ける</Text></Pressable></View> : null}
-              {!gmailBusy && gmailConnection?.connected && gmailCandidates.length === 0 && !gmailError ? <View style={styles.gmailState}><Text style={styles.gmailStateTitle}>候補は見つかりませんでした</Text><Text style={styles.gmailStateText}>この旅行の前後30日を対象に、過去2年の予約メールを確認しました。</Text><Pressable onPress={loadGmailCandidates} style={styles.gmailSecondaryButton}><Text style={styles.gmailSecondaryText}>もう一度確認</Text></Pressable></View> : null}
+              {!gmailBusy && gmailConnection?.connected && gmailCandidates.length === 0 && !gmailError ? <View style={styles.gmailState}><Text style={styles.gmailStateTitle}>この範囲では候補が見つかりませんでした</Text><Text style={styles.gmailStateText}>新しい予約メールから{gmailScanned}件確認しました。{gmailPageToken ? 'さらに前のメールへ遡れます。' : '確認できる予約メールは以上です。'}</Text><Pressable onPress={() => void loadGmailCandidates(gmailPageToken, Boolean(gmailPageToken))} style={styles.gmailSecondaryButton}><Text style={styles.gmailSecondaryText}>{gmailPageToken ? 'さらに前のメールを探す' : '最初から確認'}</Text></Pressable></View> : null}
               {!gmailBusy && gmailCandidates.length ? <View style={styles.gmailList}>
                 {gmailCandidates.map((candidate) => {
                   const kind = KINDS.find((entry) => entry.value === candidate.kind)!;
@@ -343,6 +357,7 @@ export default function BookingsScreen() {
                     <Text numberOfLines={1} style={styles.gmailSubject}>{candidate.subject}</Text>
                   </Pressable>;
                 })}
+                {gmailPageToken ? <Pressable onPress={() => void loadGmailCandidates(gmailPageToken, true)} style={styles.gmailSecondaryButton}><Text style={styles.gmailSecondaryText}>さらに前のメールを探す</Text></Pressable> : null}
               </View> : null}
               {gmailError ? <Text accessibilityLiveRegion="polite" style={styles.error}>{gmailError}</Text> : null}
             </ScrollView>
