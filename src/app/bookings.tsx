@@ -1,7 +1,8 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { type ComponentProps, type Dispatch, type SetStateAction, useState } from 'react';
+import { type ComponentProps, type Dispatch, type SetStateAction, useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -33,6 +34,7 @@ function blankDraft(day: string, kind: BookingKind = 'flight'): Draft {
 }
 
 export default function BookingsScreen() {
+  const { booking: requestedBooking } = useLocalSearchParams<{ booking?: string | string[] }>();
   const { bookings, createBooking, deleteBooking, documentsByBooking, pendingCount, selectedTrip, updateBooking } = useTravel();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(() => blankDraft(selectedTrip?.startsOn ?? ''));
@@ -46,7 +48,7 @@ export default function BookingsScreen() {
     setFormOpen(true);
   };
 
-  const openEdit = (booking: Booking) => {
+  const openEdit = useCallback((booking: Booking) => {
     setEditingId(booking.id);
     setDraft({
       kind: booking.kind,
@@ -65,7 +67,19 @@ export default function BookingsScreen() {
     });
     setFormError('');
     setFormOpen(true);
-  };
+  }, []);
+
+  useEffect(() => {
+    const bookingId = Array.isArray(requestedBooking) ? requestedBooking[0] : requestedBooking;
+    if (!bookingId) return;
+    const booking = bookings.find((entry) => entry.id === bookingId);
+    if (!booking) return;
+    const timeout = setTimeout(() => {
+      openEdit(booking);
+      router.setParams({ booking: undefined });
+    }, 0);
+    return () => clearTimeout(timeout);
+  }, [bookings, openEdit, requestedBooking]);
 
   const save = () => {
     const needsRoute = ['flight', 'train', 'car'].includes(draft.kind);

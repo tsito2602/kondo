@@ -1,14 +1,69 @@
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateRangePicker } from '@/components/date-range-picker';
 import { palette } from '@/constants/design';
-import type { ItineraryItem } from '@/data/types';
+import type { Booking, BookingKind, ItineraryItem } from '@/data/types';
 import { useTravel } from '@/data/travel-provider';
 
+const BOOKING_STAGES: Record<BookingKind, [string, string]> = {
+  flight: ['出発', '到着'],
+  hotel: ['チェックイン', 'チェックアウト'],
+  train: ['乗車', '到着'],
+  car: ['受取', '返却'],
+  restaurant: ['予約', '終了'],
+  ticket: ['利用', '終了'],
+  other: ['予約', '終了'],
+};
+
+type TimelineEntry = {
+  key: string;
+  day: string;
+  time: string;
+  title: string;
+  note: string;
+  item?: ItineraryItem;
+  booking?: Booking;
+  bookingStage?: string;
+};
+
+function bookingNote(booking: Booking) {
+  if (booking.origin || booking.destination) {
+    return `${booking.originCode || booking.origin} → ${booking.destinationCode || booking.destination}`;
+  }
+  return booking.detail;
+}
+
+function bookingTimelineEntries(booking: Booking): TimelineEntry[] {
+  const [startStage, endStage] = BOOKING_STAGES[booking.kind];
+  const entries: TimelineEntry[] = [{
+    key: `booking-${booking.id}-start`,
+    day: booking.day,
+    time: booking.time,
+    title: booking.title,
+    note: bookingNote(booking),
+    booking,
+    bookingStage: startStage,
+  }];
+
+  if (booking.endDay && booking.endDay !== booking.day) {
+    entries.push({
+      key: `booking-${booking.id}-end`,
+      day: booking.endDay,
+      time: booking.endTime,
+      title: booking.title,
+      note: booking.kind === 'hotel' ? booking.detail : bookingNote(booking),
+      booking,
+      bookingStage: endStage,
+    });
+  }
+  return entries;
+}
+
 export default function ItineraryScreen() {
-  const { selectedTrip, items, createItem, updateItem, deleteItem, pendingCount } = useTravel();
+  const { selectedTrip, items, bookings, createItem, updateItem, deleteItem, pendingCount } = useTravel();
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [day, setDay] = useState(selectedTrip?.startsOn ?? '');
@@ -16,8 +71,12 @@ export default function ItineraryScreen() {
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
 
-  const grouped = items.reduce<Record<string, typeof items>>((result, item) => {
-    (result[item.day] ??= []).push(item);
+  const timeline = [
+    ...items.map<TimelineEntry>((item) => ({ key: `item-${item.id}`, day: item.day, time: item.time, title: item.title, note: item.note, item })),
+    ...bookings.flatMap(bookingTimelineEntries),
+  ].sort((left, right) => left.day.localeCompare(right.day) || left.time.localeCompare(right.time) || left.key.localeCompare(right.key));
+  const grouped = timeline.reduce<Record<string, TimelineEntry[]>>((result, entry) => {
+    (result[entry.day] ??= []).push(entry);
     return result;
   }, {});
 
@@ -82,7 +141,7 @@ export default function ItineraryScreen() {
 
         {!selectedTrip ? (
           <View style={styles.empty}><Text style={styles.emptyTitle}>旅行がありません</Text><Text style={styles.emptyBody}>「旅」タブから旅行を作成してください。</Text></View>
-        ) : !items.length ? (
+        ) : !timeline.length ? (
           <View style={styles.empty}><Text style={styles.emptyMark}>＋</Text><Text style={styles.emptyTitle}>予定を追加</Text><Text style={styles.emptyBody}>移動、食事、観光などを時系列でまとめられます。</Text></View>
         ) : (
           Object.entries(grouped).map(([date, dateItems], dayIndex) => (
@@ -91,15 +150,19 @@ export default function ItineraryScreen() {
               <View style={styles.dayContent}>
                 <Text style={styles.date}>{date}</Text>
                 <View style={styles.items}>
-                  {dateItems.map((item) => (
+                  {dateItems.map((entry) => (
                     <Pressable
-                      accessibilityHint="予定を編集します"
+                      accessibilityHint={entry.booking ? '予約の詳細を開きます' : '予定を編集します'}
                       accessibilityRole="button"
-                      key={item.id}
-                      onPress={() => openEdit(item)}
-                      style={({ pressed }) => [styles.itemRow, pressed && styles.itemPressed]}>
-                      <Text style={styles.time}>{item.time}</Text>
-                      <View style={styles.itemCopy}><Text style={styles.itemTitle}>{item.title}</Text>{item.note ? <Text style={styles.note}>{item.note}</Text> : null}</View>
+                      key={entry.key}
+                      onPress={() => entry.booking ? router.push({ pathname: '/bookings', params: { booking: entry.booking.id } }) : openEdit(entry.item!)}
+                      style={({ pressed }) => [styles.itemRow, entry.booking && styles.bookingRow, pressed && styles.itemPressed]}>
+                      <Text style={styles.time}>{entry.time}</Text>
+                      <View style={styles.itemCopy}>
+                        {entry.booking ? <Text style={styles.bookingTag}>予約 · {entry.bookingStage}</Text> : null}
+                        <Text style={styles.itemTitle}>{entry.title}</Text>
+                        {entry.note ? <Text style={styles.note}>{entry.note}</Text> : null}
+                      </View>
                       <Text style={styles.chevron}>›</Text>
                     </Pressable>
                   ))}
@@ -150,9 +213,11 @@ const styles = StyleSheet.create({
   date: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, fontWeight: '400' },
   items: { marginTop: 8 },
   itemRow: { minHeight: 58, flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
+  bookingRow: { backgroundColor: palette.soft, borderRadius: 12, borderBottomWidth: 0, paddingHorizontal: 10, marginVertical: 3 },
   itemPressed: { opacity: 0.55 },
   time: { color: palette.ocean, width: 52, fontFamily: 'monospace', fontSize: 12, fontWeight: '700' },
   itemCopy: { flex: 1 },
+  bookingTag: { color: palette.ocean, fontFamily: 'monospace', fontSize: 9, lineHeight: 13, fontWeight: '700', marginBottom: 2 },
   itemTitle: { color: palette.ink, fontSize: 16, fontWeight: '700' },
   note: { color: palette.slate, fontSize: 12, lineHeight: 18, marginTop: 4 },
   chevron: { color: palette.smoke, fontSize: 22, lineHeight: 22, marginLeft: 12 },
