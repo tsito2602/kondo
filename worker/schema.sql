@@ -108,36 +108,6 @@ CREATE TABLE IF NOT EXISTS booking_documents (
 );
 CREATE INDEX IF NOT EXISTS booking_documents_trip ON booking_documents(trip_id, booking_id, created_at);
 
-CREATE TABLE IF NOT EXISTS booking_imports (
-  booking_id TEXT PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
-  trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
-  imported_by TEXT NOT NULL REFERENCES users(id),
-  provider TEXT NOT NULL CHECK(provider IN ('gmail')),
-  external_id TEXT NOT NULL,
-  fingerprint TEXT NOT NULL,
-  imported_at INTEGER NOT NULL DEFAULT (unixepoch()),
-  UNIQUE(trip_id, provider, external_id)
-);
-CREATE INDEX IF NOT EXISTS booking_imports_trip ON booking_imports(trip_id, provider, fingerprint);
-
-CREATE TABLE IF NOT EXISTS gmail_connections (
-  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  email TEXT NOT NULL,
-  encrypted_refresh_token TEXT NOT NULL,
-  token_iv TEXT NOT NULL,
-  scope TEXT NOT NULL,
-  updated_at INTEGER NOT NULL DEFAULT (unixepoch())
-);
-
-CREATE TABLE IF NOT EXISTS gmail_oauth_states (
-  state_hash TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  return_url TEXT NOT NULL,
-  expires_at INTEGER NOT NULL,
-  created_at INTEGER NOT NULL DEFAULT (unixepoch())
-);
-CREATE INDEX IF NOT EXISTS gmail_oauth_states_expiry ON gmail_oauth_states(expires_at);
-
 CREATE TABLE IF NOT EXISTS invites (
   token_hash TEXT PRIMARY KEY,
   trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
@@ -160,17 +130,9 @@ CREATE TABLE IF NOT EXISTS attachments (
 );
 
 
-CREATE TABLE IF NOT EXISTS gmail_scan_limits (
-  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  next_allowed_at INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS gmail_message_cache (
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  message_id TEXT NOT NULL,
-  parser_version INTEGER NOT NULL,
-  encrypted_result TEXT NOT NULL,
-  token_iv TEXT NOT NULL,
-  expires_at INTEGER NOT NULL,
-  PRIMARY KEY (user_id, message_id)
-);
-CREATE INDEX IF NOT EXISTS gmail_message_cache_expiry ON gmail_message_cache(user_id, expires_at);
+-- Purge data left by the discontinued Gmail import feature.
+DROP TABLE IF EXISTS gmail_message_cache;
+DROP TABLE IF EXISTS gmail_scan_limits;
+DROP TABLE IF EXISTS gmail_oauth_states;
+DROP TABLE IF EXISTS gmail_connections;
+DROP TABLE IF EXISTS booking_imports;

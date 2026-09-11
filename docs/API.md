@@ -9,16 +9,6 @@ Dates use `YYYY-MM-DD`; times use local `HH:mm`. A trip owner and every invited 
 - `GET /v1/me` — return the current user.
 - `POST /v1/auth/logout` — revoke the current session.
 
-## Gmail import
-
-- `GET /v1/integrations/gmail` — return Gmail integration status.
-- `POST /v1/integrations/gmail/authorization` — create a one-time Google authorization URL from `{ returnUrl }`.
-- `GET /v1/integrations/gmail/callback` — Google OAuth callback. This endpoint consumes its single-use state and redirects to `returnUrl`.
-- `DELETE /v1/integrations/gmail` — remove the encrypted refresh token and revoke it at Google when possible.
-- `POST /v1/trips/:tripId/gmail/candidates` — inspect Gmail and return flight, train, and hotel candidates near the trip dates.
-- `POST /v1/trips/:tripId/gmail/imports` — create a booking from a reviewed candidate and link its Gmail message ID for duplicate prevention.
-
-The Worker stores only an AES-GCM encrypted refresh token and booking provenance. Gmail message bodies and access tokens are never persisted.
 
 ## Trips
 
