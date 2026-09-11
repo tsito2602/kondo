@@ -55,8 +55,8 @@ function bookingNote(booking: Booking) {
 }
 
 function bookingTimelineEntries(booking: Booking): TimelineEntry[] {
-  const [startStage, endStage] = BOOKING_STAGES[booking.kind];
-  const entries: TimelineEntry[] = [{
+  const [startStage] = BOOKING_STAGES[booking.kind];
+  return [{
     key: `booking-${booking.id}-start`,
     day: booking.day,
     time: booking.time,
@@ -65,19 +65,6 @@ function bookingTimelineEntries(booking: Booking): TimelineEntry[] {
     booking,
     bookingStage: startStage,
   }];
-
-  if (booking.endDay && booking.endDay !== booking.day) {
-    entries.push({
-      key: `booking-${booking.id}-end`,
-      day: booking.endDay,
-      time: booking.endTime,
-      title: booking.title,
-      note: booking.kind === 'hotel' ? booking.detail : bookingNote(booking),
-      booking,
-      bookingStage: endStage,
-    });
-  }
-  return entries;
 }
 
 function datesBetween(start: string, end: string) {
@@ -115,8 +102,12 @@ function entryTitle(entry: TimelineEntry) {
 function bookingDetails(entry: TimelineEntry) {
   if (!entry.booking) return [];
   const booking = entry.booking;
+  const [, endStage] = BOOKING_STAGES[booking.kind];
+  const endDate = booking.endDay && booking.endDay !== booking.day ? `${shortDate(booking.endDay)} ` : '';
+  const endDetail = booking.endTime ? `${endStage} ${endDate}${booking.endTime}` : '';
   return [
     `${entry.bookingStage} · ${booking.title}`,
+    endDetail,
     booking.detail,
     booking.confirmationCode ? `確認番号 ${booking.confirmationCode}` : '',
     booking.note,
