@@ -170,12 +170,19 @@ export default function ItineraryScreen() {
   const scrollTrackingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flightConnections = useMemo(() => findFlightConnections(bookings), [bookings]);
   const connectionByArrival = useMemo(() => new Map(flightConnections.map((connection) => [connection.arrivalBookingId, connection])), [flightConnections]);
-  const connectedDepartures = useMemo(() => new Set(flightConnections.map((connection) => connection.departureBookingId)), [flightConnections]);
 
   const timeline = [
     ...items.map<TimelineEntry>((item) => ({ key: `item-${item.id}`, day: item.day, time: item.time, title: item.title, note: item.note, item })),
     ...bookings.flatMap(bookingTimelineEntries),
   ].sort((left, right) => left.day.localeCompare(right.day) || left.time.localeCompare(right.time) || left.key.localeCompare(right.key));
+  // Continue a layover rail only when the next visible event is that flight.
+  // A manually selected later departure must not appear attached to an
+  // unrelated flight or plan that falls between the two endpoints.
+  const connectedDepartures = new Set(flightConnections.filter((connection) => {
+    const index = timeline.findIndex((entry) => entry.booking?.id === connection.departureBookingId && entry.bookingEndpoint === 'start');
+    const previous = timeline[index - 1];
+    return previous?.booking?.id === connection.arrivalBookingId && previous.bookingEndpoint === 'end';
+  }).map((connection) => connection.departureBookingId));
   const grouped = timeline.reduce<Record<string, TimelineEntry[]>>((result, entry) => {
     (result[entry.day] ??= []).push(entry);
     return result;
@@ -345,7 +352,7 @@ export default function ItineraryScreen() {
                       </View>
                       <Text style={styles.chevron}>›</Text>
                     </Pressable>
-                    {connection ? <ConnectionRow connection={connection} nextFlight={bookings.find((flight) => flight.id === connection.departureBookingId)} onPress={() => setConnectionBookingId(connection.arrivalBookingId)} />
+                    {connection ? <ConnectionRow connection={connection} continueRail={connectedDepartures.has(connection.departureBookingId)} nextFlight={bookings.find((flight) => flight.id === connection.departureBookingId)} onPress={() => setConnectionBookingId(connection.arrivalBookingId)} />
                       : isLinkedEnd && entry.booking?.kind === 'flight' && (entry.booking.connectionMode === 'manual' || entry.booking.connectionMode === 'none' || flightConnectionCandidates(entry.booking, bookings).length > 0)
                         ? <View style={styles.connectionAction}><FlightConnectionLink compact booking={entry.booking} onPress={() => setConnectionBookingId(entry.booking!.id)} /></View> : null}
                     </Fragment>
@@ -383,19 +390,19 @@ export default function ItineraryScreen() {
   );
 }
 
-function ConnectionRow({ connection, nextFlight, onPress }: { connection: FlightConnection; nextFlight?: Booking; onPress: () => void }) {
+function ConnectionRow({ connection, continueRail, nextFlight, onPress }: { connection: FlightConnection; continueRail: boolean; nextFlight?: Booking; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`${connection.airportName}で${formatConnectionDuration(connection.durationMinutes)}の乗り継ぎ、${nextFlight?.title ?? '次便'}への紐づけを変更`} onPress={onPress} style={({ pressed }) => [styles.connectionRow, pressed && styles.itemPressed]}>
       <View style={styles.connectionTimeColumn} />
       <View style={styles.connectionRailColumn}>
-        <View style={styles.connectionRailFull} />
+        <View style={[styles.connectionRailFull, !continueRail && styles.connectionRailEnding]} />
         <View style={styles.connectionIconCircle}>
           <SymbolView name={CONNECTION_ICON} size={15} tintColor={palette.ocean} />
         </View>
       </View>
       <View style={styles.connectionCopy}>
         <View style={styles.connectionHeading}><Text style={styles.connectionTitle}>乗り継ぎ</Text><Text style={styles.connectionDuration}>{formatConnectionDuration(connection.durationMinutes)}</Text><Text style={styles.connectionMode}>{connection.mode === 'auto' ? '自動' : '指定'}</Text></View>
-        {nextFlight ? <Text style={styles.connectionNext}>{nextFlight.title} · {nextFlight.originCode} → {nextFlight.destinationCode || nextFlight.destination}</Text> : null}
+        {nextFlight ? <Text style={styles.connectionNext}>{nextFlight.title} · {shortDate(nextFlight.day)} {nextFlight.time}発 → {nextFlight.destinationCode || nextFlight.destination}</Text> : null}
       </View>
       <Text style={styles.connectionChevron}>›</Text>
     </Pressable>
@@ -442,6 +449,7 @@ const styles = StyleSheet.create({
   connectionTimeColumn: { width: 64 },
   connectionRailColumn: { width: 50, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   connectionRailFull: { position: 'absolute', top: 0, bottom: 0, left: 24, width: 0, borderLeftWidth: 2, borderColor: palette.smoke, borderStyle: 'dashed' },
+  connectionRailEnding: { bottom: '50%' },
   connectionIconCircle: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.mist, zIndex: 1 },
   connectionCopy: { flex: 1, justifyContent: 'center', paddingLeft: 8, paddingVertical: 14, gap: 5 },
   connectionHeading: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
