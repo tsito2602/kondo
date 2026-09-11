@@ -1,11 +1,9 @@
 import * as DocumentPicker from 'expo-document-picker';
-import { makeRedirectUri } from 'expo-auth-session';
 import { File } from 'expo-file-system';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import * as WebBrowser from 'expo-web-browser';
-import { type ComponentProps, type Dispatch, type SetStateAction, useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { type ComponentProps, type Dispatch, type SetStateAction, useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateRangePicker } from '@/components/date-range-picker';
@@ -16,8 +14,7 @@ import { findAirports, type Airport } from '@/data/airports';
 import { cacheBookingDocument, getCachedDocumentUri, removeCachedBookingDocument } from '@/data/booking-document-cache';
 import { findMatchingItineraryItem } from '@/data/booking-match';
 import { useTravel } from '@/data/travel-provider';
-import { useGmailSearch } from '@/hooks/use-gmail-search';
-import { Booking, BookingDocument, BookingKind, GmailConnection, GmailImportCandidate } from '@/data/types';
+import { Booking, BookingDocument, BookingKind } from '@/data/types';
 
 const KINDS: { value: BookingKind; label: string; short: string; icon: string }[] = [
   { value: 'flight', label: '航空券', short: 'FLIGHT', icon: '✈' },
@@ -47,32 +44,12 @@ export default function BookingsScreen() {
 
 function TripBookingsScreen() {
   const { booking: requestedBooking } = useLocalSearchParams<{ booking?: string | string[] }>();
-  const { request } = useAuth();
-  const { bookings, createBooking, deleteBooking, deleteItem, documentsByBooking, items, selectedTrip, sync, updateBooking } = useTravel();
+  const { bookings, createBooking, deleteBooking, deleteItem, documentsByBooking, items, selectedTrip, updateBooking } = useTravel();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(() => blankDraft(selectedTrip?.startsOn ?? ''));
   const [formOpen, setFormOpen] = useState(false);
   const [formError, setFormError] = useState('');
   const [mergeItemId, setMergeItemId] = useState<string | null>(null);
-  const [importSource, setImportSource] = useState<string | null>(null);
-  const [gmailOpen, setGmailOpen] = useState(false);
-  const [gmailBusy, setGmailBusy] = useState(false);
-  const [gmailError, setGmailError] = useState('');
-  const [gmailConnection, setGmailConnection] = useState<GmailConnection | null>(null);
-  const gmail = useGmailSearch(selectedTrip?.id, selectedTrip?.startsOn, selectedTrip?.endsOn);
-  const [gmailQuery, setGmailQuery] = useState('');
-  const [gmailReviewOpen, setGmailReviewOpen] = useState(false);
-  const [gmailReviewLimit, setGmailReviewLimit] = useState(20);
-  const [gmailNow, setGmailNow] = useState(() => Date.now());
-  const gmailVisible = useRef(false);
-  const gmailCandidates = gmail.candidates;
-  const gmailScanning = ['running', 'waiting', 'stopping'].includes(gmail.status);
-  useEffect(() => {
-    if (gmail.status !== 'waiting') return;
-    const timer = setInterval(() => setGmailNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [gmail.status]);
-  useEffect(() => () => { gmailVisible.current = false; }, []);
   const matchingCandidate = findMatchingItineraryItem(items, draft);
   const selectedMergeItem = matchingCandidate?.item.id === mergeItemId ? matchingCandidate.item : null;
 
@@ -81,7 +58,6 @@ function TripBookingsScreen() {
     setDraft(blankDraft(selectedTrip?.startsOn ?? ''));
     setFormError('');
     setMergeItemId(null);
-    setImportSource(null);
     setFormOpen(true);
   };
 
@@ -104,7 +80,6 @@ function TripBookingsScreen() {
     });
     setFormError('');
     setMergeItemId(null);
-    setImportSource(null);
     setFormOpen(true);
   }, []);
 
@@ -151,86 +126,12 @@ function TripBookingsScreen() {
       : input;
     try {
       if (editingId) updateBooking(editingId, savedInput);
-      else if (importSource && selectedTrip) {
-        await request(`/v1/trips/${selectedTrip.id}/gmail/imports`, {
-          method: 'POST',
-          body: JSON.stringify({ ...savedInput, sourceMessageId: importSource }),
-        });
-        gmail.search.markImported(importSource);
-        await sync();
-      } else createBooking(savedInput);
+      else createBooking(savedInput);
       if (selectedMergeItem) deleteItem(selectedMergeItem.id);
       setFormOpen(false);
-      setImportSource(null);
-    } catch (cause) {
+      } catch (cause) {
       setFormError(cause instanceof Error ? cause.message : '予約を保存できませんでした。');
     }
-  };
-
-  const loadGmailCandidates = async () => {
-    if (!selectedTrip || gmailBusy) return;
-    setGmailBusy(true);
-    setGmailError('');
-    try {
-      const connection = await request<GmailConnection>('/v1/integrations/gmail');
-      if (!gmailVisible.current) return;
-      setGmailConnection(connection);
-      if (connection.connected) void gmail.search.start();
-    } catch (cause) {
-      setGmailError(cause instanceof Error ? cause.message : 'Gmailを読み込めませんでした。');
-    } finally { setGmailBusy(false); }
-  };
-
-  const openGmail = () => {
-    gmailVisible.current = true; setGmailOpen(true);
-    if (!gmailConnection) void loadGmailCandidates();
-    else if (gmailConnection.connected) void gmail.search.start();
-  };
-  const closeGmail = () => { gmailVisible.current = false; gmail.search.pause(); setGmailOpen(false); };
-  const searchGmail = () => {
-    setGmailError(''); setGmailReviewOpen(false); setGmailReviewLimit(20);
-    void gmail.search.start(gmailQuery, true);
-  };
-
-  const connectGmail = async () => {
-    setGmailBusy(true);
-    setGmailError('');
-    try {
-      const returnUrl = Platform.OS === 'web' && typeof window !== 'undefined'
-        ? `${window.location.origin}${window.location.pathname}`
-        : makeRedirectUri({ scheme: 'tabi', path: 'gmail-import' });
-      const result = await request<{ authorizationUrl: string }>('/v1/integrations/gmail/authorization', {
-        method: 'POST',
-        body: JSON.stringify({ returnUrl }),
-      });
-      const authorization = await WebBrowser.openAuthSessionAsync(result.authorizationUrl, returnUrl);
-      if (authorization.type !== 'success') {
-        setGmailError(authorization.type === 'cancel' || authorization.type === 'dismiss' ? 'Gmail連携をキャンセルしました。' : 'Gmailを連携できませんでした。');
-        return;
-      }
-      await loadGmailCandidates();
-    } catch (cause) {
-      setGmailError(cause instanceof Error ? cause.message : 'Gmailを連携できませんでした。');
-    } finally {
-      setGmailBusy(false);
-    }
-  };
-
-  const selectGmailCandidate = (candidate: GmailImportCandidate) => {
-    if (candidate.duplicateBookingId || candidate.alreadyImported) return;
-    setEditingId(null);
-    setDraft({
-      kind: candidate.kind, title: candidate.title, detail: candidate.detail,
-      origin: candidate.origin || candidate.originCode, originCode: candidate.originCode,
-      destination: candidate.destination || candidate.destinationCode, destinationCode: candidate.destinationCode,
-      day: candidate.day, time: candidate.time, endDay: candidate.endDay, endTime: candidate.endTime,
-      confirmationCode: candidate.confirmationCode, note: candidate.note,
-    });
-    setFormError('');
-    setMergeItemId(null);
-    setImportSource(candidate.sourceMessageId);
-    closeGmail();
-    setFormOpen(true);
   };
 
   const remove = () => {
@@ -248,10 +149,6 @@ function TripBookingsScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {selectedTrip ? <View style={styles.importBar}>
-          <View style={styles.importCopy}><Text style={styles.importTitle}>Gmailから予約を取り込む</Text><Text style={styles.importMeta}>航空・鉄道・ホテルの予約メール</Text></View>
-          <Pressable accessibilityRole="button" onPress={openGmail} style={({ pressed }) => [styles.importButton, pressed && styles.pressed]}><Text style={styles.importButtonText}>確認</Text></Pressable>
-        </View> : null}
         {!selectedTrip ? (
           <View style={styles.empty}><Text style={styles.emptyTitle}>旅行を作成してください</Text><Text style={styles.emptyBody}>予約は選択中の旅行ごとに保存されます。</Text></View>
         ) : bookings.length === 0 ? (
@@ -304,13 +201,13 @@ function TripBookingsScreen() {
           <View accessibilityViewIsModal style={styles.dialog}>
             <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               <View style={styles.dialogHeading}>
-                <Text style={styles.dialogTitle}>{editingId ? '予約を編集' : importSource ? 'Gmailから追加' : '予約を追加'}</Text>
+                <Text style={styles.dialogTitle}>{editingId ? '予約を編集' : '予約を追加'}</Text>
                 <Pressable accessibilityLabel="予約編集を閉じる" onPress={() => setFormOpen(false)} style={styles.closeButton}><Text style={styles.close}>×</Text></Pressable>
               </View>
 
               <Text style={styles.label}>種類</Text>
               <View style={styles.kindList}>
-                {KINDS.filter((kind) => !importSource || ['flight', 'hotel', 'train'].includes(kind.value)).map((kind) => <Pressable key={kind.value} onPress={() => setDraft((current) => blankDraft(current.day || selectedTrip?.startsOn || '', kind.value))} style={[styles.kindButton, draft.kind === kind.value && styles.kindSelected]}><Text style={[styles.kindText, draft.kind === kind.value && styles.kindTextSelected]}>{kind.label}</Text></Pressable>)}
+                {KINDS.map((kind) => <Pressable key={kind.value} onPress={() => setDraft((current) => blankDraft(current.day || selectedTrip?.startsOn || '', kind.value))} style={[styles.kindButton, draft.kind === kind.value && styles.kindSelected]}><Text style={[styles.kindText, draft.kind === kind.value && styles.kindTextSelected]}>{kind.label}</Text></Pressable>)}
               </View>
 
               <BookingFormFields draft={draft} setDraft={setDraft} />
@@ -337,76 +234,6 @@ function TripBookingsScreen() {
         </SafeAreaView>
       </Modal>
 
-      <Modal animationType="fade" onRequestClose={closeGmail} transparent visible={gmailOpen}>
-        <SafeAreaView style={styles.backdrop}>
-          <Pressable accessibilityLabel="Gmail取込を閉じる" onPress={closeGmail} style={StyleSheet.absoluteFill} />
-          <View accessibilityViewIsModal style={styles.dialog}>
-            <ScrollView contentContainerStyle={styles.gmailContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-              <View style={styles.dialogHeading}>
-                <View><Text style={styles.dialogTitle}>Gmailから取り込む</Text>{gmailConnection?.email ? <Text style={styles.gmailAccount}>{gmailConnection.email}</Text> : null}</View>
-                <Pressable accessibilityLabel="Gmail取込を閉じる" onPress={closeGmail} style={styles.closeButton}><Text style={styles.close}>×</Text></Pressable>
-              </View>
-
-              {gmailConnection?.connected ? <View style={styles.gmailSearchRow}>
-                <TextInput accessibilityLabel="メールの検索条件" autoCapitalize="none" autoCorrect={false} maxLength={500}
-                  onChangeText={setGmailQuery} onSubmitEditing={searchGmail} placeholder="航空会社名・ホテル名・予約番号" placeholderTextColor={palette.smoke}
-                  returnKeyType="search" style={styles.gmailSearchInput} value={gmailQuery} />
-                <Pressable accessibilityRole="button" onPress={searchGmail} style={styles.gmailSearchButton}><Text style={styles.gmailPrimaryText}>検索</Text></Pressable>
-              </View> : null}
-              {gmailBusy ? <ActivityIndicator color={palette.ocean} /> : null}
-              {gmailConnection?.connected && gmail.status !== 'idle' ? <View style={styles.gmailProgress}>
-                {gmail.status === 'running' ? <ActivityIndicator color={palette.ocean} size="small" /> : null}
-                <View style={styles.gmailProgressCopy}>
-                  <Text accessibilityLiveRegion="polite" style={styles.gmailLoadingText}>
-                    {gmail.status === 'complete' ? '探索完了' : gmail.status === 'paused' ? '探索を停止中' : gmail.status === 'stopping' ? '停止しています' : gmail.status === 'error' ? '探索を中断しました' : gmail.status === 'waiting' ? `${Math.max(1, Math.ceil((gmail.retryAt - gmailNow) / 1000))}秒後に自動再開` : '予約メールを探索中'}
-                  </Text>
-                  <Text style={styles.gmailAccount}>{gmail.scanned}件確認 · 予約候補 {gmailCandidates.length}件</Text>
-                </View>
-                {gmailScanning ? <Pressable accessibilityRole="button" disabled={gmail.status === 'stopping'} onPress={gmail.search.pause} style={styles.gmailProgressButton}><Text style={styles.gmailSecondaryText}>停止</Text></Pressable>
-                  : <Pressable accessibilityRole="button" onPress={() => void gmail.search.start(gmail.query, gmail.status === 'complete')} style={styles.gmailProgressButton}><Text style={styles.gmailSecondaryText}>{gmail.status === 'complete' ? '再検索' : '続きを探す'}</Text></Pressable>}
-              </View> : null}
-              {!gmailBusy && gmailConnection && !gmailConnection.configured ? <View style={styles.gmailState}><Text style={styles.gmailStateTitle}>Gmail連携の設定が必要です</Text><Text style={styles.gmailStateText}>Google CloudでGmail APIとOAuthの設定を完了すると利用できます。</Text></View> : null}
-              {!gmailBusy && gmailConnection?.configured && !gmailConnection.connected ? <View style={styles.gmailState}><Text style={styles.gmailStateTitle}>Gmailを連携</Text><Text style={styles.gmailStateText}>予約メールの読み取り権限だけを使用します。メール本文は保存しません。</Text><Pressable onPress={connectGmail} style={({ pressed }) => [styles.gmailPrimaryButton, pressed && styles.pressed]}><Text style={styles.gmailPrimaryText}>Googleで続ける</Text></Pressable></View> : null}
-              {gmail.status === 'complete' && !gmailCandidates.length ? <View style={styles.gmailState}><Text style={styles.gmailStateTitle}>予約候補は見つかりませんでした</Text><Text style={styles.gmailStateText}>{gmail.reviewMessages.length ? '内容を確認するメールを見るか、航空会社名や予約番号で絞り込めます。' : '航空会社名やホテル名、予約番号で検索できます。'}</Text></View> : null}
-              {gmailCandidates.length ? <View style={styles.gmailList}>
-                {gmailCandidates.map((candidate) => {
-                  const kind = KINDS.find((entry) => entry.value === candidate.kind)!;
-                  const route = candidate.kind === 'hotel' ? candidate.detail : `${candidate.originCode || candidate.origin || '—'} → ${candidate.destinationCode || candidate.destination || '—'}`;
-                  const duplicateLabel = candidate.alreadyImported ? '取り込み済み' : candidate.duplicateBookingId ? '同じ予約あり' : null;
-                  return <Pressable accessibilityRole="button" disabled={Boolean(duplicateLabel)} key={`${candidate.sourceMessageId}-${candidate.fingerprint}`} onPress={() => selectGmailCandidate(candidate)} style={({ pressed }) => [styles.gmailCandidate, duplicateLabel && styles.gmailCandidateDisabled, pressed && styles.pressed]}>
-                    <View style={styles.gmailCandidateTop}><Text style={styles.gmailKind}>{kind.label}</Text>{duplicateLabel ? <Text style={styles.gmailDuplicate}>{duplicateLabel}</Text> : <Text style={styles.gmailConfidence}>{candidate.confidence === 'high' ? '自動抽出' : '要確認'}</Text>}</View>
-                    <Text numberOfLines={2} style={styles.gmailCandidateTitle}>{candidate.title}</Text>
-                    {route ? <Text numberOfLines={2} style={styles.gmailCandidateRoute}>{route}</Text> : null}
-                    <Text style={styles.gmailCandidateDate}>{candidate.day.replaceAll('-', '.')} {candidate.time}{candidate.endDay !== candidate.day || candidate.endTime !== candidate.time ? ` → ${candidate.endDay.replaceAll('-', '.')} ${candidate.endTime}` : ''}</Text>
-                    <Text numberOfLines={1} style={styles.gmailSubject}>{candidate.subject}</Text>
-                  </Pressable>;
-                })}
-              </View> : null}
-              {gmail.reviewMessages.length ? <View style={styles.gmailList}>
-                <Pressable accessibilityRole="button" accessibilityState={{ expanded: gmailReviewOpen }} onPress={() => setGmailReviewOpen(!gmailReviewOpen)} style={styles.gmailProgressButton}>
-                  <Text style={styles.gmailSecondaryText}>内容を確認するメール {gmail.reviewMessages.length}件 {gmailReviewOpen ? '−' : '＋'}</Text>
-                </Pressable>
-                {gmailReviewOpen ? gmail.reviewMessages.slice(0, gmailReviewLimit).map((message) => <View key={message.sourceMessageId} style={styles.gmailCandidate}>
-                  <Text style={styles.gmailConfidence}>{message.reason === 'outside-trip' ? '抽出した日付が旅行期間外' : '予約情報を自動で読み取れませんでした'}</Text>
-                  <Text numberOfLines={2} style={styles.gmailCandidateTitle}>{message.subject}</Text>
-                  <Text numberOfLines={1} style={styles.gmailSubject}>{message.sender}</Text>
-                  <View style={styles.gmailSearchRow}>
-                    <Pressable accessibilityRole="link" onPress={() => { void Linking.openURL(`https://mail.google.com/mail/u/?authuser=${encodeURIComponent(gmailConnection?.email ?? '')}#all/${encodeURIComponent(message.sourceMessageId)}`).catch(() => setGmailError('メールを開けませんでした。')); }} style={styles.gmailProgressButton}><Text style={styles.gmailSecondaryText}>Gmailで確認</Text></Pressable>
-                    <Pressable accessibilityRole="button" onPress={() => {
-                      closeGmail(); openCreate();
-                      setDraft({ ...blankDraft(selectedTrip?.startsOn ?? '', 'flight'), title: message.subject.slice(0, 160) });
-                      setImportSource(message.sourceMessageId);
-                    }} style={styles.gmailProgressButton}><Text style={styles.gmailSecondaryText}>入力して追加</Text></Pressable>
-                  </View>
-                </View>) : null}
-                {gmailReviewOpen && gmail.reviewMessages.length > gmailReviewLimit ? <Pressable onPress={() => setGmailReviewLimit((limit) => limit + 20)} style={styles.gmailProgressButton}><Text style={styles.gmailSecondaryText}>ほかのメールを表示</Text></Pressable> : null}
-              </View> : null}
-              {gmail.error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{gmail.error}</Text> : null}
-              {gmailError ? <Text accessibilityLiveRegion="polite" style={styles.error}>{gmailError}</Text> : null}
-            </ScrollView>
-          </View>
-        </SafeAreaView>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -595,12 +422,6 @@ function Field({ label, ...props }: { label: string } & ComponentProps<typeof Te
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.canvas },
   content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 112 },
-  importBar: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: palette.paper, borderRadius: 20, paddingHorizontal: 18, marginTop: 20 },
-  importCopy: { flex: 1, minWidth: 0 },
-  importTitle: { color: palette.ink, fontSize: 14, fontWeight: '800' },
-  importMeta: { color: palette.smoke, fontFamily: 'monospace', fontSize: 9, marginTop: 4 },
-  importButton: { minWidth: 68, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: palette.sky, paddingHorizontal: 14 },
-  importButtonText: { color: palette.ocean, fontSize: 12, fontWeight: '800' },
   empty: { minHeight: 260, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.paper, borderRadius: 32, padding: 28, marginTop: 24 },
   emptyMark: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.sky, marginBottom: 18 },
   emptyMarkText: { color: palette.ocean, fontSize: 27, fontWeight: '700' },
@@ -688,34 +509,6 @@ const styles = StyleSheet.create({
   deleteText: { color: palette.danger, fontSize: 14, fontWeight: '700' },
   saveButton: { minWidth: 120, minHeight: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.ocean, borderRadius: 8, paddingHorizontal: 22 },
   saveText: { color: palette.paper, fontSize: 15, fontWeight: '800' },
-  gmailSearchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  gmailSearchInput: { flex: 1, minWidth: 160, minHeight: 46, borderRadius: 14, backgroundColor: palette.paper, paddingHorizontal: 14, color: palette.ink, fontSize: 13 },
-  gmailSearchButton: { minHeight: 46, paddingHorizontal: 18, borderRadius: 14, backgroundColor: palette.ocean, justifyContent: 'center', alignItems: 'center' },
-  gmailProgress: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6 },
-  gmailProgressCopy: { flex: 1 },
-  gmailProgressButton: { minHeight: 44, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 12 },
-  gmailContent: { gap: 16, padding: 20 },
-  gmailAccount: { color: palette.smoke, fontSize: 10, marginTop: 5 },
-  gmailLoading: { minHeight: 80, alignItems: 'center', justifyContent: 'center', gap: 14 },
-  gmailLoadingText: { color: palette.slate, fontSize: 13 },
-  gmailState: { minHeight: 220, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: palette.paper, padding: 24 },
-  gmailStateTitle: { color: palette.ink, fontSize: 18, fontWeight: '900', textAlign: 'center' },
-  gmailStateText: { maxWidth: 360, color: palette.slate, fontSize: 12, lineHeight: 19, textAlign: 'center', marginTop: 8 },
-  gmailPrimaryButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 24, backgroundColor: palette.ocean, paddingHorizontal: 24, marginTop: 20 },
-  gmailPrimaryText: { color: palette.paper, fontSize: 14, fontWeight: '800' },
-  gmailSecondaryButton: { minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: palette.sky, paddingHorizontal: 20, marginTop: 18 },
-  gmailSecondaryText: { color: palette.ocean, fontSize: 12, fontWeight: '800' },
-  gmailList: { gap: 10 },
-  gmailCandidate: { borderRadius: 18, backgroundColor: palette.paper, padding: 16 },
-  gmailCandidateDisabled: { opacity: 0.52 },
-  gmailCandidateTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  gmailKind: { color: palette.ocean, fontFamily: 'monospace', fontSize: 9, fontWeight: '900' },
-  gmailConfidence: { color: palette.smoke, fontSize: 9 },
-  gmailDuplicate: { color: palette.slate, fontSize: 9, fontWeight: '800' },
-  gmailCandidateTitle: { color: palette.ink, fontSize: 17, lineHeight: 21, fontWeight: '900', marginTop: 10 },
-  gmailCandidateRoute: { color: palette.ink, fontFamily: 'monospace', fontSize: 13, fontWeight: '700', marginTop: 7 },
-  gmailCandidateDate: { color: palette.slate, fontFamily: 'monospace', fontSize: 10, lineHeight: 16, marginTop: 9 },
-  gmailSubject: { color: palette.smoke, fontSize: 9, marginTop: 8 },
   pressed: { opacity: 0.62 },
 });
 

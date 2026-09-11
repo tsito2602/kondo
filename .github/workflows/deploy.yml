@@ -20,8 +20,6 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       GOOGLE_CLIENT_IDS: ${{ vars.GOOGLE_CLIENT_IDS }}
-      GOOGLE_GMAIL_CLIENT_ID: ${{ vars.GOOGLE_GMAIL_CLIENT_ID }}
-      GOOGLE_GMAIL_REDIRECT_URI: https://tabi.tsito-apps.workers.dev/v1/integrations/gmail/callback
       ALLOWED_ORIGINS: https://tabi.tsito-apps.workers.dev
       EXPO_PUBLIC_API_URL: https://tabi.tsito-apps.workers.dev
       EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: ${{ vars.GOOGLE_IOS_CLIENT_ID }}

@@ -20,8 +20,6 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       GOOGLE_CLIENT_IDS: ${{ vars.GOOGLE_CLIENT_IDS }}
-      GOOGLE_GMAIL_CLIENT_ID: ${{ vars.GOOGLE_GMAIL_CLIENT_ID }}
-      GOOGLE_GMAIL_REDIRECT_URI: https://tabi-staging.tsito-apps.workers.dev/v1/integrations/gmail/callback
       ALLOWED_ORIGINS: https://tabi-staging.tsito-apps.workers.dev
       EXPO_PUBLIC_API_URL: https://tabi-staging.tsito-apps.workers.dev
       EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: ${{ vars.GOOGLE_IOS_CLIENT_ID }}
@@ -34,12 +32,6 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Validate Gmail configuration
-        run: |
-          if [[ -z "$GOOGLE_GMAIL_CLIENT_ID" ]]; then
-            echo "::error::GOOGLE_GMAIL_CLIENT_ID repository variable is required"
-            exit 1
-          fi
       - name: Resolve Cloudflare resources
         run: |
           database_id="$(npx wrangler d1 list --json | jq -r '.[] | select(.name == "tabi-staging") | (.uuid // .database_id)' | head -n 1)"
