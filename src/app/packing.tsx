@@ -170,7 +170,7 @@ export default function PackingScreen() {
   };
 
   return (
-    <SafeAreaView edges={['top']} style={styles.safeArea}>
+    <SafeAreaView edges={[]} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headingRow}>
           <View style={styles.tag}><Text style={styles.tagText}>TRAVEL PREP</Text></View>
@@ -181,7 +181,6 @@ export default function PackingScreen() {
         <View style={styles.titleRow}>
           <View style={styles.titleCopy}>
             <Text style={styles.title}>旅の準備</Text>
-            {selectedTrip ? <Text numberOfLines={1} style={styles.tripName}>{selectedTrip.name}</Text> : null}
           </View>
           {selectedTrip ? (
             <Pressable accessibilityLabel={isTasks ? 'やることを追加する' : '持ち物を追加する'} onPress={openCreate} style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}>
@@ -348,7 +347,7 @@ export default function PackingScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.canvas },
-  content: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 26, paddingBottom: 120 },
+  content: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 48 },
   headingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   tag: { backgroundColor: palette.sky, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 7 },
   tagText: { color: palette.ink, fontSize: 11, lineHeight: 14, fontWeight: '800', letterSpacing: 0.5 },
@@ -356,7 +355,6 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginTop: 20 },
   titleCopy: { flex: 1 },
   title: { color: palette.ink, fontSize: 48, lineHeight: 52, fontWeight: '900', letterSpacing: -2.4 },
-  tripName: { maxWidth: 420, color: palette.slate, fontSize: 14, lineHeight: 20, fontWeight: '600', marginTop: 3 },
   addButton: { backgroundColor: palette.ink, borderRadius: 8, paddingHorizontal: 18, paddingVertical: 13 },
   addButtonText: { color: palette.paper, fontSize: 14, lineHeight: 18, fontWeight: '800' },
   segmented: { flexDirection: 'row', backgroundColor: palette.sky, borderRadius: 14, padding: 4, marginTop: 24 },

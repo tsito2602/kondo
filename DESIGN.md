@@ -11,7 +11,7 @@ tabiは、旅程・予約票・持ち物をふたりで編集し、海外でも�
 3. **One quiet hue** — 通常UIは低彩度のブルーグレー一系統に絞り、色相ではなく濃淡で階層を作る。
 4. **Flat and physical** — 影とグラデーションを使わず、紙色、罫線、切り取り線で物理感を出す。
 5. **Offline confidence** — オフライン編集は即時反映し、端末保存済み・同期待ちを簡潔に示す。
-6. **Native behavior** — iOSとAndroidの戻る、共有、モーダル、ボトムナビを尊重する。
+6. **Native behavior** — iOSとAndroidの戻る、共有、モーダル、階層遷移を尊重する。
 
 ## 2. Color tokens
 
@@ -99,9 +99,9 @@ Ocean Slate背景、Ticket Paper文字、8px radius、16×24px padding、16px/70
 
 Ticket Paper背景、Ocean Slateの文字または1px枠、8px radius。黒い反転面を副操作に使わない。
 
-### Nav pill
+### Trip top tabs
 
-Ticket Paper背景、48px radius、影なし。主要4項目「旅・日程・持ち物・予約」を画面下部に固定する。選択項目はPale Blueの小さなpillとOcean Slateのアイコンで示す。
+旅行一覧を最上位に置き、旅行を選択した後だけ表示する。Ticket Paper背景、16px radius、影なし。「しおり・準備・予約」の3項目を横並びにし、選択項目はPale Blueの面と太字で示す。上段には旅行一覧へ戻る操作、旅行名、共有操作を置く。
 
 ### Standard card
 
@@ -118,7 +118,7 @@ Ticket Paper背景、8px radius、16px padding、最小48px、枠なし。フォ
 ## 7. Screen rules
 
 - **Login:** Canvas Blue Gray上に大きなTravel Inkの`TABI`。GoogleログインはOcean Slateのボタン。
-- **Home:** 同期状態、旅行追加、旅行切替、Trip ticket、旅程編集・招待だけを置く。Trip ticketを最大の明るい紙面にする。
+- **Home:** 同期状態、旅行追加、Trip ticketの一覧だけを置く。Trip ticket全体を旅行詳細への入口にする。
 - **Itinerary:** 日付ごとに白い32pxカード。DAY番号はSky、時刻はOcean Slate。
 - **Packing:** 進捗をPale Blueカードに置き、Muted Accentを進捗に使う。チェック済みはPale Blueと記号の両方で示す。
 - **Bookings:** 予約ごとに白いチケットを使い、右側を明るい半券として分離する。
@@ -148,7 +148,7 @@ Ticket Paper背景、8px radius、16px padding、最小48px、枠なし。フォ
 - カードやボタンに影を付けない
 - グラデーションを使わない
 - 架空のQR、搭乗券番号、企業ロゴを表示しない
-- ボトムナビをコンテンツに重ねない
+- 旅行一覧と旅行内の機能を同じナビゲーション階層に並べない
 
 ## 10. Implementation tokens
 

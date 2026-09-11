@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateRangePicker } from '@/components/date-range-picker';
@@ -12,7 +12,7 @@ const today = new Date().toISOString().slice(0, 10);
 
 export default function HomeScreen() {
   const { invite } = useLocalSearchParams<{ invite?: string | string[] }>();
-  const { trips, selectedTrip, selectTrip, createTrip, createInvite, acceptInvite, ready, syncing, pendingCount, error } = useTravel();
+  const { trips, selectTrip, createTrip, acceptInvite, ready, syncing, pendingCount, error } = useTravel();
   const acceptingInvite = useRef(false);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
@@ -42,13 +42,9 @@ export default function HomeScreen() {
     setDestination('');
   };
 
-  const shareInvite = async () => {
-    try {
-      const url = await createInvite();
-      await Share.share({ message: `tabiで旅程を一緒に編集しよう\n${url}`, url });
-    } catch (cause) {
-      Alert.alert('招待リンクを作れませんでした', cause instanceof Error ? cause.message : 'オンラインで再度お試しください。');
-    }
+  const openTrip = (tripId: string) => {
+    selectTrip(tripId);
+    router.push({ pathname: '/trips/[tripId]/itinerary', params: { tripId } });
   };
 
   return (
@@ -56,7 +52,7 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.brand}>tabi</Text>
+            <Text style={styles.brand}>旅行</Text>
             <Text style={styles.sync}>{syncing ? '同期中…' : pendingCount ? `${pendingCount}件を同期待ち` : '同期済み'}</Text>
           </View>
           <Pressable onPress={() => setCreating(true)} style={styles.addButton}><Text style={styles.addButtonText}>＋ 旅行</Text></Pressable>
@@ -64,36 +60,24 @@ export default function HomeScreen() {
 
         {error ? <Text style={styles.error}>オフラインで表示中 · {error}</Text> : null}
 
-        {!selectedTrip ? (
+        {!trips.length ? (
           <View style={styles.empty}>
             <Text style={styles.emptyMark}>⌁</Text>
             <Text style={styles.emptyTitle}>最初の旅行を作成</Text>
             <Text style={styles.emptyBody}>予定は端末に保存され、通信が戻ると自動で同期されます。</Text>
             <Pressable onPress={() => setCreating(true)} style={styles.primaryButton}><Text style={styles.primaryButtonText}>旅行を作る</Text></Pressable>
           </View>
-        ) : (
-          <>
-            {trips.length > 1 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tripTabs}>
-                {trips.map((trip) => (
-                  <Pressable key={trip.id} onPress={() => selectTrip(trip.id)} style={[styles.tripTab, trip.id === selectedTrip.id && styles.tripTabActive]}>
-                    <Text style={[styles.tripTabText, trip.id === selectedTrip.id && styles.tripTabTextActive]}>{trip.name}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            ) : null}
-            <TripTicket trip={selectedTrip} />
-
-            <View style={styles.actionRow}>
-              <Pressable onPress={() => router.push('/itinerary')} style={styles.actionCard}>
-                <Text style={styles.actionIcon}>≡</Text><Text style={styles.actionTitle}>旅程を編集</Text>
-              </Pressable>
-              <Pressable onPress={() => void shareInvite()} style={styles.actionCard}>
-                <Text style={styles.actionIcon}>↗</Text><Text style={styles.actionTitle}>一緒に編集</Text>
-              </Pressable>
-            </View>
-          </>
-        )}
+        ) : <View style={styles.tripList}>{trips.map((trip) => (
+          <Pressable
+            accessibilityHint="旅行のしおりを開きます"
+            accessibilityLabel={trip.name}
+            accessibilityRole="button"
+            key={trip.id}
+            onPress={() => openTrip(trip.id)}
+            style={({ pressed }) => [styles.tripButton, pressed && styles.tripButtonPressed]}>
+            <TripTicket trip={trip} />
+          </Pressable>
+        ))}</View>}
       </ScrollView>
 
       <Modal visible={creating} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setCreating(false)}>
@@ -118,7 +102,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.canvas },
-  content: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 20, paddingBottom: 120, gap: 20 },
+  content: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 20, paddingBottom: 48, gap: 20 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   brand: { color: palette.ink, fontSize: 40, lineHeight: 40, fontWeight: '900', letterSpacing: -1.8 },
   sync: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, lineHeight: 16, marginTop: 3 },
@@ -131,15 +115,9 @@ const styles = StyleSheet.create({
   emptyBody: { color: palette.slate, fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 8 },
   primaryButton: { backgroundColor: palette.ocean, paddingHorizontal: 24, paddingVertical: 15, borderRadius: 8, marginTop: 22 },
   primaryButtonText: { color: palette.paper, fontWeight: '700' },
-  tripTabs: { gap: 8 },
-  tripTab: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 64, backgroundColor: palette.mist },
-  tripTabActive: { backgroundColor: palette.sky },
-  tripTabText: { color: palette.slate, fontWeight: '500' },
-  tripTabTextActive: { color: palette.ink, fontWeight: '700' },
-  actionRow: { flexDirection: 'row', gap: 12 },
-  actionCard: { flex: 1, backgroundColor: palette.paper, borderRadius: 28, padding: 20, minHeight: 120, justifyContent: 'space-between' },
-  actionIcon: { color: palette.ocean, fontSize: 28, lineHeight: 30, fontWeight: '900' },
-  actionTitle: { color: palette.ink, fontSize: 16, fontWeight: '700' },
+  tripList: { gap: 20 },
+  tripButton: { borderRadius: 28 },
+  tripButtonPressed: { opacity: 0.66, transform: [{ scale: 0.99 }] },
   modal: { flex: 1, backgroundColor: palette.canvas },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
   cancel: { color: palette.slate },
