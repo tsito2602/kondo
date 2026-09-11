@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import type { ComponentProps } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, type ComponentProps, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Modal, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,6 +8,7 @@ import { DateRangePicker } from '@/components/date-range-picker';
 import { FloatingAddButton } from '@/components/floating-add-button';
 import { palette } from '@/constants/design';
 import { findAirportByCode } from '@/data/airports';
+import { findFlightConnections, formatConnectionDuration, type FlightConnection } from '@/data/flight-connections';
 import type { Booking, BookingKind, ItineraryItem } from '@/data/types';
 import { useTravel } from '@/data/travel-provider';
 
@@ -36,6 +36,7 @@ const BOOKING_ICONS: Record<BookingKind, SymbolName> = {
 
 const PLAN_ICON: SymbolName = { ios: 'mappin', android: 'location_on', web: 'location_on' };
 const EMPTY_ICON: SymbolName = { ios: 'calendar', android: 'calendar_today', web: 'calendar_today' };
+const CONNECTION_ICON: SymbolName = { ios: 'clock', android: 'schedule', web: 'schedule' };
 
 type TimelineEntry = {
   key: string;
@@ -151,6 +152,9 @@ export default function ItineraryScreen() {
   const dayOffsets = useRef<Record<string, number>>({});
   const programmaticScrollDay = useRef<string | null>(null);
   const scrollTrackingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flightConnections = useMemo(() => findFlightConnections(bookings), [bookings]);
+  const connectionByArrival = useMemo(() => new Map(flightConnections.map((connection) => [connection.arrivalBookingId, connection])), [flightConnections]);
+  const connectedDepartures = useMemo(() => new Set(flightConnections.map((connection) => connection.departureBookingId)), [flightConnections]);
 
   const timeline = [
     ...items.map<TimelineEntry>((item) => ({ key: `item-${item.id}`, day: item.day, time: item.time, title: item.title, note: item.note, item })),
@@ -290,11 +294,13 @@ export default function ItineraryScreen() {
                     const details = bookingDetails(entry);
                     const isLinkedStart = entry.bookingEndpoint === 'start' && Boolean(entry.booking?.endTime);
                     const isLinkedEnd = entry.bookingEndpoint === 'end';
+                    const connection = isLinkedEnd && entry.booking ? connectionByArrival.get(entry.booking.id) : undefined;
+                    const isConnectedDeparture = entry.bookingEndpoint === 'start' && Boolean(entry.booking && connectedDepartures.has(entry.booking.id));
                     return (
+                    <Fragment key={entry.key}>
                     <Pressable
                       accessibilityHint={entry.booking ? '予約の詳細を開きます' : '予定を編集します'}
                       accessibilityRole="button"
-                      key={entry.key}
                       onPress={() => entry.booking && selectedTrip ? router.push({ pathname: '/trips/[tripId]/bookings', params: { tripId: selectedTrip.id, booking: entry.booking.id } }) : openEdit(entry.item!)}
                       style={({ pressed }) => [styles.itemRow, (isLinkedStart || isLinkedEnd) && styles.linkedBookingRow, pressed && styles.itemPressed]}>
                       <View style={styles.timeColumn}>
@@ -302,8 +308,9 @@ export default function ItineraryScreen() {
                         <Text style={styles.timeZone}>{timeZoneLabel(entry)}</Text>
                       </View>
                       <View style={styles.railColumn}>
-                        {isLinkedEnd ? <View style={[styles.rail, styles.railTop, styles.linkedRail]} /> : null}
+                        {isLinkedEnd ? <View style={[styles.rail, styles.railTop, styles.linkedRail]} /> : isConnectedDeparture ? <View style={[styles.connectionRail, styles.railTop]} /> : null}
                         {isLinkedStart ? <View style={[styles.rail, styles.railBottom, styles.linkedRail]} /> : null}
+                        {connection ? <View style={[styles.connectionRail, styles.railBottom]} /> : null}
                         <View style={[styles.iconCircle, entry.booking && styles.bookingIconCircle, isLinkedEnd && styles.bookingEndIconCircle]}>
                           <SymbolView
                             name={entry.booking ? BOOKING_ICONS[entry.booking.kind] : PLAN_ICON}
@@ -320,6 +327,8 @@ export default function ItineraryScreen() {
                       </View>
                       <Text style={styles.chevron}>›</Text>
                     </Pressable>
+                    {connection ? <ConnectionRow connection={connection} /> : null}
+                    </Fragment>
                     );
                   })}
                 </View> : <View style={styles.emptyRow}>
@@ -353,6 +362,24 @@ export default function ItineraryScreen() {
   );
 }
 
+function ConnectionRow({ connection }: { connection: FlightConnection }) {
+  return (
+    <View accessibilityLabel={`${connection.airportName}で${formatConnectionDuration(connection.durationMinutes)}の乗り継ぎ`} style={styles.connectionRow}>
+      <View style={styles.connectionTimeColumn} />
+      <View style={styles.connectionRailColumn}>
+        <View style={styles.connectionRailFull} />
+        <View style={styles.connectionIconCircle}>
+          <SymbolView name={CONNECTION_ICON} size={18} weight="semibold" tintColor={palette.slate} />
+        </View>
+      </View>
+      <View style={styles.connectionCopy}>
+        <Text style={styles.connectionTitle}>{connection.airportName}で乗り継ぎ</Text>
+        <Text style={styles.connectionDuration}>{formatConnectionDuration(connection.durationMinutes)}</Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.canvas },
   content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 128 },
@@ -383,11 +410,20 @@ const styles = StyleSheet.create({
   railColumn: { width: 50, alignItems: 'center', position: 'relative' },
   rail: { position: 'absolute', left: 24, width: 2, backgroundColor: palette.accent },
   linkedRail: { backgroundColor: palette.ocean },
+  connectionRail: { position: 'absolute', left: 24, width: 0, borderLeftWidth: 2, borderColor: palette.smoke, borderStyle: 'dashed' },
   railTop: { top: 0, height: 22 },
   railBottom: { top: 62, bottom: 0 },
   iconCircle: { width: 42, height: 42, borderRadius: 21, marginTop: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.soft, borderWidth: 2, borderColor: palette.accent, zIndex: 1 },
   bookingIconCircle: { backgroundColor: palette.ocean, borderColor: palette.ocean },
   bookingEndIconCircle: { backgroundColor: palette.paper, borderColor: palette.ocean },
+  connectionRow: { minHeight: 68, flexDirection: 'row', alignItems: 'stretch', paddingHorizontal: 16, backgroundColor: palette.paper },
+  connectionTimeColumn: { width: 64 },
+  connectionRailColumn: { width: 50, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  connectionRailFull: { position: 'absolute', top: 0, bottom: 0, left: 24, width: 0, borderLeftWidth: 2, borderColor: palette.smoke, borderStyle: 'dashed' },
+  connectionIconCircle: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.paper, borderWidth: 2, borderColor: palette.smoke, zIndex: 1 },
+  connectionCopy: { flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, paddingLeft: 8, paddingVertical: 14 },
+  connectionTitle: { color: palette.ink, fontSize: 14, lineHeight: 19, fontWeight: '700' },
+  connectionDuration: { color: palette.slate, fontFamily: 'monospace', fontSize: 12, lineHeight: 17 },
   itemCopy: { flex: 1, justifyContent: 'center', paddingVertical: 18, paddingLeft: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
   bookingTag: { color: palette.ocean, fontWeight: '700' },
   itemTitle: { color: palette.ink, fontSize: 17, lineHeight: 22, fontWeight: '800' },
