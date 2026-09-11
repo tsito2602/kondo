@@ -175,7 +175,9 @@ export default function BookingsScreen() {
     setGmailBusy(true);
     setGmailError('');
     try {
-      const returnUrl = makeRedirectUri({ scheme: 'tabi', path: 'gmail-import' });
+      const returnUrl = Platform.OS === 'web' && typeof window !== 'undefined'
+        ? `${window.location.origin}${window.location.pathname}`
+        : makeRedirectUri({ scheme: 'tabi', path: 'gmail-import' });
       const result = await request<{ authorizationUrl: string }>('/v1/integrations/gmail/authorization', {
         method: 'POST',
         body: JSON.stringify({ returnUrl }),
