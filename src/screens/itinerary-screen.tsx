@@ -45,6 +45,7 @@ type TimelineEntry = {
   item?: ItineraryItem;
   booking?: Booking;
   bookingStage?: string;
+  bookingEndpoint?: 'start' | 'end';
 };
 
 function bookingNote(booking: Booking) {
@@ -55,8 +56,8 @@ function bookingNote(booking: Booking) {
 }
 
 function bookingTimelineEntries(booking: Booking): TimelineEntry[] {
-  const [startStage] = BOOKING_STAGES[booking.kind];
-  return [{
+  const [startStage, endStage] = BOOKING_STAGES[booking.kind];
+  const entries: TimelineEntry[] = [{
     key: `booking-${booking.id}-start`,
     day: booking.day,
     time: booking.time,
@@ -64,7 +65,22 @@ function bookingTimelineEntries(booking: Booking): TimelineEntry[] {
     note: bookingNote(booking),
     booking,
     bookingStage: startStage,
+    bookingEndpoint: 'start',
   }];
+
+  if (booking.endTime && (booking.endDay !== booking.day || booking.endTime !== booking.time)) {
+    entries.push({
+      key: `booking-${booking.id}-end`,
+      day: booking.endDay || booking.day,
+      time: booking.endTime,
+      title: booking.title,
+      note: bookingNote(booking),
+      booking,
+      bookingStage: endStage,
+      bookingEndpoint: 'end',
+    });
+  }
+  return entries;
 }
 
 function datesBetween(start: string, end: string) {
@@ -102,16 +118,12 @@ function entryTitle(entry: TimelineEntry) {
 function bookingDetails(entry: TimelineEntry) {
   if (!entry.booking) return [];
   const booking = entry.booking;
-  const [, endStage] = BOOKING_STAGES[booking.kind];
+  const [startStage, endStage] = BOOKING_STAGES[booking.kind];
+  if (entry.bookingEndpoint === 'end') {
+    return [`${endStage} · ${booking.title}`, `${startStage} ${shortDate(booking.day)} ${booking.time}`].filter(Boolean);
+  }
   const endDate = booking.endDay && booking.endDay !== booking.day ? `${shortDate(booking.endDay)} ` : '';
-  const endDetail = booking.endTime ? `${endStage} ${endDate}${booking.endTime}` : '';
-  return [
-    `${entry.bookingStage} · ${booking.title}`,
-    endDetail,
-    booking.detail,
-    booking.confirmationCode ? `確認番号 ${booking.confirmationCode}` : '',
-    booking.note,
-  ].filter(Boolean);
+  return [`${startStage} · ${booking.title}`, booking.endTime ? `${endStage} ${endDate}${booking.endTime}` : ''].filter(Boolean);
 }
 
 export default function ItineraryScreen() {
@@ -254,35 +266,39 @@ export default function ItineraryScreen() {
           <View style={styles.empty}><Text style={styles.emptyTitle}>旅行がありません</Text><Text style={styles.emptyBody}>旅行一覧から旅行を選択してください。</Text></View>
         ) : <View style={styles.timeline}>{itineraryDates.map((date, dayIndex) => {
           const dateItems = grouped[date] ?? [];
+          const hasBookingAcrossDate = bookings.some((booking) => booking.endTime && booking.day < date && (booking.endDay || booking.day) >= date);
           return (
             <View key={date} onLayout={(event) => { dayOffsets.current[date] = event.nativeEvent.layout.y; }} style={styles.daySection}>
-              <View style={styles.dateBar}>
-                <Text style={styles.date}>{longDate(date)}</Text>
+              <View style={[styles.dateBar, hasBookingAcrossDate && styles.linkedDateBar]}>
+                {hasBookingAcrossDate ? <View style={styles.dateConnector} /> : null}
+                <Text numberOfLines={1} style={styles.date}>{longDate(date)}</Text>
                 <Text style={styles.dateDay}>DAY {String(dayIndex + 1).padStart(2, '0')}</Text>
               </View>
               {dateItems.length ? <View>
                   {dateItems.map((entry, entryIndex) => {
                     const details = bookingDetails(entry);
+                    const isLinkedStart = entry.bookingEndpoint === 'start' && Boolean(entry.booking?.endTime);
+                    const isLinkedEnd = entry.bookingEndpoint === 'end';
                     return (
                     <Pressable
                       accessibilityHint={entry.booking ? '予約の詳細を開きます' : '予定を編集します'}
                       accessibilityRole="button"
                       key={entry.key}
                       onPress={() => entry.booking && selectedTrip ? router.push({ pathname: '/trips/[tripId]/bookings', params: { tripId: selectedTrip.id, booking: entry.booking.id } }) : openEdit(entry.item!)}
-                      style={({ pressed }) => [styles.itemRow, pressed && styles.itemPressed]}>
+                      style={({ pressed }) => [styles.itemRow, (isLinkedStart || isLinkedEnd) && styles.linkedBookingRow, pressed && styles.itemPressed]}>
                       <View style={styles.timeColumn}>
                         <Text style={styles.time}>{entry.time || '—'}</Text>
                         <Text style={styles.timeKind}>{entry.booking ? entry.bookingStage : entry.item?.kind || '予定'}</Text>
                       </View>
                       <View style={styles.railColumn}>
-                        {entryIndex > 0 ? <View style={[styles.rail, styles.railTop]} /> : null}
-                        {entryIndex < dateItems.length - 1 ? <View style={[styles.rail, styles.railBottom]} /> : null}
-                        <View style={[styles.iconCircle, entry.booking && styles.bookingIconCircle]}>
+                        {entryIndex > 0 || isLinkedEnd ? <View style={[styles.rail, styles.railTop, isLinkedEnd && styles.linkedRail]} /> : null}
+                        {entryIndex < dateItems.length - 1 || isLinkedStart ? <View style={[styles.rail, styles.railBottom, isLinkedStart && styles.linkedRail]} /> : null}
+                        <View style={[styles.iconCircle, entry.booking && styles.bookingIconCircle, isLinkedEnd && styles.bookingEndIconCircle]}>
                           <SymbolView
                             name={entry.booking ? BOOKING_ICONS[entry.booking.kind] : PLAN_ICON}
                             size={21}
                             weight="semibold"
-                            tintColor={entry.booking ? palette.paper : palette.ocean}
+                            tintColor={entry.booking && !isLinkedEnd ? palette.paper : palette.ocean}
                           />
                         </View>
                       </View>
@@ -344,20 +360,25 @@ const styles = StyleSheet.create({
   emptyBody: { color: palette.slate, textAlign: 'center', marginTop: 7 },
   timeline: { marginTop: 10, marginHorizontal: -20 },
   daySection: { backgroundColor: palette.paper },
-  dateBar: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: palette.mist, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.ash, paddingHorizontal: 20 },
-  date: { color: palette.ink, fontSize: 14, lineHeight: 20, fontWeight: '800' },
+  dateBar: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: palette.mist, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.ash, paddingHorizontal: 20, position: 'relative' },
+  linkedDateBar: { paddingLeft: 122 },
+  dateConnector: { position: 'absolute', left: 104, top: -1, bottom: -1, width: 2, backgroundColor: palette.ocean },
+  date: { flex: 1, color: palette.ink, fontSize: 14, lineHeight: 20, fontWeight: '800', marginRight: 12 },
   dateDay: { color: palette.ocean, fontFamily: 'monospace', fontSize: 10, lineHeight: 14, fontWeight: '700' },
   itemRow: { minHeight: 104, flexDirection: 'row', alignItems: 'stretch', paddingHorizontal: 16 },
+  linkedBookingRow: { backgroundColor: palette.soft },
   itemPressed: { opacity: 0.55 },
   timeColumn: { width: 64, alignItems: 'flex-end', paddingTop: 20, paddingRight: 6 },
   time: { color: palette.ink, fontFamily: 'monospace', fontSize: 15, lineHeight: 20, fontWeight: '800' },
   timeKind: { color: palette.smoke, fontSize: 10, lineHeight: 15, marginTop: 2 },
   railColumn: { width: 50, alignItems: 'center', position: 'relative' },
   rail: { position: 'absolute', left: 24, width: 2, backgroundColor: palette.accent },
+  linkedRail: { backgroundColor: palette.ocean },
   railTop: { top: 0, height: 22 },
   railBottom: { top: 62, bottom: 0 },
   iconCircle: { width: 42, height: 42, borderRadius: 21, marginTop: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.soft, borderWidth: 2, borderColor: palette.accent, zIndex: 1 },
   bookingIconCircle: { backgroundColor: palette.ocean, borderColor: palette.ocean },
+  bookingEndIconCircle: { backgroundColor: palette.paper, borderColor: palette.ocean },
   itemCopy: { flex: 1, justifyContent: 'center', paddingVertical: 18, paddingLeft: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
   bookingTag: { color: palette.ocean, fontWeight: '700' },
   itemTitle: { color: palette.ink, fontSize: 17, lineHeight: 22, fontWeight: '800' },
