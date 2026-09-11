@@ -37,7 +37,6 @@ export type Booking = {
   endTime: string;
   confirmationCode: string;
   note: string;
-  used: boolean;
   updatedBy?: string;
   updatedAt?: number;
 };
@@ -126,7 +125,6 @@ export const normalizeTravelCache = (value: TravelCache): TravelCache => ({
         destinationCode: booking.destinationCode ?? '',
         endDay: booking.endDay ?? booking.day,
         endTime: booking.endTime ?? '',
-        used: Boolean(booking.used),
       })),
     ]),
   ),

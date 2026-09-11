@@ -256,16 +256,13 @@ async function listBookings(env: Env, user: User, tripId: string) {
            COALESCE(d.origin, '') AS origin, COALESCE(d.origin_code, '') AS originCode,
            COALESCE(d.destination, '') AS destination, COALESCE(d.destination_code, '') AS destinationCode,
            COALESCE(NULLIF(d.end_day, ''), b.day) AS endDay, COALESCE(d.end_time, '') AS endTime,
-           b.confirmation_code AS confirmationCode, b.note, COALESCE(u.used, 0) AS used,
-           b.updated_by AS updatedBy, b.updated_at AS updatedAt
-    FROM bookings b
-    LEFT JOIN booking_details d ON d.booking_id = b.id
-    LEFT JOIN booking_usage u ON u.booking_id = b.id
+           b.confirmation_code AS confirmationCode, b.note, b.updated_by AS updatedBy, b.updated_at AS updatedAt
+    FROM bookings b LEFT JOIN booking_details d ON d.booking_id = b.id
     WHERE b.trip_id = ? ORDER BY b.day, b.time, b.id
   `)
     .bind(tripId)
     .all();
-  return json({ bookings: result.results.map((booking) => ({ ...booking, used: Boolean(booking.used) })) });
+  return json({ bookings: result.results });
 }
 
 async function createBooking(request: Request, env: Env, user: User, tripId: string) {
@@ -295,7 +292,7 @@ async function createBooking(request: Request, env: Env, user: User, tripId: str
     `).bind(id, fields.origin, fields.originCode, fields.destination, fields.destinationCode, fields.endDay, fields.endTime, id, tripId),
   ]);
   if (!bookingResult.meta.changes) return json({ error: '予約IDが競合しました' }, 409);
-  return json({ booking: { id, ...fields, used: false, updatedBy: user.id } }, 201);
+  return json({ booking: { id, ...fields, updatedBy: user.id } }, 201);
 }
 
 async function updateBooking(request: Request, env: Env, user: User, tripId: string, bookingId: string) {
@@ -324,22 +321,6 @@ async function deleteBooking(env: Env, user: User, tripId: string, bookingId: st
   if (forbidden) return forbidden;
   const result = await env.DB.prepare('DELETE FROM bookings WHERE id = ? AND trip_id = ?').bind(bookingId, tripId).run();
   return result.meta.changes ? new Response(null, { status: 204 }) : json({ error: '予約が見つかりません' }, 404);
-}
-
-async function setBookingUsage(request: Request, env: Env, user: User, tripId: string, bookingId: string) {
-  const forbidden = await requireMember(env, tripId, user.id);
-  if (forbidden) return forbidden;
-  const body = await request.json().catch(() => null);
-  if (!isObject(body) || typeof body.used !== 'boolean') return json({ error: '正しい利用状態を入力してください' }, 400);
-  const result = await env.DB.prepare(`
-    INSERT INTO booking_usage (booking_id, used, updated_by)
-    SELECT id, ?, ? FROM bookings WHERE id = ? AND trip_id = ?
-    ON CONFLICT(booking_id) DO UPDATE SET
-      used = excluded.used, updated_by = excluded.updated_by, updated_at = unixepoch()
-  `).bind(body.used ? 1 : 0, user.id, bookingId, tripId).run();
-  return result.meta.changes
-    ? json({ booking: { id: bookingId, used: body.used, updatedBy: user.id } })
-    : json({ error: '予約が見つかりません' }, 404);
 }
 
 type PackingRow = {
@@ -540,9 +521,6 @@ async function api(request: Request, env: Env, url: URL) {
   const bookingMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/bookings\/([^/]+)$/);
   if (bookingMatch && request.method === 'PATCH') return updateBooking(request, env, user, bookingMatch[1], bookingMatch[2]);
   if (bookingMatch && request.method === 'DELETE') return deleteBooking(env, user, bookingMatch[1], bookingMatch[2]);
-
-  const bookingUsageMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/bookings\/([^/]+)\/usage$/);
-  if (bookingUsageMatch && request.method === 'PATCH') return setBookingUsage(request, env, user, bookingUsageMatch[1], bookingUsageMatch[2]);
 
   const packingItemsMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/packing$/);
   if (packingItemsMatch && request.method === 'GET') return listPacking(env, user, packingItemsMatch[1]);

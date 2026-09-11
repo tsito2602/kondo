@@ -95,13 +95,6 @@ CREATE TABLE IF NOT EXISTS booking_details (
   end_time TEXT NOT NULL DEFAULT ''
 );
 
-CREATE TABLE IF NOT EXISTS booking_usage (
-  booking_id TEXT PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
-  used INTEGER NOT NULL DEFAULT 0 CHECK(used IN (0, 1)),
-  updated_by TEXT NOT NULL REFERENCES users(id),
-  updated_at INTEGER NOT NULL DEFAULT (unixepoch())
-);
-
 CREATE TABLE IF NOT EXISTS invites (
   token_hash TEXT PRIMARY KEY,
   trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
