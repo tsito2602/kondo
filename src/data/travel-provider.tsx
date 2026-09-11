@@ -33,6 +33,7 @@ type TravelContextValue = {
   deleteItem: (id: string) => void;
   createBooking: (input: BookingInput) => string;
   updateBooking: (id: string, input: BookingInput) => void;
+  setBookingUsed: (id: string, used: boolean) => void;
   deleteBooking: (id: string) => void;
   createPackingItem: (input: PackingInput) => string;
   updatePackingItem: (id: string, input: PackingInput) => void;
@@ -195,7 +196,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     const tripId = cacheRef.current.selectedTripId;
     if (!tripId) throw new Error('旅行を選択してください');
     const id = Crypto.randomUUID();
-    const booking: Booking = { id, ...input };
+    const booking: Booking = { id, ...input, used: false };
     commit((current) => ({
       ...current,
       bookingsByTrip: { ...current.bookingsByTrip, [tripId]: [...(current.bookingsByTrip[tripId] ?? []), booking] },
@@ -228,6 +229,19 @@ export function TravelProvider({ children }: PropsWithChildren) {
       },
     }));
     enqueue({ method: 'DELETE', path: `/v1/trips/${tripId}/bookings/${id}` });
+  }, [commit, enqueue]);
+
+  const setBookingUsed = useCallback((id: string, used: boolean) => {
+    const tripId = cacheRef.current.selectedTripId;
+    if (!tripId) return;
+    commit((current) => ({
+      ...current,
+      bookingsByTrip: {
+        ...current.bookingsByTrip,
+        [tripId]: (current.bookingsByTrip[tripId] ?? []).map((booking) => booking.id === id ? { ...booking, used } : booking),
+      },
+    }));
+    enqueue({ method: 'PATCH', path: `/v1/trips/${tripId}/bookings/${id}/usage`, body: { used } });
   }, [commit, enqueue]);
 
   const createPackingItem = useCallback((input: PackingInput) => {
@@ -351,6 +365,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     deleteItem,
     createBooking,
     updateBooking,
+    setBookingUsed,
     deleteBooking,
     createPackingItem,
     updatePackingItem,
@@ -360,7 +375,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     deleteTask,
     createInvite,
     acceptInvite,
-  }), [acceptInvite, bookings, cache.pending.length, cache.trips, createBooking, createInvite, createItem, createPackingItem, createTask, createTrip, deleteBooking, deleteItem, deletePackingItem, deleteTask, error, items, packingItems, ready, selectTrip, selectedTrip, sync, syncing, tasks, updateBooking, updateItem, updatePackingItem, updateTask, updateTrip]);
+  }), [acceptInvite, bookings, cache.pending.length, cache.trips, createBooking, createInvite, createItem, createPackingItem, createTask, createTrip, deleteBooking, deleteItem, deletePackingItem, deleteTask, error, items, packingItems, ready, selectTrip, selectedTrip, setBookingUsed, sync, syncing, tasks, updateBooking, updateItem, updatePackingItem, updateTask, updateTrip]);
 
   return <TravelContext.Provider value={value}>{children}</TravelContext.Provider>;
 }

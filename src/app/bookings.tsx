@@ -1,6 +1,9 @@
-import { type ComponentProps, type Dispatch, type SetStateAction, useState } from 'react';
+import { type ComponentProps, type Dispatch, type SetStateAction, useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { Easing, Keyframe, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { DateRangePicker } from '@/components/date-range-picker';
 import { palette } from '@/constants/design';
@@ -18,6 +21,24 @@ const KINDS: { value: BookingKind; label: string; short: string; icon: string }[
   { value: 'other', label: 'その他', short: 'OTHER', icon: '＋' },
 ];
 
+const stubPrompt = new Keyframe({
+  0: { transform: [{ translateY: 0 }, { rotateZ: '0deg' }] },
+  30: { transform: [{ translateY: 5 }, { rotateZ: '1.5deg' }], easing: Easing.inOut(Easing.quad) },
+  55: { transform: [{ translateY: 1 }, { rotateZ: '-1deg' }] },
+  75: { transform: [{ translateY: 4 }, { rotateZ: '1deg' }] },
+  100: { transform: [{ translateY: 0 }, { rotateZ: '0deg' }], easing: Easing.out(Easing.quad) },
+});
+
+function hasBookingEnded(booking: Booking, now = new Date()) {
+  const [year, month, day] = booking.endDay.split('-').map(Number);
+  if (!year || !month || !day) return false;
+  const [hour, minute] = booking.endTime.split(':').map(Number);
+  const boundary = booking.endTime
+    ? new Date(year, month - 1, day, hour || 0, minute || 0)
+    : new Date(year, month - 1, day + 1);
+  return now >= boundary;
+}
+
 type Draft = Pick<Booking, 'kind' | 'title' | 'detail' | 'origin' | 'originCode' | 'destination' | 'destinationCode' | 'day' | 'time' | 'endDay' | 'endTime' | 'confirmationCode' | 'note'>;
 
 function blankDraft(day: string, kind: BookingKind = 'flight'): Draft {
@@ -29,7 +50,7 @@ function blankDraft(day: string, kind: BookingKind = 'flight'): Draft {
 }
 
 export default function BookingsScreen() {
-  const { bookings, createBooking, deleteBooking, pendingCount, selectedTrip, updateBooking } = useTravel();
+  const { bookings, createBooking, deleteBooking, pendingCount, selectedTrip, setBookingUsed, updateBooking } = useTravel();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(() => blankDraft(selectedTrip?.startsOn ?? ''));
   const [formOpen, setFormOpen] = useState(false);
@@ -121,35 +142,10 @@ export default function BookingsScreen() {
           </Pressable>
         ) : (
           <View style={styles.ticketList}>
-            {bookings.map((booking, index) => {
-              const kind = KINDS.find((entry) => entry.value === booking.kind) ?? KINDS[KINDS.length - 1];
-              const hasRoute = Boolean(booking.origin || booking.destination);
-              const route = hasRoute ? `${booking.originCode || booking.origin} → ${booking.destinationCode || booking.destination}` : booking.detail;
-              const end = booking.endDay && (booking.endDay !== booking.day || booking.endTime)
-                ? ` → ${booking.endDay.replaceAll('-', '.')}${booking.endTime ? ` ${booking.endTime}` : ''}`
-                : '';
-              return (
-                <Pressable key={booking.id} onPress={() => openEdit(booking)} style={({ pressed }) => [styles.ticket, pressed && styles.pressed]} accessibilityLabel={`${booking.title}を編集`}>
-                  <View style={styles.copy}>
-                    <View style={styles.ticketTop}>
-                      <View style={styles.typeTag}><Text style={styles.type}>{kind.short}</Text></View>
-                      <Text style={styles.serial}>TABI/{String(index + 1).padStart(2, '0')}</Text>
-                    </View>
-                    <Text numberOfLines={2} style={styles.cardTitle}>{booking.title}</Text>
-                    {route ? <Text numberOfLines={2} style={styles.route}>{route}</Text> : null}
-                    {hasRoute && booking.detail ? <Text numberOfLines={1} style={styles.detail}>{booking.detail}</Text> : null}
-                    <Text style={styles.meta}>{booking.day.replaceAll('-', '.')} {booking.time}{end}{booking.confirmationCode ? `  /  ${booking.confirmationCode}` : ''}</Text>
-                  </View>
-                  <View style={styles.stub}>
-                    <Text style={styles.icon}>{kind.icon}</Text>
-                    <Text style={styles.stubNo}>{String(index + 1).padStart(2, '0')}</Text>
-                    <Text style={styles.stubLabel}>PASS</Text>
-                  </View>
-                  <View style={[styles.notch, styles.notchTop]} />
-                  <View style={[styles.notch, styles.notchBottom]} />
-                </Pressable>
-              );
-            })}
+            {bookings.filter((booking) => !booking.used).map((booking, index) => (
+              <BookingTicketCard booking={booking} index={index} key={booking.id} onEdit={() => openEdit(booking)} onUsed={() => setBookingUsed(booking.id, true)} />
+            ))}
+            {bookings.some((booking) => booking.used) ? <UsedBookings bookings={bookings.filter((booking) => booking.used)} onEdit={openEdit} onRestore={(id) => setBookingUsed(id, false)} /> : null}
           </View>
         )}
       </ScrollView>
@@ -183,6 +179,91 @@ export default function BookingsScreen() {
       </Modal>
     </SafeAreaView>
   );
+}
+
+function BookingTicketCard({ booking, index, onEdit, onUsed }: { booking: Booking; index: number; onEdit: () => void; onUsed: () => void }) {
+  const canTear = hasBookingEnded(booking);
+  const translateY = useSharedValue(0);
+  const committed = useSharedValue(false);
+  const stubStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
+  const finishTear = () => {
+    if (committed.value) return;
+    committed.set(true);
+    translateY.set(withTiming(190, { duration: 280, easing: Easing.in(Easing.cubic) }, (finished) => {
+      if (finished) scheduleOnRN(onUsed);
+    }));
+  };
+  const gesture = useMemo(() => Gesture.Pan()
+    .enabled(canTear)
+    .activeOffsetY(8)
+    .failOffsetX([-24, 24])
+    .onUpdate((event) => { translateY.set(Math.max(0, event.translationY)); })
+    .onEnd((event) => {
+      if (event.translationY > 54 || event.velocityY > 520) {
+        committed.set(true);
+        translateY.set(withTiming(190, { duration: 240, easing: Easing.in(Easing.cubic) }, (finished) => {
+          if (finished) scheduleOnRN(onUsed);
+        }));
+      } else {
+        translateY.set(withSpring(0, { damping: 17, stiffness: 220 }));
+      }
+    })
+    .onFinalize(() => {
+      if (!committed.value && translateY.value !== 0) translateY.set(withSpring(0, { damping: 17, stiffness: 220 }));
+    }), [canTear, committed, onUsed, translateY]);
+  const kind = KINDS.find((entry) => entry.value === booking.kind) ?? KINDS[KINDS.length - 1];
+  const hasRoute = Boolean(booking.origin || booking.destination);
+  const route = hasRoute ? `${booking.originCode || booking.origin} → ${booking.destinationCode || booking.destination}` : booking.detail;
+  const end = booking.endDay && (booking.endDay !== booking.day || booking.endTime)
+    ? ` → ${booking.endDay.replaceAll('-', '.')}${booking.endTime ? ` ${booking.endTime}` : ''}`
+    : '';
+
+  return <View style={styles.ticketWrap}>
+    <View style={styles.ticket}>
+      <Pressable accessibilityLabel={`${booking.title}を編集`} onPress={onEdit} style={({ pressed }) => [styles.copy, pressed && styles.pressed]}>
+        <View style={styles.ticketTop}>
+          <View style={styles.typeTag}><Text style={styles.type}>{kind.short}</Text></View>
+          <Text style={styles.serial}>TABI/{String(index + 1).padStart(2, '0')}</Text>
+        </View>
+        <Text numberOfLines={2} style={styles.cardTitle}>{booking.title}</Text>
+        {route ? <Text numberOfLines={2} style={styles.route}>{route}</Text> : null}
+        {hasRoute && booking.detail ? <Text numberOfLines={1} style={styles.detail}>{booking.detail}</Text> : null}
+        <Text style={styles.meta}>{booking.day.replaceAll('-', '.')} {booking.time}{end}{booking.confirmationCode ? `  /  ${booking.confirmationCode}` : ''}</Text>
+      </Pressable>
+      <Animated.View entering={canTear ? stubPrompt.delay(500).duration(900) : undefined} style={styles.stubSlot}>
+        <GestureDetector gesture={gesture}>
+          <Animated.View style={[styles.stub, stubStyle]}>
+            <Pressable accessibilityLabel={canTear ? '半券。下に引いて使用済みにできます' : `${booking.title}を編集`} onPress={onEdit} style={styles.stubPressable}>
+              <Text style={styles.icon}>{kind.icon}</Text>
+              <Text style={styles.stubNo}>{String(index + 1).padStart(2, '0')}</Text>
+              <Text style={styles.stubLabel}>{canTear ? 'PULL' : 'PASS'}</Text>
+            </Pressable>
+          </Animated.View>
+        </GestureDetector>
+      </Animated.View>
+      <View style={[styles.notch, styles.notchTop]} />
+      <View style={[styles.notch, styles.notchBottom]} />
+    </View>
+    {canTear ? <View style={styles.tearHint}>
+      <Text style={styles.tearHintText}>利用時刻を過ぎました</Text>
+      <Pressable accessibilityRole="button" onPress={finishTear} style={({ pressed }) => [styles.tearButton, pressed && styles.pressed]}><Text style={styles.tearButtonText}>使用済みにする ↓</Text></Pressable>
+    </View> : null}
+  </View>;
+}
+
+function UsedBookings({ bookings, onEdit, onRestore }: { bookings: Booking[]; onEdit: (booking: Booking) => void; onRestore: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  return <View style={styles.usedSection}>
+    <Pressable accessibilityRole="button" onPress={() => setOpen((current) => !current)} style={({ pressed }) => [styles.usedHeading, pressed && styles.pressed]}>
+      <Text style={styles.usedHeadingText}>使用済み {bookings.length}</Text><Text style={styles.usedChevron}>{open ? '−' : '＋'}</Text>
+    </Pressable>
+    {open ? <View style={styles.usedList}>{bookings.map((booking) => <View key={booking.id} style={styles.usedTicket}>
+      <Pressable accessibilityLabel={`${booking.title}を編集`} onPress={() => onEdit(booking)} style={({ pressed }) => [styles.usedCopy, pressed && styles.pressed]}>
+        <Text style={styles.usedLabel}>USED</Text><Text numberOfLines={1} style={styles.usedTitle}>{booking.title}</Text><Text style={styles.usedMeta}>{booking.day.replaceAll('-', '.')} {booking.time}</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" onPress={() => onRestore(booking.id)} style={({ pressed }) => [styles.restoreButton, pressed && styles.pressed]}><Text style={styles.restoreText}>元に戻す</Text></Pressable>
+    </View>)}</View> : null}
+  </View>;
 }
 
 function BookingFormFields({ draft, setDraft }: { draft: Draft; setDraft: Dispatch<SetStateAction<Draft>> }) {
@@ -294,6 +375,7 @@ const styles = StyleSheet.create({
   emptyTitle: { color: palette.ink, fontSize: 19, fontWeight: '900', textAlign: 'center' },
   emptyBody: { color: palette.slate, fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 8 },
   ticketList: { gap: 16, marginTop: 24 },
+  ticketWrap: { gap: 8 },
   ticket: { minHeight: 174, flexDirection: 'row', position: 'relative', overflow: 'hidden', borderRadius: 28, backgroundColor: palette.paper },
   copy: { flex: 1, minWidth: 0, padding: 20 },
   ticketTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
@@ -304,13 +386,31 @@ const styles = StyleSheet.create({
   route: { color: palette.ink, fontFamily: 'monospace', fontSize: 16, fontWeight: '800', letterSpacing: 0.6, marginTop: 8 },
   detail: { color: palette.slate, fontSize: 14, marginTop: 6 },
   meta: { color: palette.slate, fontFamily: 'monospace', fontSize: 10, lineHeight: 16, marginTop: 12 },
-  stub: { width: 76, borderLeftWidth: 1, borderStyle: 'dashed', borderLeftColor: palette.ocean, backgroundColor: palette.sky, alignItems: 'center', justifyContent: 'center' },
+  stubSlot: { width: 76 },
+  stub: { flex: 1, width: '100%', borderLeftWidth: 1, borderStyle: 'dashed', borderLeftColor: palette.ocean, backgroundColor: palette.sky, alignItems: 'center', justifyContent: 'center' },
+  stubPressable: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },
   icon: { color: palette.ocean, fontSize: 24, fontWeight: '900' },
   stubNo: { color: palette.ink, fontSize: 24, lineHeight: 27, fontWeight: '900', marginTop: 12 },
   stubLabel: { color: palette.smoke, fontFamily: 'monospace', fontSize: 8, marginTop: 2 },
   notch: { position: 'absolute', right: 66, width: 20, height: 20, borderRadius: 10, backgroundColor: palette.canvas, zIndex: 2 },
   notchTop: { top: -10 },
   notchBottom: { bottom: -10 },
+  tearHint: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 12, paddingHorizontal: 6 },
+  tearHintText: { color: palette.smoke, fontSize: 11 },
+  tearButton: { minHeight: 36, justifyContent: 'center', borderRadius: 18, backgroundColor: palette.sky, paddingHorizontal: 13 },
+  tearButtonText: { color: palette.ocean, fontSize: 11, fontWeight: '800' },
+  usedSection: { overflow: 'hidden', borderRadius: 20, backgroundColor: palette.paper },
+  usedHeading: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18 },
+  usedHeadingText: { color: palette.slate, fontSize: 13, fontWeight: '800' },
+  usedChevron: { color: palette.ocean, fontSize: 18, fontWeight: '700' },
+  usedList: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.ash },
+  usedTicket: { minHeight: 76, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash, paddingLeft: 18, paddingRight: 10 },
+  usedCopy: { flex: 1, minWidth: 0, paddingVertical: 12 },
+  usedLabel: { color: palette.smoke, fontFamily: 'monospace', fontSize: 8, letterSpacing: 1 },
+  usedTitle: { color: palette.slate, fontSize: 14, fontWeight: '800', marginTop: 4 },
+  usedMeta: { color: palette.smoke, fontFamily: 'monospace', fontSize: 9, marginTop: 4 },
+  restoreButton: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 10 },
+  restoreText: { color: palette.ocean, fontSize: 11, fontWeight: '800' },
   backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(24,42,54,0.34)', padding: 16 },
   dialog: { width: '100%', maxWidth: 560, maxHeight: '94%', backgroundColor: palette.canvas, borderRadius: 28, overflow: 'hidden' },
   form: { gap: 16, padding: 20 },
