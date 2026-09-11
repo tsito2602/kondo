@@ -131,16 +131,16 @@ export default function ItineraryScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={[]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <View><Text style={styles.eyebrow}>{selectedTrip?.name ?? 'tabi'}</Text><Text style={styles.title}>日程</Text></View>
+          <View><Text style={styles.eyebrow}>ITINERARY</Text><Text style={styles.title}>しおり</Text></View>
           {selectedTrip ? <Pressable onPress={openAdd} style={styles.addButton}><Text style={styles.addText}>＋ 予定</Text></Pressable> : null}
         </View>
         {pendingCount ? <Text style={styles.pending}>{pendingCount}件を端末に保存済み · オンライン時に同期</Text> : null}
 
         {!selectedTrip ? (
-          <View style={styles.empty}><Text style={styles.emptyTitle}>旅行がありません</Text><Text style={styles.emptyBody}>「旅」タブから旅行を作成してください。</Text></View>
+          <View style={styles.empty}><Text style={styles.emptyTitle}>旅行がありません</Text><Text style={styles.emptyBody}>旅行一覧から旅行を選択してください。</Text></View>
         ) : !timeline.length ? (
           <View style={styles.empty}><Text style={styles.emptyMark}>＋</Text><Text style={styles.emptyTitle}>予定を追加</Text><Text style={styles.emptyBody}>移動、食事、観光などを時系列でまとめられます。</Text></View>
         ) : (
@@ -155,7 +155,7 @@ export default function ItineraryScreen() {
                       accessibilityHint={entry.booking ? '予約の詳細を開きます' : '予定を編集します'}
                       accessibilityRole="button"
                       key={entry.key}
-                      onPress={() => entry.booking ? router.push({ pathname: '/bookings', params: { booking: entry.booking.id } }) : openEdit(entry.item!)}
+                      onPress={() => entry.booking && selectedTrip ? router.push({ pathname: '/trips/[tripId]/bookings', params: { tripId: selectedTrip.id, booking: entry.booking.id } }) : openEdit(entry.item!)}
                       style={({ pressed }) => [styles.itemRow, entry.booking && styles.bookingRow, pressed && styles.itemPressed]}>
                       <Text style={styles.time}>{entry.time}</Text>
                       <View style={styles.itemCopy}>
@@ -194,7 +194,7 @@ export default function ItineraryScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.canvas },
-  content: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 20, paddingBottom: 120 },
+  content: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 20, paddingTop: 10, paddingBottom: 48 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   eyebrow: { alignSelf: 'flex-start', color: palette.ink, backgroundColor: palette.sky, borderRadius: 64, paddingHorizontal: 12, paddingVertical: 5, fontFamily: 'monospace', fontSize: 10, fontWeight: '400' },
   title: { color: palette.ink, fontSize: 42, lineHeight: 42, fontWeight: '900', letterSpacing: -1.5, marginTop: 8 },

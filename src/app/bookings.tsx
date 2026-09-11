@@ -135,7 +135,7 @@ export default function BookingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={[]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headingRow}>
           <View style={styles.tag}><Text style={styles.tagText}>DOCUMENTS</Text></View>
@@ -415,7 +415,7 @@ function Field({ label, ...props }: { label: string } & ComponentProps<typeof Te
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.canvas },
-  content: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 20, paddingBottom: 120 },
+  content: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 20, paddingTop: 10, paddingBottom: 48 },
   headingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   tag: { backgroundColor: palette.sky, borderRadius: 64, paddingHorizontal: 12, paddingVertical: 6 },
   tagText: { color: palette.ink, fontFamily: 'monospace', fontSize: 10 },
