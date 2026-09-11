@@ -365,17 +365,22 @@ function matchingBooking(candidate: GmailImportCandidate, bookings: ExistingBook
   });
 }
 
-async function gmailCandidates(env: Env, user: User, tripId: string) {
+async function gmailCandidates(request: Request, env: Env, user: User, tripId: string) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
   const trip = await env.DB.prepare('SELECT starts_on AS startsOn, ends_on AS endsOn FROM trips WHERE id = ?')
     .bind(tripId).first<{ startsOn: string; endsOn: string }>();
   if (!trip) return json({ error: '旅行が見つかりません' }, 404);
+  const body = await request.json().catch(() => null);
+  const pageToken = isObject(body) && typeof body.pageToken === 'string' && body.pageToken.length <= 2048
+    ? body.pageToken
+    : '';
   try {
     const accessToken = await gmailAccessToken(env, user);
     const query = encodeURIComponent('{予約 reservation booking itinerary e-ticket boarding hotel check-in train rail 新幹線 搭乗 宿泊}');
-    const listed = await gmailJson<{ messages?: { id: string }[] }>(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=250&q=${query}`,
+    const page = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '';
+    const listed = await gmailJson<{ messages?: { id: string }[]; nextPageToken?: string }>(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=75&q=${query}${page}`,
       accessToken,
     );
     const messages = listed.messages ?? [];
@@ -405,9 +410,13 @@ async function gmailCandidates(env: Env, user: User, tripId: string) {
           alreadyImported: Boolean(importedBookingId),
         };
       }),
+      nextPageToken: listed.nextPageToken ?? null,
+      scanned: messages.length,
     });
   } catch (cause) {
-    return json({ error: cause instanceof Error ? cause.message : 'Gmailを読み込めませんでした' }, 502);
+    const message = cause instanceof Error ? cause.message : 'Gmailを読み込めませんでした';
+    const limited = /quota exceeded|rate limit|too many concurrent/i.test(message);
+    return json({ error: limited ? 'Gmailの利用上限に近づきました。1分ほど待ってから、続きを探してください。' : message }, 502);
   }
 }
 
@@ -984,7 +993,7 @@ async function api(request: Request, env: Env, url: URL) {
   if (bookingsMatch && request.method === 'POST') return createBooking(request, env, user, bookingsMatch[1]);
 
   const gmailCandidatesMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/gmail\/candidates$/);
-  if (gmailCandidatesMatch && request.method === 'POST') return gmailCandidates(env, user, gmailCandidatesMatch[1]);
+  if (gmailCandidatesMatch && request.method === 'POST') return gmailCandidates(request, env, user, gmailCandidatesMatch[1]);
 
   const gmailImportsMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/gmail\/imports$/);
   if (gmailImportsMatch && request.method === 'POST') return importGmailBooking(request, env, user, gmailImportsMatch[1]);
