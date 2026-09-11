@@ -192,54 +192,60 @@ function appendResult(returnUrl: string, result: 'connected' | 'denied' | 'faile
 }
 
 async function gmailCallback(request: Request, env: Env, url: URL) {
-  const state = url.searchParams.get('state');
-  if (!state) return json({ error: 'Gmail連携情報がありません' }, 400);
-  const stateHash = await hashToken(state);
-  const stored = await env.DB.prepare(`
-    DELETE FROM gmail_oauth_states
-    WHERE state_hash = ? AND expires_at > unixepoch()
-    RETURNING user_id AS userId, return_url AS returnUrl
-  `).bind(stateHash).first<{ userId: string; returnUrl: string }>();
-  if (!stored) return json({ error: 'Gmail連携の有効期限が切れました' }, 400);
-  if (url.searchParams.get('error')) return Response.redirect(appendResult(stored.returnUrl, 'denied'), 302);
-  const code = url.searchParams.get('code');
-  if (!code || !gmailConfigured(env)) return Response.redirect(appendResult(stored.returnUrl, 'failed'), 302);
-
   try {
-    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        client_id: env.GOOGLE_GMAIL_CLIENT_ID!,
-        client_secret: env.GOOGLE_GMAIL_CLIENT_SECRET!,
-        redirect_uri: env.GOOGLE_GMAIL_REDIRECT_URI!,
-        grant_type: 'authorization_code',
-      }),
-    });
-    const token = await tokenResponse.json() as { access_token?: string; refresh_token?: string; scope?: string; error?: string };
-    if (!tokenResponse.ok || !token.access_token) throw new Error(token.error ?? 'token exchange failed');
-    const existing = await env.DB.prepare('SELECT encrypted_refresh_token AS encryptedToken, token_iv AS iv FROM gmail_connections WHERE user_id = ?')
-      .bind(stored.userId)
-      .first<{ encryptedToken: string; iv: string }>();
-    const encrypted = token.refresh_token
-      ? await encryptGmailToken(env, token.refresh_token)
-      : existing;
-    if (!encrypted) throw new Error('refresh token missing');
-    const profileResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
-      headers: { authorization: `Bearer ${token.access_token}` },
-    });
-    const profile = await profileResponse.json() as { emailAddress?: string };
-    await env.DB.prepare(`
-      INSERT INTO gmail_connections (user_id, email, encrypted_refresh_token, token_iv, scope, updated_at)
-      VALUES (?, ?, ?, ?, ?, unixepoch())
-      ON CONFLICT(user_id) DO UPDATE SET
-        email = excluded.email, encrypted_refresh_token = excluded.encrypted_refresh_token,
-        token_iv = excluded.token_iv, scope = excluded.scope, updated_at = unixepoch()
-    `).bind(stored.userId, profile.emailAddress ?? '', encrypted.encryptedToken, encrypted.iv, token.scope ?? '').run();
-    return Response.redirect(appendResult(stored.returnUrl, 'connected'), 302);
+    const state = url.searchParams.get('state');
+    if (!state) return json({ error: 'Gmail連携情報がありません' }, 400);
+    const stateHash = await hashToken(state);
+    const stored = await env.DB.prepare(`
+      SELECT user_id AS userId, return_url AS returnUrl
+      FROM gmail_oauth_states
+      WHERE state_hash = ? AND expires_at > unixepoch()
+    `).bind(stateHash).first<{ userId: string; returnUrl: string }>();
+    if (!stored) return json({ error: 'Gmail連携の有効期限が切れました' }, 400);
+    await env.DB.prepare('DELETE FROM gmail_oauth_states WHERE state_hash = ?').bind(stateHash).run();
+
+    if (url.searchParams.get('error')) return Response.redirect(appendResult(stored.returnUrl, 'denied'), 302);
+    const code = url.searchParams.get('code');
+    if (!code || !gmailConfigured(env)) return Response.redirect(appendResult(stored.returnUrl, 'failed'), 302);
+
+    try {
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          client_id: env.GOOGLE_GMAIL_CLIENT_ID!,
+          client_secret: env.GOOGLE_GMAIL_CLIENT_SECRET!,
+          redirect_uri: env.GOOGLE_GMAIL_REDIRECT_URI!,
+          grant_type: 'authorization_code',
+        }),
+      });
+      const token = await tokenResponse.json() as { access_token?: string; refresh_token?: string; scope?: string; error?: string };
+      if (!tokenResponse.ok || !token.access_token) throw new Error(token.error ?? 'token exchange failed');
+      const existing = await env.DB.prepare('SELECT encrypted_refresh_token AS encryptedToken, token_iv AS iv FROM gmail_connections WHERE user_id = ?')
+        .bind(stored.userId)
+        .first<{ encryptedToken: string; iv: string }>();
+      const encrypted = token.refresh_token
+        ? await encryptGmailToken(env, token.refresh_token)
+        : existing;
+      if (!encrypted) throw new Error('refresh token missing');
+      const profileResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+        headers: { authorization: `Bearer ${token.access_token}` },
+      });
+      const profile = await profileResponse.json() as { emailAddress?: string };
+      await env.DB.prepare(`
+        INSERT INTO gmail_connections (user_id, email, encrypted_refresh_token, token_iv, scope, updated_at)
+        VALUES (?, ?, ?, ?, ?, unixepoch())
+        ON CONFLICT(user_id) DO UPDATE SET
+          email = excluded.email, encrypted_refresh_token = excluded.encrypted_refresh_token,
+          token_iv = excluded.token_iv, scope = excluded.scope, updated_at = unixepoch()
+      `).bind(stored.userId, profile.emailAddress ?? '', encrypted.encryptedToken, encrypted.iv, token.scope ?? '').run();
+      return Response.redirect(appendResult(stored.returnUrl, 'connected'), 302);
+    } catch {
+      return Response.redirect(appendResult(stored.returnUrl, 'failed'), 302);
+    }
   } catch {
-    return Response.redirect(appendResult(stored.returnUrl, 'failed'), 302);
+    return json({ error: 'Gmail連携処理に失敗しました' }, 500);
   }
 }
 
