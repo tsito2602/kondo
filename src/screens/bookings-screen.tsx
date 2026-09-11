@@ -7,6 +7,7 @@ import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, Style
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DateRangePicker } from '@/components/date-range-picker';
+import { FloatingAddButton } from '@/components/floating-add-button';
 import { palette } from '@/constants/design';
 import { findAirports, type Airport } from '@/data/airports';
 import { cacheBookingDocument, getCachedDocumentUri, removeCachedBookingDocument } from '@/data/booking-document-cache';
@@ -36,7 +37,7 @@ function blankDraft(day: string, kind: BookingKind = 'flight'): Draft {
 
 export default function BookingsScreen() {
   const { booking: requestedBooking } = useLocalSearchParams<{ booking?: string | string[] }>();
-  const { bookings, createBooking, deleteBooking, deleteItem, documentsByBooking, items, pendingCount, selectedTrip, updateBooking } = useTravel();
+  const { bookings, createBooking, deleteBooking, deleteItem, documentsByBooking, items, selectedTrip, updateBooking } = useTravel();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(() => blankDraft(selectedTrip?.startsOn ?? ''));
   const [formOpen, setFormOpen] = useState(false);
@@ -137,15 +138,6 @@ export default function BookingsScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.headingRow}>
-          <View style={styles.tag}><Text style={styles.tagText}>DOCUMENTS</Text></View>
-          <Text style={styles.counter}>{pendingCount ? `${pendingCount} SYNCING` : `${String(bookings.length).padStart(2, '0')} SAVED`}</Text>
-        </View>
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>予約</Text>
-          {selectedTrip ? <Pressable accessibilityLabel="予約を追加する" onPress={openCreate} style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}><Text style={styles.addButtonText}>＋ 追加</Text></Pressable> : null}
-        </View>
-
         {!selectedTrip ? (
           <View style={styles.empty}><Text style={styles.emptyTitle}>旅行を作成してください</Text><Text style={styles.emptyBody}>予約は選択中の旅行ごとに保存されます。</Text></View>
         ) : bookings.length === 0 ? (
@@ -189,6 +181,8 @@ export default function BookingsScreen() {
           </View>
         )}
       </ScrollView>
+
+      {selectedTrip ? <FloatingAddButton label="予約を追加する" onPress={openCreate} /> : null}
 
       <Modal animationType="fade" onRequestClose={() => setFormOpen(false)} transparent visible={formOpen}>
         <SafeAreaView style={styles.backdrop}>
@@ -415,15 +409,7 @@ function Field({ label, ...props }: { label: string } & ComponentProps<typeof Te
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.canvas },
-  content: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 20, paddingTop: 10, paddingBottom: 48 },
-  headingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  tag: { backgroundColor: palette.sky, borderRadius: 64, paddingHorizontal: 12, paddingVertical: 6 },
-  tagText: { color: palette.ink, fontFamily: 'monospace', fontSize: 10 },
-  counter: { color: palette.slate, fontFamily: 'monospace', fontSize: 11 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginTop: 8 },
-  title: { color: palette.ink, fontSize: 42, lineHeight: 42, fontWeight: '900', letterSpacing: -1.5 },
-  addButton: { minHeight: 44, justifyContent: 'center', backgroundColor: palette.ocean, borderRadius: 8, paddingHorizontal: 16 },
-  addButtonText: { color: palette.paper, fontSize: 14, fontWeight: '800' },
+  content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 112 },
   empty: { minHeight: 260, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.paper, borderRadius: 32, padding: 28, marginTop: 24 },
   emptyMark: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.sky, marginBottom: 18 },
   emptyMarkText: { color: palette.ocean, fontSize: 27, fontWeight: '700' },
@@ -513,4 +499,3 @@ const styles = StyleSheet.create({
   saveText: { color: palette.paper, fontSize: 15, fontWeight: '800' },
   pressed: { opacity: 0.62 },
 });
-
