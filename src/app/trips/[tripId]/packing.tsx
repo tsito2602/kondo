@@ -1,1 +1,1 @@
-export { default } from '../../packing';
+export { default } from '@/screens/packing-screen';
