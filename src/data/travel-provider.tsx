@@ -4,6 +4,8 @@ import { Alert, AppState, Platform } from 'react-native';
 
 import { useAuth } from '@/auth/auth-provider';
 
+import { createDemoCache } from './demo';
+import { loadDemoDocument, saveDemoDocument } from './demo-documents';
 import { loadTravelCache, saveTravelCache } from './cache';
 import { connectionBetween, createsFlightConnectionCycle } from './flight-connections';
 import { Booking, BookingDocument, emptyTravelCache, ItineraryItem, PackingItem, PendingMutation, TravelCache, TravelTask, Trip } from './types';
@@ -54,7 +56,7 @@ type TravelContextValue = {
 const TravelContext = createContext<TravelContextValue | null>(null);
 
 export function TravelProvider({ children }: PropsWithChildren) {
-  const { request, requestRaw } = useAuth();
+  const { request, requestRaw, isDemo } = useAuth();
   const [cache, setCache] = useState<TravelCache>(emptyTravelCache);
   const [ready, setReady] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -68,10 +70,11 @@ export function TravelProvider({ children }: PropsWithChildren) {
     if (next === cacheRef.current) return;
     cacheRef.current = next;
     setCache(next);
-    void saveTravelCache(next);
-  }, []);
+    void saveTravelCache(next, isDemo ? 'demo' : undefined).catch(() => setError('端末に保存できませんでした。空き容量を確認してください'));
+  }, [isDemo]);
 
   const sync = useCallback((): Promise<void> => {
+    if (isDemo) return Promise.resolve();
     if (syncingRef.current) return syncingRef.current;
     const operation = Promise.resolve().then(async () => {
       setSyncing(true);
@@ -142,11 +145,12 @@ export function TravelProvider({ children }: PropsWithChildren) {
     });
     syncingRef.current = operation;
     return operation;
-  }, [commit, request]);
+  }, [commit, request, isDemo]);
 
   useEffect(() => {
     let active = true;
-    void loadTravelCache().then((stored) => {
+    void loadTravelCache(isDemo ? 'demo' : undefined).then((value) => {
+      const stored = isDemo && !value.trips.length ? createDemoCache() : value;
       if (!active) return;
       cacheRef.current = stored;
       setCache(stored);
@@ -162,15 +166,16 @@ export function TravelProvider({ children }: PropsWithChildren) {
       appState.remove();
       clearInterval(timer);
     };
-  }, [sync]);
+  }, [sync, isDemo]);
 
   const enqueue = useCallback((mutation: Omit<PendingMutation, 'id'>) => {
+    if (isDemo) return;
     commit((current) => ({
       ...current,
       pending: [...current.pending, { ...mutation, id: Crypto.randomUUID() }],
     }));
     queueMicrotask(() => void sync());
-  }, [commit, sync]);
+  }, [commit, sync, isDemo]);
 
   const selectTrip = useCallback((id: string) => {
     commit((current) => ({ ...current, selectedTripId: id }));
@@ -274,6 +279,12 @@ export function TravelProvider({ children }: PropsWithChildren) {
   const uploadBookingDocument = useCallback(async (bookingId: string, input: BookingDocumentInput) => {
     const tripId = cacheRef.current.selectedTripId;
     if (!tripId) throw new Error('旅行を選択してください');
+    if (isDemo) {
+      const document: BookingDocument = { id: Crypto.randomUUID(), bookingId, filename: input.filename, contentType: input.contentType, size: input.size, createdAt: Date.now() };
+      await saveDemoDocument(document.id, input.bytes);
+      commit((current) => ({ ...current, documentsByBooking: { ...current.documentsByBooking, [bookingId]: [...(current.documentsByBooking[bookingId] ?? []), document] } }));
+      return document;
+    }
     const response = await requestRaw(`/v1/trips/${tripId}/bookings/${bookingId}/documents`, {
       method: 'POST',
       headers: {
@@ -292,7 +303,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
       },
     }));
     return document;
-  }, [commit, requestRaw]);
+  }, [commit, requestRaw, isDemo]);
 
   const deleteBookingDocument = useCallback((bookingId: string, documentId: string) => {
     const tripId = cacheRef.current.selectedTripId;
@@ -310,9 +321,12 @@ export function TravelProvider({ children }: PropsWithChildren) {
   const downloadBookingDocument = useCallback(async (bookingId: string, documentId: string) => {
     const tripId = cacheRef.current.selectedTripId;
     if (!tripId) throw new Error('旅行を選択してください');
+    if (isDemo) {
+      return loadDemoDocument(documentId);
+    }
     const response = await requestRaw(`/v1/trips/${tripId}/bookings/${bookingId}/documents/${documentId}`);
     return response.arrayBuffer();
-  }, [requestRaw]);
+  }, [requestRaw, isDemo]);
 
   const deleteBooking = useCallback((id: string) => {
     const tripId = cacheRef.current.selectedTripId;

@@ -1,13 +1,15 @@
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Fragment, type ComponentProps, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Modal, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { FormSheet } from '@/components/form-sheet';
+import { validDate } from '@/utils/dates';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { FloatingAddButton } from '@/components/floating-add-button';
 import { FlightConnectionLink, FlightConnectionSheet } from '@/components/flight-connection-sheet';
-import { palette } from '@/constants/design';
+import { palette, mono } from '@/constants/design';
 import { findAirportByCode } from '@/data/airports';
 import { findFlightConnections, hasLikelyFlightConnection, formatConnectionDuration, type FlightConnection } from '@/data/flight-connections';
 import type { Booking, BookingKind, ItineraryItem } from '@/data/types';
@@ -159,6 +161,8 @@ function timeZoneLabel(entry: TimelineEntry) {
 export default function ItineraryScreen() {
   const { selectedTrip, items, bookings, createItem, updateItem, deleteItem, pendingCount } = useTravel();
   const [adding, setAdding] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [initialDraft, setInitialDraft] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [connectionBookingId, setConnectionBookingId] = useState<string | null>(null);
   const [day, setDay] = useState(selectedTrip?.startsOn ?? '');
@@ -236,6 +240,8 @@ export default function ItineraryScreen() {
     setTime('10:00');
     setTitle('');
     setNote('');
+    setInitialDraft(JSON.stringify([visibleActiveDay || selectedTrip.startsOn, '10:00', '', '']));
+    setFormError('');
     setAdding(true);
   };
 
@@ -245,6 +251,8 @@ export default function ItineraryScreen() {
     setTime(item.time || '10:00');
     setTitle(item.title);
     setNote(item.note);
+    setInitialDraft(JSON.stringify([item.day, item.time || '10:00', item.title, item.note]));
+    setFormError('');
     setAdding(true);
   };
 
@@ -254,8 +262,8 @@ export default function ItineraryScreen() {
   };
 
   const save = () => {
-    if (!title.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(day) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
-      Alert.alert('入力を確認してください', '日付、時刻、予定名を入力してください。');
+    if (!title.trim() || !validDate(day) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+      setFormError('日付、時刻、予定名を入力してください');
       return;
     }
     const input = { day, time, kind: '予定', title: title.trim(), note: note.trim() };
@@ -365,21 +373,12 @@ export default function ItineraryScreen() {
       {selectedTrip ? <FloatingAddButton label="予定を追加する" onPress={openAdd} /> : null}
       {connectionBookingId ? <FlightConnectionSheet bookingId={connectionBookingId} onClose={() => setConnectionBookingId(null)} /> : null}
 
-      <Modal visible={adding} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeEditor}>
-        <SafeAreaView style={styles.modal}>
-          <View style={styles.modalHeader}>
-            <Pressable onPress={closeEditor}><Text style={styles.cancel}>キャンセル</Text></Pressable>
-            <Text style={styles.modalTitle}>{editingId ? '予定を編集' : '予定を追加'}</Text>
-            <Pressable onPress={save}><Text style={styles.save}>保存</Text></Pressable>
-          </View>
-          <View style={styles.form}>
+      <FormSheet visible={adding} title={editingId ? '予定を編集' : '予定を追加'} onClose={closeEditor} onSave={save} canSave={Boolean(title.trim())} dirty={JSON.stringify([day, time, title, note]) !== initialDraft} error={formError}>
             <DateRangePicker mode="single" showTime label="日時" startDate={day} endDate={day} startTime={time} onChange={(range) => { setDay(range.startDate); setTime(range.startTime); }} />
-            <Text style={styles.label}>予定</Text><TextInput value={title} onChangeText={setTitle} placeholder="空港へ移動" style={styles.input} autoFocus />
-            <Text style={styles.label}>メモ</Text><TextInput value={note} onChangeText={setNote} placeholder="集合場所や予約番号など" style={[styles.input, styles.noteInput]} multiline />
+            <Text style={styles.label}>予定</Text><TextInput accessibilityLabel="予定名" maxLength={160} value={title} onChangeText={setTitle} placeholder="空港へ移動" style={styles.input} autoFocus />
+            <Text style={styles.label}>メモ</Text><TextInput accessibilityLabel="メモ" maxLength={4000} value={note} onChangeText={setNote} placeholder="集合場所や予約番号など" style={[styles.input, styles.noteInput]} multiline />
             {editingId ? <Pressable onPress={remove} style={styles.deleteButton}><Text style={styles.deleteText}>この予定を削除</Text></Pressable> : null}
-          </View>
-        </SafeAreaView>
-      </Modal>
+      </FormSheet>
     </SafeAreaView>
   );
 }
@@ -412,9 +411,9 @@ const styles = StyleSheet.create({
   dayTabSelected: { backgroundColor: palette.ocean },
   dayTabLabel: { color: palette.slate, fontSize: 13, lineHeight: 17, fontWeight: '800' },
   dayTabLabelSelected: { color: palette.paper },
-  dayTabDate: { color: palette.smoke, fontFamily: 'monospace', fontSize: 9, lineHeight: 13, marginTop: 1 },
+  dayTabDate: { color: palette.smoke, fontFamily: mono, fontSize: 9, lineHeight: 13, marginTop: 1 },
   dayTabDateSelected: { color: palette.sky },
-  pending: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, marginTop: 4 },
+  pending: { color: palette.slate, fontFamily: mono, fontSize: 11, marginTop: 4 },
   empty: { minHeight: 430, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyMark: { color: palette.accent, fontSize: 42, fontWeight: '900' },
   emptyTitle: { color: palette.ink, fontSize: 28, lineHeight: 30, fontWeight: '900', letterSpacing: -0.8, marginTop: 14 },
@@ -423,13 +422,13 @@ const styles = StyleSheet.create({
   daySection: { backgroundColor: palette.paper },
   dateBar: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: palette.mist, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.ash, paddingHorizontal: 20, position: 'relative', zIndex: 2 },
   date: { flex: 1, color: palette.ink, fontSize: 12, lineHeight: 18, fontWeight: '700', marginRight: 12 },
-  dateDay: { color: palette.ocean, fontFamily: 'monospace', fontSize: 10, lineHeight: 14, fontWeight: '700' },
+  dateDay: { color: palette.ocean, fontFamily: mono, fontSize: 10, lineHeight: 14, fontWeight: '700' },
   itemRow: { minHeight: 104, flexDirection: 'row', alignItems: 'stretch', paddingHorizontal: 16 },
   linkedBookingRow: { backgroundColor: palette.soft },
   itemPressed: { opacity: 0.55 },
   timeColumn: { width: 64, alignItems: 'flex-end', paddingTop: 20, paddingRight: 6 },
-  time: { color: palette.ink, fontFamily: 'monospace', fontSize: 15, lineHeight: 20, fontWeight: '800' },
-  timeZone: { color: palette.smoke, fontFamily: 'monospace', fontSize: 10, lineHeight: 15, marginTop: 2 },
+  time: { color: palette.ink, fontFamily: mono, fontSize: 15, lineHeight: 20, fontWeight: '800' },
+  timeZone: { color: palette.smoke, fontFamily: mono, fontSize: 10, lineHeight: 15, marginTop: 2 },
   railColumn: { width: 50, alignItems: 'center', position: 'relative' },
   rail: { position: 'absolute', left: 24, width: 2, backgroundColor: palette.accent },
   linkedRail: { backgroundColor: palette.ocean },
@@ -458,7 +457,7 @@ const styles = StyleSheet.create({
   note: { color: palette.slate, fontSize: 12, lineHeight: 17, marginTop: 3 },
   chevron: { color: palette.smoke, alignSelf: 'center', fontSize: 22, lineHeight: 22, marginLeft: 8 },
   emptyRow: { minHeight: 82, flexDirection: 'row', alignItems: 'stretch', paddingHorizontal: 16 },
-  emptyTime: { color: palette.smoke, fontFamily: 'monospace', fontSize: 14 },
+  emptyTime: { color: palette.smoke, fontFamily: mono, fontSize: 14 },
   emptyIconCircle: { width: 36, height: 36, borderRadius: 18, marginTop: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.mist },
   emptyDay: { flex: 1, alignSelf: 'center', color: palette.smoke, fontSize: 13, lineHeight: 19, paddingLeft: 8 },
   modal: { flex: 1, backgroundColor: palette.canvas },
@@ -467,7 +466,7 @@ const styles = StyleSheet.create({
   modalTitle: { color: palette.ink, fontSize: 18, fontWeight: '700' },
   save: { color: palette.ocean, fontWeight: '700' },
   form: { padding: 20, gap: 9 },
-  label: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, fontWeight: '400', marginTop: 10 },
+  label: { color: palette.slate, fontFamily: mono, fontSize: 11, fontWeight: '400', marginTop: 10 },
   input: { minHeight: 50, backgroundColor: palette.paper, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 14, color: palette.ink, fontSize: 16 },
   noteInput: { minHeight: 120, textAlignVertical: 'top' },
   deleteButton: { minHeight: 50, alignItems: 'center', justifyContent: 'center', marginTop: 24 },

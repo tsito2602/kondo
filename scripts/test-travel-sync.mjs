@@ -10,7 +10,7 @@ const { outputFiles } = await build({
   platform: 'node', format: 'cjs', jsx: 'automatic', logLevel: 'silent',
   external: ['react', 'react/jsx-runtime', 'react-native', 'expo-crypto'],
   plugins: [{ name: 'provider-boundaries', setup(builder) {
-    builder.onResolve({ filter: /^(@\/auth\/auth-provider|\.\/cache)$/ }, ({ path }) => ({ path, external: true }));
+    builder.onResolve({ filter: /^(@\/auth\/auth-provider|\.\/cache|\.\/demo-documents)$/ }, ({ path }) => ({ path, external: true }));
   } }],
 });
 const providerCode = outputFiles[0].text;
@@ -24,7 +24,7 @@ const trip = { id: 'trip', name: 'Travel', destination: '', startsOn: '2026-11-2
 const task = { id: 'task', title: 'Pack', dueOn: '', assignee: '', done: false };
 const empty = () => ({ version: 1, trips: [trip], selectedTripId: trip.id, itemsByTrip: {}, bookingsByTrip: {}, documentsByBooking: {}, packingByTrip: {}, tasksByTrip: { trip: [task] }, pending: [] });
 
-async function fixture({ stored = empty(), transport } = {}) {
+async function fixture({ stored = empty(), transport, isDemo = false } = {}) {
   let cursor = 0;
   let mounted = false;
   const slots = [];
@@ -32,6 +32,8 @@ async function fixture({ stored = empty(), transport } = {}) {
   const writes = [];
   const requests = [];
   const alerts = [];
+  const scopes = [];
+  const documents = new Map();
   const serverTasks = [structuredClone(task)];
   const serverTrips = [structuredClone(trip)];
   const request = async (path, init = {}) => {
@@ -71,8 +73,9 @@ async function fixture({ stored = empty(), transport } = {}) {
     'react/jsx-runtime': { jsx: (type, props) => ({ type, props }) },
     'react-native': { Alert: { alert: (...args) => alerts.push(args) }, Platform: { OS: 'ios' }, AppState: { addEventListener: () => ({ remove() {} }) } },
     'expo-crypto': { randomUUID },
-    '@/auth/auth-provider': { useAuth: () => ({ request, requestRaw: request }) },
-    './cache': { loadTravelCache: async () => structuredClone(stored), saveTravelCache: async (value) => { writes.push(structuredClone(value)); } },
+    './demo-documents': { saveDemoDocument: async (id, bytes) => documents.set(id, bytes), loadDemoDocument: async (id) => documents.get(id) },
+    '@/auth/auth-provider': { useAuth: () => ({ request, requestRaw: request, isDemo }) },
+    './cache': { loadTravelCache: async (scope) => { scopes.push(scope); return structuredClone(stored); }, saveTravelCache: async (value, scope) => { scopes.push(scope); writes.push(structuredClone(value)); } },
   };
   const module = { exports: {} };
   new Function('require', 'module', 'exports', 'setInterval', 'clearInterval', providerCode)(
@@ -86,7 +89,7 @@ async function fixture({ stored = empty(), transport } = {}) {
   await tick();
   const api = render();
   requests.length = 0;
-  return { api, render, requests, writes, alerts, close: () => cleanups.forEach((cleanup) => cleanup?.()) };
+  return { api, render, requests, writes, alerts, scopes, close: () => cleanups.forEach((cleanup) => cleanup?.()) };
 }
 
 test('create a trip and immediately add plans to that trip before a render', async () => {
@@ -176,5 +179,19 @@ test('a network failure keeps unacknowledged operations and retries them in orde
     ]);
     assert.equal(f.writes.at(-1).pending.length, 0);
     assert.equal(f.render().error, null);
+  } finally { f.close(); }
+});
+
+
+test('sample mode stores edits separately and never sends them to the API', async () => {
+  const f = await fixture({ isDemo: true });
+  try {
+    f.api.createItem({ day: '2026-11-21', time: '10:00', kind: 'spot', title: 'Sample', note: '' });
+    f.api.updateTask(task.id, { ...task, done: true });
+    await f.api.sync();
+    assert.equal(f.requests.length, 0);
+    assert.equal(f.writes.at(-1).pending.length, 0);
+    assert.equal(f.writes.at(-1).tasksByTrip.trip[0].done, true);
+    assert.ok(f.scopes.every((scope) => scope === 'demo'));
   } finally { f.close(); }
 });

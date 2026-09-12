@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { FormSheet } from '@/components/form-sheet';
+import { localDate } from '@/utils/dates';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { FloatingAddButton } from '@/components/floating-add-button';
 import { palette } from '@/constants/design';
@@ -11,7 +13,7 @@ import { confirmDeletion } from '@/utils/confirm-deletion';
 
 const CATEGORIES = ['衣類', '洗面・衛生', '電子機器', '書類', '薬', 'その他'];
 const TASK_HINTS = ['休暇を申請する', 'eSIMを用意する', '両替する', 'ペットの預け先を決める'];
-const today = new Date().toISOString().slice(0, 10);
+const today = localDate();
 
 type Mode = 'tasks' | 'packing';
 type PackingDraft = Pick<PackingItem, 'name' | 'category' | 'quantity' | 'packed'>;
@@ -32,6 +34,7 @@ export default function PackingScreen() {
     updatePackingItem,
     updateTask,
   } = useTravel();
+  const [initialDraft, setInitialDraft] = useState('');
   const [mode, setMode] = useState<Mode>('tasks');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [packingDraft, setPackingDraft] = useState<PackingDraft>(blankPackingDraft);
@@ -64,6 +67,7 @@ export default function PackingScreen() {
   };
 
   const openCreate = () => {
+    setInitialDraft(JSON.stringify(isTasks ? [blankTaskDraft(), false] : blankPackingDraft()));
     setEditingId(null);
     setPackingDraft(blankPackingDraft());
     setTaskDraft(blankTaskDraft());
@@ -74,14 +78,18 @@ export default function PackingScreen() {
 
   const openPackingEdit = (item: PackingItem) => {
     setEditingId(item.id);
-    setPackingDraft({ name: item.name, category: item.category, quantity: item.quantity, packed: item.packed });
+    const draft = { name: item.name, category: item.category, quantity: item.quantity, packed: item.packed };
+    setInitialDraft(JSON.stringify(draft));
+    setPackingDraft(draft);
     setFormError('');
     setFormOpen(true);
   };
 
   const openTaskEdit = (task: TravelTask) => {
     setEditingId(task.id);
-    setTaskDraft({ title: task.title, dueOn: task.dueOn, assignee: task.assignee, done: task.done });
+    const draft = { title: task.title, dueOn: task.dueOn, assignee: task.assignee, done: task.done };
+    setInitialDraft(JSON.stringify([draft, Boolean(task.dueOn)]));
+    setTaskDraft(draft);
     setHasDueDate(Boolean(task.dueOn));
     setFormError('');
     setFormOpen(true);
@@ -202,13 +210,13 @@ export default function PackingScreen() {
           <Pressable onPress={openCreate} style={({ pressed }) => [styles.empty, pressed && styles.pressed]}>
             <View style={styles.emptyMark}><Text style={styles.emptyMarkText}>＋</Text></View>
             <Text style={styles.emptyTitle}>やることはまだありません</Text>
-            <Text style={styles.emptyBody}>必要になったときだけ追加できます。</Text>
+            <Text style={styles.emptyBody}>＋ やることを追加</Text>
           </Pressable>
         ) : !isTasks && packingItems.length === 0 ? (
           <Pressable onPress={openCreate} style={({ pressed }) => [styles.empty, pressed && styles.pressed]}>
             <View style={styles.emptyMark}><Text style={styles.emptyMarkText}>＋</Text></View>
             <Text style={styles.emptyTitle}>最初の持ち物を追加</Text>
-            <Text style={styles.emptyBody}>バッグに入れるものを追加してください。</Text>
+            <Text style={styles.emptyBody}>＋ 持ち物を追加</Text>
           </Pressable>
         ) : isTasks ? (
           <View style={styles.groups}>
@@ -252,16 +260,7 @@ export default function PackingScreen() {
 
       {selectedTrip ? <FloatingAddButton label={isTasks ? 'やることを追加する' : '持ち物を追加する'} onPress={openCreate} /> : null}
 
-      <Modal animationType="fade" onRequestClose={() => setFormOpen(false)} transparent visible={formOpen}>
-        <SafeAreaView style={styles.backdrop}>
-          <Pressable accessibilityLabel="準備の編集を閉じる" onPress={() => setFormOpen(false)} style={StyleSheet.absoluteFill} />
-          <View accessibilityViewIsModal style={styles.dialog}>
-            <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-              <View style={styles.dialogHeading}>
-                <Text style={styles.dialogTitle}>{editingId ? (isTasks ? 'やることを編集' : '持ち物を編集') : (isTasks ? 'やることを追加' : '持ち物を追加')}</Text>
-                <Pressable accessibilityLabel="準備の編集を閉じる" onPress={() => setFormOpen(false)} style={styles.closeButton}><Text style={styles.close}>×</Text></Pressable>
-              </View>
-
+      <FormSheet visible={formOpen} title={editingId ? (isTasks ? 'やることを編集' : '持ち物を編集') : (isTasks ? 'やることを追加' : '持ち物を追加')} onClose={() => setFormOpen(false)} onSave={save} canSave={Boolean(isTasks ? taskDraft.title.trim() : packingDraft.name.trim())} dirty={JSON.stringify(isTasks ? [taskDraft, hasDueDate] : packingDraft) !== initialDraft} error={formError}>
               {isTasks ? (
                 <>
                   {!editingId && availableHints.length ? (
@@ -277,8 +276,8 @@ export default function PackingScreen() {
                     </>
                   ) : null}
                   <Text style={styles.label}>やること</Text>
-                  <TextInput autoFocus maxLength={160} onChangeText={(title) => setTaskDraft((current) => ({ ...current, title }))} placeholder="例：eSIMを用意する" placeholderTextColor={palette.smoke} style={styles.input} value={taskDraft.title} />
-                  <Pressable onPress={() => setHasDueDate((current) => !current)} style={styles.optionalToggle}>
+                  <TextInput accessibilityLabel="やること" autoFocus maxLength={160} onChangeText={(title) => setTaskDraft((current) => ({ ...current, title }))} placeholder="例：eSIMを用意する" placeholderTextColor={palette.smoke} style={styles.input} value={taskDraft.title} />
+                  <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: hasDueDate }} onPress={() => setHasDueDate((current) => !current)} style={styles.optionalToggle}>
                     <View style={[styles.miniCheck, hasDueDate && styles.miniCheckSelected]}>{hasDueDate ? <Text style={styles.miniCheckText}>✓</Text> : null}</View>
                     <Text style={styles.optionalToggleText}>期限を設定する</Text>
                   </Pressable>
@@ -292,12 +291,12 @@ export default function PackingScreen() {
                     />
                   ) : null}
                   <Text style={styles.label}>担当（任意）</Text>
-                  <TextInput maxLength={80} onChangeText={(assignee) => setTaskDraft((current) => ({ ...current, assignee }))} placeholder="名前を入力" placeholderTextColor={palette.smoke} style={styles.input} value={taskDraft.assignee} />
+                  <TextInput accessibilityLabel="担当" maxLength={80} onChangeText={(assignee) => setTaskDraft((current) => ({ ...current, assignee }))} placeholder="名前を入力" placeholderTextColor={palette.smoke} style={styles.input} value={taskDraft.assignee} />
                 </>
               ) : (
                 <>
                   <Text style={styles.label}>持ち物</Text>
-                  <TextInput autoFocus maxLength={120} onChangeText={(name) => setPackingDraft((current) => ({ ...current, name }))} placeholder="例：モバイルバッテリー" placeholderTextColor={palette.smoke} style={styles.input} value={packingDraft.name} />
+                  <TextInput accessibilityLabel="持ち物" autoFocus maxLength={120} onChangeText={(name) => setPackingDraft((current) => ({ ...current, name }))} placeholder="例：モバイルバッテリー" placeholderTextColor={palette.smoke} style={styles.input} value={packingDraft.name} />
                   <Text style={styles.label}>カテゴリー</Text>
                   <View style={styles.categoryList}>
                     {CATEGORIES.map((category) => <Pressable key={category} onPress={() => setPackingDraft((current) => ({ ...current, category }))} style={[styles.categoryButton, packingDraft.category === category && styles.categorySelected]}><Text style={[styles.categoryText, packingDraft.category === category && styles.categoryTextSelected]}>{category}</Text></Pressable>)}
@@ -311,15 +310,8 @@ export default function PackingScreen() {
                 </>
               )}
 
-              {formError ? <Text accessibilityLiveRegion="polite" style={styles.error}>{formError}</Text> : null}
-              <View style={styles.actions}>
-                {editingId ? <Pressable onPress={remove} style={styles.deleteButton}><Text style={styles.deleteText}>削除</Text></Pressable> : <View />}
-                <Pressable onPress={save} style={({ pressed }) => [styles.saveButton, pressed && styles.pressed]}><Text style={styles.saveText}>保存</Text></Pressable>
-              </View>
-            </ScrollView>
-          </View>
-        </SafeAreaView>
-      </Modal>
+        {editingId ? <Pressable accessibilityRole="button" onPress={remove} style={styles.deleteButton}><Text style={styles.deleteText}>削除</Text></Pressable> : null}
+      </FormSheet>
     </SafeAreaView>
   );
 }
@@ -332,12 +324,12 @@ const styles = StyleSheet.create({
   segmentSelected: { backgroundColor: palette.paper },
   segmentText: { color: palette.slate, fontSize: 13, lineHeight: 18, fontWeight: '700' },
   segmentTextSelected: { color: palette.ink, fontWeight: '900' },
-  progressCard: { backgroundColor: palette.ocean, borderRadius: 28, padding: 24, marginTop: 18 },
+  progressCard: { backgroundColor: palette.sky, borderRadius: 28, padding: 24, marginTop: 18 },
   progressCopy: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  progressLabel: { color: palette.paper, fontSize: 15, lineHeight: 20, fontWeight: '700' },
-  progressValue: { color: palette.paper, fontSize: 36, lineHeight: 40, fontWeight: '900', letterSpacing: -1.5 },
-  progressTrack: { height: 10, backgroundColor: 'rgba(250,252,253,0.24)', borderRadius: 999, overflow: 'hidden', marginTop: 18 },
-  progressFill: { height: '100%', minWidth: 0, backgroundColor: palette.paper, borderRadius: 999 },
+  progressLabel: { color: palette.ink, fontSize: 15, lineHeight: 20, fontWeight: '700' },
+  progressValue: { color: palette.ink, fontSize: 36, lineHeight: 40, fontWeight: '900', letterSpacing: -1.5 },
+  progressTrack: { height: 10, backgroundColor: palette.paper, borderRadius: 999, overflow: 'hidden', marginTop: 18 },
+  progressFill: { height: '100%', minWidth: 0, backgroundColor: palette.accent, borderRadius: 999 },
   progressMeta: { color: palette.sky, fontSize: 12, lineHeight: 18, fontWeight: '700', marginTop: 11 },
   empty: { backgroundColor: palette.paper, borderRadius: 28, alignItems: 'center', paddingHorizontal: 28, paddingVertical: 48, marginTop: 24 },
   emptyMark: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.sky, marginBottom: 16 },

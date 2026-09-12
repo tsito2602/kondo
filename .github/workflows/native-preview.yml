@@ -1,0 +1,71 @@
+name: Native preview
+
+on:
+  push:
+    branches: [feat/issue-82-native-polish]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_VARIANT: preview
+  CI: '1'
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+      - run: npx expo prebuild --platform android --no-install
+      - name: Build installable preview APK
+        working-directory: android
+        run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tabi-preview-android-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx expo prebuild --platform ios
+      - name: Build iOS simulator app
+        shell: bash
+        run: |
+          workspaces=(ios/*.xcworkspace)
+          workspace="${workspaces[0]}"
+          scheme="$(basename "$workspace" .xcworkspace)"
+          xcodebuild -workspace "$workspace" -scheme "$scheme" -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO > /tmp/tabi-xcodebuild.log 2>&1 || { tail -n 100 /tmp/tabi-xcodebuild.log; exit 1; }
+          apps=(build/Build/Products/Release-iphonesimulator/*.app)
+          ditto -c -k --sequesterRsrc --keepParent "${apps[0]}" tabi-preview-ios-simulator.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tabi-preview-ios-simulator
+          path: tabi-preview-ios-simulator.zip
+          if-no-files-found: error
+          retention-days: 14

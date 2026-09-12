@@ -1,3 +1,7 @@
+import { Platform } from 'react-native';
+
+export const mono = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+
 export const palette = {
   ink: '#182A36',
   ocean: '#496B80',

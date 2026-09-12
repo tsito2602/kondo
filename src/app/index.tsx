@@ -1,129 +1,62 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { DateRangePicker } from '@/components/date-range-picker';
+import { useAuth } from '@/auth/auth-provider';
+import { SyncStatus } from '@/components/sync-status';
+import { TripEditor } from '@/components/trip-editor';
 import { TripTicket } from '@/components/trip-ticket';
 import { palette } from '@/constants/design';
 import { useTravel } from '@/data/travel-provider';
-
-const today = new Date().toISOString().slice(0, 10);
+import { localDate } from '@/utils/dates';
 
 export default function HomeScreen() {
   const { invite } = useLocalSearchParams<{ invite?: string | string[] }>();
-  const { trips, selectTrip, createTrip, acceptInvite, ready, syncing, pendingCount, error } = useTravel();
+  const { trips, selectTrip, acceptInvite, ready, syncing, sync } = useTravel();
+  const { isDemo, exitDemo, signOut } = useAuth();
   const acceptingInvite = useRef(false);
   const [creating, setCreating] = useState(false);
-  const [name, setName] = useState('');
-  const [destination, setDestination] = useState('');
-  const [startsOn, setStartsOn] = useState(today);
-  const [endsOn, setEndsOn] = useState(today);
-
+  const [notice, setNotice] = useState('');
   useEffect(() => {
     const token = Array.isArray(invite) ? invite[0] : invite;
-    if (!ready || !token || acceptingInvite.current) return;
-
+    if (!ready || !token || acceptingInvite.current || isDemo) return;
     acceptingInvite.current = true;
-    void acceptInvite(token)
-      .then(() => Alert.alert('旅行に参加しました', '旅程がこの端末にも同期されました。'))
-      .catch((cause) => Alert.alert('旅行に参加できませんでした', cause instanceof Error ? cause.message : '招待リンクを確認してください。'))
-      .finally(() => router.replace('/'));
-  }, [acceptInvite, invite, ready]);
-
-  const save = () => {
-    if (!name.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(startsOn) || !/^\d{4}-\d{2}-\d{2}$/.test(endsOn) || startsOn > endsOn) {
-      Alert.alert('入力を確認してください', '旅行名と正しい日付を入力してください。');
-      return;
-    }
-    createTrip({ name: name.trim(), destination: destination.trim(), startsOn, endsOn });
-    setCreating(false);
-    setName('');
-    setDestination('');
-  };
-
+    void acceptInvite(token).then(() => setNotice('旅行に参加しました')).catch((cause) => setNotice(cause instanceof Error ? cause.message : '招待リンクを確認してください')).finally(() => router.replace('/'));
+  }, [acceptInvite, invite, ready, isDemo]);
   const openTrip = (tripId: string) => {
     selectTrip(tripId);
     router.push({ pathname: '/trips/[tripId]/itinerary', params: { tripId } });
   };
-
-  return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.brand}>旅行</Text>
-            <Text style={styles.sync}>{syncing ? '同期中…' : pendingCount ? `${pendingCount}件を同期待ち` : '同期済み'}</Text>
-          </View>
-          <Pressable onPress={() => setCreating(true)} style={styles.addButton}><Text style={styles.addButtonText}>＋ 旅行</Text></Pressable>
-        </View>
-
-        {error ? <Text style={styles.error}>オフラインで表示中 · {error}</Text> : null}
-
-        {!trips.length ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyMark}>⌁</Text>
-            <Text style={styles.emptyTitle}>最初の旅行を作成</Text>
-            <Text style={styles.emptyBody}>予定は端末に保存され、通信が戻ると自動で同期されます。</Text>
-            <Pressable onPress={() => setCreating(true)} style={styles.primaryButton}><Text style={styles.primaryButtonText}>旅行を作る</Text></Pressable>
-          </View>
-        ) : <View style={styles.tripList}>{trips.map((trip) => (
-          <Pressable
-            accessibilityHint="旅行のしおりを開きます"
-            accessibilityLabel={trip.name}
-            accessibilityRole="button"
-            key={trip.id}
-            onPress={() => openTrip(trip.id)}
-            style={({ pressed }) => [styles.tripButton, pressed && styles.tripButtonPressed]}>
-            <TripTicket trip={trip} />
-          </Pressable>
-        ))}</View>}
-      </ScrollView>
-
-      <Modal visible={creating} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setCreating(false)}>
-        <SafeAreaView style={styles.modal}>
-          <View style={styles.modalHeader}>
-            <Pressable onPress={() => setCreating(false)}><Text style={styles.cancel}>キャンセル</Text></Pressable>
-            <Text style={styles.modalTitle}>新しい旅行</Text>
-            <Pressable onPress={save}><Text style={styles.save}>保存</Text></Pressable>
-          </View>
-          <View style={styles.form}>
-            <Text style={styles.label}>旅行名</Text>
-            <TextInput value={name} onChangeText={setName} placeholder="ローマ旅行" style={styles.input} autoFocus />
-            <Text style={styles.label}>行き先</Text>
-            <TextInput value={destination} onChangeText={setDestination} placeholder="Rome, Italy" style={styles.input} />
-            <DateRangePicker startDate={startsOn} endDate={endsOn} label="旅行期間" onChange={(range) => { setStartsOn(range.startDate); setEndsOn(range.endDate); }} />
-          </View>
-        </SafeAreaView>
-      </Modal>
-    </SafeAreaView>
-  );
+  const today = localDate();
+  const groups = [{ label: 'これからの旅行', trips: trips.filter((trip) => trip.endsOn >= today).sort((a,b) => a.startsOn.localeCompare(b.startsOn)) }, { label: 'これまでの旅行', trips: trips.filter((trip) => trip.endsOn < today).sort((a,b) => b.startsOn.localeCompare(a.startsOn)) }];
+  return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+    <ScrollView contentContainerStyle={styles.content} refreshControl={!isDemo ? <RefreshControl refreshing={syncing} onRefresh={() => void sync()} tintColor={palette.ocean} /> : undefined}>
+      <View style={styles.header}>
+        <View><Text style={styles.eyebrow}>TABI</Text><Text accessibilityRole="header" style={styles.title}>旅行</Text></View>
+        <Pressable accessibilityRole="button" accessibilityLabel="旅行を追加する" disabled={!ready} onPress={() => setCreating(true)} style={({ pressed }) => [styles.add, pressed && styles.pressed]}><Text style={styles.addText}>＋ 旅行</Text></Pressable>
+      </View>
+      <SyncStatus />
+      {notice ? <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text> : null}
+      {!ready ? <View style={styles.loading}><ActivityIndicator color={palette.ocean} /></View> : !trips.length ? <View style={styles.empty}>
+        <View style={styles.emptyTicket}><Text style={styles.emptyTicketText}>TABI / 01</Text><View style={styles.perforation} /><Text style={styles.emptyPlus}>＋</Text></View>
+        <Text style={styles.emptyTitle}>最初の旅行を作成</Text>
+        <Text style={styles.body}>行き先と日程が決まったら、旅行を作成できます。</Text>
+        <Pressable accessibilityRole="button" onPress={() => setCreating(true)} style={styles.primary}><Text style={styles.addText}>旅行を作る</Text></Pressable>
+      </View> : groups.filter((group) => group.trips.length).map((group) => <View key={group.label} style={styles.group}>
+        <Text style={styles.groupTitle}>{group.label}<Text style={styles.count}>　{group.trips.length}</Text></Text>
+        {group.trips.map((trip) => <Pressable key={trip.id} accessibilityRole="button" accessibilityLabel={trip.name} accessibilityHint="旅行のしおりを開きます" onPress={() => openTrip(trip.id)} style={({pressed}) => [pressed && styles.pressed]}><TripTicket trip={trip} /></Pressable>)}
+      </View>)}
+      <Pressable accessibilityRole="button" onPress={() => isDemo ? exitDemo() : void signOut()} style={styles.exit}><Text style={styles.exitText}>{isDemo ? 'サンプルを終了' : 'ログアウト'}</Text></Pressable>
+    </ScrollView>
+    {creating ? <TripEditor onClose={() => setCreating(false)} onSaved={openTrip} /> : null}
+  </SafeAreaView>;
 }
-
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: palette.canvas },
-  content: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 20, paddingBottom: 48, gap: 20 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  brand: { color: palette.ink, fontSize: 40, lineHeight: 40, fontWeight: '900', letterSpacing: -1.8 },
-  sync: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, lineHeight: 16, marginTop: 3 },
-  addButton: { minHeight: 44, backgroundColor: palette.ocean, borderRadius: 8, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center' },
-  addButtonText: { color: palette.paper, fontWeight: '700' },
-  error: { color: palette.danger, fontSize: 12 },
-  empty: { minHeight: 440, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  emptyMark: { color: palette.accent, fontSize: 48, fontWeight: '900' },
-  emptyTitle: { color: palette.ink, fontSize: 28, lineHeight: 30, fontWeight: '900', letterSpacing: -0.9, marginTop: 18 },
-  emptyBody: { color: palette.slate, fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 8 },
-  primaryButton: { backgroundColor: palette.ocean, paddingHorizontal: 24, paddingVertical: 15, borderRadius: 8, marginTop: 22 },
-  primaryButtonText: { color: palette.paper, fontWeight: '700' },
-  tripList: { gap: 20 },
-  tripButton: { borderRadius: 28 },
-  tripButtonPressed: { opacity: 0.66, transform: [{ scale: 0.99 }] },
-  modal: { flex: 1, backgroundColor: palette.canvas },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
-  cancel: { color: palette.slate },
-  modalTitle: { color: palette.ink, fontSize: 18, fontWeight: '700' },
-  save: { color: palette.ocean, fontWeight: '700' },
-  form: { padding: 20, gap: 9 },
-  label: { color: palette.slate, fontFamily: 'monospace', fontSize: 11, fontWeight: '400', marginTop: 10 },
-  input: { minHeight: 50, backgroundColor: palette.paper, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 14, color: palette.ink, fontSize: 16 },
+  screen: { flex: 1, backgroundColor: palette.canvas }, content: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 20, paddingBottom: 32 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }, eyebrow: { color: palette.ocean, fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 8 }, title: { color: palette.ink, fontSize: 36, lineHeight: 44, fontWeight: '800', letterSpacing: -1 },
+  add: { minHeight: 48, paddingHorizontal: 18, borderRadius: 12, backgroundColor: palette.ocean, justifyContent: 'center' }, addText: { color: palette.paper, fontSize: 15, fontWeight: '700' }, pressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },
+  group: { gap: 18, marginTop: 24 }, groupTitle: { color: palette.slate, fontSize: 13, fontWeight: '600' }, count: { color: palette.ocean },
+  notice: { color: palette.ocean, paddingVertical: 12, fontSize: 14 }, loading: { padding: 80 }, empty: { paddingVertical: 56, alignItems: 'center', gap: 12 },
+  emptyTicket: { width: 190, height: 90, backgroundColor: palette.paper, borderRadius: 18, transform: [{ rotate: '-6deg' }], padding: 18, marginBottom: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, emptyTicketText: { fontSize: 11, color: palette.ocean, letterSpacing: 1 }, perforation: { height: 64, borderLeftWidth: 1, borderStyle: 'dashed', borderColor: palette.ash }, emptyPlus: { color: palette.ocean, fontSize: 28 },
+  emptyTitle: { color: palette.ink, fontSize: 23, fontWeight: '700' }, body: { color: palette.slate, fontSize: 14, lineHeight: 22, textAlign: 'center', maxWidth: 270 }, primary: { marginTop: 12, backgroundColor: palette.ocean, padding: 16, borderRadius: 10 }, exit: { minHeight: 48, marginTop: 32, alignItems: 'center', justifyContent: 'center' }, exitText: { color: palette.slate, fontSize: 13 },
 });

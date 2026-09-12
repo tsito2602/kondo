@@ -2,9 +2,10 @@ import { File, Paths } from 'expo-file-system';
 
 import { emptyTravelCache, normalizeTravelCache, TravelCache } from './types';
 
-const cacheFile = new File(Paths.document, 'tabi-travel-cache.json');
+const fileFor = (scope?: string) => new File(Paths.document, scope ? `tabi-travel-cache-${scope}.json` : 'tabi-travel-cache.json');
 
-export async function loadTravelCache(): Promise<TravelCache> {
+export async function loadTravelCache(scope?: string): Promise<TravelCache> {
+  const cacheFile = fileFor(scope);
   if (!cacheFile.exists) return emptyTravelCache();
   try {
     const value = JSON.parse(await cacheFile.text()) as TravelCache;
@@ -14,7 +15,8 @@ export async function loadTravelCache(): Promise<TravelCache> {
   }
 }
 
-export async function saveTravelCache(value: TravelCache) {
+export async function saveTravelCache(value: TravelCache, scope?: string) {
+  const cacheFile = fileFor(scope);
   if (!cacheFile.exists) cacheFile.create({ intermediates: true, overwrite: true });
   cacheFile.write(JSON.stringify(value));
 }

@@ -2,21 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { palette } from '@/constants/design';
+import { palette, mono } from '@/constants/design';
 
 import { calendarDate, displayDate, monthDays, rangeRows, selectRangeDate, type DateRange } from './date-range';
 
-type Props = DateRange & {
-  disabled?: boolean;
-  endLabel?: string;
-  endTime?: string;
-  label?: string;
-  mode?: 'range' | 'single';
-  onChange: (range: DateRange & { startTime: string; endTime: string }) => void;
-  showTime?: boolean;
-  startLabel?: string;
-  startTime?: string;
-};
+import type { DateRangePickerProps as Props } from './date-range-picker.types';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const WEEKDAY_HEIGHT = 32;
@@ -361,14 +351,14 @@ function DateMarker({ gridWidth, index, origin = -1, preview = false }: { gridWi
 
 const styles = StyleSheet.create({
   field: { gap: 8 },
-  label: { color: palette.slate, fontFamily: 'monospace', fontSize: 11 },
+  label: { color: palette.slate, fontFamily: mono, fontSize: 11 },
   trigger: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: palette.paper, borderRadius: 8, paddingHorizontal: 14 },
   calendarIcon: { width: 24, height: 24, borderWidth: 1.5, borderColor: palette.ocean, borderRadius: 6, overflow: 'hidden' },
   calendarTop: { height: 6, borderBottomWidth: 1.5, borderBottomColor: palette.ocean, backgroundColor: palette.sky },
   calendarDots: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   calendarDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: palette.ocean },
   triggerPart: { flex: 1, minWidth: 0 },
-  triggerMeta: { color: palette.smoke, fontFamily: 'monospace', fontSize: 9 },
+  triggerMeta: { color: palette.smoke, fontFamily: mono, fontSize: 9 },
   triggerValue: { color: palette.ink, fontSize: 13, fontWeight: '700', marginTop: 3 },
   triggerDash: { color: palette.ash },
   disabled: { opacity: 0.45 },
@@ -383,7 +373,7 @@ const styles = StyleSheet.create({
   summary: { flexDirection: 'row', gap: 8, marginTop: 16 },
   summaryPart: { flex: 1, minHeight: 60, justifyContent: 'center', backgroundColor: palette.mist, borderRadius: 12, paddingHorizontal: 14, borderWidth: 1, borderColor: 'transparent' },
   summaryActive: { backgroundColor: palette.sky, borderColor: palette.ocean },
-  summaryMeta: { color: palette.smoke, fontFamily: 'monospace', fontSize: 9 },
+  summaryMeta: { color: palette.smoke, fontFamily: mono, fontSize: 9 },
   summaryValue: { color: palette.ink, fontSize: 13, fontWeight: '700', marginTop: 3 },
   monthControls: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10 },
   arrow: { color: palette.ink, fontSize: 30, lineHeight: 32 },
@@ -394,7 +384,7 @@ const styles = StyleSheet.create({
   grid: { position: 'relative', flexDirection: 'row', flexWrap: 'wrap' },
   highlights: { position: 'absolute', inset: 0, zIndex: 0 },
   weekdayCell: { width: `${100 / 7}%`, height: WEEKDAY_HEIGHT, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
-  weekday: { color: palette.smoke, fontFamily: 'monospace', fontSize: 10 },
+  weekday: { color: palette.smoke, fontFamily: mono, fontSize: 10 },
   dayCell: { width: `${100 / 7}%`, height: ROW_HEIGHT, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   day: { color: palette.ink, fontSize: 14, fontWeight: '600', zIndex: 3 },
   daySelected: { color: palette.paper, fontWeight: '900' },
@@ -405,16 +395,16 @@ const styles = StyleSheet.create({
   timeSection: { backgroundColor: palette.paper, borderRadius: 16, padding: 12, marginTop: 10 },
   timeHeading: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   timeLabel: { flex: 1, color: palette.ink, fontSize: 13, fontWeight: '800' },
-  timeInput: { width: 82, height: 38, color: palette.ink, backgroundColor: palette.mist, borderRadius: 8, fontFamily: 'monospace', fontSize: 16, fontWeight: '800', textAlign: 'center', padding: 0, borderWidth: 1, borderColor: 'transparent' },
+  timeInput: { width: 82, height: 38, color: palette.ink, backgroundColor: palette.mist, borderRadius: 8, fontFamily: mono, fontSize: 16, fontWeight: '800', textAlign: 'center', padding: 0, borderWidth: 1, borderColor: 'transparent' },
   timeInputInvalid: { borderColor: palette.danger },
   wheelRow: { height: 108, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   wheelFrame: { width: 78, height: 108, position: 'relative', overflow: 'hidden' },
   wheelContent: { paddingVertical: WHEEL_ITEM_HEIGHT },
   wheelSelection: { position: 'absolute', left: 4, right: 4, top: WHEEL_ITEM_HEIGHT, height: WHEEL_ITEM_HEIGHT, backgroundColor: palette.sky, borderRadius: 8, zIndex: 0 },
   wheelItem: { height: WHEEL_ITEM_HEIGHT, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
-  wheelText: { color: palette.smoke, fontFamily: 'monospace', fontSize: 15 },
+  wheelText: { color: palette.smoke, fontFamily: mono, fontSize: 15 },
   wheelTextSelected: { color: palette.ink, fontSize: 18, fontWeight: '900' },
-  timeColon: { color: palette.ink, fontFamily: 'monospace', fontSize: 22, fontWeight: '900', marginHorizontal: 6 },
+  timeColon: { color: palette.ink, fontFamily: mono, fontSize: 22, fontWeight: '900', marginHorizontal: 6 },
   timeError: { color: palette.danger, fontSize: 10, textAlign: 'center', marginTop: 4 },
   actions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 },
   clearButton: { minWidth: 72, minHeight: 48, alignItems: 'center', justifyContent: 'center' },

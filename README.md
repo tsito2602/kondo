@@ -16,7 +16,9 @@ npm install
 npx expo start
 ```
 
-表示されたQRコードをExpo Goで読み取るか、ターミナルで`i`または`a`を押してシミュレーターを起動する。
+Google設定なしで試す場合は`npm run preview`を実行し、QRコードをExpo Goで読み取る。「サンプルの旅行で試す」から主要操作を確認できる。
+
+APK・iPhone・Simulatorでの起動手順は[ネイティブプレビュー](docs/NATIVE_PREVIEW.md)を参照。
 
 ## 技術構成
 

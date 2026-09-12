@@ -1,3 +1,4 @@
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Google from 'expo-auth-session/providers/google';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
@@ -9,6 +10,9 @@ WebBrowser.maybeCompleteAuthSession();
 type User = { id: string; email: string; name: string | null };
 type AuthContextValue = {
   configured: boolean;
+  isDemo: boolean;
+  startDemo: () => void;
+  exitDemo: () => void;
   loading: boolean;
   signingIn: boolean;
   user: User | null;
@@ -61,7 +65,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
   const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
   const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
-  const configured = Boolean(API_URL && iosClientId && androidClientId && webClientId);
+  const isExpoGo = Platform.OS !== 'web' && Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+  const clientId = Platform.OS === 'ios' ? iosClientId : Platform.OS === 'android' ? androidClientId : webClientId;
+  const configured = Boolean(API_URL && clientId && !isExpoGo && !Constants.expoConfig?.extra?.preview);
+  const [isDemo, setIsDemo] = useState(false);
+  const startDemo = useCallback(() => setIsDemo(true), []);
+  const exitDemo = useCallback(() => setIsDemo(false), []);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
@@ -139,7 +148,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
     setSigningIn(true);
     setError(null);
-    await promptAsync();
+    try { await promptAsync(); } catch (cause) { setSigningIn(false); setError(cause instanceof Error ? cause.message : 'ログインを開始できませんでした'); }
   }, [configured, promptAsync, request]);
 
   const signOut = useCallback(async () => {
@@ -150,12 +159,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   const requestApi = useCallback(async <T,>(path: string, init: RequestInit = {}) => {
+    if (isDemo) throw new Error('サンプルでは共有機能を利用できません');
     const token = await readToken();
     if (!token) throw new Error('ログインが必要です');
     return api<T>(path, init, token);
-  }, []);
+  }, [isDemo]);
 
   const requestRaw = useCallback(async (path: string, init: RequestInit = {}) => {
+    if (isDemo) throw new Error('サンプルでは共有機能を利用できません');
     const token = await readToken();
     if (!token) throw new Error('ログインが必要です');
     const response = await apiResponse(path, init, token);
@@ -164,11 +175,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
       throw new Error(result?.error ?? '通信に失敗しました');
     }
     return response;
-  }, []);
+  }, [isDemo]);
 
   const value = useMemo(
-    () => ({ configured, loading, signingIn, user, error, request: requestApi, requestRaw, signIn, signOut }),
-    [configured, error, loading, requestApi, requestRaw, signIn, signOut, signingIn, user],
+    () => ({ configured, isDemo, startDemo, exitDemo, loading, signingIn, user, error, request: requestApi, requestRaw, signIn, signOut }),
+    [configured, isDemo, startDemo, exitDemo, error, loading, requestApi, requestRaw, signIn, signOut, signingIn, user],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
