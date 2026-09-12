@@ -1,4 +1,5 @@
 import '@/global.css';
+import { ToastProvider } from '@/components/toast';
 import { PwaSetup } from '@/components/pwa';
 import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -12,11 +13,11 @@ export default function RootLayout() {
     <ThemeProvider value={DefaultTheme}>
       <PwaSetup />
       <StatusBar style="dark" />
-      <AuthProvider>
+      <ToastProvider><AuthProvider>
         <AuthGate>
           <TravelRoot />
         </AuthGate>
-      </AuthProvider>
+      </AuthProvider></ToastProvider>
     </ThemeProvider>
   );
 }

@@ -2,6 +2,7 @@ import { PropsWithChildren, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ToastHost } from './toast';
 import { palette } from '@/constants/design';
 
 type Props = PropsWithChildren<{
@@ -50,6 +51,7 @@ export function FormSheet({ visible, title, onClose, onSave, saveLabel = '保存
           </ScrollView>
         </View>
       </SafeAreaView>
+      <ToastHost />
     </KeyboardAvoidingView>
   </Modal>
     {Platform.OS === 'web' ? <Modal visible={visible && confirmClose} transparent animationType={reduceMotion ? 'none' : 'fade'} onRequestClose={() => setConfirmClose(false)}>

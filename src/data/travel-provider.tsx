@@ -20,6 +20,7 @@ type BookingDocumentInput = { filename: string; contentType: string; size: numbe
 
 type TravelContextValue = {
   ready: boolean;
+  canEdit: boolean;
   syncing: boolean;
   error: string | null;
   trips: Trip[];
@@ -62,6 +63,10 @@ type TravelContextValue = {
 
 const TravelContext = createContext<TravelContextValue | null>(null);
 
+function assertTripEditable(cache: TravelCache, tripId: string | null) {
+  if (cache.trips.find((trip) => trip.id === tripId)?.role === 'viewer') throw new Error('この旅行は閲覧のみです');
+}
+
 export function TravelProvider({ children }: PropsWithChildren) {
   const { request, requestRaw, isDemo, user } = useAuth();
   const [cache, setCache] = useState<TravelCache>(emptyTravelCache);
@@ -85,6 +90,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     if (syncingRef.current) return syncingRef.current;
     const operation = Promise.resolve().then(async () => {
       setSyncing(true);
+      let permissionNotice: string | null = null;
       try {
         do {
           while (cacheRef.current.pending.length) {
@@ -96,6 +102,15 @@ export function TravelProvider({ children }: PropsWithChildren) {
               });
             } catch (cause) {
               const status = cause instanceof Error && 'status' in cause ? cause.status : null;
+              const forbiddenTrip = mutation.path.match(/^\/v1\/trips\/([^/]+)(?:\/|$)/)?.[1];
+              if (Number(status) === 403 && forbiddenTrip) {
+                // Revoked edits must not block every other trip's queue or keep
+                // optimistic data visible after access has changed.
+                const prefix = `/v1/trips/${forbiddenTrip}`;
+                commit((current) => ({ ...current, pending: current.pending.filter((entry) => entry.path !== prefix && !entry.path.startsWith(`${prefix}/`)) }));
+                permissionNotice = '旅行の権限が変更されたため、未同期の編集を取り消しました';
+                continue;
+              }
               if (!mutation.path.endsWith('/connection') || ![400, 403, 404, 409].includes(Number(status))) throw cause;
               // Discard only a permanently rejected link, then reload the server's
               // choices. Network/auth failures keep their queued mutation for retry.
@@ -144,7 +159,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
             };
           });
         } while (cacheRef.current.pending.length);
-        setError(null);
+        setError(permissionNotice);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : '同期できませんでした');
       } finally {
@@ -211,6 +226,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
   }, [commit, enqueue]);
 
   const updateTrip = useCallback((id: string, input: TripInput) => {
+    assertTripEditable(cacheRef.current, id);
     commit((current) => ({ ...current, trips: current.trips.map((trip) => trip.id === id ? { ...trip, ...input } : trip) }));
     enqueue({ method: 'PATCH', path: `/v1/trips/${id}`, body: input });
   }, [commit, enqueue]);
@@ -235,6 +251,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
 
   const createPlace = useCallback((input: PlaceInput) => {
     const tripId = cacheRef.current.selectedTripId;
+    assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
     const id = Crypto.randomUUID();
     commit((current) => ({ ...current, placesByTrip: { ...current.placesByTrip, [tripId]: [...(current.placesByTrip[tripId] ?? []), { id, ...input }] } }));
@@ -243,12 +260,14 @@ export function TravelProvider({ children }: PropsWithChildren) {
   }, [commit, enqueue]);
   const updatePlace = useCallback((id: string, input: PlaceInput) => {
     const tripId = cacheRef.current.selectedTripId;
+    assertTripEditable(cacheRef.current, tripId);
     if (!tripId) return;
     commit((current) => ({ ...current, placesByTrip: { ...current.placesByTrip, [tripId]: (current.placesByTrip[tripId] ?? []).map((place) => place.id === id ? { ...place, ...input } : place) } }));
     enqueue({ method: 'PATCH', path: `/v1/trips/${tripId}/places/${id}`, body: input });
   }, [commit, enqueue]);
   const deletePlace = useCallback((id: string) => {
     const tripId = cacheRef.current.selectedTripId;
+    assertTripEditable(cacheRef.current, tripId);
     if (!tripId) return;
     commit((current) => ({ ...current, placesByTrip: { ...current.placesByTrip, [tripId]: (current.placesByTrip[tripId] ?? []).filter((place) => place.id !== id) } }));
     enqueue({ method: 'DELETE', path: `/v1/trips/${tripId}/places/${id}` });
@@ -256,6 +275,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
 
   const createItem = useCallback((input: ItemInput) => {
     const tripId = cacheRef.current.selectedTripId;
+    assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
     const id = Crypto.randomUUID();
     const item: ItineraryItem = { id, ...input };
@@ -266,6 +286,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
 
   const updateItem = useCallback((id: string, input: ItemInput) => {
     const tripId = cacheRef.current.selectedTripId;
+    assertTripEditable(cacheRef.current, tripId);
     if (!tripId) return;
     commit((current) => ({ ...current, itemsByTrip: { ...current.itemsByTrip, [tripId]: (current.itemsByTrip[tripId] ?? []).map((item) => item.id === id ? { ...item, ...input } : item) } }));
     enqueue({ method: 'PATCH', path: `/v1/trips/${tripId}/items/${id}`, body: input });
@@ -273,6 +294,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
 
   const deleteItem = useCallback((id: string) => {
     const tripId = cacheRef.current.selectedTripId;
+    assertTripEditable(cacheRef.current, tripId);
     if (!tripId) return;
     commit((current) => ({ ...current, itemsByTrip: { ...current.itemsByTrip, [tripId]: (current.itemsByTrip[tripId] ?? []).filter((item) => item.id !== id) } }));
     enqueue({ method: 'DELETE', path: `/v1/trips/${tripId}/items/${id}` });
@@ -280,6 +302,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
 
   const createBooking = useCallback((input: BookingInput) => {
     const tripId = cacheRef.current.selectedTripId;
+    assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
     const id = Crypto.randomUUID();
     const booking: Booking = { id, ...input };
@@ -293,6 +316,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
 
   const updateBooking = useCallback((id: string, input: BookingInput) => {
     const tripId = cacheRef.current.selectedTripId;
+    assertTripEditable(cacheRef.current, tripId);
     if (!tripId) return;
     commit((current) => ({
       ...current,
@@ -306,6 +330,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
 
   const setFlightConnection = useCallback((id: string, mode: NonNullable<Booking['connectionMode']>, nextFlightId?: string | null) => {
     const tripId = cacheRef.current.selectedTripId;
+    assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
     const bookings = cacheRef.current.bookingsByTrip[tripId] ?? [];
     const arrival = bookings.find((booking) => booking.id === id && booking.kind === 'flight');
@@ -330,6 +355,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
 
   const uploadBookingDocument = useCallback(async (bookingId: string, input: BookingDocumentInput) => {
     const tripId = cacheRef.current.selectedTripId;
+    assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
     if (isDemo) {
       const document: BookingDocument = { id: Crypto.randomUUID(), bookingId, filename: input.filename, contentType: input.contentType, size: input.size, createdAt: Date.now() };
@@ -359,6 +385,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
 
   const deleteBookingDocument = useCallback((bookingId: string, documentId: string) => {
     const tripId = cacheRef.current.selectedTripId;
+    assertTripEditable(cacheRef.current, tripId);
     if (!tripId) return;
     commit((current) => ({
       ...current,
@@ -408,6 +435,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
 
   const deleteBooking = useCallback((id: string) => {
     const tripId = cacheRef.current.selectedTripId;
+    assertTripEditable(cacheRef.current, tripId);
     if (!tripId) return;
     commit((current) => ({
       ...current,
@@ -423,6 +451,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
 
   const createPackingItem = useCallback((input: PackingInput) => {
     const tripId = cacheRef.current.selectedTripId;
+    assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
     const id = Crypto.randomUUID();
     const item: PackingItem = { id, ...input };
@@ -436,6 +465,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
 
   const updatePackingItem = useCallback((id: string, input: PackingInput) => {
     const tripId = cacheRef.current.selectedTripId;
+    assertTripEditable(cacheRef.current, tripId);
     if (!tripId) return;
     commit((current) => ({
       ...current,
@@ -449,6 +479,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
 
   const deletePackingItem = useCallback((id: string) => {
     const tripId = cacheRef.current.selectedTripId;
+    assertTripEditable(cacheRef.current, tripId);
     if (!tripId) return;
     commit((current) => ({
       ...current,
@@ -462,6 +493,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
 
   const createTask = useCallback((input: TaskInput) => {
     const tripId = cacheRef.current.selectedTripId;
+    assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
     const id = Crypto.randomUUID();
     const task: TravelTask = { id, ...input };
@@ -475,6 +507,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
 
   const updateTask = useCallback((id: string, input: TaskInput) => {
     const tripId = cacheRef.current.selectedTripId;
+    assertTripEditable(cacheRef.current, tripId);
     if (!tripId) return;
     commit((current) => ({
       ...current,
@@ -488,6 +521,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
 
   const deleteTask = useCallback((id: string) => {
     const tripId = cacheRef.current.selectedTripId;
+    assertTripEditable(cacheRef.current, tripId);
     if (!tripId) return;
     commit((current) => ({
       ...current,
@@ -524,6 +558,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     .sort((a, b) => `${a.done ? 1 : 0} ${a.dueOn || '9999-12-31'} ${a.title} ${a.id}`.localeCompare(`${b.done ? 1 : 0} ${b.dueOn || '9999-12-31'} ${b.title} ${b.id}`));
   const value = useMemo<TravelContextValue>(() => ({
     ready,
+    canEdit: Boolean(selectedTrip && selectedTrip.role !== 'viewer'),
     syncing,
     error,
     trips: cache.trips,

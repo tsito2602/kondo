@@ -1,7 +1,10 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { palette } from '@/constants/design';
 
-export function DeleteTripDialog({ visible, name, busy, error, onCancel, onConfirm }: {
+export function ConfirmationDialog({ visible, name, title, description, confirmLabel, busy, error, onCancel, onConfirm }: {
+  title: string;
+  description: string;
+  confirmLabel: string;
   visible: boolean;
   name: string;
   busy: boolean;
@@ -14,18 +17,21 @@ export function DeleteTripDialog({ visible, name, busy, error, onCancel, onConfi
     <View style={styles.overlay}>
       <Pressable style={StyleSheet.absoluteFill} onPress={cancel} accessibilityLabel="削除をキャンセル" />
       <View testID="delete-trip-dialog" accessibilityViewIsModal style={styles.card}>
-        <Text style={styles.eyebrow}>DELETE TRIP</Text>
-        <Text style={styles.title}>この旅行を削除しますか？</Text>
-        <Text numberOfLines={3} style={styles.tripName}>{name}</Text>
-        <Text style={styles.body}>共有相手の画面からも、しおり・予約・書類・行きたい場所・準備が削除されます。この操作は元に戻せません。</Text>
+        <Text style={styles.title}>{title}</Text>
+        {name ? <Text numberOfLines={3} style={styles.tripName}>{name}</Text> : null}
+        <Text style={styles.body}>{description}</Text>
         {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
         <View style={styles.actions}>
           <Pressable accessibilityRole="button" disabled={busy} onPress={cancel} style={[styles.button, styles.cancel, busy && styles.disabled]}><Text style={styles.cancelText}>キャンセル</Text></Pressable>
-          <Pressable accessibilityRole="button" disabled={busy} onPress={onConfirm} style={[styles.button, styles.delete, busy && styles.disabled]}><Text style={styles.deleteText}>{busy ? '削除中…' : '旅行を削除'}</Text></Pressable>
+          <Pressable accessibilityRole="button" disabled={busy} onPress={onConfirm} style={[styles.button, styles.delete, busy && styles.disabled]}><Text style={styles.deleteText}>{busy ? '処理中…' : confirmLabel}</Text></Pressable>
         </View>
       </View>
     </View>
   </Modal>;
+}
+
+export function DeleteTripDialog(props: Omit<Parameters<typeof ConfirmationDialog>[0], 'title' | 'description' | 'confirmLabel'>) {
+  return <ConfirmationDialog {...props} title="この旅行を削除しますか？" description="共有相手の画面からも、しおり・予約・書類・行きたい場所・準備が削除されます。この操作は元に戻せません。" confirmLabel="旅行を削除" />;
 }
 
 const styles = StyleSheet.create({

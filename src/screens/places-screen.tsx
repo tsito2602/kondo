@@ -8,11 +8,13 @@ import type { Place, PlaceInput, PlaceStatus } from '@/data/types';
 import { mapUrl, placeStatuses, reservationStatuses } from '@/data/places';
 import { confirmDeletion } from '@/utils/confirm-deletion';
 import { DateRangePicker } from '@/components/date-range-picker';
+import { useToast } from '@/components/toast';
 import { useTripHeaderHeight } from '@/components/trip-header-context';
 
 const empty: PlaceInput = { title: '', note: '', openingHours: '', reservationStatus: 'not_needed', location: '', status: 'want' };
 export default function PlacesScreen() {
-  const { places, createPlace, updatePlace, deletePlace, selectedTrip, createItem } = useTravel();
+  const { canEdit, places, createPlace, updatePlace, deletePlace, selectedTrip, createItem } = useTravel();
+  const toast = useToast();
   const headerHeight = useTripHeaderHeight();
   const [filter, setFilter] = useState<PlaceStatus | 'all'>('all');
   const [search, setSearch] = useState('');
@@ -23,7 +25,6 @@ export default function PlacesScreen() {
   const [statusPlace, setStatusPlace] = useState<Place | null>(null);
   const [planning, setPlanning] = useState<Place | null>(null);
   const [day, setDay] = useState('');
-  const [notice, setNotice] = useState('');
   const filtered = useMemo(() => places.filter((place) => (filter === 'all' || place.status === filter) && `${place.title} ${place.note} ${place.location}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())), [places, filter, search]);
   const open = (place?: Place) => { const value = place ?? empty; setDraft(value); setInitial(JSON.stringify(value)); setError(''); setEditing(place ?? 'new'); };
   const save = () => {
@@ -31,14 +32,14 @@ export default function PlacesScreen() {
     if (draft.location.trim() && !mapUrl(draft.location)) return setError('場所は住所か、http / httpsのURLを入力してください');
     const input = { ...draft, title: draft.title.trim(), location: draft.location.trim() };
     if (editing && editing !== 'new') updatePlace(editing.id, input); else createPlace(input);
-    setEditing(null);
+    setEditing(null); toast('場所を保存しました');
   };
   const remove = () => { if (!editing || editing === 'new') return; confirmDeletion('この場所を削除しますか？', editing.title, () => { deletePlace(editing.id); setEditing(null); }); };
   const plan = () => {
     if (!planning || !day) return;
     createItem({ title: planning.title, day, time: '', kind: '予定', note: [planning.note, planning.location].filter(Boolean).join('\n') });
     updatePlace(planning.id, { ...planning, status: 'planned' });
-    setNotice('しおりに追加しました'); setPlanning(null);
+    toast('しおりに追加しました'); setPlanning(null);
   };
   return <View style={styles.screen}>
     <ScrollView contentContainerStyle={[styles.content, { paddingTop: headerHeight + 24 }]} showsVerticalScrollIndicator={false}>
@@ -47,8 +48,7 @@ export default function PlacesScreen() {
       {places.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
         {[{ value: 'all' as const, label: 'すべて' }, ...placeStatuses].map((item) => <Pressable key={item.value} onPress={() => setFilter(item.value)} style={[styles.filter, filter === item.value && styles.filterSelected]}><Text style={[styles.filterText, filter === item.value && styles.filterTextSelected]}>{item.label} {item.value === 'all' ? places.length : places.filter((place) => place.status === item.value).length}</Text></Pressable>)}
       </ScrollView> : null}
-      {notice ? <Pressable onPress={() => setNotice('')} style={styles.notice}><Text style={styles.noticeText}>{notice}　✓</Text></Pressable> : null}
-      {!places.length ? <View style={styles.empty}><View style={styles.emptyStamp}><Text style={styles.stampMark}>↗</Text><Text style={styles.stampText}>NEXT STOP</Text></View><Text style={styles.emptyTitle}>気になる場所を保存</Text><Pressable onPress={() => open()} style={styles.primary}><Text style={styles.primaryText}>＋ 場所を追加</Text></Pressable></View> : !filtered.length ? <View style={styles.empty}><Text style={styles.emptyTitle}>該当する場所がありません</Text><Pressable onPress={() => { setFilter('all'); setSearch(''); }} style={styles.primary}><Text style={styles.primaryText}>絞り込みを解除</Text></Pressable></View> : filtered.map((place, index) => {
+      {!places.length ? <View style={styles.empty}><View style={styles.emptyStamp}><Text style={styles.stampMark}>↗</Text><Text style={styles.stampText}>NEXT STOP</Text></View><Text style={styles.emptyTitle}>気になる場所を保存</Text><Pressable disabled={!canEdit} onPress={() => open()} style={styles.primary}><Text style={styles.primaryText}>＋ 場所を追加</Text></Pressable></View> : !filtered.length ? <View style={styles.empty}><Text style={styles.emptyTitle}>該当する場所がありません</Text><Pressable onPress={() => { setFilter('all'); setSearch(''); }} style={styles.primary}><Text style={styles.primaryText}>絞り込みを解除</Text></Pressable></View> : filtered.map((place, index) => {
         const status = placeStatuses.find((entry) => entry.value === place.status)!;
         const reservation = reservationStatuses.find((entry) => entry.value === place.reservationStatus)!;
         return <View key={place.id} testID="place-card" style={[styles.card, place.status === 'visited' && styles.visited]}>
@@ -60,24 +60,24 @@ export default function PlacesScreen() {
             {place.location ? <Text numberOfLines={1} style={styles.location}>{/^https?:/i.test(place.location) ? '↗ 地図リンクを保存済み' : place.location}</Text> : null}
           </Pressable>
           <View style={styles.cardFooter}>
-            <Pressable accessibilityLabel={`${place.title}のステータスを変更`} onPress={() => setStatusPlace(place)} style={[styles.status, place.status === 'visited' && styles.statusVisited]}><Text style={styles.statusText}>{status.mark}　{status.label}</Text></Pressable>
-            <View style={styles.cardActions}>{place.status === 'want' ? <Pressable onPress={() => { setDay(selectedTrip?.startsOn ?? ''); setPlanning(place); }} style={styles.action}><Text style={styles.actionText}>しおりへ</Text></Pressable> : null}<Pressable accessibilityLabel={`${place.title}の地図を開く`} onPress={() => { const url = mapUrl(place.location, place.title); if (url) void Linking.openURL(url); }} style={styles.action}><Text style={styles.actionText}>地図 ↗</Text></Pressable></View>
+            <Pressable accessibilityLabel={`${place.title}のステータスを変更`} disabled={!canEdit} onPress={() => setStatusPlace(place)} style={[styles.status, place.status === 'visited' && styles.statusVisited]}><Text style={styles.statusText}>{status.mark}　{status.label}</Text></Pressable>
+            <View style={styles.cardActions}>{canEdit && place.status === 'want' ? <Pressable onPress={() => { setDay(selectedTrip?.startsOn ?? ''); setPlanning(place); }} style={styles.action}><Text style={styles.actionText}>しおりへ</Text></Pressable> : null}<Pressable accessibilityLabel={`${place.title}の地図を開く`} onPress={() => { const url = mapUrl(place.location, place.title); if (url) void Linking.openURL(url); }} style={styles.action}><Text style={styles.actionText}>地図 ↗</Text></Pressable></View>
           </View>
         </View>;
       })}
     </ScrollView>
-    <FloatingAddButton label="場所を追加" onPress={() => open()} />
-    {editing ? <FormSheet visible title={editing === 'new' ? '場所を追加' : '場所を編集'} onClose={() => setEditing(null)} onSave={save} canSave={Boolean(draft.title.trim())} dirty={JSON.stringify(draft) !== initial} error={error}>
-      <Text style={styles.label}>タイトル</Text><TextInput autoFocus accessibilityLabel="場所のタイトル" value={draft.title} onChangeText={(title) => setDraft({ ...draft, title })} maxLength={160} placeholder="カフェ、美術館、気になるお店" placeholderTextColor={palette.smoke} style={styles.input} />
-      <Text style={styles.label}>ステータス</Text><View style={styles.options}>{placeStatuses.map((item) => <Pressable key={item.value} onPress={() => setDraft({ ...draft, status: item.value })} style={[styles.option, draft.status === item.value && styles.filterSelected]}><Text style={styles.optionText}>{item.mark} {item.label}</Text></Pressable>)}</View>
-      <Text style={styles.label}>場所</Text><TextInput accessibilityLabel="場所" value={draft.location} onChangeText={(location) => setDraft({ ...draft, location })} maxLength={2000} placeholder="URL または住所" placeholderTextColor={palette.smoke} autoCapitalize="none" style={styles.input} /><Text style={styles.hint}>Google Mapsの共有URLがおすすめです</Text>
-      <Text style={styles.label}>営業時間</Text><TextInput accessibilityLabel="営業時間" value={draft.openingHours} onChangeText={(openingHours) => setDraft({ ...draft, openingHours })} maxLength={500} placeholder="例：10:00–18:00 ／ 月曜休み" placeholderTextColor={palette.smoke} style={styles.input} />
-      <Text style={styles.label}>予約状況</Text><View style={styles.options}>{reservationStatuses.map((item) => <Pressable key={item.value} onPress={() => setDraft({ ...draft, reservationStatus: item.value })} style={[styles.option, draft.reservationStatus === item.value && styles.filterSelected]}><Text style={styles.optionText}>{item.label}</Text></Pressable>)}</View>
-      <Text style={styles.label}>メモ</Text><TextInput accessibilityLabel="場所のメモ" value={draft.note} onChangeText={(note) => setDraft({ ...draft, note })} maxLength={4000} multiline placeholder="食べたいもの、見たい展示など" placeholderTextColor={palette.smoke} style={[styles.input, styles.memo]} />
-      {editing !== 'new' ? <Pressable onPress={remove} style={styles.delete}><Text style={styles.deleteText}>この場所を削除</Text></Pressable> : null}
+    {canEdit ? <FloatingAddButton label="場所を追加" onPress={() => open()} /> : null}
+    {editing ? <FormSheet visible title={!canEdit ? '場所の詳細' : editing === 'new' ? '場所を追加' : '場所を編集'} onClose={() => setEditing(null)} onSave={canEdit ? save : undefined} canSave={Boolean(draft.title.trim())} dirty={JSON.stringify(draft) !== initial} error={error}>
+      <Text style={styles.label}>タイトル</Text><TextInput editable={canEdit} autoFocus={canEdit} accessibilityLabel="場所のタイトル" value={draft.title} onChangeText={(title) => setDraft({ ...draft, title })} maxLength={160} placeholder="カフェ、美術館、気になるお店" placeholderTextColor={palette.smoke} style={styles.input} />
+      <Text style={styles.label}>ステータス</Text><View style={styles.options}>{placeStatuses.map((item) => <Pressable key={item.value} disabled={!canEdit} onPress={() => setDraft({ ...draft, status: item.value })} style={[styles.option, draft.status === item.value && styles.filterSelected]}><Text style={styles.optionText}>{item.mark} {item.label}</Text></Pressable>)}</View>
+      <Text style={styles.label}>場所</Text><TextInput editable={canEdit} accessibilityLabel="場所" value={draft.location} onChangeText={(location) => setDraft({ ...draft, location })} maxLength={2000} placeholder="URL または住所" placeholderTextColor={palette.smoke} autoCapitalize="none" style={styles.input} /><Text style={styles.hint}>Google Mapsの共有URLがおすすめです</Text>
+      <Text style={styles.label}>営業時間</Text><TextInput editable={canEdit} accessibilityLabel="営業時間" value={draft.openingHours} onChangeText={(openingHours) => setDraft({ ...draft, openingHours })} maxLength={500} placeholder="例：10:00–18:00 ／ 月曜休み" placeholderTextColor={palette.smoke} style={styles.input} />
+      <Text style={styles.label}>予約状況</Text><View style={styles.options}>{reservationStatuses.map((item) => <Pressable key={item.value} disabled={!canEdit} onPress={() => setDraft({ ...draft, reservationStatus: item.value })} style={[styles.option, draft.reservationStatus === item.value && styles.filterSelected]}><Text style={styles.optionText}>{item.label}</Text></Pressable>)}</View>
+      <Text style={styles.label}>メモ</Text><TextInput editable={canEdit} accessibilityLabel="場所のメモ" value={draft.note} onChangeText={(note) => setDraft({ ...draft, note })} maxLength={4000} multiline placeholder="食べたいもの、見たい展示など" placeholderTextColor={palette.smoke} style={[styles.input, styles.memo]} />
+      {canEdit && editing !== 'new' ? <Pressable onPress={remove} style={styles.delete}><Text style={styles.deleteText}>この場所を削除</Text></Pressable> : null}
     </FormSheet> : null}
-    {statusPlace ? <FormSheet visible title="ステータスを変更" onClose={() => setStatusPlace(null)}><Text style={styles.placeTitle}>{statusPlace.title}</Text>{placeStatuses.map((entry) => <Pressable key={entry.value} onPress={() => { updatePlace(statusPlace.id, { ...statusPlace, status: entry.value }); setStatusPlace(null); }} style={[styles.option, statusPlace.status === entry.value && styles.filterSelected]}><Text style={styles.optionText}>{entry.mark}　{entry.label}{statusPlace.status === entry.value ? '　✓' : ''}</Text></Pressable>)}</FormSheet> : null}
-    {planning ? <FormSheet visible title="しおりに追加" onClose={() => setPlanning(null)} onSave={plan} saveLabel="追加" canSave={Boolean(day)}><Text style={styles.placeTitle}>{planning.title}</Text><DateRangePicker mode="single" startDate={day} endDate={day} label="訪問日" onChange={(range) => setDay(range.startDate)} /></FormSheet> : null}
+    {statusPlace ? <FormSheet visible title="ステータスを変更" onClose={() => setStatusPlace(null)}><Text style={styles.placeTitle}>{statusPlace.title}</Text>{placeStatuses.map((entry) => <Pressable key={entry.value} disabled={!canEdit} onPress={() => { updatePlace(statusPlace.id, { ...statusPlace, status: entry.value }); setStatusPlace(null); }} style={[styles.option, statusPlace.status === entry.value && styles.filterSelected]}><Text style={styles.optionText}>{entry.mark}　{entry.label}{statusPlace.status === entry.value ? '　✓' : ''}</Text></Pressable>)}</FormSheet> : null}
+    {planning ? <FormSheet visible title="しおりに追加" onClose={() => setPlanning(null)} onSave={canEdit ? plan : undefined} saveLabel="追加" canSave={Boolean(day)}><Text style={styles.placeTitle}>{planning.title}</Text><DateRangePicker mode="single" startDate={day} endDate={day} label="訪問日" onChange={(range) => setDay(range.startDate)} /></FormSheet> : null}
   </View>;
 }
 const styles = StyleSheet.create({

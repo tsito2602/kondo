@@ -1,3 +1,4 @@
+import { useToast } from '@/components/toast';
 import { useTripHeaderHeight } from '@/components/trip-header-context';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -24,8 +25,10 @@ const blankPackingDraft = (): PackingDraft => ({ name: '', category: CATEGORIES[
 const blankTaskDraft = (): TaskDraft => ({ title: '', dueOn: '', assignee: '', done: false });
 
 export default function PackingScreen() {
+  const toast = useToast();
   const headerHeight = useTripHeaderHeight();
   const {
+    canEdit,
     createPackingItem,
     createTask,
     deletePackingItem,
@@ -120,7 +123,7 @@ export default function PackingScreen() {
       if (editingId) updatePackingItem(editingId, input);
       else createPackingItem(input);
     }
-    setFormOpen(false);
+    setFormOpen(false); toast(isTasks ? 'やることを保存しました' : '持ち物を保存しました');
   };
 
   const remove = () => {
@@ -158,17 +161,17 @@ export default function PackingScreen() {
           accessibilityRole="checkbox"
           aria-checked={task.done}
           hitSlop={8}
-          onPress={() => toggleTask(task)}
+          disabled={!canEdit} onPress={() => toggleTask(task)}
           style={[styles.check, task.done && styles.checkDone]}>
           <Text style={[styles.checkText, task.done && styles.checkTextDone]}>{task.done ? '✓' : ''}</Text>
         </Pressable>
-        <Pressable accessibilityLabel={`${task.title}を編集`} onPress={() => openTaskEdit(task)} style={({ pressed }) => [styles.rowCopy, pressed && styles.pressed]}>
+        <Pressable accessibilityLabel={`${task.title}を編集`} disabled={!canEdit} onPress={() => openTaskEdit(task)} style={({ pressed }) => [styles.rowCopy, pressed && styles.pressed]}>
           <View style={styles.itemCopy}>
             <Text style={[styles.itemName, task.done && styles.itemDone]}>{task.title}</Text>
             {metadata ? <Text style={styles.itemMeta}>{metadata}</Text> : null}
           </View>
         </Pressable>
-        <Pressable accessibilityLabel={`${task.title}を編集`} hitSlop={8} onPress={() => openTaskEdit(task)}><Text style={styles.editMark}>•••</Text></Pressable>
+        <Pressable accessibilityLabel={`${task.title}を編集`} hitSlop={8} disabled={!canEdit} onPress={() => openTaskEdit(task)}><Text style={styles.editMark}>•••</Text></Pressable>
       </View>
     );
   };
@@ -209,13 +212,13 @@ export default function PackingScreen() {
         {!selectedTrip ? (
           <View style={styles.empty}><Text style={styles.emptyTitle}>旅行を作成してください</Text><Text style={styles.emptyBody}>準備は選択中の旅行ごとに保存されます。</Text></View>
         ) : isTasks && tasks.length === 0 ? (
-          <Pressable onPress={openCreate} style={({ pressed }) => [styles.empty, pressed && styles.pressed]}>
+          <Pressable disabled={!canEdit} onPress={openCreate} style={({ pressed }) => [styles.empty, pressed && styles.pressed]}>
             <View style={styles.emptyMark}><Text style={styles.emptyMarkText}>＋</Text></View>
             <Text style={styles.emptyTitle}>やることはまだありません</Text>
             <Text style={styles.emptyBody}>＋ やることを追加</Text>
           </Pressable>
         ) : !isTasks && packingItems.length === 0 ? (
-          <Pressable onPress={openCreate} style={({ pressed }) => [styles.empty, pressed && styles.pressed]}>
+          <Pressable disabled={!canEdit} onPress={openCreate} style={({ pressed }) => [styles.empty, pressed && styles.pressed]}>
             <View style={styles.emptyMark}><Text style={styles.emptyMarkText}>＋</Text></View>
             <Text style={styles.emptyTitle}>最初の持ち物を追加</Text>
             <Text style={styles.emptyBody}>＋ 持ち物を追加</Text>
@@ -243,14 +246,14 @@ export default function PackingScreen() {
                 <View style={styles.list}>
                   {group.items.map((item, index) => (
                     <View key={item.id} style={[styles.row, index > 0 && styles.rowBorder]}>
-                      <Pressable accessibilityLabel={`${item.name}を${item.packed ? '未準備' : '準備済み'}にする`} accessibilityRole="checkbox" aria-checked={item.packed} hitSlop={8} onPress={() => togglePacking(item)} style={[styles.check, item.packed && styles.checkDone]}>
+                      <Pressable accessibilityLabel={`${item.name}を${item.packed ? '未準備' : '準備済み'}にする`} accessibilityRole="checkbox" aria-checked={item.packed} hitSlop={8} disabled={!canEdit} onPress={() => togglePacking(item)} style={[styles.check, item.packed && styles.checkDone]}>
                         <Text style={[styles.checkText, item.packed && styles.checkTextDone]}>{item.packed ? '✓' : ''}</Text>
                       </Pressable>
-                      <Pressable accessibilityLabel={`${item.name}を編集`} onPress={() => openPackingEdit(item)} style={({ pressed }) => [styles.rowCopy, pressed && styles.pressed]}>
+                      <Pressable accessibilityLabel={`${item.name}を編集`} disabled={!canEdit} onPress={() => openPackingEdit(item)} style={({ pressed }) => [styles.rowCopy, pressed && styles.pressed]}>
                         <Text style={[styles.itemName, item.packed && styles.itemDone]}>{item.name}</Text>
                         {item.quantity > 1 ? <Text style={styles.quantity}>× {item.quantity}</Text> : null}
                       </Pressable>
-                      <Pressable accessibilityLabel={`${item.name}を編集`} hitSlop={8} onPress={() => openPackingEdit(item)}><Text style={styles.editMark}>•••</Text></Pressable>
+                      <Pressable accessibilityLabel={`${item.name}を編集`} hitSlop={8} disabled={!canEdit} onPress={() => openPackingEdit(item)}><Text style={styles.editMark}>•••</Text></Pressable>
                     </View>
                   ))}
                 </View>
@@ -260,9 +263,9 @@ export default function PackingScreen() {
         )}
       </ScrollView>
 
-      {selectedTrip ? <FloatingAddButton label={isTasks ? 'やることを追加する' : '持ち物を追加する'} onPress={openCreate} /> : null}
+      {selectedTrip && canEdit ? <FloatingAddButton label={isTasks ? 'やることを追加する' : '持ち物を追加する'} onPress={openCreate} /> : null}
 
-      <FormSheet visible={formOpen} title={editingId ? (isTasks ? 'やることを編集' : '持ち物を編集') : (isTasks ? 'やることを追加' : '持ち物を追加')} onClose={() => setFormOpen(false)} onSave={save} canSave={Boolean(isTasks ? taskDraft.title.trim() : packingDraft.name.trim())} dirty={JSON.stringify(isTasks ? [taskDraft, hasDueDate] : packingDraft) !== initialDraft} error={formError}>
+      <FormSheet visible={formOpen} title={editingId ? (isTasks ? 'やることを編集' : '持ち物を編集') : (isTasks ? 'やることを追加' : '持ち物を追加')} onClose={() => setFormOpen(false)} onSave={canEdit ? save : undefined} canSave={Boolean(isTasks ? taskDraft.title.trim() : packingDraft.name.trim())} dirty={JSON.stringify(isTasks ? [taskDraft, hasDueDate] : packingDraft) !== initialDraft} error={formError}>
               {isTasks ? (
                 <>
                   {!editingId && availableHints.length ? (
@@ -312,7 +315,7 @@ export default function PackingScreen() {
                 </>
               )}
 
-        {editingId ? <Pressable accessibilityRole="button" onPress={remove} style={styles.deleteButton}><Text style={styles.deleteText}>削除</Text></Pressable> : null}
+        {editingId && canEdit ? <Pressable accessibilityRole="button" onPress={remove} style={styles.deleteButton}><Text style={styles.deleteText}>削除</Text></Pressable> : null}
       </FormSheet>
     </SafeAreaView>
   );

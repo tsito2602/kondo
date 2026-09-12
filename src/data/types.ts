@@ -1,10 +1,13 @@
+export type TripRole = 'owner' | 'editor' | 'viewer';
+export type TripMember = { id: string; name: string | null; email: string; role: TripRole };
+
 export type Trip = {
   id: string;
   name: string;
   destination: string;
   startsOn: string;
   endsOn: string;
-  role: 'owner' | 'editor';
+  role: TripRole;
   memberCount: number;
   coverImage?: string;
   updatedAt?: number;

@@ -34,3 +34,6 @@ input:focus, textarea:focus { outline: none; box-shadow: 0 0 0 2px #92ADB766; }
 @media (prefers-reduced-motion: reduce) {
   [data-testid="route-transition"], [data-testid="form-sheet"], [data-testid="place-card"] { animation: none; }
 }
+
+[data-testid="trip-menu"] { animation: menu-enter 170ms cubic-bezier(.2,.8,.2,1) both; transform-origin: top right; box-shadow: 0 12px 40px #12232d22; }
+@keyframes menu-enter { from { opacity: 0; transform: scale(.94) translateY(-4px); } to { opacity: 1; transform: scale(1) translateY(0); } }

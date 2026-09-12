@@ -1,27 +1,30 @@
-import { useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import { useTravel } from '@/data/travel-provider';
-import { palette } from '@/constants/design';
+import { useToast } from './toast';
 
-export function OfflineTrip() {
-  const { saveTripOffline, selectedTrip } = useTravel();
+export function useOfflineTrip() {
+  const { saveTripOffline } = useTravel();
+  const toast = useToast();
+  const busyRef = useRef(false);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
+  const [progress, setProgress] = useState('');
   const save = async () => {
-    setBusy(true); setMessage('');
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    setProgress('保存中…');
     try {
       if (Platform.OS === 'web') {
         if (!('serviceWorker' in navigator)) throw new Error('このブラウザーではオフライン起動に対応していません');
         const registration = await navigator.serviceWorker.getRegistration();
         if (!registration?.active) throw new Error('起動の準備中です。少し待ってもう一度お試しください');
       }
-      const count = await saveTripOffline((done, total) => setMessage(`書類を保存中 ${done} / ${total}`));
-      if (Platform.OS === 'web') await navigator.storage?.persist?.();
-      setMessage(count ? `しおり・場所・書類${count}件を端末に保存しました` : 'しおり・予約・場所・準備を端末に保存しました');
-    } catch (cause) { setMessage(cause instanceof Error ? cause.message : '保存できませんでした。オンラインで再度お試しください'); }
-    finally { setBusy(false); }
+      const count = await saveTripOffline((done, total) => setProgress(`書類を保存中 ${done} / ${total}`));
+      if (Platform.OS === 'web') await navigator.storage?.persist?.().catch(() => false);
+      toast(count ? `旅行と書類${count}件をオフライン保存しました` : '旅行をオフライン保存しました');
+    } catch (cause) { toast(cause instanceof Error ? cause.message : '保存できませんでした。オンラインで再度お試しください'); }
+    finally { busyRef.current = false; setBusy(false); setProgress(''); }
   };
-  if (!selectedTrip || Platform.OS !== 'web') return null;
-  return <View style={styles.row}><Pressable disabled={busy} onPress={() => void save()} style={styles.button}><Text style={styles.text}>{busy ? '保存中…' : '↓ オフライン保存'}</Text></Pressable>{message ? <Text style={styles.message}>{message}</Text> : null}</View>;
+  return { save, busy, progress };
 }
-const styles = StyleSheet.create({ row: { marginBottom: 16, gap: 8 }, button: { alignSelf: 'flex-end', minHeight: 40, paddingHorizontal: 14, borderRadius: 10, backgroundColor: palette.sky, justifyContent: 'center' }, text: { fontSize: 12, fontWeight: '600', color: palette.ocean }, message: { fontSize: 12, color: palette.slate, lineHeight: 20 } });

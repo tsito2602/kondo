@@ -74,3 +74,70 @@ test('only owners delete trips and cascades remove children and R2 objects', asy
     assert.equal((await call(`/trips/${trip.id}`, 'DELETE')).status, 204);
   } finally { db.close(); }
 });
+
+test('members are scoped and only owners can change roles or remove people', async () => {
+  const { db, call, trip } = await fixture();
+  try {
+    const base = `/trips/${trip.id}/members`;
+    assert.equal((await call(base, 'GET', undefined, 'outsider')).status, 403);
+    assert.equal((await (await call(base, 'GET', undefined, 'editor')).json()).members.length, 2);
+    for (const actor of ['editor', 'outsider']) {
+      assert.equal((await call(`${base}/editor`, 'PATCH', { role: 'viewer' }, actor)).status, 403);
+      assert.equal((await call(`${base}/editor`, 'DELETE', undefined, actor)).status, 403);
+      assert.equal((await call(`/trips/${trip.id}/invites`, 'POST', undefined, actor)).status, 403);
+      assert.equal((await call(`/trips/${trip.id}/invites`, 'DELETE', undefined, actor)).status, 403);
+    }
+    assert.equal((await call(`${base}/owner`, 'DELETE')).status, 409);
+    assert.equal((await call(`${base}/owner`, 'PATCH', { role: 'viewer' })).status, 409);
+    assert.equal((await call(`${base}/editor`, 'PATCH', { role: 'owner' })).status, 400);
+    assert.equal((await call(`${base}/outsider`, 'PATCH', { role: 'viewer' })).status, 404);
+    assert.equal((await call(`${base}/editor`, 'PATCH', { role: 'viewer' })).status, 200);
+    assert.equal((await (await call('/trips', 'GET', undefined, 'editor')).json()).trips[0].role, 'viewer');
+    assert.equal((await call(`${base}/editor`, 'PATCH', { role: 'editor' })).status, 200);
+    assert.equal((await (await call('/trips', 'GET', undefined, 'editor')).json()).trips[0].role, 'editor');
+    assert.equal((await call(`${base}/editor`, 'DELETE')).status, 204);
+    assert.equal((await call(`/trips/${trip.id}/places`, 'GET', undefined, 'editor')).status, 403);
+    assert.equal((await (await call('/trips', 'GET', undefined, 'editor')).json()).trips.length, 0);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM trip_member_permissions').get().n, 0);
+  } finally { db.close(); }
+});
+
+test('viewers can read every collection but cannot mutate trips, plans, documents or membership', async () => {
+  const { db, call, trip } = await fixture();
+  try {
+    const base = `/trips/${trip.id}`;
+    await call(`${base}/members/editor`, 'PATCH', { role: 'viewer' });
+    for (const collection of ['items', 'bookings', 'packing', 'tasks', 'places', 'booking-documents', 'members']) {
+      assert.equal((await call(`${base}/${collection}`, 'GET', undefined, 'editor')).status, 200, collection);
+    }
+    for (const [path, method] of [
+      ['', 'PATCH'], ['', 'DELETE'], ['/items', 'POST'], ['/items/id', 'PATCH'], ['/items/id', 'DELETE'],
+      ['/bookings', 'POST'], ['/bookings/id', 'PATCH'], ['/bookings/id', 'DELETE'], ['/bookings/id/connection', 'PATCH'],
+      ['/bookings/id/documents', 'POST'], ['/bookings/id/documents/doc', 'DELETE'],
+      ['/packing', 'POST'], ['/packing/id', 'PATCH'], ['/packing/id', 'DELETE'],
+      ['/tasks', 'POST'], ['/tasks/id', 'PATCH'], ['/tasks/id', 'DELETE'],
+      ['/places', 'POST'], ['/places/id', 'PATCH'], ['/places/id', 'DELETE'],
+      ['/invites', 'POST'], ['/invites', 'DELETE'], ['/members/owner', 'PATCH'], ['/members/owner', 'DELETE'],
+    ]) assert.equal((await call(base + path, method, { role: 'editor' }, 'editor')).status, 403, `${method} ${path}`);
+    await call(`${base}/members/editor`, 'PATCH', { role: 'editor' });
+    assert.equal((await call(`${base}/places`, 'POST', place, 'editor')).status, 201);
+  } finally { db.close(); }
+});
+
+test('revoked links cannot be used and removing a member also revokes outstanding invites', async () => {
+  const { db, call, trip } = await fixture();
+  try {
+    const base = `/trips/${trip.id}`;
+    const token = async () => new URL((await (await call(`${base}/invites`, 'POST')).json()).invite.url).searchParams.get('invite');
+    const first = await token();
+    await call(`${base}/invites`, 'DELETE');
+    assert.equal((await call(`/invites/${first}/accept`, 'POST', undefined, 'outsider')).status, 404);
+    const second = await token();
+    await call(`${base}/members/editor`, 'DELETE');
+    assert.equal((await call(`/invites/${second}/accept`, 'POST', undefined, 'editor')).status, 404);
+    const third = await token();
+    assert.equal((await call(`/invites/${third}/accept`, 'POST', undefined, 'outsider')).status, 200);
+    assert.equal((await call(`/invites/${third}/accept`, 'POST', undefined, 'editor')).status, 404);
+    assert.equal((await (await call('/trips', 'GET', undefined, 'outsider')).json()).trips[0].role, 'editor');
+  } finally { db.close(); }
+});

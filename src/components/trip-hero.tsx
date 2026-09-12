@@ -3,7 +3,7 @@ import { Animated, StyleSheet, Text, View } from 'react-native';
 import { TripCover } from './trip-cover';
 import type { Trip } from '@/data/types';
 
-export const TripHeroContext = createContext<{ height: number; scrollY: Animated.Value } | null>(null);
+export const TripHeroContext = createContext<{ height: number; scrollY: Animated.Value; setPinAt: (offset: number) => void } | null>(null);
 export const useTripHero = () => useContext(TripHeroContext);
 
 // The photo belongs to the viewport; only the journal sheet scrolls over it.
@@ -28,9 +28,9 @@ export function TripHero({ trip, height, scrollY }: { trip: Trip; height: number
 const styles = StyleSheet.create({
   hero: { position: 'absolute', top: 0, left: 0, right: 0, overflow: 'hidden', backgroundColor: '#557984' },
   shade: { backgroundColor: 'rgba(13,32,43,0.28)' },
-  caption: { position: 'absolute', bottom: 62, width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 28, gap: 10 },
+  caption: { position: 'absolute', bottom: 54, width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 28, gap: 10 },
   eyebrow: { color: '#FFFFFFCC', fontSize: 10, fontWeight: '600', letterSpacing: 3 },
-  destination: { color: '#FFFFFF', fontSize: 34, lineHeight: 42, fontWeight: '800', letterSpacing: -0.7 },
+  destination: { color: '#FFFFFF', fontSize: 28, lineHeight: 36, fontWeight: '800', letterSpacing: -0.7 },
   captionBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dates: { color: '#FFFFFFDD', fontSize: 11, letterSpacing: 1 },
   arrow: { color: '#FFFFFF', fontSize: 22 },

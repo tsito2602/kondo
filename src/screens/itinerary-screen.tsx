@@ -1,4 +1,4 @@
-import { OfflineTrip } from '@/components/offline-trip';
+import { useToast } from '@/components/toast';
 import { useTripHero } from '@/components/trip-hero';
 import { useTripHeaderHeight } from '@/components/trip-header-context';
 import { router } from 'expo-router';
@@ -162,10 +162,12 @@ function timeZoneLabel(entry: TimelineEntry) {
 }
 
 export default function ItineraryScreen() {
+  const toast = useToast();
   const headerHeight = useTripHeaderHeight();
   const hero = useTripHero();
+  const [dayBarHeight, setDayBarHeight] = useState(60);
   const { height: windowHeight } = useWindowDimensions();
-  const { selectedTrip, items, bookings, createItem, updateItem, deleteItem, pendingCount } = useTravel();
+  const { canEdit, selectedTrip, items, bookings, createItem, updateItem, deleteItem, pendingCount } = useTravel();
   const [adding, setAdding] = useState(false);
   const [formError, setFormError] = useState('');
   const [initialDraft, setInitialDraft] = useState('');
@@ -176,6 +178,9 @@ export default function ItineraryScreen() {
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
   const scrollRef = useRef<ScrollView>(null);
+  const dateScrollRef = useRef<ScrollView>(null);
+  const dateTabOffsets = useRef<Record<string, { x: number; width: number }>>({});
+  const dateViewport = useRef(0);
   const sheetOffset = useRef(0);
   const timelineOffset = useRef(0);
   const dayOffsets = useRef<Record<string, number>>({});
@@ -207,6 +212,11 @@ export default function ItineraryScreen() {
   const [activeDay, setActiveDay] = useState(selectedTrip?.startsOn ?? '');
   const visibleActiveDay = itineraryDates.includes(activeDay) ? activeDay : itineraryDates[0];
 
+  useEffect(() => {
+    const frame = dateTabOffsets.current[visibleActiveDay];
+    if (frame) dateScrollRef.current?.scrollTo({ x: Math.max(0, frame.x - (dateViewport.current - frame.width) / 2), animated: true });
+  }, [visibleActiveDay]);
+
   const resumeScrollTracking = () => {
     programmaticScrollDay.current = null;
     if (scrollTrackingTimer.current) clearTimeout(scrollTrackingTimer.current);
@@ -226,14 +236,14 @@ export default function ItineraryScreen() {
       resumeScrollTracking();
       return;
     }
-    scrollRef.current?.scrollTo({ y: Math.max(0, sheetOffset.current + timelineOffset.current + offset - headerHeight - 10), animated: true });
+    scrollRef.current?.scrollTo({ y: Math.max(0, sheetOffset.current + timelineOffset.current + offset - dayBarHeight - 10), animated: true });
     scrollTrackingTimer.current = setTimeout(resumeScrollTracking, 1000);
   };
 
   const trackVisibleDay = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     hero?.scrollY.setValue(Math.max(0, event.nativeEvent.contentOffset.y));
     if (programmaticScrollDay.current) return;
-    const scrollPosition = event.nativeEvent.contentOffset.y + headerHeight + 24 - sheetOffset.current - timelineOffset.current;
+    const scrollPosition = event.nativeEvent.contentOffset.y + dayBarHeight + 24 - sheetOffset.current - timelineOffset.current;
     let visibleDay = itineraryDates[0];
     for (const date of itineraryDates) {
       if ((dayOffsets.current[date] ?? Number.POSITIVE_INFINITY) <= scrollPosition) visibleDay = date;
@@ -278,7 +288,7 @@ export default function ItineraryScreen() {
     const input = { day, time, kind: '予定', title: title.trim(), note: note.trim() };
     if (editingId) updateItem(editingId, input);
     else createItem(input);
-    closeEditor();
+    closeEditor(); toast('予定を保存しました');
   };
 
   const remove = () => {
@@ -292,6 +302,8 @@ export default function ItineraryScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>
       <ScrollView
+        style={{ marginTop: headerHeight }}
+        stickyHeaderIndices={[1]}
         contentContainerStyle={styles.scrollContent}
         onMomentumScrollEnd={resumeScrollTracking}
         onScroll={trackVisibleDay}
@@ -300,22 +312,25 @@ export default function ItineraryScreen() {
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         >
-        <View pointerEvents="none" style={{ height: (hero?.height ?? headerHeight + 240) - 28 }} />
-        <View testID="journal-sheet" onLayout={(event) => { sheetOffset.current = event.nativeEvent.layout.y; }} style={[styles.journalSheet, { minHeight: windowHeight }]}>
-        <View style={styles.content}>
-        <View style={styles.sheetIntro}><Text style={styles.journalLabel}>YOUR ITINERARY</Text><Text style={styles.journalCount}>{itineraryDates.length} DAYS</Text></View>
-        <OfflineTrip />
-        <View style={styles.dayNavSticky}>
-          {selectedTrip && itineraryDates.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayTabs}>
+        <View onLayout={(event) => hero?.setPinAt(event.nativeEvent.layout.height)}>
+          <View pointerEvents="none" style={{ height: Math.max(0, (hero?.height ?? headerHeight + 200) - headerHeight - 28) }} />
+          <View style={styles.journalSheet}><View style={styles.content}><View style={styles.sheetIntro}><Text style={styles.journalLabel}>しおり</Text><Text style={styles.journalCount}>{itineraryDates.length}日間</Text></View></View></View>
+        </View>
+        <View testID="itinerary-day-bar" onLayout={(event) => setDayBarHeight(event.nativeEvent.layout.height)} style={styles.dayNavSticky}>
+          <View style={styles.content}>
+          {selectedTrip && itineraryDates.length ? <ScrollView ref={dateScrollRef} onLayout={(event) => { dateViewport.current = event.nativeEvent.layout.width; }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayTabs}>
             {itineraryDates.map((date, index) => {
               const selected = date === visibleActiveDay;
-              return <Pressable accessibilityRole="tab" aria-selected={selected} key={date} onPress={() => scrollToDay(date)} style={[styles.dayTab, selected && styles.dayTabSelected]}>
+              return <Pressable accessibilityRole="tab" aria-selected={selected} onLayout={(event) => { dateTabOffsets.current[date] = event.nativeEvent.layout; }} key={date} onPress={() => scrollToDay(date)} style={[styles.dayTab, selected && styles.dayTabSelected]}>
                 <Text style={[styles.dayTabLabel, selected && styles.dayTabLabelSelected]}>{index + 1}日目</Text>
                 <Text style={[styles.dayTabDate, selected && styles.dayTabDateSelected]}>{shortDate(date)}</Text>
               </Pressable>;
             })}
           </ScrollView> : null}
         </View>
+        </View>
+        <View onLayout={(event) => { sheetOffset.current = event.nativeEvent.layout.y; }} style={[styles.journalBody, { minHeight: windowHeight - headerHeight }]}>
+        <View style={[styles.content, { paddingBottom: Math.max(128, windowHeight - headerHeight - dayBarHeight - 100) }]}>
         {pendingCount ? <Text style={styles.pending}>{pendingCount}件を端末に保存済み · オンライン時に同期</Text> : null}
 
         {!selectedTrip ? (
@@ -340,6 +355,7 @@ export default function ItineraryScreen() {
                     <Pressable
                       accessibilityHint={entry.booking ? '予約の詳細を開きます' : '予定を編集します'}
                       accessibilityRole="button"
+                      disabled={!canEdit && !entry.booking}
                       onPress={() => entry.booking && selectedTrip ? router.push({ pathname: '/trips/[tripId]/bookings', params: { tripId: selectedTrip.id, booking: entry.booking.id } }) : openEdit(entry.item!)}
                       style={({ pressed }) => [styles.itemRow, (isLinkedStart || isLinkedEnd) && styles.linkedBookingRow, pressed && styles.itemPressed]}>
                       <View style={styles.timeColumn}>
@@ -368,8 +384,8 @@ export default function ItineraryScreen() {
                       </View>
                       <Text style={styles.chevron}>›</Text>
                     </Pressable>
-                    {connection ? <ConnectionRow connection={connection} continueRail={connectedDepartures.has(connection.departureBookingId)} nextFlight={bookings.find((flight) => flight.id === connection.departureBookingId)} onPress={() => setConnectionBookingId(connection.arrivalBookingId)} />
-                      : isLinkedEnd && entry.booking?.kind === 'flight' && hasLikelyFlightConnection(entry.booking, bookings)
+                    {connection ? <ConnectionRow disabled={!canEdit} connection={connection} continueRail={connectedDepartures.has(connection.departureBookingId)} nextFlight={bookings.find((flight) => flight.id === connection.departureBookingId)} onPress={() => setConnectionBookingId(connection.arrivalBookingId)} />
+                      : canEdit && isLinkedEnd && entry.booking?.kind === 'flight' && hasLikelyFlightConnection(entry.booking, bookings)
                         ? <View style={styles.connectionAction}><FlightConnectionLink compact booking={entry.booking} onPress={() => setConnectionBookingId(entry.booking!.id)} /></View> : null}
                     </Fragment>
                     );
@@ -386,22 +402,22 @@ export default function ItineraryScreen() {
         </View>
       </ScrollView>
 
-      {selectedTrip ? <FloatingAddButton label="予定を追加する" onPress={openAdd} /> : null}
+      {selectedTrip && canEdit ? <FloatingAddButton label="予定を追加する" onPress={openAdd} /> : null}
       {connectionBookingId ? <FlightConnectionSheet bookingId={connectionBookingId} onClose={() => setConnectionBookingId(null)} /> : null}
 
-      <FormSheet visible={adding} title={editingId ? '予定を編集' : '予定を追加'} onClose={closeEditor} onSave={save} canSave={Boolean(title.trim())} dirty={JSON.stringify([day, time, title, note]) !== initialDraft} error={formError}>
+      <FormSheet visible={adding} title={editingId ? '予定を編集' : '予定を追加'} onClose={closeEditor} onSave={canEdit ? save : undefined} canSave={Boolean(title.trim())} dirty={JSON.stringify([day, time, title, note]) !== initialDraft} error={formError}>
             <DateRangePicker mode="single" showTime label="日時" startDate={day} endDate={day} startTime={time} onChange={(range) => { setDay(range.startDate); setTime(range.startTime); }} />
             <Text style={styles.label}>予定</Text><TextInput accessibilityLabel="予定名" maxLength={160} value={title} onChangeText={setTitle} placeholder="空港へ移動" style={styles.input} autoFocus />
             <Text style={styles.label}>メモ</Text><TextInput accessibilityLabel="メモ" maxLength={4000} value={note} onChangeText={setNote} placeholder="集合場所や予約番号など" style={[styles.input, styles.noteInput]} multiline />
-            {editingId ? <Pressable onPress={remove} style={styles.deleteButton}><Text style={styles.deleteText}>この予定を削除</Text></Pressable> : null}
+            {editingId && canEdit ? <Pressable onPress={remove} style={styles.deleteButton}><Text style={styles.deleteText}>この予定を削除</Text></Pressable> : null}
       </FormSheet>
     </SafeAreaView>
   );
 }
 
-function ConnectionRow({ connection, continueRail, nextFlight, onPress }: { connection: FlightConnection; continueRail: boolean; nextFlight?: Booking; onPress: () => void }) {
+function ConnectionRow({ connection, continueRail, nextFlight, onPress, disabled = false }: { connection: FlightConnection; continueRail: boolean; nextFlight?: Booking; onPress: () => void; disabled?: boolean }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${connection.airportName}で${formatConnectionDuration(connection.durationMinutes)}の乗り継ぎ、${nextFlight?.title ?? '次便'}への紐づけを変更`} onPress={onPress} style={({ pressed }) => [styles.connectionRow, pressed && styles.itemPressed]}>
+    <Pressable disabled={disabled} accessibilityRole="button" accessibilityLabel={`${connection.airportName}で${formatConnectionDuration(connection.durationMinutes)}の乗り継ぎ、${nextFlight?.title ?? '次便'}への紐づけを変更`} onPress={onPress} style={({ pressed }) => [styles.connectionRow, pressed && styles.itemPressed]}>
       <View style={styles.connectionTimeColumn} />
       <View style={styles.connectionRailColumn}>
         <View style={[styles.connectionRailFull, !continueRail && styles.connectionRailEnding]} />
@@ -422,11 +438,12 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: 'transparent' },
   scrollContent: { flexGrow: 1 },
   journalSheet: { backgroundColor: palette.canvas, borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden' },
+  journalBody: { backgroundColor: palette.canvas },
   sheetIntro: { paddingTop: 24, paddingBottom: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   journalLabel: { color: palette.ocean, fontSize: 10, fontWeight: '700', letterSpacing: 2 },
   journalCount: { color: palette.smoke, fontFamily: mono, fontSize: 10, letterSpacing: 1 },
-  content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 128 },
-  dayNavSticky: { zIndex: 4, marginHorizontal: -20, paddingHorizontal: 20, paddingBottom: 10, backgroundColor: palette.canvas, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
+  content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20 },
+  dayNavSticky: { zIndex: 4, paddingVertical: 6, backgroundColor: palette.canvas, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
   dayTabs: { gap: 8, paddingRight: 20 },
   dayTab: { minWidth: 68, minHeight: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: palette.mist, paddingHorizontal: 12 },
   dayTabSelected: { backgroundColor: palette.ocean },

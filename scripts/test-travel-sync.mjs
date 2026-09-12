@@ -230,3 +230,32 @@ test('owner deletion removes trip collections; editors cannot delete', async () 
   try { await assert.rejects(editor.api.deleteTrip('trip')); assert.equal(editor.render().trips.length, 1); }
   finally { editor.close(); }
 });
+
+test('a revoked queued edit is removed and cannot block another trip or stale optimistic data', async () => {
+  const stored = empty();
+  stored.pending = [
+    { id: 'revoked-1', method: 'PATCH', path: '/v1/trips/trip/tasks/task', body: { title: 'Not allowed' } },
+    { id: 'revoked-2', method: 'POST', path: '/v1/trips/trip/items', body: { title: 'Also not allowed' } },
+    { id: 'allowed', method: 'PATCH', path: '/v1/trips/other/tasks/task', body: { title: 'Allowed' } },
+  ];
+  const sent = [];
+  const f = await fixture({ stored, transport: async (path, init) => {
+    if (init.method) {
+      sent.push(path);
+      if (path.startsWith('/v1/trips/trip/')) throw Object.assign(new Error('閲覧のみ'), { status: 403 });
+      return {};
+    }
+    if (path === '/v1/trips') return { trips: [{ ...trip, role: 'viewer' }] };
+  } });
+  try {
+    await f.api.sync();
+    const current = f.render();
+    assert.equal(current.pendingCount, 0);
+    assert.equal(current.canEdit, false);
+    assert.equal(current.tasks[0].title, task.title);
+    assert.ok(sent.includes('/v1/trips/other/tasks/task'));
+    assert.ok(!sent.includes('/v1/trips/trip/items'));
+    assert.throws(() => current.updateTask('task', task), /閲覧のみ/);
+    assert.throws(() => current.createPlace({ title: 'Test' }), /閲覧のみ/);
+  } finally { f.close(); }
+});

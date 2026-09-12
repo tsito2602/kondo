@@ -49,9 +49,9 @@ function idField(value: unknown) {
 }
 
 async function memberRole(env: Env, tripId: string, userId: string) {
-  const row = await env.DB.prepare('SELECT role FROM trip_members WHERE trip_id = ? AND user_id = ?')
+  const row = await env.DB.prepare(`SELECT CASE WHEN tm.role = 'owner' THEN 'owner' WHEN p.read_only = 1 THEN 'viewer' ELSE tm.role END AS role FROM trip_members tm LEFT JOIN trip_member_permissions p ON p.trip_id = tm.trip_id AND p.user_id = tm.user_id WHERE tm.trip_id = ? AND tm.user_id = ?`)
     .bind(tripId, userId)
-    .first<{ role: 'owner' | 'editor' }>();
+    .first<{ role: 'owner' | 'editor' | 'viewer' }>();
   return row?.role ?? null;
 }
 
@@ -106,11 +106,12 @@ async function googleLogin(request: Request, env: Env) {
 async function listTrips(env: Env, user: User) {
   const result = await env.DB.prepare(`
     SELECT t.id, t.name, t.destination, t.starts_on AS startsOn, t.ends_on AS endsOn,
-           t.updated_at AS updatedAt, tm.role, COALESCE(tc.image, '') AS coverImage,
+           t.updated_at AS updatedAt, CASE WHEN tm.role = 'owner' THEN 'owner' WHEN mp.read_only = 1 THEN 'viewer' ELSE tm.role END AS role, COALESCE(tc.image, '') AS coverImage,
            (SELECT COUNT(*) FROM trip_members members WHERE members.trip_id = t.id) AS memberCount
     FROM trips t
     LEFT JOIN trip_covers tc ON tc.trip_id = t.id
     JOIN trip_members tm ON tm.trip_id = t.id
+    LEFT JOIN trip_member_permissions mp ON mp.trip_id = tm.trip_id AND mp.user_id = tm.user_id
     WHERE tm.user_id = ?
     ORDER BY t.starts_on, t.id
   `).bind(user.id).all();
@@ -669,13 +670,56 @@ async function deleteTask(env: Env, user: User, tripId: string, taskId: string) 
   return result.meta.changes ? new Response(null, { status: 204 }) : json({ error: 'タスクが見つかりません' }, 404);
 }
 
-async function createInvite(env: Env, user: User, tripId: string, url: URL) {
+async function requireOwner(env: Env, tripId: string, userId: string) {
+  return await memberRole(env, tripId, userId) === 'owner' ? null : json({ error: 'メンバーを管理できるのは管理者だけです' }, 403);
+}
+
+async function membersRoute(request: Request, env: Env, user: User, tripId: string, memberId?: string) {
   const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  if (request.method === 'GET' && !memberId) {
+    const members = await env.DB.prepare(`SELECT u.id, u.display_name AS name, u.email,
+      CASE WHEN tm.role = 'owner' THEN 'owner' WHEN mp.read_only = 1 THEN 'viewer' ELSE tm.role END AS role
+      FROM trip_members tm JOIN users u ON u.id = tm.user_id
+      LEFT JOIN trip_member_permissions mp ON mp.trip_id = tm.trip_id AND mp.user_id = tm.user_id
+      WHERE tm.trip_id = ? ORDER BY tm.role = 'owner' DESC, tm.joined_at, u.id`).bind(tripId).all();
+    return json({ members: members.results });
+  }
+  const notOwner = await requireOwner(env, tripId, user.id);
+  if (notOwner) return notOwner;
+  if (!memberId || !['PATCH', 'DELETE'].includes(request.method)) return json({ error: 'Not found' }, 404);
+  const target = await memberRole(env, tripId, memberId);
+  if (!target) return json({ error: 'メンバーが見つかりません' }, 404);
+  if (target === 'owner') return json({ error: '管理者の削除・権限変更はできません' }, 409);
+  if (request.method === 'PATCH') {
+    const body = await request.json().catch(() => null) as { role?: unknown } | null;
+    if (body?.role !== 'editor' && body?.role !== 'viewer') return json({ error: '編集可または閲覧のみを選択してください' }, 400);
+    await env.DB.prepare(`INSERT INTO trip_member_permissions (trip_id, user_id, read_only)
+      SELECT trip_id, user_id, ? FROM trip_members WHERE trip_id = ? AND user_id = ? AND role != 'owner'
+      ON CONFLICT(trip_id, user_id) DO UPDATE SET read_only = excluded.read_only`)
+      .bind(body.role === 'viewer' ? 1 : 0, tripId, memberId).run();
+    return json({ role: body.role });
+  }
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM invites WHERE trip_id = ? AND consumed_at IS NULL').bind(tripId),
+    env.DB.prepare("DELETE FROM trip_members WHERE trip_id = ? AND user_id = ? AND role != 'owner'").bind(tripId, memberId),
+  ]);
+  return new Response(null, { status: 204 });
+}
+
+async function revokeInvites(env: Env, user: User, tripId: string) {
+  const forbidden = await requireOwner(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  await env.DB.prepare('DELETE FROM invites WHERE trip_id = ? AND consumed_at IS NULL').bind(tripId).run();
+  return new Response(null, { status: 204 });
+}
+
+async function createInvite(env: Env, user: User, tripId: string, url: URL) {
+  const forbidden = await requireOwner(env, tripId, user.id);
   if (forbidden) return forbidden;
   const token = randomToken();
   await env.DB.prepare('INSERT INTO invites (token_hash, trip_id, created_by, expires_at) VALUES (?, ?, ?, unixepoch() + 604800)')
-    .bind(await hashToken(token), tripId, user.id)
-    .run();
+    .bind(await hashToken(token), tripId, user.id).run();
   return json({ invite: { url: `${url.origin}/?invite=${encodeURIComponent(token)}`, expiresIn: 604800 } }, 201);
 }
 
@@ -685,6 +729,7 @@ async function acceptInvite(env: Env, user: User, token: string) {
     UPDATE invites
     SET consumed_by = ?, consumed_at = unixepoch()
     WHERE token_hash = ? AND expires_at > unixepoch() AND consumed_at IS NULL
+      AND EXISTS (SELECT 1 FROM trip_members tm WHERE tm.trip_id = invites.trip_id AND tm.user_id = invites.created_by AND tm.role = 'owner')
     RETURNING trip_id AS tripId
   `)
     .bind(user.id, tokenHash)
@@ -709,6 +754,13 @@ async function api(request: Request, env: Env, url: URL) {
   if (request.method === 'GET' && url.pathname === '/v1/trips') return listTrips(env, user);
   if (request.method === 'POST' && url.pathname === '/v1/trips') return createTrip(request, env, user);
 
+  // This gate also protects old clients and document uploads after a role change.
+  const scope = url.pathname.match(/^\/v1\/trips\/([^/]+)(?:\/|$)/);
+  if (scope && request.method !== 'GET' && await memberRole(env, scope[1], user.id) === 'viewer') {
+    return json({ error: 'この旅行は閲覧のみです' }, 403);
+  }
+  const membersMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/members(?:\/([^/]+))?$/);
+  if (membersMatch) return membersRoute(request, env, user, membersMatch[1], membersMatch[2]);
   const tripMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)$/);
   if (tripMatch && request.method === 'DELETE') return deleteTrip(env, user, tripMatch[1]);
   const placesMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/places(?:\/([^/]+))?$/);
@@ -761,6 +813,7 @@ async function api(request: Request, env: Env, url: URL) {
   if (taskMatch && request.method === 'DELETE') return deleteTask(env, user, taskMatch[1], taskMatch[2]);
 
   const inviteMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/invites$/);
+  if (inviteMatch && request.method === 'DELETE') return revokeInvites(env, user, inviteMatch[1]);
   if (inviteMatch && request.method === 'POST') return createInvite(env, user, inviteMatch[1], url);
   const acceptMatch = url.pathname.match(/^\/v1\/invites\/([^/]+)\/accept$/);
   if (acceptMatch && request.method === 'POST') return acceptInvite(env, user, acceptMatch[1]);

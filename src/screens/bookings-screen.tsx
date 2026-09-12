@@ -1,5 +1,6 @@
 import { useTripHeaderHeight } from '@/components/trip-header-context';
-import * as Clipboard from 'expo-clipboard';
+import { useToast } from '@/components/toast';
+import { CopyButton } from '@/components/copy-button';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -50,9 +51,10 @@ export default function BookingsScreen() {
 }
 
 function TripBookingsScreen() {
+  const toast = useToast();
   const headerHeight = useTripHeaderHeight();
   const { booking: requestedBooking } = useLocalSearchParams<{ booking?: string | string[] }>();
-  const { bookings, createBooking, deleteBooking, deleteItem, documentsByBooking, items, selectedTrip, updateBooking } = useTravel();
+  const { canEdit, bookings, createBooking, deleteBooking, deleteItem, documentsByBooking, items, selectedTrip, updateBooking } = useTravel();
   const [initialDraft, setInitialDraft] = useState('');
   const [viewing, setViewing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -155,7 +157,7 @@ function TripBookingsScreen() {
       if (selectedMergeItem) deleteItem(selectedMergeItem.id);
       setDraft(savedInput);
       setInitialDraft(JSON.stringify(savedInput));
-      setViewing(true);
+      setViewing(true); toast('予約を保存しました');
     } catch (cause) {
       setFormError(cause instanceof Error ? cause.message : '予約を保存できませんでした。');
     }
@@ -176,7 +178,7 @@ function TripBookingsScreen() {
         {!selectedTrip ? (
           <View style={styles.empty}><Text style={styles.emptyTitle}>旅行を作成してください</Text><Text style={styles.emptyBody}>予約は選択中の旅行ごとに保存されます。</Text></View>
         ) : bookings.length === 0 ? (
-          <Pressable onPress={openCreate} style={({ pressed }) => [styles.empty, pressed && styles.pressed]}>
+          <Pressable disabled={!canEdit} onPress={openCreate} style={({ pressed }) => [styles.empty, pressed && styles.pressed]}>
             <View style={styles.emptyMark}><Text style={styles.emptyMarkText}>＋</Text></View>
             <Text style={styles.emptyTitle}>予約はまだありません</Text>
             <Text style={styles.emptyBody}>＋ 航空券・ホテル・チケットを追加</Text>
@@ -210,7 +212,7 @@ function TripBookingsScreen() {
                   <View style={[styles.notch, styles.notchTop]} />
                   <View style={[styles.notch, styles.notchBottom]} />
                 </Pressable>
-                {booking.kind === 'flight' && (connection || hasLikelyFlightConnection(booking, bookings)) ? <FlightConnectionLink booking={booking} connection={connection} nextFlight={bookings.find((flight) => flight.id === connection?.departureBookingId)} onPress={() => setConnectionBookingId(booking.id)} /> : null}
+                {booking.kind === 'flight' && (connection || (canEdit && hasLikelyFlightConnection(booking, bookings))) ? <FlightConnectionLink disabled={!canEdit} booking={booking} connection={connection} nextFlight={bookings.find((flight) => flight.id === connection?.departureBookingId)} onPress={() => setConnectionBookingId(booking.id)} /> : null}
                 </View>
               );
             })}
@@ -218,10 +220,10 @@ function TripBookingsScreen() {
         )}
       </ScrollView>
 
-      {selectedTrip ? <FloatingAddButton label="予約を追加する" onPress={openCreate} /> : null}
+      {selectedTrip && canEdit ? <FloatingAddButton label="予約を追加する" onPress={openCreate} /> : null}
       {connectionBookingId ? <FlightConnectionSheet bookingId={connectionBookingId} onClose={() => setConnectionBookingId(null)} /> : null}
 
-      <FormSheet visible={formOpen} title={viewing ? '予約の詳細' : editingId ? '予約を編集' : '予約を追加'} onClose={() => setFormOpen(false)} onSave={viewing ? () => setViewing(false) : save} saveLabel={viewing ? '編集' : '保存'} canSave={viewing || Boolean(draft.title.trim())} dirty={!viewing && (JSON.stringify(draft) !== initialDraft || Boolean(selectedMergeItem))} error={formError}>
+      <FormSheet visible={formOpen} title={viewing ? '予約の詳細' : editingId ? '予約を編集' : '予約を追加'} onClose={() => setFormOpen(false)} onSave={canEdit ? viewing ? () => setViewing(false) : save : undefined} saveLabel={viewing ? '編集' : '保存'} canSave={viewing || Boolean(draft.title.trim())} dirty={!viewing && (JSON.stringify(draft) !== initialDraft || Boolean(selectedMergeItem))} error={formError}>
         {viewing && editingId ? <BookingDetails booking={{ id: editingId, ...draft }} documents={documentsByBooking[editingId] ?? []} /> : <>
               <Text style={styles.label}>種類</Text>
               <View style={styles.kindList}>
@@ -241,7 +243,7 @@ function TripBookingsScreen() {
               </View> : null}
               {editingId ? <BookingDocuments bookingId={editingId} documents={documentsByBooking[editingId] ?? []} /> : <Text style={styles.documentNotice}>書類は予約を保存したあとに追加できます。</Text>}
               <Field label="メモ" multiline placeholder="任意" value={draft.note} onChangeText={(note) => setDraft((current) => ({ ...current, note }))} />
-          {editingId ? <Pressable accessibilityRole="button" onPress={remove} style={styles.deleteButton}><Text style={styles.deleteText}>この予約を削除</Text></Pressable> : null}
+          {editingId && canEdit ? <Pressable accessibilityRole="button" onPress={remove} style={styles.deleteButton}><Text style={styles.deleteText}>この予約を削除</Text></Pressable> : null}
         </>}
       </FormSheet>
 
@@ -250,13 +252,8 @@ function TripBookingsScreen() {
 }
 
 function BookingDetails({ booking, documents }: { booking: Booking; documents: BookingDocument[] }) {
-  const [copyStatus, setCopyStatus] = useState('');
   const kind = KINDS.find((entry) => entry.value === booking.kind);
   const route = Boolean(booking.originCode || booking.origin || booking.destinationCode || booking.destination);
-  const copy = async () => {
-    try { const copied = await Clipboard.setStringAsync(booking.confirmationCode); setCopyStatus(copied ? 'コピーしました' : '番号を長押ししてコピーしてください'); }
-    catch { setCopyStatus('番号を長押ししてコピーしてください'); }
-  };
   return <>
     <View style={styles.detailTicket}>
       <Text style={styles.detailKind}>{kind?.label}</Text>
@@ -269,15 +266,14 @@ function BookingDetails({ booking, documents }: { booking: Booking; documents: B
       </View>
       {booking.kind === 'flight' ? <Text style={styles.placeName}>時刻は各空港の現地時刻</Text> : null}
     </View>
-    {booking.confirmationCode ? <View style={styles.confirmation}><View style={styles.confirmationCopy}><Text style={styles.label}>予約・確認番号</Text><Text selectable accessibilityLabel={`予約番号 ${booking.confirmationCode}`} style={styles.confirmationCode}>{booking.confirmationCode}</Text></View><Pressable accessibilityRole="button" accessibilityLabel="予約番号をコピー" onPress={() => void copy()} style={styles.copyButton}><Text style={styles.copyText}>コピー</Text></Pressable></View> : null}
-    {copyStatus ? <Text accessibilityLiveRegion="polite" style={styles.placeName}>{copyStatus}</Text> : null}
+    {booking.confirmationCode ? <View style={styles.confirmation}><View style={styles.confirmationCopy}><Text style={styles.label}>予約・確認番号</Text><Text selectable accessibilityLabel={`予約番号 ${booking.confirmationCode}`} style={styles.confirmationCode}>{booking.confirmationCode}</Text></View><CopyButton key={booking.confirmationCode} value={booking.confirmationCode} /></View> : null}
     <BookingDocuments bookingId={booking.id} documents={documents} />
     {booking.note ? <View style={styles.noteBlock}><Text style={styles.label}>メモ</Text><Text selectable style={styles.detailBody}>{booking.note}</Text></View> : null}
   </>;
 }
 
 function BookingDocuments({ bookingId, documents }: { bookingId: string; documents: BookingDocument[] }) {
-  const { deleteBookingDocument, downloadBookingDocument, uploadBookingDocument } = useTravel();
+  const { canEdit, deleteBookingDocument, downloadBookingDocument, uploadBookingDocument } = useTravel();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
 
@@ -349,13 +345,13 @@ function BookingDocuments({ bookingId, documents }: { bookingId: string; documen
   };
 
   return <View style={styles.documentsSection}>
-    <View style={styles.documentsHeading}><Text style={styles.label}>書類</Text><Pressable accessibilityRole="button" disabled={Boolean(busy)} onPress={addDocuments} style={({ pressed }) => [styles.documentAddButton, pressed && styles.pressed]}><Text style={styles.documentAddText}>＋ 画像・PDF</Text></Pressable></View>
+    <View style={styles.documentsHeading}><Text style={styles.label}>書類</Text><Pressable accessibilityRole="button" disabled={!canEdit || Boolean(busy)} onPress={addDocuments} style={({ pressed }) => [styles.documentAddButton, pressed && styles.pressed]}><Text style={styles.documentAddText}>＋ 画像・PDF</Text></Pressable></View>
     {documents.length ? <View style={styles.documentList}>{documents.map((document) => <View key={document.id} style={styles.documentRow}>
       <View style={styles.documentIcon}><Text style={styles.documentIconText}>{document.contentType === 'application/pdf' ? 'PDF' : 'IMG'}</Text></View>
       <Pressable accessibilityLabel={`${document.filename}を開く`} disabled={Boolean(busy)} onPress={() => openDocument(document)} style={({ pressed }) => [styles.documentCopy, pressed && styles.pressed]}>
         <Text numberOfLines={1} style={styles.documentName}>{document.filename}</Text><Text style={styles.documentMeta}>{formatFileSize(document.size)} · {getCachedDocumentUri(document.id, document.filename) ? '端末に保存済み' : 'タップして開く'}</Text>
       </Pressable>
-      {busy === document.id ? <ActivityIndicator color={palette.ocean} size="small" /> : <Pressable accessibilityLabel={`${document.filename}を削除`} disabled={Boolean(busy)} onPress={() => removeDocument(document)} style={styles.documentDelete}><Text style={styles.documentDeleteText}>×</Text></Pressable>}
+      {busy === document.id ? <ActivityIndicator color={palette.ocean} size="small" /> : canEdit ? <Pressable accessibilityLabel={`${document.filename}を削除`} disabled={Boolean(busy)} onPress={() => removeDocument(document)} style={styles.documentDelete}><Text style={styles.documentDeleteText}>×</Text></Pressable> : null}
     </View>)}</View> : <View style={styles.documentEmpty}><Text style={styles.documentEmptyText}>画像やPDFを追加できます</Text></View>}
     {busy === 'upload' ? <View style={styles.uploading}><ActivityIndicator color={palette.ocean} size="small" /><Text style={styles.uploadingText}>アップロード中</Text></View> : null}
     {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}

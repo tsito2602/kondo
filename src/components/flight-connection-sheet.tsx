@@ -14,11 +14,11 @@ export function flightDate(day: string) {
   return parts.length === 3 ? `${Number(parts[1])}/${Number(parts[2])}` : day;
 }
 
-export function FlightConnectionLink({ booking, connection, nextFlight, onPress, compact = false }: {
-  booking: Booking; connection?: FlightConnection; nextFlight?: Booking; onPress: () => void; compact?: boolean;
+export function FlightConnectionLink({ booking, connection, nextFlight, onPress, compact = false, disabled = false }: {
+  booking: Booking; connection?: FlightConnection; nextFlight?: Booking; onPress: () => void; compact?: boolean; disabled?: boolean;
 }) {
   const missing = booking.connectionMode === 'manual' && !connection;
-  return <Pressable accessibilityRole="button" accessibilityLabel={`${booking.title}の乗り継ぎを${connection ? '変更' : '設定'}`} onPress={onPress}
+  return <Pressable disabled={disabled} accessibilityRole="button" accessibilityLabel={`${booking.title}の乗り継ぎを${connection ? '変更' : '設定'}`} onPress={onPress}
     style={({ pressed }) => [styles.link, compact && styles.linkCompact, pressed && styles.pressed]}>
     <SymbolView name={{ ios: 'arrow.triangle.branch', android: 'connecting_airports', web: 'connecting_airports' }} size={18} tintColor={palette.ocean} />
     <View style={styles.linkCopy}>
@@ -30,9 +30,9 @@ export function FlightConnectionLink({ booking, connection, nextFlight, onPress,
 }
 
 export function FlightConnectionSheet({ bookingId, onClose }: { bookingId: string; onClose: () => void }) {
-  const { bookings, selectedTrip, setFlightConnection } = useTravel();
+  const { canEdit, bookings, selectedTrip, setFlightConnection } = useTravel();
   const booking = bookings.find((item) => item.id === bookingId);
-  if (!booking || booking.kind !== 'flight') return null;
+  if (!canEdit || !booking || booking.kind !== 'flight') return null;
   return <ConnectionEditor key={`${selectedTrip?.id}:${bookingId}`} booking={booking} bookings={bookings} onClose={onClose} onSave={setFlightConnection} />;
 }
 

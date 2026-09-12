@@ -166,3 +166,12 @@ CREATE TABLE IF NOT EXISTS places (
   updated_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 CREATE INDEX IF NOT EXISTS places_trip ON places(trip_id, status, updated_at);
+
+-- Add read-only membership without rebuilding the existing member table.
+CREATE TABLE IF NOT EXISTS trip_member_permissions (
+  trip_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  read_only INTEGER NOT NULL DEFAULT 1 CHECK(read_only IN (0, 1)),
+  PRIMARY KEY (trip_id, user_id),
+  FOREIGN KEY (trip_id, user_id) REFERENCES trip_members(trip_id, user_id) ON DELETE CASCADE
+);

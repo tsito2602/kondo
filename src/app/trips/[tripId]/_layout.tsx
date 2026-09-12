@@ -15,8 +15,9 @@ export default function TripLayout() {
   const pathname = usePathname();
   const { height: windowHeight } = useWindowDimensions();
   const [scrollY] = useState(() => new Animated.Value(0));
+  const [pinAt, setPinAt] = useState(200);
   const showHero = pathname.endsWith('/itinerary');
-  const heroHeight = Math.max(headerHeight + insets.top + 220, Math.min(560, windowHeight * 0.64));
+  const heroHeight = Math.max(headerHeight + insets.top + 170, Math.min(430, windowHeight * 0.48));
   useEffect(() => { scrollY.setValue(0); }, [pathname, scrollY]);
   const { tripId: rawTripId } = useLocalSearchParams<{ tripId: string | string[] }>();
   const tripId = Array.isArray(rawTripId) ? rawTripId[0] : rawTripId;
@@ -35,8 +36,9 @@ export default function TripLayout() {
   return (
     <View style={styles.safeArea}>
       {showHero && selectedTrip ? <TripHero trip={selectedTrip} height={heroHeight} scrollY={scrollY} /> : null}
+      {showHero ? <Animated.View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: headerHeight + insets.top, backgroundColor: palette.canvas, opacity: scrollY.interpolate({ inputRange: [Math.max(0, pinAt - 100), Math.max(1, pinAt)], outputRange: [0, 1], extrapolate: 'clamp' }) }} /> : null}
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <TripHeroContext.Provider value={{ height: heroHeight - insets.top, scrollY }}>
+        <TripHeroContext.Provider value={{ height: heroHeight - insets.top, scrollY, setPinAt }}>
           <TripHeaderHeight.Provider value={headerHeight}>
             <View style={{ position: 'absolute', top: insets.top, left: 0, right: 0, zIndex: 30 }} onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}><TripTopTabs tripId={tripId} /></View>
             <View key={pathname} testID="route-transition" style={{ flex: 1 }}><Slot /></View>
