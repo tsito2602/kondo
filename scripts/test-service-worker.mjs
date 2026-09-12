@@ -33,9 +33,10 @@ test('installed shell and bundles support deep-link offline reload without cachi
 });
 test('updates wait for consent and keep one previous shell for active tabs', async () => {
   const f = await fixture();
-  f.stores.set('tabi-shell-old1', new Map()); f.stores.set('tabi-shell-old2', new Map()); f.stores.set('other-app-cache', new Map());
+  f.stores.set('tabi-shell-old1', new Map()); f.stores.set('tabi-shell-old2', new Map([['/_expo/static/js/web/previous.js', new Response('previous bundle')]])); f.stores.set('other-app-cache', new Map());
   await f.lifecycle('install'); assert.equal(f.activated(), false);
   f.listeners.message({ data: { type: 'ACTIVATE_UPDATE' } }); assert.equal(f.activated(), true);
   await f.lifecycle('activate'); assert.equal(f.claimed(), true);
   assert.deepEqual(f.deleted, ['tabi-shell-old1']); assert.ok(f.stores.has('other-app-cache'));
+  f.offline(); assert.equal(await (await f.fetch('/_expo/static/js/web/previous.js')).text(), 'previous bundle');
 });

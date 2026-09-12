@@ -25,5 +25,5 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(caches.open(CACHE).then(async (cache) => (await cache.match('/index.html')) || fetch(request)));
     return;
   }
-  if (PRECACHE.includes(url.pathname)) event.respondWith(caches.open(CACHE).then(async (cache) => (await cache.match(url.pathname)) || (await caches.match(request)) || fetch(request)));
+  if (PRECACHE.includes(url.pathname) || url.pathname.startsWith('/_expo/static/') || url.pathname.startsWith('/assets/')) event.respondWith(caches.open(CACHE).then(async (cache) => (await cache.match(url.pathname)) || (await caches.match(request)) || fetch(request)));
 });
