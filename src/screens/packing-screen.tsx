@@ -1,3 +1,4 @@
+import { useTripHeaderHeight } from '@/components/trip-header-context';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +24,7 @@ const blankPackingDraft = (): PackingDraft => ({ name: '', category: CATEGORIES[
 const blankTaskDraft = (): TaskDraft => ({ title: '', dueOn: '', assignee: '', done: false });
 
 export default function PackingScreen() {
+  const headerHeight = useTripHeaderHeight();
   const {
     createPackingItem,
     createTask,
@@ -173,7 +175,7 @@ export default function PackingScreen() {
 
   return (
     <SafeAreaView edges={[]} style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingTop: headerHeight + 20 }]} showsVerticalScrollIndicator={false}>
         <View accessibilityRole="tablist" style={styles.segmented}>
           <Pressable
             accessibilityRole="tab"

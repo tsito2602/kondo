@@ -1,13 +1,16 @@
-import { Redirect, Slot, useLocalSearchParams } from 'expo-router';
-import { useEffect } from 'react';
+import { Redirect, Slot, useLocalSearchParams, usePathname } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { TripHeaderHeight } from '@/components/trip-header-context';
 import { TripTopTabs } from '@/components/trip-top-tabs';
 import { palette } from '@/constants/design';
 import { useTravel } from '@/data/travel-provider';
 
 export default function TripLayout() {
+  const [headerHeight, setHeaderHeight] = useState(160);
+  const pathname = usePathname();
   const { tripId: rawTripId } = useLocalSearchParams<{ tripId: string | string[] }>();
   const tripId = Array.isArray(rawTripId) ? rawTripId[0] : rawTripId;
   const { ready, trips, selectedTrip, selectTrip } = useTravel();
@@ -24,8 +27,10 @@ export default function TripLayout() {
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
-      <TripTopTabs tripId={tripId} />
-      <Slot />
+      <TripHeaderHeight.Provider value={headerHeight}>
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30 }} onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}><TripTopTabs tripId={tripId} /></View>
+        <View key={pathname} testID="route-transition" style={{ flex: 1 }}><Slot /></View>
+      </TripHeaderHeight.Provider>
     </SafeAreaView>
   );
 }

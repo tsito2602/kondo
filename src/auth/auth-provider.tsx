@@ -24,18 +24,20 @@ type AuthContextValue = {
 };
 
 const SESSION_KEY = 'tabi.session';
+const USER_KEY = 'tabi.offline-user';
 const API_URL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '') ?? '';
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function readToken() {
-  if (Platform.OS === 'web') return globalThis.sessionStorage?.getItem(SESSION_KEY) ?? null;
+  if (Platform.OS === 'web') return globalThis.localStorage?.getItem(SESSION_KEY) ?? globalThis.sessionStorage?.getItem(SESSION_KEY) ?? null;
   return SecureStore.getItemAsync(SESSION_KEY);
 }
 
 async function writeToken(token: string | null) {
   if (Platform.OS === 'web') {
-    if (token) globalThis.sessionStorage?.setItem(SESSION_KEY, token);
-    else globalThis.sessionStorage?.removeItem(SESSION_KEY);
+    if (token) globalThis.localStorage?.setItem(SESSION_KEY, token);
+    else { globalThis.localStorage?.removeItem(SESSION_KEY); globalThis.localStorage?.removeItem(USER_KEY); }
+    globalThis.sessionStorage?.removeItem(SESSION_KEY);
     return;
   }
   if (token) await SecureStore.setItemAsync(SESSION_KEY, token);
@@ -69,8 +71,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const clientId = Platform.OS === 'ios' ? iosClientId : Platform.OS === 'android' ? androidClientId : webClientId;
   const configured = Boolean(API_URL && clientId && !isExpoGo && !Constants.expoConfig?.extra?.preview);
   const [isDemo, setIsDemo] = useState(false);
-  const startDemo = useCallback(() => setIsDemo(true), []);
-  const exitDemo = useCallback(() => setIsDemo(false), []);
+  const startDemo = useCallback(() => { if (Platform.OS === 'web') localStorage.setItem('tabi.demo-active', '1'); setIsDemo(true); }, []);
+  const exitDemo = useCallback(() => { if (Platform.OS === 'web') localStorage.removeItem('tabi.demo-active'); setIsDemo(false); }, []);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
@@ -90,11 +92,24 @@ export function AuthProvider({ children }: PropsWithChildren) {
     let active = true;
     void readToken()
       .then(async (token) => {
+        if (active && Platform.OS === 'web' && localStorage.getItem('tabi.demo-active') === '1') setIsDemo(true);
         if (!token) return;
+        // Offline identity only unlocks this account's local cache. The API still
+        // verifies the bearer session for every server read and write.
+        if (Platform.OS === 'web') {
+          try { const cached = JSON.parse(localStorage.getItem(USER_KEY) ?? 'null'); if (active && cached?.user && cached.expiresAt > Date.now()) setUser(cached.user); } catch { /* online validation below */ }
+        }
         const result = await api<{ user: User }>('/v1/me', {}, token);
+        await writeToken(token);
+        if (Platform.OS === 'web') {
+          localStorage.setItem(USER_KEY, JSON.stringify({ user: result.user, expiresAt: Date.now() + 30 * 86400000 }));
+          if (!localStorage.getItem('tabi.legacy-cache-owner')) localStorage.setItem('tabi.legacy-cache-owner', result.user.id);
+        }
         if (active) setUser(result.user);
       })
-      .catch(() => writeToken(null))
+      .catch(async (cause) => {
+        if (cause?.status === 401 || cause?.status === 403) { await writeToken(null); if (active) setUser(null); }
+      })
       .finally(() => {
         if (active) setLoading(false);
       });
@@ -125,6 +140,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       })
         .then(async (result) => {
           await writeToken(result.token);
+          if (Platform.OS === 'web') localStorage.setItem(USER_KEY, JSON.stringify({ user: result.user, expiresAt: Date.now() + 30 * 86400000 }));
           if (!active) return;
           setUser(result.user);
           setError(null);

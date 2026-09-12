@@ -1,3 +1,4 @@
+import { useTripHeaderHeight } from '@/components/trip-header-context';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
@@ -49,6 +50,7 @@ export default function BookingsScreen() {
 }
 
 function TripBookingsScreen() {
+  const headerHeight = useTripHeaderHeight();
   const { booking: requestedBooking } = useLocalSearchParams<{ booking?: string | string[] }>();
   const { bookings, createBooking, deleteBooking, deleteItem, documentsByBooking, items, selectedTrip, updateBooking } = useTravel();
   const [initialDraft, setInitialDraft] = useState('');
@@ -170,7 +172,7 @@ function TripBookingsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingTop: headerHeight + 20 }]} showsVerticalScrollIndicator={false}>
         {!selectedTrip ? (
           <View style={styles.empty}><Text style={styles.emptyTitle}>旅行を作成してください</Text><Text style={styles.emptyBody}>予約は選択中の旅行ごとに保存されます。</Text></View>
         ) : bookings.length === 0 ? (

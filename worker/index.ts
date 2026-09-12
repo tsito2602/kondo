@@ -106,9 +106,10 @@ async function googleLogin(request: Request, env: Env) {
 async function listTrips(env: Env, user: User) {
   const result = await env.DB.prepare(`
     SELECT t.id, t.name, t.destination, t.starts_on AS startsOn, t.ends_on AS endsOn,
-           t.updated_at AS updatedAt, tm.role,
+           t.updated_at AS updatedAt, tm.role, COALESCE(tc.image, '') AS coverImage,
            (SELECT COUNT(*) FROM trip_members members WHERE members.trip_id = t.id) AS memberCount
     FROM trips t
+    LEFT JOIN trip_covers tc ON tc.trip_id = t.id
     JOIN trip_members tm ON tm.trip_id = t.id
     WHERE tm.user_id = ?
     ORDER BY t.starts_on, t.id
@@ -123,6 +124,8 @@ async function createTrip(request: Request, env: Env, user: User) {
   const destination = textField(body.destination, 160);
   const startsOn = dateField(body.startsOn);
   const endsOn = dateField(body.endsOn);
+  const coverImage = body.coverImage === undefined ? undefined : textField(body.coverImage, 550000);
+  if (coverImage === null || (coverImage && !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(coverImage))) return json({ error: 'トップ画像を選び直してください' }, 400);
   if (!name || destination === null || !startsOn || !endsOn || startsOn > endsOn) {
     return json({ error: '旅行名と正しい日付を入力してください' }, 400);
   }
@@ -144,7 +147,8 @@ async function createTrip(request: Request, env: Env, user: User) {
       .bind(user.id, id, user.id),
   ]);
   if (!(await memberRole(env, id, user.id))) return json({ error: '旅行IDが競合しました' }, 409);
-  return json({ trip: { id, name, destination, startsOn, endsOn, role: 'owner', memberCount: 1 } }, 201);
+  if (coverImage !== undefined) await env.DB.prepare('INSERT INTO trip_covers (trip_id, image) VALUES (?, ?) ON CONFLICT(trip_id) DO UPDATE SET image = excluded.image').bind(id, coverImage).run();
+  return json({ trip: { id, name, destination, startsOn, endsOn, coverImage, role: 'owner', memberCount: 1 } }, 201);
 }
 
 async function updateTrip(request: Request, env: Env, user: User, tripId: string) {
@@ -156,13 +160,67 @@ async function updateTrip(request: Request, env: Env, user: User, tripId: string
   const destination = textField(body.destination, 160);
   const startsOn = dateField(body.startsOn);
   const endsOn = dateField(body.endsOn);
+  const coverImage = body.coverImage === undefined ? undefined : textField(body.coverImage, 550000);
+  if (coverImage === null || (coverImage && !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(coverImage))) return json({ error: 'トップ画像を選び直してください' }, 400);
   if (!name || destination === null || !startsOn || !endsOn || startsOn > endsOn) {
     return json({ error: '旅行名と正しい日付を入力してください' }, 400);
   }
-  const result = await env.DB.prepare(`UPDATE trips SET name = ?, destination = ?, starts_on = ?, ends_on = ?, updated_at = unixepoch() WHERE id = ?`)
-    .bind(name, destination, startsOn, endsOn, tripId)
-    .run();
-  return result.meta.changes ? json({ trip: { id: tripId, name, destination, startsOn, endsOn } }) : json({ error: '旅行が見つかりません' }, 404);
+  const results = await env.DB.batch([
+    env.DB.prepare(`UPDATE trips SET name = ?, destination = ?, starts_on = ?, ends_on = ?, updated_at = unixepoch() WHERE id = ?`).bind(name, destination, startsOn, endsOn, tripId),
+    ...(coverImage === undefined ? [] : [env.DB.prepare('INSERT INTO trip_covers (trip_id, image) VALUES (?, ?) ON CONFLICT(trip_id) DO UPDATE SET image = excluded.image').bind(tripId, coverImage)]),
+  ]);
+  return results[0].meta.changes ? json({ trip: { id: tripId, name, destination, startsOn, endsOn, coverImage } }) : json({ error: '旅行が見つかりません' }, 404);
+}
+
+async function deleteTrip(env: Env, user: User, tripId: string) {
+  const role = await memberRole(env, tripId, user.id);
+  if (!role) {
+    const exists = await env.DB.prepare('SELECT id FROM trips WHERE id = ?').bind(tripId).first();
+    return exists ? json({ error: '旅行を削除する権限がありません' }, 403) : new Response(null, { status: 204 });
+  }
+  if (role !== 'owner') return json({ error: '旅行を削除できるのは作成者だけです' }, 403);
+  const objects = await env.DB.prepare('SELECT object_key FROM booking_documents WHERE trip_id = ? UNION SELECT object_key FROM attachments WHERE trip_id = ?').bind(tripId, tripId).all<{ object_key: string }>();
+  // Keep the database records if object cleanup fails; a retry can safely finish.
+  for (let i = 0; i < objects.results.length; i += 1000) await env.BUCKET.delete(objects.results.slice(i, i + 1000).map((entry) => entry.object_key));
+  await env.DB.prepare('DELETE FROM trips WHERE id = ?').bind(tripId).run();
+  return new Response(null, { status: 204 });
+}
+
+function placeFields(body: Record<string, unknown>) {
+  const title = textField(body.title, 160, true);
+  const note = textField(body.note, 4000);
+  const openingHours = textField(body.openingHours, 500);
+  const location = textField(body.location, 2000);
+  const status = textField(body.status, 20);
+  const reservationStatus = textField(body.reservationStatus, 20);
+  if (!title || note === null || openingHours === null || location === null || !['want','planned','visited','skipped'].includes(status ?? '') || !['not_needed','needed','requested','confirmed'].includes(reservationStatus ?? '')) return null;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(location) && !/^https?:\/\//i.test(location)) return null;
+  return { title, note, openingHours, location, status, reservationStatus };
+}
+async function placesRoute(request: Request, env: Env, user: User, tripId: string, placeId?: string) {
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  if (!placeId && request.method === 'GET') {
+    const rows = await env.DB.prepare('SELECT id, title, note, opening_hours AS openingHours, reservation_status AS reservationStatus, location, status, updated_at AS updatedAt FROM places WHERE trip_id = ? ORDER BY updated_at DESC, id').bind(tripId).all();
+    return json({ places: rows.results });
+  }
+  if (placeId && request.method === 'DELETE') {
+    await env.DB.prepare('DELETE FROM places WHERE trip_id = ? AND id = ?').bind(tripId, placeId).run();
+    return new Response(null, { status: 204 });
+  }
+  if ((!placeId && request.method === 'POST') || (placeId && request.method === 'PATCH')) {
+    const body = await request.json().catch(() => null);
+    const fields = isObject(body) ? placeFields(body) : null;
+    if (!fields) return json({ error: '場所の名前と入力内容を確認してください' }, 400);
+    const { title, note, openingHours, reservationStatus, location, status } = fields;
+    const id = placeId ?? idField(body.id) ?? crypto.randomUUID();
+    const result = placeId
+      ? await env.DB.prepare('UPDATE places SET title=?, note=?, opening_hours=?, reservation_status=?, location=?, status=?, updated_by=?, updated_at=unixepoch() WHERE id=? AND trip_id=?').bind(title, note, openingHours, reservationStatus, location, status, user.id, id, tripId).run()
+      : await env.DB.prepare(`INSERT INTO places (id, trip_id, title, note, opening_hours, reservation_status, location, status, updated_by) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title, note=excluded.note, opening_hours=excluded.opening_hours, reservation_status=excluded.reservation_status, location=excluded.location, status=excluded.status, updated_by=excluded.updated_by, updated_at=unixepoch() WHERE places.trip_id=excluded.trip_id`).bind(id, tripId, title, note, openingHours, reservationStatus, location, status, user.id).run();
+    if (!result.meta.changes) return json({ error: '場所が見つからないか、IDが競合しました' }, placeId ? 404 : 409);
+    return json({ place: { id, ...fields } }, placeId ? 200 : 201);
+  }
+  return json({ error: 'Not found' }, 404);
 }
 
 async function listItems(env: Env, user: User, tripId: string) {
@@ -652,6 +710,9 @@ async function api(request: Request, env: Env, url: URL) {
   if (request.method === 'POST' && url.pathname === '/v1/trips') return createTrip(request, env, user);
 
   const tripMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)$/);
+  if (tripMatch && request.method === 'DELETE') return deleteTrip(env, user, tripMatch[1]);
+  const placesMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/places(?:\/([^/]+))?$/);
+  if (placesMatch) return placesRoute(request, env, user, placesMatch[1], placesMatch[2]);
   if (tripMatch && request.method === 'PATCH') return updateTrip(request, env, user, tripMatch[1]);
 
   const itemsMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/items$/);

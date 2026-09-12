@@ -22,7 +22,7 @@ const deferred = () => {
 };
 const trip = { id: 'trip', name: 'Travel', destination: '', startsOn: '2026-11-21', endsOn: '2026-11-28', role: 'owner', memberCount: 1 };
 const task = { id: 'task', title: 'Pack', dueOn: '', assignee: '', done: false };
-const empty = () => ({ version: 1, trips: [trip], selectedTripId: trip.id, itemsByTrip: {}, bookingsByTrip: {}, documentsByBooking: {}, packingByTrip: {}, tasksByTrip: { trip: [task] }, pending: [] });
+const empty = () => ({ version: 1, trips: [trip], selectedTripId: trip.id, itemsByTrip: {}, bookingsByTrip: {}, documentsByBooking: {}, packingByTrip: {}, tasksByTrip: { trip: [task] }, placesByTrip: {}, pending: [] });
 
 async function fixture({ stored = empty(), transport, isDemo = false } = {}) {
   let cursor = 0;
@@ -49,6 +49,7 @@ async function fixture({ stored = empty(), transport, isDemo = false } = {}) {
     if (init.method) return {};
     if (path === '/v1/trips') return { trips: structuredClone(serverTrips) };
     if (path.endsWith('/tasks')) return { tasks: structuredClone(serverTasks) };
+    if (path.endsWith('/places')) return { places: [] };
     if (path.endsWith('/bookings')) return { bookings: [] };
     if (path.endsWith('/booking-documents')) return { documents: [] };
     return { items: [] };
@@ -199,4 +200,33 @@ test('sample mode stores edits separately and never sends them to the API', asyn
     assert.equal(f.writes.at(-1).documentsByBooking[bookingId][0].filename, 'sample.pdf');
     assert.ok(f.scopes.every((scope) => scope === 'demo'));
   } finally { f.close(); }
+});
+
+test('places survive offline edits, queue exactly once, and remain separate from bookings', async () => {
+  const f = await fixture({ isDemo: true });
+  try {
+    const input = { title: 'Museum', note: 'Gallery', openingHours: '10–18', reservationStatus: 'needed', location: 'https://maps.app.goo.gl/example', status: 'want' };
+    const id = f.api.createPlace(input);
+    f.api.updatePlace(id, { ...input, status: 'visited' });
+    assert.equal(f.render().places[0].status, 'visited');
+    assert.equal(f.render().bookings.length, 0);
+    f.api.deletePlace(id);
+    assert.equal(f.render().places.length, 0);
+    assert.equal(f.requests.length, 0);
+  } finally { f.close(); }
+});
+
+test('owner deletion removes trip collections; editors cannot delete', async () => {
+  const stored = empty(); stored.placesByTrip.trip = [{ id: 'place', title: 'Place' }];
+  const f = await fixture({ stored, isDemo: true });
+  try {
+    await f.api.deleteTrip('trip');
+    assert.equal(f.render().trips.length, 0);
+    assert.deepEqual(f.writes.at(-1).placesByTrip, {});
+    assert.deepEqual(f.writes.at(-1).tasksByTrip, {});
+  } finally { f.close(); }
+  const other = empty(); other.trips[0] = { ...trip, role: 'editor' };
+  const editor = await fixture({ stored: other, isDemo: true });
+  try { await assert.rejects(editor.api.deleteTrip('trip')); assert.equal(editor.render().trips.length, 1); }
+  finally { editor.close(); }
 });

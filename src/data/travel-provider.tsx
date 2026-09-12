@@ -4,13 +4,14 @@ import { Alert, AppState, Platform } from 'react-native';
 
 import { useAuth } from '@/auth/auth-provider';
 
+import { readOfflineFile, saveOfflineFile } from './offline-files';
 import { createDemoCache } from './demo';
 import { loadDemoDocument, saveDemoDocument } from './demo-documents';
 import { loadTravelCache, saveTravelCache } from './cache';
 import { connectionBetween, createsFlightConnectionCycle } from './flight-connections';
-import { Booking, BookingDocument, emptyTravelCache, ItineraryItem, PackingItem, PendingMutation, TravelCache, TravelTask, Trip } from './types';
+import { Booking, BookingDocument, emptyTravelCache, ItineraryItem, PackingItem, PendingMutation, Place, PlaceInput, TravelCache, TravelTask, Trip } from './types';
 
-type TripInput = Pick<Trip, 'name' | 'destination' | 'startsOn' | 'endsOn'>;
+type TripInput = Pick<Trip, 'name' | 'destination' | 'startsOn' | 'endsOn' | 'coverImage'>;
 type ItemInput = Pick<ItineraryItem, 'day' | 'time' | 'kind' | 'title' | 'note'>;
 type BookingInput = Pick<Booking, 'kind' | 'title' | 'detail' | 'origin' | 'originCode' | 'destination' | 'destinationCode' | 'day' | 'time' | 'endDay' | 'endTime' | 'confirmationCode' | 'note'>;
 type PackingInput = Pick<PackingItem, 'name' | 'category' | 'quantity' | 'packed'>;
@@ -28,6 +29,12 @@ type TravelContextValue = {
   documentsByBooking: Record<string, BookingDocument[]>;
   packingItems: PackingItem[];
   tasks: TravelTask[];
+  places: Place[];
+  createPlace: (input: PlaceInput) => string;
+  updatePlace: (id: string, input: PlaceInput) => void;
+  deletePlace: (id: string) => void;
+  deleteTrip: (id: string) => Promise<void>;
+  saveTripOffline: (onProgress: (done: number, total: number) => void) => Promise<number>;
   pendingCount: number;
   selectTrip: (id: string) => void;
   sync: () => Promise<void>;
@@ -56,7 +63,7 @@ type TravelContextValue = {
 const TravelContext = createContext<TravelContextValue | null>(null);
 
 export function TravelProvider({ children }: PropsWithChildren) {
-  const { request, requestRaw, isDemo } = useAuth();
+  const { request, requestRaw, isDemo, user } = useAuth();
   const [cache, setCache] = useState<TravelCache>(emptyTravelCache);
   const [ready, setReady] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -70,8 +77,8 @@ export function TravelProvider({ children }: PropsWithChildren) {
     if (next === cacheRef.current) return;
     cacheRef.current = next;
     setCache(next);
-    void saveTravelCache(next, isDemo ? 'demo' : undefined).catch(() => setError('端末に保存できませんでした。空き容量を確認してください'));
-  }, [isDemo]);
+    void saveTravelCache(next, isDemo ? 'demo' : user?.id).catch(() => setError('端末に保存できませんでした。空き容量を確認してください'));
+  }, [isDemo, user?.id]);
 
   const sync = useCallback((): Promise<void> => {
     if (isDemo) return Promise.resolve();
@@ -102,14 +109,15 @@ export function TravelProvider({ children }: PropsWithChildren) {
           const { trips } = await request<{ trips: Trip[] }>('/v1/trips');
           const tripEntries = await Promise.all(
             trips.map(async (trip) => {
-              const [itemResult, bookingResult, packingResult, taskResult, documentResult] = await Promise.all([
+              const [itemResult, bookingResult, packingResult, taskResult, documentResult, placeResult] = await Promise.all([
                 request<{ items: ItineraryItem[] }>(`/v1/trips/${trip.id}/items`),
                 request<{ bookings: Booking[] }>(`/v1/trips/${trip.id}/bookings`),
                 request<{ items: PackingItem[] }>(`/v1/trips/${trip.id}/packing`),
                 request<{ tasks: TravelTask[] }>(`/v1/trips/${trip.id}/tasks`),
                 request<{ documents: BookingDocument[] }>(`/v1/trips/${trip.id}/booking-documents`),
+                request<{ places: Place[] }>(`/v1/trips/${trip.id}/places`),
               ]);
-              return [trip.id, itemResult.items, bookingResult.bookings, packingResult.items, taskResult.tasks, documentResult.documents] as const;
+              return [trip.id, itemResult.items, bookingResult.bookings, packingResult.items, taskResult.tasks, documentResult.documents, placeResult.places] as const;
             }),
           );
           commit((current) => {
@@ -131,6 +139,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
               bookingsByTrip: Object.fromEntries(tripEntries.map(([tripId, , bookings]) => [tripId, bookings])),
               packingByTrip: Object.fromEntries(tripEntries.map(([tripId, , , packingItems]) => [tripId, packingItems])),
               tasksByTrip: Object.fromEntries(tripEntries.map(([tripId, , , , tasks]) => [tripId, tasks])),
+              placesByTrip: Object.fromEntries(tripEntries.map(([tripId, , , , , , places]) => [tripId, places ?? []])),
               documentsByBooking,
             };
           });
@@ -149,24 +158,27 @@ export function TravelProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let active = true;
-    void loadTravelCache(isDemo ? 'demo' : undefined).then((value) => {
+    void loadTravelCache(isDemo ? 'demo' : user?.id).then((value) => {
       const stored = isDemo && !value.trips.length ? createDemoCache() : value;
       if (!active) return;
       cacheRef.current = stored;
       setCache(stored);
       setReady(true);
       void sync();
-    });
+    }).catch(() => { if (active) { setError('端末の保存データを開けませんでした'); setReady(true); } });
     const appState = AppState.addEventListener('change', (state) => {
       if (state === 'active') void sync();
     });
+    const onOnline = () => void sync();
+    if (Platform.OS === 'web') globalThis.addEventListener?.('online', onOnline);
     const timer = setInterval(() => void sync(), 30_000);
     return () => {
       active = false;
       appState.remove();
+      if (Platform.OS === 'web') globalThis.removeEventListener?.('online', onOnline);
       clearInterval(timer);
     };
-  }, [sync, isDemo]);
+  }, [sync, isDemo, user?.id]);
 
   const enqueue = useCallback((mutation: Omit<PendingMutation, 'id'>) => {
     if (isDemo) return;
@@ -192,6 +204,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
       bookingsByTrip: { ...current.bookingsByTrip, [id]: [] },
       packingByTrip: { ...current.packingByTrip, [id]: [] },
       tasksByTrip: { ...current.tasksByTrip, [id]: [] },
+      placesByTrip: { ...current.placesByTrip, [id]: [] },
     }));
     enqueue({ method: 'POST', path: '/v1/trips', body: { id, ...input } });
     return id;
@@ -200,6 +213,45 @@ export function TravelProvider({ children }: PropsWithChildren) {
   const updateTrip = useCallback((id: string, input: TripInput) => {
     commit((current) => ({ ...current, trips: current.trips.map((trip) => trip.id === id ? { ...trip, ...input } : trip) }));
     enqueue({ method: 'PATCH', path: `/v1/trips/${id}`, body: input });
+  }, [commit, enqueue]);
+
+  const deleteTrip = useCallback(async (id: string) => {
+    const trip = cacheRef.current.trips.find((entry) => entry.id === id);
+    if (!trip || trip.role !== 'owner') throw new Error('旅行を削除できるのは作成者だけです');
+    if (!isDemo) {
+      await sync();
+      if (cacheRef.current.pending.length) throw new Error('未同期の変更があります。オンラインで同期してから削除してください');
+      await request(`/v1/trips/${id}`, { method: 'DELETE' });
+    }
+    commit((current) => {
+      const withoutTrip = <T,>(values: Record<string, T>) => Object.fromEntries(Object.entries(values).filter(([key]) => key !== id));
+      const bookingIds = new Set((current.bookingsByTrip[id] ?? []).map((booking) => booking.id));
+      return { ...current, trips: current.trips.filter((entry) => entry.id !== id), selectedTripId: current.selectedTripId === id ? null : current.selectedTripId,
+        itemsByTrip: withoutTrip(current.itemsByTrip), bookingsByTrip: withoutTrip(current.bookingsByTrip),
+        packingByTrip: withoutTrip(current.packingByTrip), tasksByTrip: withoutTrip(current.tasksByTrip), placesByTrip: withoutTrip(current.placesByTrip),
+        documentsByBooking: Object.fromEntries(Object.entries(current.documentsByBooking).filter(([key]) => !bookingIds.has(key))) };
+    });
+  }, [commit, isDemo, request, sync]);
+
+  const createPlace = useCallback((input: PlaceInput) => {
+    const tripId = cacheRef.current.selectedTripId;
+    if (!tripId) throw new Error('旅行を選択してください');
+    const id = Crypto.randomUUID();
+    commit((current) => ({ ...current, placesByTrip: { ...current.placesByTrip, [tripId]: [...(current.placesByTrip[tripId] ?? []), { id, ...input }] } }));
+    enqueue({ method: 'POST', path: `/v1/trips/${tripId}/places`, body: { id, ...input } });
+    return id;
+  }, [commit, enqueue]);
+  const updatePlace = useCallback((id: string, input: PlaceInput) => {
+    const tripId = cacheRef.current.selectedTripId;
+    if (!tripId) return;
+    commit((current) => ({ ...current, placesByTrip: { ...current.placesByTrip, [tripId]: (current.placesByTrip[tripId] ?? []).map((place) => place.id === id ? { ...place, ...input } : place) } }));
+    enqueue({ method: 'PATCH', path: `/v1/trips/${tripId}/places/${id}`, body: input });
+  }, [commit, enqueue]);
+  const deletePlace = useCallback((id: string) => {
+    const tripId = cacheRef.current.selectedTripId;
+    if (!tripId) return;
+    commit((current) => ({ ...current, placesByTrip: { ...current.placesByTrip, [tripId]: (current.placesByTrip[tripId] ?? []).filter((place) => place.id !== id) } }));
+    enqueue({ method: 'DELETE', path: `/v1/trips/${tripId}/places/${id}` });
   }, [commit, enqueue]);
 
   const createItem = useCallback((input: ItemInput) => {
@@ -324,9 +376,35 @@ export function TravelProvider({ children }: PropsWithChildren) {
     if (isDemo) {
       return loadDemoDocument(documentId);
     }
+    const scope = user?.id ?? 'unknown';
+    const cached = await readOfflineFile(scope, documentId);
+    if (cached) return cached;
     const response = await requestRaw(`/v1/trips/${tripId}/bookings/${bookingId}/documents/${documentId}`);
-    return response.arrayBuffer();
-  }, [requestRaw, isDemo]);
+    const bytes = await response.arrayBuffer();
+    await saveOfflineFile(scope, documentId, bytes);
+    return bytes;
+  }, [requestRaw, isDemo, user?.id]);
+
+  const saveTripOffline = useCallback(async (onProgress: (done: number, total: number) => void) => {
+    const tripId = cacheRef.current.selectedTripId;
+    if (!tripId) throw new Error('旅行を選択してください');
+    await sync();
+    const snapshot = cacheRef.current;
+    const scope = isDemo ? 'demo' : user?.id;
+    await saveTravelCache(snapshot, scope);
+    const documents = (snapshot.bookingsByTrip[tripId] ?? []).flatMap((booking) =>
+      (snapshot.documentsByBooking[booking.id] ?? []).map((document) => ({ ...document, bookingId: booking.id })));
+    for (const [index, document] of documents.entries()) {
+      onProgress(index, documents.length);
+      if (isDemo) await loadDemoDocument(document.id);
+      else if (!(await readOfflineFile(scope ?? 'unknown', document.id))) {
+        const response = await requestRaw(`/v1/trips/${tripId}/bookings/${document.bookingId}/documents/${document.id}`);
+        await saveOfflineFile(scope ?? 'unknown', document.id, await response.arrayBuffer());
+      }
+    }
+    onProgress(documents.length, documents.length);
+    return documents.length;
+  }, [isDemo, requestRaw, sync, user?.id]);
 
   const deleteBooking = useCallback((id: string) => {
     const tripId = cacheRef.current.selectedTripId;
@@ -455,6 +533,8 @@ export function TravelProvider({ children }: PropsWithChildren) {
     documentsByBooking: cache.documentsByBooking,
     packingItems,
     tasks,
+    places: selectedTrip ? cache.placesByTrip[selectedTrip.id] ?? [] : [],
+    createPlace, updatePlace, deletePlace, deleteTrip, saveTripOffline,
     pendingCount: cache.pending.length,
     selectTrip,
     sync,
@@ -478,7 +558,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     deleteTask,
     createInvite,
     acceptInvite,
-  }), [acceptInvite, bookings, cache.documentsByBooking, cache.pending.length, cache.trips, createBooking, createInvite, createItem, createPackingItem, createTask, createTrip, deleteBooking, deleteBookingDocument, deleteItem, deletePackingItem, deleteTask, downloadBookingDocument, error, items, packingItems, ready, selectTrip, selectedTrip, setFlightConnection, sync, syncing, tasks, updateBooking, updateItem, updatePackingItem, updateTask, updateTrip, uploadBookingDocument]);
+  }), [saveTripOffline, createPlace, updatePlace, deletePlace, deleteTrip, cache.placesByTrip, acceptInvite, bookings, cache.documentsByBooking, cache.pending.length, cache.trips, createBooking, createInvite, createItem, createPackingItem, createTask, createTrip, deleteBooking, deleteBookingDocument, deleteItem, deletePackingItem, deleteTask, downloadBookingDocument, error, items, packingItems, ready, selectTrip, selectedTrip, setFlightConnection, sync, syncing, tasks, updateBooking, updateItem, updatePackingItem, updateTask, updateTrip, uploadBookingDocument]);
 
   return <TravelContext.Provider value={value}>{children}</TravelContext.Provider>;
 }

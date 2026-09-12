@@ -37,9 +37,9 @@ export function FormSheet({ visible, title, onClose, onSave, saveLabel = '保存
   return <><Modal visible={visible} transparent={Platform.OS === 'web'} presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : 'fullScreen'} animationType={reduceMotion ? 'none' : Platform.OS === 'web' ? 'fade' : 'slide'} onRequestClose={close}>
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
       {Platform.OS === 'web' ? <Pressable accessibilityLabel="シートを閉じる" onPress={close} style={StyleSheet.absoluteFill} /> : null}
-      <SafeAreaView edges={['top', 'bottom']} style={styles.sheet}>
+      <SafeAreaView testID="form-sheet" edges={['top', 'bottom']} style={styles.sheet}>
         <View accessibilityViewIsModal style={styles.fill}>
-          <View style={styles.header}>
+          <View testID="sheet-header" style={styles.header}>
             <Pressable accessibilityRole="button" accessibilityLabel="閉じる" onPress={close} style={styles.headerButton}><Text style={styles.close}>閉じる</Text></Pressable>
             <Text accessibilityRole="header" numberOfLines={2} style={styles.title}>{title}</Text>
             {onSave ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: !canSave }} disabled={!canSave} onPress={onSave} style={styles.headerButton}><Text style={[styles.save, !canSave && styles.disabled]}>{saveLabel}</Text></Pressable> : <View style={styles.headerButton} />}

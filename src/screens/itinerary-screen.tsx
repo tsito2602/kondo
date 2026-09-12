@@ -1,3 +1,6 @@
+import { OfflineTrip } from '@/components/offline-trip';
+import { TripCover } from '@/components/trip-cover';
+import { useTripHeaderHeight } from '@/components/trip-header-context';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Fragment, type ComponentProps, useEffect, useMemo, useRef, useState } from 'react';
@@ -159,6 +162,7 @@ function timeZoneLabel(entry: TimelineEntry) {
 }
 
 export default function ItineraryScreen() {
+  const headerHeight = useTripHeaderHeight();
   const { selectedTrip, items, bookings, createItem, updateItem, deleteItem, pendingCount } = useTravel();
   const [adding, setAdding] = useState(false);
   const [formError, setFormError] = useState('');
@@ -170,6 +174,7 @@ export default function ItineraryScreen() {
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
   const scrollRef = useRef<ScrollView>(null);
+  const timelineOffset = useRef(0);
   const dayOffsets = useRef<Record<string, number>>({});
   const programmaticScrollDay = useRef<string | null>(null);
   const scrollTrackingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -218,13 +223,13 @@ export default function ItineraryScreen() {
       resumeScrollTracking();
       return;
     }
-    scrollRef.current?.scrollTo({ y: Math.max(0, offset - 68), animated: true });
+    scrollRef.current?.scrollTo({ y: Math.max(0, timelineOffset.current + offset - headerHeight - 10), animated: true });
     scrollTrackingTimer.current = setTimeout(resumeScrollTracking, 1000);
   };
 
   const trackVisibleDay = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (programmaticScrollDay.current) return;
-    const scrollPosition = event.nativeEvent.contentOffset.y + 76;
+    const scrollPosition = event.nativeEvent.contentOffset.y + headerHeight + 24 - timelineOffset.current;
     let visibleDay = itineraryDates[0];
     for (const date of itineraryDates) {
       if ((dayOffsets.current[date] ?? Number.POSITIVE_INFINITY) <= scrollPosition) visibleDay = date;
@@ -283,14 +288,16 @@ export default function ItineraryScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingTop: headerHeight + 20 }]}
         onMomentumScrollEnd={resumeScrollTracking}
         onScroll={trackVisibleDay}
         onScrollBeginDrag={resumeScrollTracking}
         ref={scrollRef}
         scrollEventThrottle={32}
         showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[0]}>
+        >
+        <View style={{ marginBottom: 18 }}><TripCover image={selectedTrip?.coverImage} /></View>
+        <OfflineTrip />
         <View style={styles.dayNavSticky}>
           {selectedTrip && itineraryDates.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayTabs}>
             {itineraryDates.map((date, index) => {
@@ -306,7 +313,7 @@ export default function ItineraryScreen() {
 
         {!selectedTrip ? (
           <View style={styles.empty}><Text style={styles.emptyTitle}>旅行がありません</Text><Text style={styles.emptyBody}>旅行一覧から旅行を選択してください。</Text></View>
-        ) : <View style={styles.timeline}>{itineraryDates.map((date, dayIndex) => {
+        ) : <View onLayout={(event) => { timelineOffset.current = event.nativeEvent.layout.y; }} style={styles.timeline}>{itineraryDates.map((date, dayIndex) => {
           const dateItems = grouped[date] ?? [];
           return (
             <View key={date} onLayout={(event) => { dayOffsets.current[date] = event.nativeEvent.layout.y; }} style={styles.daySection}>

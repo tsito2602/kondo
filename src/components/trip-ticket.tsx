@@ -1,3 +1,4 @@
+import { TripCover } from './trip-cover';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { palette, mono } from '@/constants/design';
@@ -15,7 +16,7 @@ export function TripTicket({ trip }: { trip: Trip }) {
   const serial = trip.id.replaceAll('-', '').slice(0, 8).toUpperCase();
 
   return (
-    <View style={styles.ticket} accessibilityLabel={`${trip.name}、${trip.startsOn}から${trip.endsOn}まで`}>
+    <View style={{ borderRadius: 24, overflow: 'hidden' }}><TripCover image={trip.coverImage} compact /><View style={styles.ticket} accessibilityLabel={`${trip.name}、${trip.startsOn}から${trip.endsOn}まで`}>
       <View style={styles.main}>
         <View style={styles.issuerRow}>
           <View style={styles.issuerTag}><Text style={styles.issuer}>TABI TRIP TICKET</Text></View>
@@ -55,12 +56,12 @@ export function TripTicket({ trip }: { trip: Trip }) {
 
       <View style={[styles.notch, styles.notchTop]} />
       <View style={[styles.notch, styles.notchBottom]} />
-    </View>
+    </View></View>
   );
 }
 
 const styles = StyleSheet.create({
-  ticket: { minHeight: 238, flexDirection: 'row', overflow: 'hidden', position: 'relative', borderRadius: 28, backgroundColor: palette.paper, borderWidth: StyleSheet.hairlineWidth, borderColor: palette.ash },
+  ticket: { minHeight: 206, flexDirection: 'row', overflow: 'hidden', position: 'relative', borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: palette.paper, borderWidth: StyleSheet.hairlineWidth, borderColor: palette.ash },
   main: { flex: 1, minWidth: 0, padding: 20, justifyContent: 'space-between' },
   issuerRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 4 },
   issuerTag: { alignSelf: 'flex-start', backgroundColor: palette.sky, borderRadius: 64, paddingHorizontal: 10, paddingVertical: 5 },

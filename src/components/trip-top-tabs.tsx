@@ -10,6 +10,7 @@ import { useTravel } from '@/data/travel-provider';
 
 const tabs = [
   { key: 'itinerary', label: 'しおり' },
+  { key: 'places', label: '行きたい場所' },
   { key: 'packing', label: '準備' },
   { key: 'bookings', label: '予約' },
 ] as const;
@@ -34,13 +35,14 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
   };
 
   return (
-    <View style={styles.shell}>
+    <View testID="trip-header" style={styles.shell}>
       <View style={styles.topRow}>
-        <Pressable accessibilityRole="button" accessibilityLabel="旅行一覧へ戻る" hitSlop={8} onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="旅行一覧へ戻る" hitSlop={8} onPress={() => router.replace('/')} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
           <Text style={styles.backMark}>‹</Text>
 
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="旅行名と日程を編集" onPress={() => setEditing(true)} style={styles.titleButton}><Text numberOfLines={2} style={styles.tripName}>{selectedTrip?.name}</Text><Text style={styles.tripDates}>{selectedTrip?.startsOn.replaceAll('-', '.')} — {selectedTrip?.endsOn.replaceAll('-', '.')}</Text></Pressable>
+        <Pressable accessibilityLabel="旅行を編集" onPress={() => setEditing(true)} style={styles.editButton}><Text style={styles.shareMark}>⋯</Text></Pressable>
         {!isDemo ? <Pressable accessibilityRole="button" disabled={sharing} accessibilityLabel="この旅行に招待する" hitSlop={8} onPress={() => void shareInvite()} style={({ pressed }) => [styles.shareButton, pressed && styles.pressed]}>
           <Text style={styles.shareMark}>{sharing ? '…' : '↗'}</Text>
         </Pressable> : null}
@@ -68,20 +70,21 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
 }
 
 const styles = StyleSheet.create({
-  shell: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 10, backgroundColor: palette.canvas },
+  shell: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 10, backgroundColor: Platform.OS === 'web' ? 'rgba(238,242,244,0.76)' : palette.canvas },
+  editButton: { position: 'absolute', right: 0, width: 40, height: 44, alignItems: 'center', justifyContent: 'center' },
   topRow: { minHeight: 64, position: 'relative', alignItems: 'center', justifyContent: 'center' },
   backButton: { position: 'absolute', left: 0, zIndex: 2, minWidth: 44, minHeight: 44, flexDirection: 'row', alignItems: 'center' },
   backMark: { color: palette.ocean, fontSize: 32, lineHeight: 34, marginRight: 3, marginTop: -2 },
-  backText: { color: palette.ocean, fontSize: 14, lineHeight: 20, fontWeight: '700' },
-  titleButton: { minHeight: 60, marginHorizontal: 52, alignItems: 'center', justifyContent: 'center' },
+  backText: { color: palette.ocean, fontSize: 12, lineHeight: 20, fontWeight: '700' },
+  titleButton: { minHeight: 60, marginLeft: 40, marginRight: 84, alignItems: 'center', justifyContent: 'center' },
   tripDates: { color: palette.slate, fontSize: 10, marginTop: 4 },
   tripName: { color: palette.ink, fontSize: 16, lineHeight: 22, fontWeight: '800', textAlign: 'center' },
-  shareButton: { position: 'absolute', right: 0, zIndex: 2, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.paper },
+  shareButton: { position: 'absolute', right: 38, zIndex: 2, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.paper },
   shareMark: { color: palette.ocean, fontSize: 21, lineHeight: 23, fontWeight: '800' },
   tabs: { minHeight: 52, flexDirection: 'row', padding: 4, borderRadius: 16, backgroundColor: palette.paper },
   tab: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
   tabSelected: { backgroundColor: palette.sky },
-  tabText: { color: palette.slate, fontSize: 14, lineHeight: 20, fontWeight: '700' },
+  tabText: { color: palette.slate, fontSize: 12, lineHeight: 20, fontWeight: '700' },
   tabTextSelected: { color: palette.ink, fontWeight: '900' },
   pressed: { opacity: 0.58 },
 });

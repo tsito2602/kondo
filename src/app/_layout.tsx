@@ -1,3 +1,5 @@
+import '@/global.css';
+import { PwaSetup } from '@/components/pwa';
 import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
@@ -8,6 +10,7 @@ import { TravelProvider } from '@/data/travel-provider';
 export default function RootLayout() {
   return (
     <ThemeProvider value={DefaultTheme}>
+      <PwaSetup />
       <StatusBar style="dark" />
       <AuthProvider>
         <AuthGate>

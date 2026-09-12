@@ -1,3 +1,4 @@
+import { PwaControls } from '@/components/pwa';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -31,11 +32,12 @@ export default function HomeScreen() {
   const groups = [{ label: 'これからの旅行', trips: trips.filter((trip) => trip.endsOn >= today).sort((a,b) => a.startsOn.localeCompare(b.startsOn)) }, { label: 'これまでの旅行', trips: trips.filter((trip) => trip.endsOn < today).sort((a,b) => b.startsOn.localeCompare(a.startsOn)) }];
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
     <ScrollView contentContainerStyle={styles.content} refreshControl={!isDemo ? <RefreshControl refreshing={syncing} onRefresh={() => void sync()} tintColor={palette.ocean} /> : undefined}>
-      <View style={styles.header}>
+      <View testID="home-header" style={styles.header}>
         <View><Text style={styles.eyebrow}>TABI</Text><Text accessibilityRole="header" style={styles.title}>旅行</Text></View>
         <Pressable accessibilityRole="button" accessibilityLabel="旅行を追加する" disabled={!ready} onPress={() => setCreating(true)} style={({ pressed }) => [styles.add, pressed && styles.pressed]}><Text style={styles.addText}>＋ 旅行</Text></Pressable>
       </View>
       <SyncStatus />
+      <PwaControls />
       {notice ? <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text> : null}
       {!ready ? <View style={styles.loading}><ActivityIndicator color={palette.ocean} /></View> : !trips.length ? <View style={styles.empty}>
         <View style={styles.emptyTicket}><Text style={styles.emptyTicketText}>TABI / 01</Text><View style={styles.perforation} /><Text style={styles.emptyPlus}>＋</Text></View>

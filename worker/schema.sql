@@ -148,3 +148,21 @@ DROP TABLE IF EXISTS gmail_scan_limits;
 DROP TABLE IF EXISTS gmail_oauth_states;
 DROP TABLE IF EXISTS gmail_connections;
 DROP TABLE IF EXISTS booking_imports;
+
+CREATE TABLE IF NOT EXISTS trip_covers (
+  trip_id TEXT PRIMARY KEY REFERENCES trips(id) ON DELETE CASCADE,
+  image TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS places (
+  id TEXT PRIMARY KEY,
+  trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  opening_hours TEXT NOT NULL DEFAULT '',
+  reservation_status TEXT NOT NULL DEFAULT 'not_needed' CHECK(reservation_status IN ('not_needed','needed','requested','confirmed')),
+  location TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'want' CHECK(status IN ('want','planned','visited','skipped')),
+  updated_by TEXT NOT NULL REFERENCES users(id),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS places_trip ON places(trip_id, status, updated_at);

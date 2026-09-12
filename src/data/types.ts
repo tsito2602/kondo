@@ -6,6 +6,7 @@ export type Trip = {
   endsOn: string;
   role: 'owner' | 'editor';
   memberCount: number;
+  coverImage?: string;
   updatedAt?: number;
 };
 
@@ -75,6 +76,20 @@ export type TravelTask = {
   updatedAt?: number;
 };
 
+export type PlaceStatus = 'want' | 'planned' | 'visited' | 'skipped';
+export type ReservationStatus = 'not_needed' | 'needed' | 'requested' | 'confirmed';
+export type Place = {
+  id: string;
+  title: string;
+  note: string;
+  openingHours: string;
+  reservationStatus: ReservationStatus;
+  location: string;
+  status: PlaceStatus;
+  updatedAt?: number;
+};
+export type PlaceInput = Omit<Place, 'id' | 'updatedAt'>;
+
 export type PendingMutation = {
   id: string;
   method: 'POST' | 'PATCH' | 'DELETE';
@@ -91,6 +106,7 @@ export type TravelCache = {
   documentsByBooking: Record<string, BookingDocument[]>;
   packingByTrip: Record<string, PackingItem[]>;
   tasksByTrip: Record<string, TravelTask[]>;
+  placesByTrip: Record<string, Place[]>;
   pending: PendingMutation[];
 };
 
@@ -103,11 +119,13 @@ export const emptyTravelCache = (): TravelCache => ({
   documentsByBooking: {},
   packingByTrip: {},
   tasksByTrip: {},
+  placesByTrip: {},
   pending: [],
 });
 
 export const normalizeTravelCache = (value: TravelCache): TravelCache => ({
   ...value,
+  placesByTrip: value.placesByTrip ?? {},
   documentsByBooking: Object.fromEntries(
     Object.entries(value.documentsByBooking ?? {}).map(([bookingId, documents]) => [
       bookingId,
