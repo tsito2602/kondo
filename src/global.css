@@ -20,6 +20,11 @@ input:focus, textarea:focus { outline: none; box-shadow: 0 0 0 2px #92ADB766; }
 [data-testid="form-sheet"] { animation: sheet-enter 280ms cubic-bezier(.2,.8,.2,1) both; }
 [data-testid="sheet-header"] { background: #eef2f4d9; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
 [data-testid="place-card"] { animation: card-enter 240ms ease both; }
+[data-testid="ticket-photo-shade"] { background: linear-gradient(105deg, rgba(9,27,37,.72), rgba(9,27,37,.24) 70%, rgba(9,27,37,.4)); }
+[data-testid="trip-hero-shade"] { background: linear-gradient(180deg, rgba(9,27,37,.1) 30%, rgba(9,27,37,.12) 45%, rgba(9,27,37,.65)); }
+[data-testid="trip-hero-photo"] { will-change: transform, filter; }
+[data-testid="journal-sheet"] { box-shadow: 0 -14px 44px rgba(9,27,37,.12); }
+[data-testid="delete-trip-dialog"] { animation: card-enter 180ms ease both; box-shadow: 0 24px 80px rgba(9,27,37,.2); }
 @keyframes page-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes card-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes sheet-enter { from { opacity: 0; transform: translateY(22px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }

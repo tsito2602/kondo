@@ -1,10 +1,10 @@
 import { OfflineTrip } from '@/components/offline-trip';
-import { TripCover } from '@/components/trip-cover';
+import { useTripHero } from '@/components/trip-hero';
 import { useTripHeaderHeight } from '@/components/trip-header-context';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Fragment, type ComponentProps, useEffect, useMemo, useRef, useState } from 'react';
-import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormSheet } from '@/components/form-sheet';
@@ -163,6 +163,8 @@ function timeZoneLabel(entry: TimelineEntry) {
 
 export default function ItineraryScreen() {
   const headerHeight = useTripHeaderHeight();
+  const hero = useTripHero();
+  const { height: windowHeight } = useWindowDimensions();
   const { selectedTrip, items, bookings, createItem, updateItem, deleteItem, pendingCount } = useTravel();
   const [adding, setAdding] = useState(false);
   const [formError, setFormError] = useState('');
@@ -174,6 +176,7 @@ export default function ItineraryScreen() {
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
   const scrollRef = useRef<ScrollView>(null);
+  const sheetOffset = useRef(0);
   const timelineOffset = useRef(0);
   const dayOffsets = useRef<Record<string, number>>({});
   const programmaticScrollDay = useRef<string | null>(null);
@@ -223,13 +226,14 @@ export default function ItineraryScreen() {
       resumeScrollTracking();
       return;
     }
-    scrollRef.current?.scrollTo({ y: Math.max(0, timelineOffset.current + offset - headerHeight - 10), animated: true });
+    scrollRef.current?.scrollTo({ y: Math.max(0, sheetOffset.current + timelineOffset.current + offset - headerHeight - 10), animated: true });
     scrollTrackingTimer.current = setTimeout(resumeScrollTracking, 1000);
   };
 
   const trackVisibleDay = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    hero?.scrollY.setValue(Math.max(0, event.nativeEvent.contentOffset.y));
     if (programmaticScrollDay.current) return;
-    const scrollPosition = event.nativeEvent.contentOffset.y + headerHeight + 24 - timelineOffset.current;
+    const scrollPosition = event.nativeEvent.contentOffset.y + headerHeight + 24 - sheetOffset.current - timelineOffset.current;
     let visibleDay = itineraryDates[0];
     for (const date of itineraryDates) {
       if ((dayOffsets.current[date] ?? Number.POSITIVE_INFINITY) <= scrollPosition) visibleDay = date;
@@ -288,15 +292,18 @@ export default function ItineraryScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingTop: headerHeight + 20 }]}
+        contentContainerStyle={styles.scrollContent}
         onMomentumScrollEnd={resumeScrollTracking}
         onScroll={trackVisibleDay}
         onScrollBeginDrag={resumeScrollTracking}
         ref={scrollRef}
-        scrollEventThrottle={32}
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         >
-        <View style={{ marginBottom: 18 }}><TripCover image={selectedTrip?.coverImage} /></View>
+        <View pointerEvents="none" style={{ height: (hero?.height ?? headerHeight + 240) - 28 }} />
+        <View testID="journal-sheet" onLayout={(event) => { sheetOffset.current = event.nativeEvent.layout.y; }} style={[styles.journalSheet, { minHeight: windowHeight }]}>
+        <View style={styles.content}>
+        <View style={styles.sheetIntro}><Text style={styles.journalLabel}>YOUR ITINERARY</Text><Text style={styles.journalCount}>{itineraryDates.length} DAYS</Text></View>
         <OfflineTrip />
         <View style={styles.dayNavSticky}>
           {selectedTrip && itineraryDates.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayTabs}>
@@ -375,6 +382,8 @@ export default function ItineraryScreen() {
             </View>
           );
         })}</View>}
+        </View>
+        </View>
       </ScrollView>
 
       {selectedTrip ? <FloatingAddButton label="予定を追加する" onPress={openAdd} /> : null}
@@ -410,7 +419,12 @@ function ConnectionRow({ connection, continueRail, nextFlight, onPress }: { conn
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: palette.canvas },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
+  scrollContent: { flexGrow: 1 },
+  journalSheet: { backgroundColor: palette.canvas, borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden' },
+  sheetIntro: { paddingTop: 24, paddingBottom: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  journalLabel: { color: palette.ocean, fontSize: 10, fontWeight: '700', letterSpacing: 2 },
+  journalCount: { color: palette.smoke, fontFamily: mono, fontSize: 10, letterSpacing: 1 },
   content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 128 },
   dayNavSticky: { zIndex: 4, marginHorizontal: -20, paddingHorizontal: 20, paddingBottom: 10, backgroundColor: palette.canvas, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
   dayTabs: { gap: 8, paddingRight: 20 },

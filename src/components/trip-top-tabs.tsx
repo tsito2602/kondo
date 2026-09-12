@@ -36,6 +36,7 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
 
   return (
     <View testID="trip-header" style={styles.shell}>
+      <View style={styles.inner}>
       <View style={styles.topRow}>
         <Pressable accessibilityRole="button" accessibilityLabel="旅行一覧へ戻る" hitSlop={8} onPress={() => router.replace('/')} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
           <Text style={styles.backMark}>‹</Text>
@@ -65,12 +66,14 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
           );
         })}
       </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  shell: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 10, backgroundColor: Platform.OS === 'web' ? 'rgba(238,242,244,0.76)' : palette.canvas },
+  shell: { width: '100%', backgroundColor: Platform.OS === 'web' ? 'rgba(238,242,244,0.66)' : 'rgba(238,242,244,0.92)' },
+  inner: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 10 },
   editButton: { position: 'absolute', right: 0, width: 40, height: 44, alignItems: 'center', justifyContent: 'center' },
   topRow: { minHeight: 64, position: 'relative', alignItems: 'center', justifyContent: 'center' },
   backButton: { position: 'absolute', left: 0, zIndex: 2, minWidth: 44, minHeight: 44, flexDirection: 'row', alignItems: 'center' },
