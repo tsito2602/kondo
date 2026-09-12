@@ -43,6 +43,48 @@ jobs:
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
+  ios-ui:
+    needs: ios
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: actions/download-artifact@v4
+        with:
+          name: tabi-preview-ios-simulator
+          path: preview-app
+      - name: Install Maestro 2.10.0
+        run: |
+          curl -fL https://github.com/mobile-dev-inc/Maestro/releases/download/cli-2.10.0/maestro.zip -o "$RUNNER_TEMP/maestro.zip"
+          echo "29b675e10cc12080e445e9bfb2e2b4e4dfb9c0f2e30d5884120d258b5e1cd991  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c
+          unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP/maestro-cli"
+          echo "$RUNNER_TEMP/maestro-cli/maestro/bin" >> "$GITHUB_PATH"
+      - name: Launch iPhone 13 simulator
+        run: |
+          unzip -q preview-app/tabi-preview-ios-simulator.zip -d preview-app
+          device=$(xcrun simctl create 'tabi QA iPhone 13' com.apple.CoreSimulator.SimDeviceType.iPhone-13)
+          echo "TABI_SIMULATOR_ID=$device" >> "$GITHUB_ENV"
+          xcrun simctl boot "$device"
+          xcrun simctl bootstatus "$device" -b
+          apps=(preview-app/*.app)
+          xcrun simctl install "$device" "${apps[0]}"
+          xcrun simctl status_bar "$device" override --time '9:41' --batteryState charged --batteryLevel 100
+      - name: Verify native sample and persistence
+        env:
+          MAESTRO_CLI_NO_ANALYTICS: '1'
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: '180000'
+        run: maestro --device "$TABI_SIMULATOR_ID" test .maestro/native-preview.yml --test-output-dir native-ui --debug-output native-ui/debug --format JUNIT --output native-ui/results.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tabi-preview-ios-ui
+          path: native-ui
+          if-no-files-found: warn
+          retention-days: 14
   ios:
     runs-on: macos-latest
     timeout-minutes: 45

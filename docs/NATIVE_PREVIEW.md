@@ -56,4 +56,6 @@ npm run check:native
 
 `check`は型、Lint、旅程の接続判定・同期回帰テスト、Web生成を実行する。`check:native`はiOS/AndroidのJSバンドルを検証する。インストール可能なネイティブ成果物の生成結果はNative previewワークフローで確認する。
 
+Native previewの`ios-ui`ジョブはiPhone 13 Simulatorでサンプルの起動、予約の閲覧・編集、キーボード表示中の保存、持ち物の完了、再起動後の保存状態をMaestroで確認する。スクリーンショットと実行結果は`tabi-preview-ios-ui`に保存する。ローカルで再現する場合は、プレビューアプリをインストールしたSimulatorで`maestro test .maestro/native-preview.yml`を実行する。このテストはサンプル用アプリのデータを初期化する。
+
 参考: [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/)、[ローカル開発](https://docs.expo.dev/guides/local-app-development/)、[内部配布](https://docs.expo.dev/build/internal-distribution/)。
