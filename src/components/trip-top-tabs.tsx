@@ -36,7 +36,7 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
   return (
     <View style={styles.shell}>
       <View style={styles.topRow}>
-        <Pressable accessibilityLabel="旅行一覧へ戻る" hitSlop={8} onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="旅行一覧へ戻る" hitSlop={8} onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
           <Text style={styles.backMark}>‹</Text>
 
         </Pressable>
@@ -54,7 +54,7 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
           return (
             <Pressable
               accessibilityRole="tab"
-              accessibilityState={{ selected }}
+              aria-selected={selected}
               key={tab.key}
               onPress={() => router.replace({ pathname: `/trips/[tripId]/${tab.key}`, params: { tripId } })}
               style={({ pressed }) => [styles.tab, selected && styles.tabSelected, pressed && styles.pressed]}>

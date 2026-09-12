@@ -223,7 +223,7 @@ function TripBookingsScreen() {
         {viewing && editingId ? <BookingDetails booking={{ id: editingId, ...draft }} documents={documentsByBooking[editingId] ?? []} /> : <>
               <Text style={styles.label}>種類</Text>
               <View style={styles.kindList}>
-                {KINDS.map((kind) => <Pressable key={kind.value} accessibilityRole="radio" accessibilityState={{ checked: draft.kind === kind.value }} onPress={() => setDraft((current) => ({ ...current, kind: kind.value }))} style={[styles.kindButton, draft.kind === kind.value && styles.kindSelected]}><Text style={[styles.kindText, draft.kind === kind.value && styles.kindTextSelected]}>{kind.label}</Text></Pressable>)}
+                {KINDS.map((kind) => <Pressable key={kind.value} accessibilityRole="radio" aria-checked={draft.kind === kind.value} onPress={() => setDraft((current) => ({ ...current, kind: kind.value }))} style={[styles.kindButton, draft.kind === kind.value && styles.kindSelected]}><Text style={[styles.kindText, draft.kind === kind.value && styles.kindTextSelected]}>{kind.label}</Text></Pressable>)}
               </View>
 
               <BookingFormFields draft={draft} setDraft={setDraft} />

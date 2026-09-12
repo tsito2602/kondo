@@ -154,7 +154,7 @@ export default function PackingScreen() {
         <Pressable
           accessibilityLabel={`${task.title}を${task.done ? '未完了' : '完了'}にする`}
           accessibilityRole="checkbox"
-          accessibilityState={{ checked: task.done }}
+          aria-checked={task.done}
           hitSlop={8}
           onPress={() => toggleTask(task)}
           style={[styles.check, task.done && styles.checkDone]}>
@@ -177,14 +177,14 @@ export default function PackingScreen() {
         <View accessibilityRole="tablist" style={styles.segmented}>
           <Pressable
             accessibilityRole="tab"
-            accessibilityState={{ selected: isTasks }}
+            aria-selected={isTasks}
             onPress={() => changeMode('tasks')}
             style={[styles.segment, isTasks && styles.segmentSelected]}>
             <Text style={[styles.segmentText, isTasks && styles.segmentTextSelected]}>やること {tasks.filter((task) => !task.done).length}</Text>
           </Pressable>
           <Pressable
             accessibilityRole="tab"
-            accessibilityState={{ selected: !isTasks }}
+            aria-selected={!isTasks}
             onPress={() => changeMode('packing')}
             style={[styles.segment, !isTasks && styles.segmentSelected]}>
             <Text style={[styles.segmentText, !isTasks && styles.segmentTextSelected]}>持ち物 {packingItems.filter((item) => !item.packed).length}</Text>
@@ -241,7 +241,7 @@ export default function PackingScreen() {
                 <View style={styles.list}>
                   {group.items.map((item, index) => (
                     <View key={item.id} style={[styles.row, index > 0 && styles.rowBorder]}>
-                      <Pressable accessibilityLabel={`${item.name}を${item.packed ? '未準備' : '準備済み'}にする`} accessibilityRole="checkbox" accessibilityState={{ checked: item.packed }} hitSlop={8} onPress={() => togglePacking(item)} style={[styles.check, item.packed && styles.checkDone]}>
+                      <Pressable accessibilityLabel={`${item.name}を${item.packed ? '未準備' : '準備済み'}にする`} accessibilityRole="checkbox" aria-checked={item.packed} hitSlop={8} onPress={() => togglePacking(item)} style={[styles.check, item.packed && styles.checkDone]}>
                         <Text style={[styles.checkText, item.packed && styles.checkTextDone]}>{item.packed ? '✓' : ''}</Text>
                       </Pressable>
                       <Pressable accessibilityLabel={`${item.name}を編集`} onPress={() => openPackingEdit(item)} style={({ pressed }) => [styles.rowCopy, pressed && styles.pressed]}>
@@ -277,7 +277,7 @@ export default function PackingScreen() {
                   ) : null}
                   <Text style={styles.label}>やること</Text>
                   <TextInput accessibilityLabel="やること" autoFocus maxLength={160} onChangeText={(title) => setTaskDraft((current) => ({ ...current, title }))} placeholder="例：eSIMを用意する" placeholderTextColor={palette.smoke} style={styles.input} value={taskDraft.title} />
-                  <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: hasDueDate }} onPress={() => setHasDueDate((current) => !current)} style={styles.optionalToggle}>
+                  <Pressable accessibilityRole="checkbox" aria-checked={hasDueDate} onPress={() => setHasDueDate((current) => !current)} style={styles.optionalToggle}>
                     <View style={[styles.miniCheck, hasDueDate && styles.miniCheckSelected]}>{hasDueDate ? <Text style={styles.miniCheckText}>✓</Text> : null}</View>
                     <Text style={styles.optionalToggleText}>期限を設定する</Text>
                   </Pressable>

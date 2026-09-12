@@ -17,6 +17,7 @@ type Props = PropsWithChildren<{
 
 export function FormSheet({ visible, title, onClose, onSave, saveLabel = '保存', canSave = true, dirty = false, error, children }: Props) {
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
   const scroll = useRef<ScrollView>(null);
   useEffect(() => {
     void AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
@@ -27,13 +28,13 @@ export function FormSheet({ visible, title, onClose, onSave, saveLabel = '保存
   const close = () => {
     if (!dirty) return onClose();
     if (Platform.OS === 'web') {
-      if (globalThis.confirm('変更を保存せずに閉じますか？')) onClose();
+      setConfirmClose(true);
     } else Alert.alert('変更を保存せずに閉じますか？', undefined, [
       { text: '編集を続ける', style: 'cancel' },
       { text: '変更を破棄', style: 'destructive', onPress: onClose },
     ]);
   };
-  return <Modal visible={visible} transparent={Platform.OS === 'web'} presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : 'fullScreen'} animationType={reduceMotion ? 'none' : Platform.OS === 'web' ? 'fade' : 'slide'} onRequestClose={close}>
+  return <><Modal visible={visible} transparent={Platform.OS === 'web'} presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : 'fullScreen'} animationType={reduceMotion ? 'none' : Platform.OS === 'web' ? 'fade' : 'slide'} onRequestClose={close}>
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
       {Platform.OS === 'web' ? <Pressable accessibilityLabel="シートを閉じる" onPress={close} style={StyleSheet.absoluteFill} /> : null}
       <SafeAreaView edges={['top', 'bottom']} style={styles.sheet}>
@@ -50,7 +51,18 @@ export function FormSheet({ visible, title, onClose, onSave, saveLabel = '保存
         </View>
       </SafeAreaView>
     </KeyboardAvoidingView>
-  </Modal>;
+  </Modal>
+    {Platform.OS === 'web' ? <Modal visible={visible && confirmClose} transparent animationType={reduceMotion ? 'none' : 'fade'} onRequestClose={() => setConfirmClose(false)}>
+      <View style={styles.overlay}>
+        <View accessibilityViewIsModal style={styles.confirmCard}>
+          <Text accessibilityRole="header" style={styles.confirmTitle}>変更を保存せずに閉じますか？</Text>
+          <Text style={styles.confirmBody}>入力した内容は保存されません。</Text>
+          <Pressable accessibilityRole="button" onPress={() => setConfirmClose(false)} style={styles.continueButton}><Text style={styles.continueText}>編集を続ける</Text></Pressable>
+          <Pressable accessibilityRole="button" onPress={() => { setConfirmClose(false); onClose(); }} style={styles.discardButton}><Text style={styles.discardText}>変更を破棄</Text></Pressable>
+        </View>
+      </View>
+    </Modal> : null}
+  </>;
 }
 
 const styles = StyleSheet.create({
@@ -65,4 +77,11 @@ const styles = StyleSheet.create({
   title: { flex: 1, textAlign: 'center', fontSize: 17, lineHeight: 24, color: palette.ink, fontWeight: '700' },
   content: { padding: 24, paddingBottom: 40, gap: 12 },
   error: { padding: 14, borderRadius: 8, color: palette.danger, fontSize: 14, lineHeight: 21, backgroundColor: palette.paper },
+  confirmCard: { width: '100%', maxWidth: 360, padding: 24, borderRadius: 20, backgroundColor: palette.paper, gap: 12 },
+  confirmTitle: { color: palette.ink, fontSize: 18, lineHeight: 27, fontWeight: '700' },
+  confirmBody: { color: palette.slate, fontSize: 14, lineHeight: 22, marginBottom: 8 },
+  continueButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: palette.ocean },
+  continueText: { color: palette.paper, fontSize: 15, fontWeight: '700' },
+  discardButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  discardText: { color: palette.danger, fontSize: 15 },
 });

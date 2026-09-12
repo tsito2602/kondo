@@ -295,7 +295,7 @@ export default function ItineraryScreen() {
           {selectedTrip && itineraryDates.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayTabs}>
             {itineraryDates.map((date, index) => {
               const selected = date === visibleActiveDay;
-              return <Pressable accessibilityRole="tab" accessibilityState={{ selected }} key={date} onPress={() => scrollToDay(date)} style={[styles.dayTab, selected && styles.dayTabSelected]}>
+              return <Pressable accessibilityRole="tab" aria-selected={selected} key={date} onPress={() => scrollToDay(date)} style={[styles.dayTab, selected && styles.dayTabSelected]}>
                 <Text style={[styles.dayTabLabel, selected && styles.dayTabLabelSelected]}>{index + 1}日目</Text>
                 <Text style={[styles.dayTabDate, selected && styles.dayTabDateSelected]}>{shortDate(date)}</Text>
               </Pressable>;

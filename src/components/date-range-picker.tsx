@@ -162,7 +162,7 @@ function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', sta
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`${displayDate(date)}${date === range.startDate ? '、開始日' : ''}${date === range.endDate ? '、終了日' : ''}`}
-                  accessibilityState={{ selected }}
+                  aria-selected={selected}
                   key={date}
                   onHoverIn={() => setHoverDate(date)}
                   onHoverOut={() => setHoverDate((current) => current === date ? '' : current)}
