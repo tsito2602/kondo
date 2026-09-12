@@ -60,83 +60,88 @@ export function TravelProvider({ children }: PropsWithChildren) {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cacheRef = useRef(cache);
-  const syncingRef = useRef(false);
+  const syncingRef = useRef<Promise<void> | null>(null);
 
   const commit = useCallback((update: (current: TravelCache) => TravelCache) => {
-    setCache((current) => {
-      const next = update(current);
-      cacheRef.current = next;
-      void saveTravelCache(next);
-      return next;
-    });
+    // Queue ownership must not depend on when React renders a state update.
+    const next = update(cacheRef.current);
+    if (next === cacheRef.current) return;
+    cacheRef.current = next;
+    setCache(next);
+    void saveTravelCache(next);
   }, []);
 
-  const sync = useCallback(async () => {
-    if (syncingRef.current) return;
-    syncingRef.current = true;
-    setSyncing(true);
-    try {
-      while (cacheRef.current.pending.length) {
-        const mutation = cacheRef.current.pending[0];
-        try {
-          await request(mutation.path, {
-            method: mutation.method,
-            ...(mutation.body ? { body: JSON.stringify(mutation.body) } : {}),
-          });
-        } catch (cause) {
-          const status = cause instanceof Error && 'status' in cause ? cause.status : null;
-          if (!mutation.path.endsWith('/connection') || ![400, 403, 404, 409].includes(Number(status))) throw cause;
-          // Discard only a permanently rejected link, then reload the server's
-          // choices. Network/auth failures keep their queued mutation for retry.
-          const message = cause instanceof Error ? cause.message : '便を選び直してください';
-          if (Platform.OS === 'web') globalThis.alert(`乗り継ぎを保存できませんでした\n${message}`);
-          else Alert.alert('乗り継ぎを保存できませんでした', message);
-        }
-        commit((current) => ({ ...current, pending: current.pending.filter((item) => item.id !== mutation.id) }));
-      }
-
-      const { trips } = await request<{ trips: Trip[] }>('/v1/trips');
-      const tripEntries = await Promise.all(
-        trips.map(async (trip) => {
-          const [itemResult, bookingResult, packingResult, taskResult, documentResult] = await Promise.all([
-            request<{ items: ItineraryItem[] }>(`/v1/trips/${trip.id}/items`),
-            request<{ bookings: Booking[] }>(`/v1/trips/${trip.id}/bookings`),
-            request<{ items: PackingItem[] }>(`/v1/trips/${trip.id}/packing`),
-            request<{ tasks: TravelTask[] }>(`/v1/trips/${trip.id}/tasks`),
-            request<{ documents: BookingDocument[] }>(`/v1/trips/${trip.id}/booking-documents`),
-          ]);
-          return [trip.id, itemResult.items, bookingResult.bookings, packingResult.items, taskResult.tasks, documentResult.documents] as const;
-        }),
-      );
-      commit((current) => {
-        if (current.pending.length) return current;
-        const selectedTripId = trips.some((trip) => trip.id === current.selectedTripId)
-          ? current.selectedTripId
-          : (trips[0]?.id ?? null);
-        const documentsByBooking: Record<string, BookingDocument[]> = {};
-        for (const [, , , , , documents] of tripEntries) {
-          for (const document of documents) {
-            documentsByBooking[document.bookingId] = [...(documentsByBooking[document.bookingId] ?? []), document];
+  const sync = useCallback((): Promise<void> => {
+    if (syncingRef.current) return syncingRef.current;
+    const operation = Promise.resolve().then(async () => {
+      setSyncing(true);
+      try {
+        do {
+          while (cacheRef.current.pending.length) {
+            const mutation = cacheRef.current.pending[0];
+            try {
+              await request(mutation.path, {
+                method: mutation.method,
+                ...(mutation.body ? { body: JSON.stringify(mutation.body) } : {}),
+              });
+            } catch (cause) {
+              const status = cause instanceof Error && 'status' in cause ? cause.status : null;
+              if (!mutation.path.endsWith('/connection') || ![400, 403, 404, 409].includes(Number(status))) throw cause;
+              // Discard only a permanently rejected link, then reload the server's
+              // choices. Network/auth failures keep their queued mutation for retry.
+              const message = cause instanceof Error ? cause.message : '便を選び直してください';
+              if (Platform.OS === 'web') globalThis.alert(`乗り継ぎを保存できませんでした\n${message}`);
+              else Alert.alert('乗り継ぎを保存できませんでした', message);
+            }
+            commit((current) => ({ ...current, pending: current.pending.filter((item) => item.id !== mutation.id) }));
           }
-        }
-        return {
-          ...current,
-          trips,
-          selectedTripId,
-          itemsByTrip: Object.fromEntries(tripEntries.map(([tripId, items]) => [tripId, items])),
-          bookingsByTrip: Object.fromEntries(tripEntries.map(([tripId, , bookings]) => [tripId, bookings])),
-          packingByTrip: Object.fromEntries(tripEntries.map(([tripId, , , packingItems]) => [tripId, packingItems])),
-          tasksByTrip: Object.fromEntries(tripEntries.map(([tripId, , , , tasks]) => [tripId, tasks])),
-          documentsByBooking,
-        };
-      });
-      setError(null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '同期できませんでした');
-    } finally {
-      syncingRef.current = false;
-      setSyncing(false);
-    }
+
+          const { trips } = await request<{ trips: Trip[] }>('/v1/trips');
+          const tripEntries = await Promise.all(
+            trips.map(async (trip) => {
+              const [itemResult, bookingResult, packingResult, taskResult, documentResult] = await Promise.all([
+                request<{ items: ItineraryItem[] }>(`/v1/trips/${trip.id}/items`),
+                request<{ bookings: Booking[] }>(`/v1/trips/${trip.id}/bookings`),
+                request<{ items: PackingItem[] }>(`/v1/trips/${trip.id}/packing`),
+                request<{ tasks: TravelTask[] }>(`/v1/trips/${trip.id}/tasks`),
+                request<{ documents: BookingDocument[] }>(`/v1/trips/${trip.id}/booking-documents`),
+              ]);
+              return [trip.id, itemResult.items, bookingResult.bookings, packingResult.items, taskResult.tasks, documentResult.documents] as const;
+            }),
+          );
+          commit((current) => {
+            if (current.pending.length) return current;
+            const selectedTripId = trips.some((trip) => trip.id === current.selectedTripId)
+              ? current.selectedTripId
+              : (trips[0]?.id ?? null);
+            const documentsByBooking: Record<string, BookingDocument[]> = {};
+            for (const [, , , , , documents] of tripEntries) {
+              for (const document of documents) {
+                documentsByBooking[document.bookingId] = [...(documentsByBooking[document.bookingId] ?? []), document];
+              }
+            }
+            return {
+              ...current,
+              trips,
+              selectedTripId,
+              itemsByTrip: Object.fromEntries(tripEntries.map(([tripId, items]) => [tripId, items])),
+              bookingsByTrip: Object.fromEntries(tripEntries.map(([tripId, , bookings]) => [tripId, bookings])),
+              packingByTrip: Object.fromEntries(tripEntries.map(([tripId, , , packingItems]) => [tripId, packingItems])),
+              tasksByTrip: Object.fromEntries(tripEntries.map(([tripId, , , , tasks]) => [tripId, tasks])),
+              documentsByBooking,
+            };
+          });
+        } while (cacheRef.current.pending.length);
+        setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : '同期できませんでした');
+      } finally {
+        syncingRef.current = null;
+        setSyncing(false);
+      }
+    });
+    syncingRef.current = operation;
+    return operation;
   }, [commit, request]);
 
   useEffect(() => {

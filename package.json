@@ -50,8 +50,9 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
-    "check": "npm run typecheck && npm run lint && npm run test:connections && npx expo export --platform web",
-    "test:connections": "node scripts/test-flight-connections.mjs"
+    "check": "npm run typecheck && npm run lint && npm run test:connections && npm run test:sync && npx expo export --platform web",
+    "test:connections": "node scripts/test-flight-connections.mjs",
+    "test:sync": "node scripts/test-travel-sync.mjs"
   },
   "private": true
 }
