@@ -290,12 +290,12 @@ function BookingDocuments({ bookingId, documents }: { bookingId: string; documen
       if (result.canceled) return;
       for (const asset of result.assets) {
         const bytes = asset.file ? await asset.file.arrayBuffer() : await new File(asset.uri).arrayBuffer();
-        const size = asset.size ?? bytes.byteLength;
+        const size = bytes.byteLength;
         if (size > 20 * 1024 * 1024) throw new Error(`${asset.name}は20MBを超えています`);
         const extension = asset.name.split('.').pop()?.toLowerCase();
         const fallbackTypes: Record<string, string> = { pdf: 'application/pdf', gif: 'image/gif', heic: 'image/heic', heif: 'image/heif', jpeg: 'image/jpeg', jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
-        const contentType = asset.mimeType || (extension ? fallbackTypes[extension] : '');
-        if (!contentType) throw new Error(`${asset.name}の形式には対応していません`);
+        const contentType = (asset.mimeType || (extension ? fallbackTypes[extension] : '') || '').toLowerCase();
+        if (!Object.values(fallbackTypes).includes(contentType)) throw new Error(`${asset.name}の形式には対応していません。画像かPDFを選択してください`);
         const document = await uploadBookingDocument(bookingId, { filename: asset.name, contentType, size, bytes });
         cacheBookingDocument(document.id, document.filename, bytes);
       }

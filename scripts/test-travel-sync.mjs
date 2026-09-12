@@ -188,10 +188,15 @@ test('sample mode stores edits separately and never sends them to the API', asyn
   try {
     f.api.createItem({ day: '2026-11-21', time: '10:00', kind: 'spot', title: 'Sample', note: '' });
     f.api.updateTask(task.id, { ...task, done: true });
+    const bookingId = f.api.createBooking({ kind: 'hotel', title: 'Sample hotel', detail: '', origin: '', originCode: '', destination: '', destinationCode: '', day: '2026-11-21', endDay: '2026-11-22', time: '15:00', endTime: '11:00', confirmationCode: '', note: '' });
+    const bytes = new TextEncoder().encode('%PDF-1.7 sample fixture').buffer;
+    const document = await f.api.uploadBookingDocument(bookingId, { filename: 'sample.pdf', contentType: 'application/pdf', size: bytes.byteLength, bytes });
+    assert.deepEqual(await f.api.downloadBookingDocument(bookingId, document.id), bytes);
     await f.api.sync();
     assert.equal(f.requests.length, 0);
     assert.equal(f.writes.at(-1).pending.length, 0);
     assert.equal(f.writes.at(-1).tasksByTrip.trip[0].done, true);
+    assert.equal(f.writes.at(-1).documentsByBooking[bookingId][0].filename, 'sample.pdf');
     assert.ok(f.scopes.every((scope) => scope === 'demo'));
   } finally { f.close(); }
 });
