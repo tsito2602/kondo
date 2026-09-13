@@ -21,6 +21,8 @@ Cloudflareは共有バックエンドとWeb/PWA版を担当し、iOS・Android�
 | Variable | `GOOGLE_WEB_CLIENT_ID_PRODUCTION` | productionのWeb OAuth Client ID |
 | Variable | `GOOGLE_CLIENT_IDS_PRODUCTION` | productionで検証を許可するClient IDのカンマ区切りリスト |
 
+Googleの本番2項目は同名のRepository Secretsへ登録しても読み取れる。Variablesがあればそちらを優先する。
+
 Web/PWAのみ公開する段階では、productionの2つのGoogle変数に同じWeb Client IDを設定する。
 `CLOUDFLARE_ACCOUNT_ID_PRODUCTION`は不要。本番ワークフローはstagingのOAuth Client IDを参照しない。
 既存の`GOOGLE_IOS_CLIENT_ID`・`GOOGLE_ANDROID_CLIENT_ID`はstaging/ネイティブ用であり、本番Webビルドでは使用しない。
