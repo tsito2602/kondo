@@ -1,3 +1,18 @@
+
+:root {
+  color-scheme: light;
+  --canvas: #EEF2F4; --paper: #FAFCFD; --ink: #182A36; --ocean: #496B80;
+  --mist: #E6ECEF; --sky: #D7E2E8; --accent: #92ADB7; --danger: #B42318;
+  --on-ocean: #FAFCFD; --glass: #eef2f4bb; --glass-strong: #eef2f4d9;
+  --glass-line: #ffffff66; --drop-fill: #ffffff80;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #10191F; --paper: #18242D; --ink: #E9F0F4; --ocean: #A1BDCC;
+  --mist: #23333F; --sky: #2B4352; --accent: #8FAFBE; --danger: #FFA69D;
+  --on-ocean: #14232D; --glass: #10191fbb; --glass-strong: #10191fee;
+  --glass-line: #3d505d66; --drop-fill: #18242d80;
+}
 :root {
   --font-display:
     Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji,
@@ -6,4 +21,110 @@
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
   --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
+}
+
+html, body { background: var(--canvas); overscroll-behavior-y: none; }
+body { -webkit-tap-highlight-color: transparent; }
+[role="button"], [role="tab"], button { transition: background-color 180ms ease, color 180ms ease, opacity 160ms ease, transform 220ms cubic-bezier(.2,.8,.2,1); touch-action: manipulation; }
+[role="button"]:active, button:active { transform: scale(.975); }
+input, textarea { transition: background-color 180ms ease, box-shadow 180ms ease; }
+input:focus, textarea:focus { outline: none; box-shadow: 0 0 0 2px #92ADB766; }
+[data-testid="trip-header"] { backdrop-filter: blur(24px) saturate(150%); -webkit-backdrop-filter: blur(24px) saturate(150%); border-bottom: 1px solid var(--glass-line); }
+[data-testid="home-header"] { position: sticky; top: 0; z-index: 10; padding: 10px 0; background: var(--glass); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+[data-testid="route-transition"] { animation: page-enter 260ms cubic-bezier(.2,.8,.2,1) both; }
+[data-testid="form-sheet"] { animation: sheet-enter 280ms cubic-bezier(.2,.8,.2,1) both; }
+[data-testid="sheet-header"] { background: var(--glass-strong); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+[data-testid="place-card"] { animation: card-enter 240ms ease both; }
+[data-testid="ticket-photo-shade"] { background: linear-gradient(105deg, rgba(9,27,37,.72), rgba(9,27,37,.24) 70%, rgba(9,27,37,.4)); }
+[data-testid="trip-hero-shade"] { background: linear-gradient(180deg, rgba(9,27,37,.1) 30%, rgba(9,27,37,.12) 45%, rgba(9,27,37,.65)); }
+[data-testid="trip-hero-photo"] { will-change: transform, filter; }
+[data-testid="journal-sheet"] { box-shadow: 0 -14px 44px rgba(9,27,37,.12); }
+[data-testid="delete-trip-dialog"] { animation: card-enter 180ms ease both; box-shadow: 0 24px 80px rgba(9,27,37,.2); }
+@keyframes page-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes card-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes sheet-enter { from { opacity: 0; transform: translateY(22px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (max-width: 600px) {
+  :is([data-testid="form-modal-viewport"], [data-testid="detail-modal-viewport"]) { padding: 0 !important; padding-top: max(12px, env(safe-area-inset-top)) !important; justify-content: flex-end !important; }
+  [data-testid="form-sheet"] { border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; max-height: 100% !important; margin-top: auto; }
+  :is([data-testid="form-modal-viewport"], [data-testid="detail-modal-viewport"]):has(input:focus, textarea:focus) [data-testid="form-sheet"] { padding-bottom: 0 !important; }
+  [data-testid="modal-viewport"]:has(input:focus, textarea:focus) { padding: 0 !important; padding-top: max(12px, env(safe-area-inset-top)) !important; justify-content: flex-end !important; }
+  [data-testid="modal-viewport"]:has(input:focus, textarea:focus) [data-testid="picker-sheet"] { max-height: 100% !important; border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; }
+  /* Keep Safari from zooming the viewport when a compact form field gains focus. */
+  [data-testid="form-sheet"] input, [data-testid="form-sheet"] textarea, [data-testid="picker-sheet"] input { font-size: 16px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-testid="route-transition"], [data-testid="form-sheet"], [data-testid="place-card"] { animation: none; }
+}
+
+[data-testid="trip-menu"] { animation: menu-enter 170ms cubic-bezier(.2,.8,.2,1) both; transform-origin: top right; box-shadow: 0 12px 40px #12232d22; }
+@keyframes menu-enter { from { opacity: 0; transform: scale(.94) translateY(-4px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+.native-time-input { box-sizing: border-box; min-width: 132px; min-height: 48px; padding: 10px 12px; border: 0; border-radius: 10px; background: var(--mist); color: var(--ink); font: 600 20px var(--font-display); font-variant-numeric: tabular-nums; color-scheme: inherit; }
+.native-time-input:focus-visible { outline: 2px solid var(--ocean); outline-offset: 2px; }
+[data-testid="form-sheet"], [data-testid="picker-sheet"] { min-height: 0; }
+
+/* Browser controls keep the same palette as the native app. */
+a { -webkit-tap-highlight-color: transparent; }
+a:focus-visible, button:focus-visible, [role="button"]:focus-visible, [role="tab"]:focus-visible, [role="checkbox"]:focus-visible, select:focus-visible { outline: 2px solid var(--ocean); outline-offset: 3px; }
+.skip-link { position: fixed; top: -60px; left: 250px; z-index: 1000; padding: 12px; background: var(--paper); color: var(--ink); border-radius: 8px; }
+.skip-link:focus { top: 12px; }
+.file-drop { min-width: 0; border: 1.5px dashed var(--accent); border-radius: 14px; padding: 12px; background: var(--drop-fill); transition: background 160ms ease, border-color 160ms ease; }
+.file-drop.is-dragging { background: var(--sky); border-color: var(--ocean); outline: 3px solid #92ADB744; }
+.file-drop.is-disabled { opacity: .6; }
+.file-drop-button { width: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; min-height: 150px; padding: 18px 12px; border: 0; border-radius: 9px; color: var(--ocean); background: transparent; font: 13px var(--font-display); cursor: pointer; }
+.file-drop-button strong { font-size: 14px; }
+.file-drop-button span { font-size: 11px; line-height: 18px; }
+.file-drop-button .file-drop-select { margin-top: 4px; font-size: 12px; font-weight: 600; background: var(--mist); padding: 6px 14px; border-radius: 7px; }
+.file-drop-button:disabled { cursor: wait; }
+.file-drop-error { color: var(--danger); font-size: 13px; white-space: pre-wrap; }
+@media (hover: hover) and (pointer: fine) {
+  [role="button"]:not([aria-disabled="true"]):hover, [role="tab"]:hover, [role="checkbox"]:hover { filter: brightness(.97); }
+  a:hover { background-color: var(--mist); }
+  .file-drop-button:not(:disabled):hover { background: #E6ECEF88; }
+}
+@media (min-width: 1024px) {
+  [data-testid="web-workspace"] { height: 100dvh; }
+  [data-testid="route-transition"] { animation: none; }
+  [data-testid="home-scroll"] > div, [data-testid="bookings-scroll"] > div, [data-testid="places-scroll"] > div, [data-testid="packing-scroll"] > div, [data-testid="members-scroll"] > div { max-width: 1280px !important; padding-left: 32px !important; padding-right: 32px !important; padding-bottom: 48px !important; }
+  [data-testid="home-scroll"] > div { padding-top: 32px !important; }
+  [data-testid="home-header"] { margin-bottom: 20px; }
+  [data-testid="trip-grid"], [data-testid="booking-grid"], [data-testid="place-grid"], [data-testid="preparation-groups"] { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px !important; align-items: start; }
+  [data-testid="trip-grid"] { grid-template-columns: repeat(auto-fit, minmax(min(100%, 370px), 1fr)); }
+  [data-testid="booking-grid"] { grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); }
+  [data-testid="booking-grid"] > div, [data-testid="place-grid"] > div { min-width: 0; }
+  [data-testid="trip-grid"] > div { height: 100%; }
+  [data-testid="trip-ticket"] { min-height: 252px !important; height: 100%; }
+  [data-testid="trip-header-inner"] { max-width: 1280px !important; padding: 16px 32px !important; }
+  [data-testid="trip-header-inner"] > div:first-child { min-height: 54px !important; }
+  [data-testid="trip-back"], [data-testid="trip-tabs"] { display: none !important; }
+  [data-testid="trip-heading"] { margin-left: 0 !important; margin-right: 262px !important; min-height: 54px !important; }
+  [data-testid="trip-heading"] > div:first-child { font-size: 18px !important; }
+  [data-testid="trip-heading"] > div:last-child { font-size: 12px !important; }
+  [data-testid="trip-menu-position"] { max-width: none !important; padding-right: 32px !important; }
+  [data-testid="places-scroll"] input, [data-testid="booking-filters"] > input { max-width: 480px; }
+  [data-testid="preparation-tabs"] { max-width: 420px; margin-bottom: 20px; }
+  [data-testid="preparation-progress"] { margin-top: 0 !important; margin-bottom: 24px; }
+  [data-testid="preparation-groups"] { margin-top: 0 !important; }
+  [data-testid="members-grid"] { display: grid !important; grid-template-columns: minmax(0, 1.25fr) minmax(260px, 1fr); gap: 28px !important; align-items: start; }
+  [data-testid="member-list"] { grid-column: 1; grid-row: 1; }
+  [data-testid="invite-panel"] { grid-column: 2; grid-row: 1; position: sticky; top: 0; }
+  [data-testid="itinerary-intro"], [data-testid="itinerary-day-bar"] { display: none !important; }
+  [data-testid="itinerary-scroll"] { margin-right: 32px; border-radius: 18px 18px 0 0; background: var(--paper); }
+  [data-testid="itinerary-scroll"] > div > div:last-child > div { max-width: 1000px !important; padding-left: 28px !important; padding-right: 28px !important; }
+  [data-testid="itinerary-scroll"] > div > div:last-child { border-radius: 18px 18px 0 0; }
+  [data-testid="form-modal-viewport"] { padding: 32px !important; }
+  [data-testid="form-modal-viewport"] [data-testid="form-sheet"] { flex: 0 1 auto !important; max-height: calc(100dvh - 64px) !important; width: min(720px, 100%) !important; max-width: 720px !important; border-radius: 18px !important; box-shadow: 0 24px 90px #12232d30; }
+  [data-testid="form-sheet-fill"] { min-height: 0; }
+  [data-testid="form-sheet-scroll"] { flex: 0 1 auto !important; max-height: calc(100dvh - 140px); overscroll-behavior: contain; }
+  [data-testid="form-sheet-scroll"] > div { padding: 28px 32px !important; }
+  [data-testid="sheet-header"] { padding: 6px 20px !important; flex-shrink: 0; }
+  [data-testid="sheet-header"] > [role="button"]:last-child { background: var(--ocean); border-radius: 9px; min-height: 38px !important; }
+  [data-testid="sheet-header"] > [role="button"]:last-child > * { color: var(--on-ocean) !important; font-size: 14px !important; }
+  [data-testid="detail-modal-viewport"] { align-items: flex-end !important; padding: 0 !important; }
+  [data-testid="detail-modal-viewport"] [data-testid="form-sheet"] { width: min(580px, 55vw) !important; max-height: 100% !important; border-radius: 0 !important; animation: none; box-shadow: -16px 0 60px #12232d22; }
+  [data-testid="detail-modal-viewport"] [data-testid="form-sheet-scroll"] { flex: 1 !important; max-height: none; }
+  [data-testid="login-content"] { flex: 0 1 auto !important; max-width: 460px !important; margin-top: auto; margin-bottom: auto; padding: 36px !important; }
+}
+@media (min-width: 1600px) {
+  [data-testid="place-grid"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
