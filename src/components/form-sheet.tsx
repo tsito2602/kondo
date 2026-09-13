@@ -1,10 +1,11 @@
+import { useThemedStyles } from '@/theme/theme-provider';
 import { useModalViewport } from '@/hooks/use-modal-viewport';
 import { PropsWithChildren, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ToastHost } from './toast';
-import { palette } from '@/constants/design';
+import { type Palette } from '@/constants/design';
 
 type Props = PropsWithChildren<{
   visible: boolean;
@@ -19,6 +20,8 @@ type Props = PropsWithChildren<{
 }>;
 
 export function FormSheet({ presentation = 'form', visible, title, onClose, onSave, saveLabel = '保存', canSave = true, dirty = false, error, children }: Props) {
+  const styles = useThemedStyles(createStyles);
+
   const viewport = useModalViewport(visible);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
@@ -70,7 +73,7 @@ export function FormSheet({ presentation = 'form', visible, title, onClose, onSa
   </>;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Platform.OS === 'web' ? 'rgba(24,42,54,0.3)' : palette.canvas, padding: Platform.OS === 'web' ? 16 : 0 },
   sheet: { width: '100%', flex: 1, maxWidth: 640, maxHeight: Platform.OS === 'web' ? '92%' : '100%', backgroundColor: palette.canvas, borderRadius: Platform.OS === 'web' ? 24 : 0, overflow: 'hidden' },
   fill: { flex: 1 },
@@ -86,7 +89,7 @@ const styles = StyleSheet.create({
   confirmTitle: { color: palette.ink, fontSize: 18, lineHeight: 27, fontWeight: '700' },
   confirmBody: { color: palette.slate, fontSize: 14, lineHeight: 22, marginBottom: 8 },
   continueButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: palette.ocean },
-  continueText: { color: palette.paper, fontSize: 15, fontWeight: '700' },
+  continueText: { color: palette.onOcean, fontSize: 15, fontWeight: '700' },
   discardButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   discardText: { color: palette.danger, fontSize: 15 },
 });

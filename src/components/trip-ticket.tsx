@@ -1,6 +1,7 @@
+import { useThemedStyles } from '@/theme/theme-provider';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
-import { palette, mono } from '@/constants/design';
+import { mono, type Palette } from '@/constants/design';
 import type { Trip } from '@/data/types';
 
 const STUB_WIDTH = 96;
@@ -15,6 +16,8 @@ function ticketDate(value: string) {
 }
 
 export function TripTicket({ trip }: { trip: Trip }) {
+  const styles = useThemedStyles(createStyles);
+
   const photo = Boolean(trip.coverImage);
   const serial = trip.id.replaceAll('-', '').slice(0, 8).toUpperCase();
 
@@ -64,7 +67,7 @@ export function TripTicket({ trip }: { trip: Trip }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   ticket: { minHeight: 206, flexDirection: 'row', overflow: 'hidden', position: 'relative', borderRadius: 24, backgroundColor: palette.paper },
   photoShade: { backgroundColor: 'rgba(13,32,43,0.52)' },
   photoText: { color: '#FFFFFF' },

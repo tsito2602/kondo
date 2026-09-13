@@ -1,6 +1,7 @@
+import { useThemedStyles } from '@/theme/theme-provider';
 import { useModalViewport } from '@/hooks/use-modal-viewport';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { palette } from '@/constants/design';
+import { type Palette } from '@/constants/design';
 
 export function ConfirmationDialog({ visible, name, title, description, confirmLabel, busy, error, onCancel, onConfirm }: {
   title: string;
@@ -13,6 +14,8 @@ export function ConfirmationDialog({ visible, name, title, description, confirmL
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const styles = useThemedStyles(createStyles);
+
   const viewport = useModalViewport(visible);
   const cancel = () => { if (!busy) onCancel(); };
   return <Modal visible={visible} transparent animationType="fade" onRequestClose={cancel}>
@@ -36,7 +39,7 @@ export function DeleteTripDialog(props: Omit<Parameters<typeof ConfirmationDialo
   return <ConfirmationDialog {...props} title="この旅行を削除しますか？" description="共有相手の画面からも、しおり・予約・書類・行きたい場所・準備が削除されます。この操作は元に戻せません。" confirmLabel="旅行を削除" />;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: 'rgba(18,35,45,0.48)' },
   card: { width: '100%', maxWidth: 400, borderRadius: 24, padding: 24, gap: 14, backgroundColor: palette.paper },
   eyebrow: { color: palette.danger, fontSize: 10, fontWeight: '700', letterSpacing: 2 },
@@ -49,6 +52,6 @@ const styles = StyleSheet.create({
   cancel: { backgroundColor: palette.canvas },
   delete: { backgroundColor: palette.danger },
   cancelText: { color: palette.slate, fontSize: 14, fontWeight: '600' },
-  deleteText: { color: palette.paper, fontSize: 14, fontWeight: '700' },
+  deleteText: { color: palette.onOcean, fontSize: 14, fontWeight: '700' },
   disabled: { opacity: 0.5 },
 });

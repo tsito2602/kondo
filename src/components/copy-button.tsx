@@ -1,9 +1,12 @@
+import { useThemedStyles } from '@/theme/theme-provider';
 import * as Clipboard from 'expo-clipboard';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text } from 'react-native';
-import { palette } from '@/constants/design';
+import { type Palette } from '@/constants/design';
 
 export function CopyButton({ value, label = 'コピー' }: { value: string; label?: string }) {
+  const styles = useThemedStyles(createStyles);
+
   const [state, setState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [motion] = useState(() => new Animated.Value(1));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -26,7 +29,7 @@ export function CopyButton({ value, label = 'コピー' }: { value: string; labe
     </Animated.View>
   </Pressable>;
 }
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   button: { minWidth: 76, minHeight: 44, paddingHorizontal: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.sky },
   text: { color: palette.ocean, fontSize: 12, fontWeight: '700' },
   check: { fontSize: 22, lineHeight: 26 },

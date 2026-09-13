@@ -1,3 +1,4 @@
+import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { MemberPicker } from '@/components/member-picker';
 import { MemberAvatar } from '@/components/member-avatar';
 import { assigneeName, assignedMember } from '@/data/assignee';
@@ -12,7 +13,7 @@ import { FormSheet } from '@/components/form-sheet';
 import { localDate } from '@/utils/dates';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { FloatingAddButton } from '@/components/floating-add-button';
-import { palette } from '@/constants/design';
+import { type Palette } from '@/constants/design';
 import { useTravel } from '@/data/travel-provider';
 import { PackingItem, TravelTask } from '@/data/types';
 import { confirmDeletion } from '@/utils/confirm-deletion';
@@ -28,6 +29,9 @@ const blankPackingDraft = (): PackingDraft => ({ name: '', category: CATEGORIES[
 const blankTaskDraft = (): TaskDraft => ({ title: '', dueOn: '', assignee: '', done: false });
 
 export default function PackingScreen() {
+  const palette = usePalette();
+  const styles = useThemedStyles(createStyles);
+
   const toast = useToast();
   const headerHeight = useTripHeaderHeight();
   const {
@@ -313,7 +317,7 @@ export default function PackingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.canvas },
   content: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 112 },
   segmented: { flexDirection: 'row', backgroundColor: palette.sky, borderRadius: 14, padding: 4 },
@@ -343,8 +347,8 @@ const styles = StyleSheet.create({
   rowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.ash },
   check: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: palette.accent, alignItems: 'center', justifyContent: 'center' },
   checkDone: { backgroundColor: palette.ocean, borderColor: palette.ocean },
-  checkText: { color: palette.paper, fontSize: 16, lineHeight: 18, fontWeight: '900' },
-  checkTextDone: { color: palette.paper },
+  checkText: { color: palette.onOcean, fontSize: 16, lineHeight: 18, fontWeight: '900' },
+  checkTextDone: { color: palette.onOcean },
   rowCopy: { flex: 1, minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 8 },
   itemCopy: { flex: 1, paddingVertical: 10 },
   itemName: { flexShrink: 1, color: palette.ink, fontSize: 16, lineHeight: 22, fontWeight: '700' },
@@ -364,13 +368,13 @@ const styles = StyleSheet.create({
   optionalToggle: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 18 },
   miniCheck: { width: 22, height: 22, borderRadius: 7, borderWidth: 2, borderColor: palette.accent, alignItems: 'center', justifyContent: 'center' },
   miniCheckSelected: { backgroundColor: palette.ocean, borderColor: palette.ocean },
-  miniCheckText: { color: palette.paper, fontSize: 12, lineHeight: 14, fontWeight: '900' },
+  miniCheckText: { color: palette.onOcean, fontSize: 12, lineHeight: 14, fontWeight: '900' },
   optionalToggleText: { color: palette.slate, fontSize: 14, lineHeight: 19, fontWeight: '700' },
   categoryList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   categoryButton: { backgroundColor: palette.mist, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 },
   categorySelected: { backgroundColor: palette.ocean },
   categoryText: { color: palette.slate, fontSize: 13, lineHeight: 17, fontWeight: '700' },
-  categoryTextSelected: { color: palette.paper },
+  categoryTextSelected: { color: palette.onOcean },
   stepper: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', backgroundColor: palette.mist, borderRadius: 14, padding: 4 },
   stepButton: { width: 44, height: 44, borderRadius: 11, backgroundColor: palette.paper, alignItems: 'center', justifyContent: 'center' },
   stepText: { color: palette.ink, fontSize: 24, lineHeight: 26, fontWeight: '600' },
@@ -380,6 +384,6 @@ const styles = StyleSheet.create({
   deleteButton: { paddingHorizontal: 8, paddingVertical: 13 },
   deleteText: { color: palette.danger, fontSize: 14, lineHeight: 18, fontWeight: '800' },
   saveButton: { minWidth: 112, backgroundColor: palette.ink, borderRadius: 8, alignItems: 'center', paddingHorizontal: 24, paddingVertical: 15 },
-  saveText: { color: palette.paper, fontSize: 15, lineHeight: 19, fontWeight: '800' },
+  saveText: { color: palette.onOcean, fontSize: 15, lineHeight: 19, fontWeight: '800' },
   pressed: { opacity: 0.62 },
 });

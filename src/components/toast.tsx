@@ -1,7 +1,8 @@
+import { useThemedStyles } from '@/theme/theme-provider';
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { palette } from '@/constants/design';
+import { type Palette } from '@/constants/design';
 
 const ToastContext = createContext<{ show: (message: string) => void; message: string; progress: Animated.Value } | null>(null);
 export const useToast = () => useContext(ToastContext)!.show;
@@ -26,6 +27,8 @@ export function ToastProvider({ children }: PropsWithChildren) {
 
 // A sheet has its own native modal layer, so it also hosts the same toast.
 export function ToastHost() {
+  const styles = useThemedStyles(createStyles);
+
   const toast = useContext(ToastContext);
   const insets = useSafeAreaInsets();
   if (!toast) return null;
@@ -36,8 +39,8 @@ export function ToastHost() {
   </View>;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   position: { position: 'absolute', left: 24, right: 24, alignItems: 'center', zIndex: 1000 },
   toast: { maxWidth: 440, borderRadius: 16, paddingHorizontal: 20, paddingVertical: 14, backgroundColor: palette.ink },
-  text: { color: palette.paper, fontSize: 13, lineHeight: 20, textAlign: 'center' },
+  text: { color: palette.onOcean, fontSize: 13, lineHeight: 20, textAlign: 'center' },
 });

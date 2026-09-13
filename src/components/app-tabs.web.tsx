@@ -1,3 +1,4 @@
+import { useThemedStyles } from '@/theme/theme-provider';
 import {
   Tabs,
   TabList,
@@ -8,13 +9,15 @@ import {
 } from 'expo-router/ui';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { palette } from '@/constants/design';
+import { type Palette } from '@/constants/design';
 
 type TabButtonProps = TabTriggerSlotProps & {
   icon: string;
 };
 
 export default function AppTabs() {
+  const styles = useThemedStyles(createStyles);
+
   return (
     <Tabs>
       <TabSlot style={styles.slot} />
@@ -39,6 +42,8 @@ export default function AppTabs() {
 }
 
 function TabButton({ children, icon, isFocused, ...props }: TabButtonProps) {
+  const styles = useThemedStyles(createStyles);
+
   return (
     <Pressable
       {...props}
@@ -52,6 +57,8 @@ function TabButton({ children, icon, isFocused, ...props }: TabButtonProps) {
 }
 
 function BottomTabList(props: TabListProps) {
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View {...props} style={styles.tabListContainer}>
       <View style={styles.innerContainer}>{props.children}</View>
@@ -59,7 +66,7 @@ function BottomTabList(props: TabListProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   slot: {
     flex: 1,
   },

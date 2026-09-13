@@ -1,3 +1,4 @@
+import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { PageHeading } from '@/components/page-heading';
 import { useTripHeaderHeight } from '@/components/trip-header-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -9,7 +10,7 @@ import { BookingSheet, BOOKING_KINDS } from '@/components/booking-sheet';
 import { BookingRoute } from '@/components/booking-route';
 import { FloatingAddButton } from '@/components/floating-add-button';
 import { FlightConnectionLink, FlightConnectionSheet } from '@/components/flight-connection-sheet';
-import { palette, mono } from '@/constants/design';
+import { mono, type Palette } from '@/constants/design';
 import { findFlightConnections, hasLikelyFlightConnection } from '@/data/flight-connections';
 import { useTravel } from '@/data/travel-provider';
 import { formatDate } from '@/utils/dates';
@@ -21,6 +22,9 @@ export default function BookingsScreen() {
 }
 
 function TripBookingsScreen() {
+  const palette = usePalette();
+  const styles = useThemedStyles(createStyles);
+
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState('all');
   const headerHeight = useTripHeaderHeight();
@@ -105,7 +109,7 @@ function TripBookingsScreen() {
 const STUB_WIDTH = 60;
 const NOTCH_RADIUS = 10;
 
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.canvas },
   content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 112 },
   empty: { minHeight: 260, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.paper, borderRadius: 32, padding: 28, marginTop: 24 },

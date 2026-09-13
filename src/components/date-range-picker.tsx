@@ -1,9 +1,10 @@
+import { useThemedStyles } from '@/theme/theme-provider';
 import { useModalViewport } from '@/hooks/use-modal-viewport';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { palette, mono } from '@/constants/design';
+import { mono, type Palette } from '@/constants/design';
 
 import { calendarDate, displayDate, monthDays, rangeRows, selectRangeDate, type DateRange } from './date-range';
 
@@ -25,6 +26,8 @@ function todayValue() {
 }
 
 export function DateRangePicker({ startDate, endDate, startTime = '', endTime = '', disabled, label = '期間', mode = 'range', onChange, showTime = false, startLabel, endLabel }: Props) {
+  const styles = useThemedStyles(createStyles);
+
   const [open, setOpen] = useState(false);
   const firstLabel = startLabel ?? (mode === 'single' ? '日付' : '出発日');
   const lastLabel = endLabel ?? '帰着日';
@@ -58,6 +61,8 @@ export function DateRangePicker({ startDate, endDate, startTime = '', endTime = 
 }
 
 function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', startLabel = '出発日', endLabel = '帰着日', label = '期間', mode, showTime = false, close, onChange }: Props & { close: () => void }) {
+  const styles = useThemedStyles(createStyles);
+
   const viewport = useModalViewport(true);
   const initial = startDate || endDate || todayValue();
   const [range, setRange] = useState<DateRange>({ startDate, endDate });
@@ -189,6 +194,8 @@ function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', sta
 }
 
 function TimeSelector({ label, onChange, value }: { label: string; onChange: (value: string) => void; value: string }) {
+  const styles = useThemedStyles(createStyles);
+
   return <View style={styles.timeSection}>
     <View style={styles.timeHeading}>
       <Text style={styles.timeLabel}>{label}</Text>
@@ -207,6 +214,8 @@ function TimeSelector({ label, onChange, value }: { label: string; onChange: (va
 }
 
 function DateRangeHighlight({ anchorDate, days, gridWidth, markerRange, previewEndDate, range }: { anchorDate: string; days: (string | null)[]; gridWidth: number; markerRange: DateRange; previewEndDate: string; range: DateRange }) {
+  const styles = useThemedStyles(createStyles);
+
   const anchor = days.indexOf(anchorDate);
   const anchorRow = anchor < 0 ? (range.startDate < (days.find(Boolean) ?? '') ? 0 : 5) : Math.floor(anchor / 7);
   const rows = rangeRows(days, range);
@@ -239,6 +248,8 @@ function DateRangeHighlight({ anchorDate, days, gridWidth, markerRange, previewE
 }
 
 function RangeBand({ bounds, gridWidth, origin, row }: { bounds: { start: number; end: number } | null; gridWidth: number; origin: number; row: number }) {
+  const styles = useThemedStyles(createStyles);
+
   const cell = gridWidth / 7;
   const [left] = useState(() => new Animated.Value((bounds?.start ?? origin + 0.5) * cell));
   const [width] = useState(() => new Animated.Value(bounds ? (bounds.end - bounds.start) * cell : 0));
@@ -254,6 +265,8 @@ function RangeBand({ bounds, gridWidth, origin, row }: { bounds: { start: number
 }
 
 function DateMarker({ gridWidth, index, origin = -1, preview = false }: { gridWidth: number; index: number; origin?: number; preview?: boolean }) {
+  const styles = useThemedStyles(createStyles);
+
   const [position] = useState(() => new Animated.ValueXY());
   const [opacity] = useState(() => new Animated.Value(index >= 0 ? 1 : 0));
   const positioned = useRef(false);
@@ -276,7 +289,7 @@ function DateMarker({ gridWidth, index, origin = -1, preview = false }: { gridWi
   return <Animated.View style={[styles.marker, preview && styles.markerPreview, { left: position.x, top: position.y, opacity }]} />;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   field: { gap: 8 },
   label: { color: palette.slate, fontFamily: mono, fontSize: 11 },
   trigger: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: palette.paper, borderRadius: 8, paddingHorizontal: 14 },
@@ -314,7 +327,7 @@ const styles = StyleSheet.create({
   weekday: { color: palette.smoke, fontFamily: mono, fontSize: 10 },
   dayCell: { width: `${100 / 7}%`, height: ROW_HEIGHT, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   day: { color: palette.ink, fontSize: 14, fontWeight: '600', zIndex: 3 },
-  daySelected: { color: palette.paper, fontWeight: '900' },
+  daySelected: { color: palette.onOcean, fontWeight: '900' },
   band: { position: 'absolute', height: BAND_HEIGHT, borderRadius: BAND_HEIGHT / 2, backgroundColor: palette.sky },
   marker: { position: 'absolute', width: MARKER_SIZE, height: MARKER_SIZE, borderRadius: MARKER_SIZE / 2, backgroundColor: palette.ocean },
   markerPreview: { backgroundColor: palette.smoke },
@@ -327,5 +340,5 @@ const styles = StyleSheet.create({
   clearText: { color: palette.slate, fontSize: 14, fontWeight: '700' },
   confirmButton: { minWidth: 112, minHeight: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.ocean, borderRadius: 8 },
   confirmDisabled: { opacity: 0.35 },
-  confirmText: { color: palette.paper, fontSize: 15, fontWeight: '700' },
+  confirmText: { color: palette.onOcean, fontSize: 15, fontWeight: '700' },
 });

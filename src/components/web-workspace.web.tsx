@@ -1,12 +1,13 @@
+import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { MemberAvatar } from './member-avatar';
 import { PropsWithChildren, useEffect } from 'react';
 import { Link, usePathname } from 'expo-router';
-import { Image } from 'expo-image';
+import { BrandLogo } from '@/components/brand-logo';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { useAuth } from '@/auth/auth-provider';
 import { useTravel } from '@/data/travel-provider';
-import { palette } from '@/constants/design';
+import { type Palette } from '@/constants/design';
 import { useDesktop } from '@/hooks/use-desktop';
 
 const pages = [
@@ -18,6 +19,9 @@ const pages = [
 ] as const;
 
 export function WebWorkspace({ children }: PropsWithChildren) {
+  const palette = usePalette();
+  const styles = useThemedStyles(createStyles);
+
   const desktop = useDesktop();
   const pathname = usePathname();
   const { selectedTrip, syncing, sync } = useTravel();
@@ -43,7 +47,7 @@ export function WebWorkspace({ children }: PropsWithChildren) {
   return <View testID="web-workspace" style={styles.workspace}>
     {desktop ? <a href="#workspace-main" className="skip-link">本文へ移動</a> : null}
     {desktop ? <View role="navigation" accessibilityLabel="メインナビゲーション" style={styles.sidebar}>
-      <Link href="/" style={styles.brand} accessibilityLabel="tabi 旅行一覧"><Image source={require('../../assets/brand/logo.png')} style={{ width: 50, height: 50 }} contentFit="contain" /><Text style={styles.wordmark}>tabi</Text></Link>
+      <Link href="/" style={styles.brand} accessibilityLabel="tabi 旅行一覧"><BrandLogo style={{ width: 50, height: 50 }} contentFit="contain" /><Text style={styles.wordmark}>tabi</Text></Link>
       <Link href="/" style={[styles.nav, pathname === '/' && styles.selected]}><SymbolView name={{ web: 'luggage' }} size={21} tintColor={palette.ocean} /><Text style={styles.navText}>すべての旅行</Text></Link>
       {trip ? <View style={styles.section}>
         <View style={styles.links}>{pages.map((page) => <Link key={page.key} href={{ pathname: `/trips/[tripId]/${page.key}`, params: { tripId: trip.id } }} style={[styles.nav, pathname.endsWith(`/${page.key}`) && styles.selected]} aria-current={pathname.endsWith(`/${page.key}`) ? 'page' : undefined}><SymbolView name={{ web: page.icon }} size={21} tintColor={palette.ocean} /><Text style={styles.navText}>{page.label}</Text></Link>)}</View>
@@ -58,7 +62,7 @@ export function WebWorkspace({ children }: PropsWithChildren) {
     <View nativeID="workspace-main" role="main" style={styles.main}>{children}</View>
   </View>;
 }
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   workspace: { flex: 1, flexDirection: 'row', backgroundColor: palette.canvas },
   sidebar: { width: 232, flexShrink: 0, paddingHorizontal: 18, paddingTop: 24, backgroundColor: palette.paper, borderRightWidth: 1, borderColor: palette.ash },
   brand: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 32, paddingHorizontal: 8, textDecorationLine: 'none' },

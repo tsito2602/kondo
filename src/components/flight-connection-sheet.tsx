@@ -1,10 +1,11 @@
+import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { useModalViewport } from '@/hooks/use-modal-viewport';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { palette } from '@/constants/design';
+import { type Palette } from '@/constants/design';
 import { findAirportByCode } from '@/data/airports';
 import { findFlightConnections, flightConnectionCandidates, formatConnectionDuration, type FlightConnection } from '@/data/flight-connections';
 import { useTravel } from '@/data/travel-provider';
@@ -18,6 +19,9 @@ export function flightDate(day: string) {
 export function FlightConnectionLink({ booking, connection, nextFlight, onPress, compact = false, disabled = false }: {
   booking: Booking; connection?: FlightConnection; nextFlight?: Booking; onPress: () => void; compact?: boolean; disabled?: boolean;
 }) {
+  const palette = usePalette();
+  const styles = useThemedStyles(createStyles);
+
   const missing = booking.connectionMode === 'manual' && !connection;
   return <Pressable disabled={disabled} accessibilityRole="button" accessibilityLabel={`${booking.title}の乗り継ぎを${connection ? '変更' : '設定'}`} onPress={onPress}
     style={({ pressed }) => [styles.link, compact && styles.linkCompact, pressed && styles.pressed]}>
@@ -41,6 +45,8 @@ function ConnectionEditor({ booking, bookings, onClose, onSave }: {
   booking: Booking; bookings: Booking[]; onClose: () => void;
   onSave: (id: string, mode: FlightConnectionMode, nextFlightId?: string | null) => void;
 }) {
+  const styles = useThemedStyles(createStyles);
+
   const viewport = useModalViewport(true);
   const [mode, setMode] = useState<FlightConnectionMode>(booking.connectionMode ?? 'auto');
   const [target, setTarget] = useState<string | null>(booking.nextFlightId ?? null);
@@ -115,10 +121,12 @@ function ConnectionEditor({ booking, bookings, onClose, onSave }: {
 }
 
 function Radio({ checked }: { checked: boolean }) {
+  const styles = useThemedStyles(createStyles);
+
   return <View style={[styles.radio, checked && styles.radioChecked]}>{checked ? <View style={styles.radioDot} /> : null}</View>;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(24,42,54,0.34)', alignItems: 'center', justifyContent: 'center', padding: 16 },
   sheet: { width: '100%', maxWidth: 520, maxHeight: '94%', backgroundColor: palette.canvas, borderRadius: 28, overflow: 'hidden', flexShrink: 1 },
   header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -153,7 +161,7 @@ const styles = StyleSheet.create({
   preview: { alignItems: 'center' },
   previewRoute: { color: palette.ink, fontSize: 15, fontWeight: '700', textAlign: 'center' },
   save: { minHeight: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.ocean },
-  saveText: { color: palette.paper, fontSize: 15, fontWeight: '700' },
+  saveText: { color: palette.onOcean, fontSize: 15, fontWeight: '700' },
   error: { color: palette.danger, fontSize: 12, lineHeight: 18 },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.65 },

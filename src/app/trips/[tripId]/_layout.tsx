@@ -1,3 +1,4 @@
+import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { PageActionContext, type PageAction } from '@/components/page-action-context';
 import { useDesktop } from '@/hooks/use-desktop';
 import { Redirect, Slot, useLocalSearchParams, usePathname } from 'expo-router';
@@ -8,10 +9,13 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { TripHeaderHeight } from '@/components/trip-header-context';
 import { TripHero, TripHeroContext } from '@/components/trip-hero';
 import { TripTopTabs } from '@/components/trip-top-tabs';
-import { palette } from '@/constants/design';
+import { type Palette } from '@/constants/design';
 import { useTravel } from '@/data/travel-provider';
 
 export default function TripLayout() {
+  const palette = usePalette();
+  const styles = useThemedStyles(createStyles);
+
   const desktop = useDesktop();
   const [action, setAction] = useState<PageAction | null>(null);
   const insets = useSafeAreaInsets();
@@ -53,7 +57,7 @@ export default function TripLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.canvas },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.canvas },
 });

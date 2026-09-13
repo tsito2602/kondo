@@ -1,7 +1,8 @@
+import { useThemedStyles } from '@/theme/theme-provider';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { FormSheet } from './form-sheet';
-import { palette } from '@/constants/design';
+import { type Palette } from '@/constants/design';
 import { useTravel } from '@/data/travel-provider';
 
 type InstallEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
@@ -19,6 +20,8 @@ export function PwaSetup() {
   return null;
 }
 export function PwaControls() {
+  const styles = useThemedStyles(createStyles);
+
   const { pendingCount } = useTravel();
   const [guide, setGuide] = useState(false);
   const [standalone, setStandalone] = useState(true);
@@ -49,4 +52,4 @@ export function PwaControls() {
     {guide ? <FormSheet visible title="ホーム画面に追加" onClose={() => setGuide(false)}><Text style={styles.guideTitle}>いつものアプリと同じように。</Text><Text style={styles.guideText}>{/iPhone|iPad|iPod/.test(navigator.userAgent) ? 'Safariの共有メニューから「ホーム画面に追加」を選び、「追加」をタップしてください。' : 'ブラウザーのメニューから「アプリをインストール」または「ホーム画面に追加」を選んでください。'}</Text><Text style={styles.guideText}>旅行のしおりから「オフライン保存」をすると、保存した書類も圏外で開けます。</Text></FormSheet> : null}
   </>;
 }
-const styles = StyleSheet.create({ row: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 }, button: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 12, backgroundColor: palette.sky, borderRadius: 10 }, text: { color: palette.ocean, fontSize: 12, fontWeight: '600' }, guideTitle: { color: palette.ink, fontSize: 22, fontWeight: '700', marginTop: 12 }, guideText: { color: palette.slate, fontSize: 15, lineHeight: 26 } });
+const createStyles = (palette: Palette) => StyleSheet.create({ row: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 }, button: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 12, backgroundColor: palette.sky, borderRadius: 10 }, text: { color: palette.ocean, fontSize: 12, fontWeight: '600' }, guideTitle: { color: palette.ink, fontSize: 22, fontWeight: '700', marginTop: 12 }, guideText: { color: palette.slate, fontSize: 15, lineHeight: 26 } });

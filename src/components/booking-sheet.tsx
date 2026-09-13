@@ -1,3 +1,4 @@
+import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { FileDrop, type DroppedFile } from './file-drop';
 import { type ComponentProps, type Dispatch, type SetStateAction, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -9,7 +10,7 @@ import { CopyButton } from '@/components/copy-button';
 import { FormSheet } from '@/components/form-sheet';
 import { BookingRoute } from '@/components/booking-route';
 import { DateRangePicker } from '@/components/date-range-picker';
-import { palette, mono } from '@/constants/design';
+import { mono, type Palette } from '@/constants/design';
 import { findAirports, type Airport } from '@/data/airports';
 import { cacheBookingDocument, getCachedDocumentUri, removeCachedBookingDocument } from '@/data/booking-document-cache';
 import { findMatchingItineraryItem } from '@/data/booking-match';
@@ -39,6 +40,8 @@ function blankDraft(day: string, kind: BookingKind = 'flight'): Draft {
 }
 
 export function BookingSheet({ booking, onClose }: { booking?: Booking; onClose: () => void }) {
+  const styles = useThemedStyles(createStyles);
+
   const toast = useToast();
   const { canEdit, createBooking, deleteBooking, deleteItem, documentsByBooking, items, selectedTrip, updateBooking } = useTravel();
   const [draft, setDraft] = useState<Draft>(() => booking ? {
@@ -141,6 +144,8 @@ export function BookingSheet({ booking, onClose }: { booking?: Booking; onClose:
 }
 
 function BookingDetails({ booking, documents }: { booking: Booking; documents: BookingDocument[] }) {
+  const styles = useThemedStyles(createStyles);
+
   const kind = BOOKING_KINDS.find((entry) => entry.value === booking.kind);
   const route = Boolean(booking.originCode || booking.origin || booking.destinationCode || booking.destination);
   return <>
@@ -162,6 +167,9 @@ function BookingDetails({ booking, documents }: { booking: Booking; documents: B
 }
 
 function BookingDocuments({ bookingId, documents }: { bookingId: string; documents: BookingDocument[] }) {
+  const palette = usePalette();
+  const styles = useThemedStyles(createStyles);
+
   const { canEdit, deleteBookingDocument, downloadBookingDocument, uploadBookingDocument } = useTravel();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -347,6 +355,9 @@ function BookingFormFields({ draft, setDraft }: { draft: Draft; setDraft: Dispat
 }
 
 function AirportField({ code, label, onChange, onChangeText, placeholder, value }: { code: string; label: string; onChange: (airport: Airport) => void; onChangeText: (value: string) => void; placeholder: string; value: string }) {
+  const palette = usePalette();
+  const styles = useThemedStyles(createStyles);
+
   const matches = findAirports(value);
   const selected = Boolean(code && matches.some((airport) => airport.code === code && airport.name === value));
   return <View style={styles.field}>
@@ -365,10 +376,13 @@ function AirportField({ code, label, onChange, onChangeText, placeholder, value 
 }
 
 function Field({ label, ...props }: { label: string } & ComponentProps<typeof TextInput>) {
+  const palette = usePalette();
+  const styles = useThemedStyles(createStyles);
+
   return <View style={styles.field}><Text style={styles.label}>{label}</Text><TextInput accessibilityLabel={label} maxLength={props.multiline ? 4000 : 240} placeholderTextColor={palette.placeholder} style={[styles.input, props.multiline && styles.inputMultiline]} {...props} /></View>;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   detailTicket: { backgroundColor: palette.paper, borderRadius: 20, padding: 22, gap: 12 },
   detailKind: { color: palette.ocean, fontSize: 12, fontWeight: '700' },
   detailTitle: { color: palette.ink, fontSize: 25, fontWeight: '800', lineHeight: 34 },
@@ -409,7 +423,7 @@ const styles = StyleSheet.create({
   matchButton: { minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: palette.sky, paddingHorizontal: 13 },
   matchButtonSelected: { backgroundColor: palette.ocean },
   matchButtonText: { color: palette.ocean, fontSize: 11, fontWeight: '800' },
-  matchButtonTextSelected: { color: palette.paper },
+  matchButtonTextSelected: { color: palette.onOcean },
   documentNotice: { color: palette.smoke, fontSize: 11, lineHeight: 17 },
   documentsSection: { gap: 10 },
   documentsHeading: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

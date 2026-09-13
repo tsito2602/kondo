@@ -1,10 +1,13 @@
+import { useThemedStyles } from '@/theme/theme-provider';
 import { StyleSheet, Text, View } from 'react-native';
-import { palette } from '@/constants/design';
+import { type Palette } from '@/constants/design';
 import { findAirportByCode } from '@/data/airports';
 import type { Booking } from '@/data/types';
 
 /** Keep airport codes paired with their names in both tickets and details. */
 export function BookingRoute({ booking, compact = false }: { booking: Booking; compact?: boolean }) {
+  const styles = useThemedStyles(createStyles);
+
   const endpoint = (code: string, name: string) => {
     const airportName = booking.kind === 'flight' ? findAirportByCode(code)?.name || name : name;
     return <View style={styles.endpoint}>
@@ -19,7 +22,7 @@ export function BookingRoute({ booking, compact = false }: { booking: Booking; c
   </View>;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   route: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginVertical: 8 },
   endpoint: { flex: 1, minWidth: 0, gap: 4 },
   code: { color: palette.ink, fontSize: 28, lineHeight: 36, fontWeight: '700' },

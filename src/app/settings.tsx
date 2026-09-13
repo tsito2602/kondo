@@ -1,5 +1,7 @@
+import { ThemeSetting } from '@/components/theme-setting';
+import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { router } from 'expo-router';
-import { Image } from 'expo-image';
+import { BrandLogo } from '@/components/brand-logo';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -9,10 +11,13 @@ import { MemberAvatar } from '@/components/member-avatar';
 import { PwaControls } from '@/components/pwa';
 import { useToast } from '@/components/toast';
 import { useTravel } from '@/data/travel-provider';
-import { palette } from '@/constants/design';
+import { type Palette } from '@/constants/design';
 import packageInfo from '../../package.json';
 
 export default function SettingsScreen() {
+  const palette = usePalette();
+  const styles = useThemedStyles(createStyles);
+
   const { user, isDemo, updateProfile, signOut, exitDemo } = useAuth();
   const { trips, selectTrip, sync, syncing, pendingCount, error: syncError } = useTravel();
   const toast = useToast();
@@ -43,6 +48,7 @@ export default function SettingsScreen() {
         {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
         {changed ? <Pressable accessibilityRole="button" disabled={busy || !name.trim()} onPress={() => void save()} style={[styles.save, (busy || !name.trim()) && { opacity: 0.45 }]}><Text style={styles.saveText}>{busy ? '保存中…' : '変更を保存'}</Text></Pressable> : null}
       </View></View>
+      <View style={styles.section}><Text style={styles.sectionTitle}>表示</Text><View style={styles.card}><ThemeSetting /></View></View>
       <View style={styles.section}><Text style={styles.sectionTitle}>旅行のメンバー</Text><View style={styles.card}>
         {trips.length ? trips.map((trip) => <Pressable accessibilityRole="button" accessibilityLabel={`${trip.name}のメンバー`} key={trip.id} onPress={() => { selectTrip(trip.id); router.push({ pathname: '/trips/[tripId]/members', params: { tripId: trip.id } }); }} style={styles.row}>
           <SymbolView name={{ ios: 'person.2', android: 'group', web: 'group' }} size={22} tintColor={palette.ocean} /><View style={{ flex: 1, gap: 5 }}><Text style={styles.rowText}>{trip.name}</Text><Text style={styles.meta}>{trip.memberCount}人</Text></View><Text style={styles.chevron}>›</Text>
@@ -54,14 +60,14 @@ export default function SettingsScreen() {
         {pendingCount && !isDemo ? <Text style={styles.meta}>ログアウトする前に、変更を同期してください。</Text> : null}
         <Pressable accessibilityRole="button" disabled={busy || (!isDemo && pendingCount > 0)} onPress={() => void logout()} style={[styles.row, (busy || (!isDemo && pendingCount > 0)) && { opacity: 0.45 }]}><SymbolView name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' }} size={22} tintColor={palette.slate} /><Text style={styles.rowText}>{isDemo ? 'サンプルを終了' : 'ログアウト'}</Text></Pressable>
       </View></View>
-      <View style={styles.appInfo}><Image source={require('../../assets/brand/logo.png')} style={{ width: 48, height: 48 }} contentFit="contain" /><Text style={styles.brand}>tabi</Text><Text style={styles.meta}>バージョン {packageInfo.version}</Text></View>
+      <View style={styles.appInfo}><BrandLogo style={{ width: 48, height: 48 }} contentFit="contain" /><Text style={styles.brand}>tabi</Text><Text style={styles.meta}>バージョン {packageInfo.version}</Text></View>
     </ScrollView></KeyboardAvoidingView></SafeAreaView>;
 }
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: palette.canvas }, content: { width: '100%', maxWidth: 720, alignSelf: 'center', padding: 24, paddingBottom: 48, gap: 30 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 8 }, back: { width: 40, height: 48, justifyContent: 'center' }, title: { fontSize: 28, fontWeight: '700', color: palette.ink },
   section: { gap: 12 }, sectionTitle: { color: palette.slate, fontSize: 13, fontWeight: '600', paddingLeft: 4 }, card: { padding: 22, backgroundColor: palette.paper, borderRadius: 22, gap: 14 },
   profile: { flexDirection: 'row', alignItems: 'center', gap: 18, marginBottom: 12 }, name: { color: palette.ink, fontSize: 20, fontWeight: '700' }, meta: { color: palette.slate, fontSize: 12, lineHeight: 19 }, label: { color: palette.slate, fontSize: 12, fontWeight: '600' },
-  input: { backgroundColor: palette.canvas, color: palette.ink, padding: 14, borderRadius: 10, fontSize: 16, minHeight: 48 }, save: { backgroundColor: palette.ocean, minHeight: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }, saveText: { color: palette.paper, fontSize: 14, fontWeight: '700' }, error: { color: palette.danger, fontSize: 13 },
+  input: { backgroundColor: palette.canvas, color: palette.ink, padding: 14, borderRadius: 10, fontSize: 16, minHeight: 48 }, save: { backgroundColor: palette.ocean, minHeight: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }, saveText: { color: palette.onOcean, fontSize: 14, fontWeight: '700' }, error: { color: palette.danger, fontSize: 13 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 48, paddingVertical: 8 }, rowText: { color: palette.ink, fontSize: 14, lineHeight: 21, fontWeight: '600' }, chevron: { color: palette.smoke, fontSize: 24 }, appInfo: { alignItems: 'center', gap: 6, paddingTop: 8 }, brand: { fontSize: 20, color: palette.ink, fontWeight: '700' },
 });

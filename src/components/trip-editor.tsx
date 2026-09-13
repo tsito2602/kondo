@@ -1,8 +1,9 @@
+import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { useToast } from './toast';
 import { CoverPicker } from './cover-picker';
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput } from 'react-native';
-import { palette } from '@/constants/design';
+import { type Palette } from '@/constants/design';
 import { useTravel } from '@/data/travel-provider';
 import type { Trip } from '@/data/types';
 import { localDate, validDate } from '@/utils/dates';
@@ -10,6 +11,9 @@ import { DateRangePicker } from './date-range-picker';
 import { FormSheet } from './form-sheet';
 
 export function TripEditor({ trip, onClose, onSaved }: { trip?: Trip; onClose: () => void; onSaved?: (id: string) => void }) {
+  const palette = usePalette();
+  const styles = useThemedStyles(createStyles);
+
   const { createTrip, updateTrip } = useTravel();
   const [name, setName] = useState(trip?.name ?? '');
   const [destination, setDestination] = useState(trip?.destination ?? '');
@@ -37,4 +41,4 @@ export function TripEditor({ trip, onClose, onSaved }: { trip?: Trip; onClose: (
   </FormSheet>;
 }
 
-const styles = StyleSheet.create({ label: { color: palette.slate, fontSize: 13, fontWeight: '600', marginTop: 8 }, input: { minHeight: 52, backgroundColor: palette.paper, borderRadius: 10, padding: 16, color: palette.ink, fontSize: 16 } });
+const createStyles = (palette: Palette) => StyleSheet.create({ label: { color: palette.slate, fontSize: 13, fontWeight: '600', marginTop: 8 }, input: { minHeight: 52, backgroundColor: palette.paper, borderRadius: 10, padding: 16, color: palette.ink, fontSize: 16 } });

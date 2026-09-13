@@ -1,3 +1,4 @@
+import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { useDesktop } from '@/hooks/use-desktop';
 import { PageHeading } from '@/components/page-heading';
 import { useToast } from '@/components/toast';
@@ -14,7 +15,7 @@ import { validDate } from '@/utils/dates';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { FloatingAddButton } from '@/components/floating-add-button';
 import { FlightConnectionLink, FlightConnectionSheet } from '@/components/flight-connection-sheet';
-import { palette, mono } from '@/constants/design';
+import { mono, type Palette } from '@/constants/design';
 import { findAirportByCode } from '@/data/airports';
 import { findFlightConnections, hasLikelyFlightConnection, formatConnectionDuration, type FlightConnection } from '@/data/flight-connections';
 import type { Booking, BookingKind, ItineraryItem } from '@/data/types';
@@ -164,6 +165,9 @@ function timeZoneLabel(entry: TimelineEntry) {
 }
 
 export default function ItineraryScreen() {
+  const palette = usePalette();
+  const styles = useThemedStyles(createStyles);
+
   const desktop = useDesktop();
   const toast = useToast();
   const headerHeight = useTripHeaderHeight();
@@ -429,6 +433,9 @@ export default function ItineraryScreen() {
 }
 
 function ConnectionRow({ connection, continueRail, nextFlight, onPress, disabled = false }: { connection: FlightConnection; continueRail: boolean; nextFlight?: Booking; onPress: () => void; disabled?: boolean }) {
+  const palette = usePalette();
+  const styles = useThemedStyles(createStyles);
+
   return (
     <Pressable disabled={disabled} accessibilityRole="button" accessibilityLabel={`${connection.airportName}で${formatConnectionDuration(connection.durationMinutes)}の乗り継ぎ、${nextFlight?.title ?? '次便'}への紐づけを変更`} onPress={onPress} style={({ pressed }) => [styles.connectionRow, pressed && styles.itemPressed]}>
       <View style={styles.connectionTimeColumn} />
@@ -447,7 +454,7 @@ function ConnectionRow({ connection, continueRail, nextFlight, onPress, disabled
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: 'transparent' },
   scrollContent: { flexGrow: 1 },
   journalSheet: { backgroundColor: palette.canvas, borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden' },
@@ -461,7 +468,7 @@ const styles = StyleSheet.create({
   dayTab: { minWidth: 68, minHeight: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: palette.mist, paddingHorizontal: 12 },
   dayTabSelected: { backgroundColor: palette.ocean },
   dayTabLabel: { color: palette.slate, fontSize: 13, lineHeight: 17, fontWeight: '800' },
-  dayTabLabelSelected: { color: palette.paper },
+  dayTabLabelSelected: { color: palette.onOcean },
   dayTabDate: { color: palette.smoke, fontFamily: mono, fontSize: 9, lineHeight: 13, marginTop: 1 },
   dayTabDateSelected: { color: palette.sky },
   pending: { color: palette.slate, fontFamily: mono, fontSize: 11, marginTop: 4 },

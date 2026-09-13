@@ -1,3 +1,4 @@
+import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { MemberAvatar } from '@/components/member-avatar';
 import { useDesktop } from '@/hooks/use-desktop';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -8,11 +9,14 @@ import { useAuth } from '@/auth/auth-provider';
 import { SyncStatus } from '@/components/sync-status';
 import { TripEditor } from '@/components/trip-editor';
 import { TripTicket } from '@/components/trip-ticket';
-import { palette } from '@/constants/design';
+import { type Palette } from '@/constants/design';
 import { useTravel } from '@/data/travel-provider';
 import { localDate } from '@/utils/dates';
 
 export default function HomeScreen() {
+  const palette = usePalette();
+  const styles = useThemedStyles(createStyles);
+
   const desktop = useDesktop();
   const [search, setSearch] = useState('');
   const { invite } = useLocalSearchParams<{ invite?: string | string[] }>();
@@ -57,10 +61,10 @@ export default function HomeScreen() {
     {creating ? <TripEditor onClose={() => setCreating(false)} onSaved={openTrip} /> : null}
   </SafeAreaView>;
 }
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: palette.canvas }, content: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 20, paddingBottom: 32 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }, eyebrow: { color: palette.ocean, fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 8 }, title: { color: palette.ink, fontSize: 36, lineHeight: 44, fontWeight: '800', letterSpacing: -1 },
-  add: { minHeight: 48, paddingHorizontal: 18, borderRadius: 12, backgroundColor: palette.ocean, justifyContent: 'center' }, addText: { color: palette.paper, fontSize: 15, fontWeight: '700' }, pressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },
+  add: { minHeight: 48, paddingHorizontal: 18, borderRadius: 12, backgroundColor: palette.ocean, justifyContent: 'center' }, addText: { color: palette.onOcean, fontSize: 15, fontWeight: '700' }, pressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },
   group: { gap: 18, marginTop: 24 }, groupTitle: { color: palette.slate, fontSize: 13, fontWeight: '600' }, count: { color: palette.ocean },
   notice: { color: palette.ocean, paddingVertical: 12, fontSize: 14 }, loading: { padding: 80 }, empty: { paddingVertical: 56, alignItems: 'center', gap: 12 },
   emptyTicket: { width: 190, height: 90, backgroundColor: palette.paper, borderRadius: 18, transform: [{ rotate: '-6deg' }], padding: 18, marginBottom: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, emptyTicketText: { fontSize: 11, color: palette.ocean, letterSpacing: 1 }, perforation: { height: 64, borderLeftWidth: 1, borderStyle: 'dashed', borderColor: palette.ash }, emptyPlus: { color: palette.ocean, fontSize: 28 },

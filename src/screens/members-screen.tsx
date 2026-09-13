@@ -1,3 +1,4 @@
+import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { MemberAvatar } from '@/components/member-avatar';
 import { PageHeading } from '@/components/page-heading';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -8,11 +9,14 @@ import { CopyButton } from '@/components/copy-button';
 import { ConfirmationDialog } from '@/components/delete-trip-dialog';
 import { useTripHeaderHeight } from '@/components/trip-header-context';
 import { useToast } from '@/components/toast';
-import { palette } from '@/constants/design';
+import { type Palette } from '@/constants/design';
 import { useTravel } from '@/data/travel-provider';
 import type { TripMember } from '@/data/types';
 
 export default function MembersScreen() {
+  const palette = usePalette();
+  const styles = useThemedStyles(createStyles);
+
   const { selectedTrip, createInvite, sync } = useTravel();
   const { request, isDemo, user } = useAuth();
   const headerHeight = useTripHeaderHeight();
@@ -97,7 +101,7 @@ export default function MembersScreen() {
     <ConfirmationDialog visible={Boolean(confirm)} title={confirm === 'invites' ? '招待リンクを無効にしますか？' : 'メンバーを削除しますか？'} name={confirm && confirm !== 'invites' ? confirm.name || confirm.email : ''} description={confirm === 'invites' ? '未使用の招待リンクがすべて使えなくなります。参加済みのメンバーには影響しません。' : 'この旅行を開けなくなります。再参加を防ぐため、未使用の招待リンクも無効になります。'} confirmLabel={confirm === 'invites' ? '無効にする' : '削除する'} busy={busy === 'remove'} error={confirmError} onCancel={() => setConfirm(null)} onConfirm={() => void remove()} />
   </View>;
 }
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: palette.canvas },
   content: { width: '100%', maxWidth: 720, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 100, gap: 14 },
   inviteCard: { backgroundColor: palette.paper, borderRadius: 22, padding: 22, gap: 16 },
@@ -108,7 +112,7 @@ const styles = StyleSheet.create({
   url: { padding: 14, borderRadius: 12, backgroundColor: palette.canvas, color: palette.ocean, fontSize: 12, lineHeight: 20 },
   inviteActions: { flexDirection: 'row', gap: 10 },
   primary: { minHeight: 46, paddingHorizontal: 18, borderRadius: 12, backgroundColor: palette.ocean, alignItems: 'center', justifyContent: 'center' },
-  primaryText: { color: palette.paper, fontSize: 13, fontWeight: '700' },
+  primaryText: { color: palette.onOcean, fontSize: 13, fontWeight: '700' },
   secondary: { minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: palette.sky },
   secondaryText: { color: palette.ocean, fontSize: 13, fontWeight: '600' },
   revoke: { paddingVertical: 6, alignItems: 'center' },

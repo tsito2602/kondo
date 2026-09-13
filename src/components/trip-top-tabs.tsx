@@ -1,3 +1,4 @@
+import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { useModalViewport } from '@/hooks/use-modal-viewport';
 import { router, usePathname } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -11,7 +12,7 @@ import { DeleteTripDialog } from './delete-trip-dialog';
 import { SyncStatus } from './sync-status';
 import { useOfflineTrip } from './offline-trip';
 import { useToast } from './toast';
-import { palette } from '@/constants/design';
+import { type Palette } from '@/constants/design';
 import { useTravel } from '@/data/travel-provider';
 
 const tabs = [
@@ -22,6 +23,9 @@ const tabs = [
 ] as const;
 
 export function TripTopTabs({ tripId }: { tripId: string }) {
+  const palette = usePalette();
+  const styles = useThemedStyles(createStyles);
+
   const pathname = usePathname();
   const desktop = useDesktop();
   const { action } = useContext(PageActionContext);
@@ -49,7 +53,7 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
       <View style={styles.topRow}>
         <Pressable accessibilityRole="button" accessibilityLabel={managing ? 'しおりへ戻る' : '旅行一覧へ戻る'} onPress={() => managing ? router.replace({ pathname: '/trips/[tripId]/itinerary', params: { tripId } }) : router.replace('/')} testID="trip-back" style={styles.backButton}><Text style={styles.backMark}>‹</Text></Pressable>
         <View testID="trip-heading" style={styles.title}><Text numberOfLines={1} style={styles.tripName}>{managing ? 'メンバー' : selectedTrip?.name}</Text><Text style={styles.tripDates}>{managing ? selectedTrip?.name : `${selectedTrip?.startsOn.replaceAll('-', '.')} — ${selectedTrip?.endsOn.replaceAll('-', '.')}`}</Text></View>
-        {desktop && action ? <Pressable testID="desktop-page-action" accessibilityRole="button" accessibilityLabel={action.label} onPress={action.run} style={{ position: 'absolute', right: 56, paddingHorizontal: 18, height: 44, borderRadius: 10, backgroundColor: palette.ocean, justifyContent: 'center' }}><Text style={{ color: palette.paper, fontSize: 14, fontWeight: '700' }}>＋ {action.label.replace(/する$/, '')}</Text></Pressable> : null}
+        {desktop && action ? <Pressable testID="desktop-page-action" accessibilityRole="button" accessibilityLabel={action.label} onPress={action.run} style={{ position: 'absolute', right: 56, paddingHorizontal: 18, height: 44, borderRadius: 10, backgroundColor: palette.ocean, justifyContent: 'center' }}><Text style={{ color: palette.onOcean, fontSize: 14, fontWeight: '700' }}>＋ {action.label.replace(/する$/, '')}</Text></Pressable> : null}
         <Pressable accessibilityRole="button" accessibilityLabel="旅行メニュー" onPress={() => setMenu(true)} style={styles.menuButton}><Text style={styles.menuMark}>⋯</Text></Pressable>
       </View>
       {!managing ? <>
@@ -79,8 +83,8 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
     <DeleteTripDialog visible={confirmDelete} name={selectedTrip?.name ?? ''} busy={deleting} error={deleteError} onCancel={() => setConfirmDelete(false)} onConfirm={() => void remove()} />
   </View>;
 }
-const styles = StyleSheet.create({
-  shell: { width: '100%', backgroundColor: Platform.OS === 'web' ? 'rgba(238,242,244,0.66)' : 'rgba(238,242,244,0.92)' },
+const createStyles = (palette: Palette) => StyleSheet.create({
+  shell: { width: '100%', backgroundColor: Platform.OS === 'web' ? palette.glass : palette.glassNative },
   inner: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 10 },
   topRow: { minHeight: 64, justifyContent: 'center', position: 'relative' },
   backButton: { position: 'absolute', left: 0, width: 40, height: 48, justifyContent: 'center' },

@@ -1,10 +1,13 @@
+import { usePalette } from '@/theme/theme-provider';
 import { Pressable, Text, View } from 'react-native';
-import { palette } from '@/constants/design';
+
 import type { TripMember } from '@/data/types';
 import { assigneeName, memberAssignee } from '@/data/assignee';
 import { MemberAvatar } from './member-avatar';
 
 export function MemberPicker({ value, members, onChange }: { value: string; members: TripMember[]; onChange: (value: string) => void }) {
+  const palette = usePalette();
+
   const options = [{ value: '', name: '未指定', avatarUrl: null }, ...members.map((member) => ({ value: memberAssignee(member.id), name: member.name || member.email, avatarUrl: member.avatarUrl }))];
   if (value && !options.some((option) => option.value === value)) options.push({ value, name: assigneeName(value, members), avatarUrl: null });
   return <View accessibilityRole="radiogroup" accessibilityLabel="担当" style={{ gap: 6 }}>

@@ -1,13 +1,17 @@
+import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { PropsWithChildren } from 'react';
-import { Image } from 'expo-image';
+import { BrandLogo } from '@/components/brand-logo';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { palette } from '@/constants/design';
+import { type Palette } from '@/constants/design';
 
 import { useAuth } from './auth-provider';
 
 export function AuthGate({ children }: PropsWithChildren) {
+  const palette = usePalette();
+  const styles = useThemedStyles(createStyles);
+
   const { configured, error, loading, signingIn, signIn, user, isDemo, startDemo } = useAuth();
   if (loading) {
     return (
@@ -20,7 +24,7 @@ export function AuthGate({ children }: PropsWithChildren) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View testID="login-content" style={styles.content}>
-        <Image source={require('../../assets/brand/logo.png')} style={styles.logo} contentFit="contain" accessible={false} />
+        <BrandLogo style={styles.logo} contentFit="contain" accessible={false} />
         <Text accessibilityRole="header" style={styles.wordmark}>tabi</Text>
         <Text style={styles.body}>しおり、予約、旅の準備をひとつに。</Text>
         <Pressable
@@ -38,7 +42,7 @@ export function AuthGate({ children }: PropsWithChildren) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: Palette) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.canvas },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.canvas },
   content: { width: '100%', maxWidth: 720, alignSelf: 'center', flex: 1, justifyContent: 'center', padding: 28 },
@@ -48,7 +52,7 @@ const styles = StyleSheet.create({
   sampleText: { color: palette.ocean, fontSize: 15, fontWeight: '700' },
   body: { maxWidth: 460, alignSelf: 'center', textAlign: 'center', color: palette.slate, fontSize: 16, lineHeight: 24, marginTop: 16, marginBottom: 40 },
   button: { minHeight: 56, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.ocean },
-  buttonText: { color: palette.paper, fontSize: 16, fontWeight: '700' },
+  buttonText: { color: palette.onOcean, fontSize: 16, fontWeight: '700' },
   pressed: { opacity: 0.82, transform: [{ scale: 0.99 }] },
   disabled: { opacity: 0.65 },
   note: { color: palette.slate, fontSize: 12, textAlign: 'center', marginTop: 14 },

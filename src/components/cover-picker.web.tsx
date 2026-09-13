@@ -1,10 +1,13 @@
+import { useThemedStyles } from '@/theme/theme-provider';
 import { FileDrop, type DroppedFile } from './file-drop';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { palette } from '@/constants/design';
+import { type Palette } from '@/constants/design';
 import { TripCover } from './trip-cover';
 
 export function CoverPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const styles = useThemedStyles(createStyles);
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const select = async (file?: DroppedFile) => {
@@ -37,4 +40,4 @@ export function CoverPicker({ value, onChange }: { value: string; onChange: (val
     {error ? <Text style={styles.remove}>{error}</Text> : null}
   </View>;
 }
-const styles = StyleSheet.create({ actions: { flexDirection: 'row', gap: 12 }, button: { minHeight: 40, justifyContent: 'center' }, text: { color: palette.ocean, fontWeight: '700', fontSize: 14 }, remove: { color: palette.danger, fontSize: 13 } });
+const createStyles = (palette: Palette) => StyleSheet.create({ actions: { flexDirection: 'row', gap: 12 }, button: { minHeight: 40, justifyContent: 'center' }, text: { color: palette.ocean, fontWeight: '700', fontSize: 14 }, remove: { color: palette.danger, fontSize: 13 } });

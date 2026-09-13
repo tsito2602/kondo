@@ -1,8 +1,11 @@
+import { usePalette } from '@/theme/theme-provider';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 
-import { palette } from '@/constants/design';
+
 
 export default function AppTabs() {
+  const palette = usePalette();
+
   return (
     <NativeTabs
       backgroundColor={palette.canvas}
