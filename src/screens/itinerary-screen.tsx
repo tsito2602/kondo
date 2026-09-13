@@ -1,7 +1,7 @@
 import { useToast } from '@/components/toast';
 import { useTripHero } from '@/components/trip-hero';
 import { useTripHeaderHeight } from '@/components/trip-header-context';
-import { router } from 'expo-router';
+import { BookingSheet } from '@/components/booking-sheet';
 import { SymbolView } from 'expo-symbols';
 import { Fragment, type ComponentProps, useEffect, useMemo, useRef, useState } from 'react';
 import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
@@ -168,6 +168,8 @@ export default function ItineraryScreen() {
   const [dayBarHeight, setDayBarHeight] = useState(60);
   const { height: windowHeight } = useWindowDimensions();
   const { canEdit, selectedTrip, items, bookings, createItem, updateItem, deleteItem, pendingCount } = useTravel();
+  const [viewingBookingId, setViewingBookingId] = useState<string | null>(null);
+  const viewingBooking = bookings.find((booking) => booking.id === viewingBookingId);
   const [adding, setAdding] = useState(false);
   const [formError, setFormError] = useState('');
   const [initialDraft, setInitialDraft] = useState('');
@@ -339,12 +341,12 @@ export default function ItineraryScreen() {
           const dateItems = grouped[date] ?? [];
           return (
             <View key={date} onLayout={(event) => { dayOffsets.current[date] = event.nativeEvent.layout.y; }} style={styles.daySection}>
-              <View style={styles.dateBar}>
+              <View style={[styles.dateBar, dayIndex > 0 && styles.dateBarDivider]}>
                 <Text numberOfLines={1} style={styles.date}>{longDate(date)}</Text>
                 <Text style={styles.dateDay}>DAY {String(dayIndex + 1).padStart(2, '0')}</Text>
               </View>
               {dateItems.length ? <View>
-                  {dateItems.map((entry) => {
+                  {dateItems.map((entry, entryIndex) => {
                     const details = bookingDetails(entry);
                     const isLinkedStart = entry.bookingEndpoint === 'start' && Boolean(entry.booking?.endTime);
                     const isLinkedEnd = entry.bookingEndpoint === 'end';
@@ -356,7 +358,7 @@ export default function ItineraryScreen() {
                       accessibilityHint={entry.booking ? '予約の詳細を開きます' : '予定を編集します'}
                       accessibilityRole="button"
                       disabled={!canEdit && !entry.booking}
-                      onPress={() => entry.booking && selectedTrip ? router.push({ pathname: '/trips/[tripId]/bookings', params: { tripId: selectedTrip.id, booking: entry.booking.id } }) : openEdit(entry.item!)}
+                      onPress={() => entry.booking ? setViewingBookingId(entry.booking.id) : openEdit(entry.item!)}
                       style={({ pressed }) => [styles.itemRow, (isLinkedStart || isLinkedEnd) && styles.linkedBookingRow, pressed && styles.itemPressed]}>
                       <View style={styles.timeColumn}>
                         <Text style={styles.time}>{entry.time || '—'}</Text>
@@ -377,7 +379,7 @@ export default function ItineraryScreen() {
                           />
                         </View>
                       </View>
-                      <View style={styles.itemCopy}>
+                      <View style={[styles.itemCopy, entryIndex < dateItems.length - 1 && styles.itemDivider]}>
                         <Text style={styles.itemTitle}>{entryTitle(entry)}</Text>
                         {details.map((detail, index) => <Text key={`${entry.key}-detail-${index}`} style={[styles.note, index === 0 && styles.bookingTag]}>{detail}</Text>)}
                         {!entry.booking && entry.note ? <Text style={styles.note}>{entry.note}</Text> : null}
@@ -405,10 +407,12 @@ export default function ItineraryScreen() {
       {selectedTrip && canEdit ? <FloatingAddButton label="予定を追加する" onPress={openAdd} /> : null}
       {connectionBookingId ? <FlightConnectionSheet bookingId={connectionBookingId} onClose={() => setConnectionBookingId(null)} /> : null}
 
+      {viewingBooking ? <BookingSheet key={`${selectedTrip?.id}:${viewingBooking.id}`} booking={viewingBooking} onClose={() => setViewingBookingId(null)} /> : null}
+
       <FormSheet visible={adding} title={editingId ? '予定を編集' : '予定を追加'} onClose={closeEditor} onSave={canEdit ? save : undefined} canSave={Boolean(title.trim())} dirty={JSON.stringify([day, time, title, note]) !== initialDraft} error={formError}>
             <DateRangePicker mode="single" showTime label="日時" startDate={day} endDate={day} startTime={time} onChange={(range) => { setDay(range.startDate); setTime(range.startTime); }} />
-            <Text style={styles.label}>予定</Text><TextInput accessibilityLabel="予定名" maxLength={160} value={title} onChangeText={setTitle} placeholder="空港へ移動" style={styles.input} autoFocus />
-            <Text style={styles.label}>メモ</Text><TextInput accessibilityLabel="メモ" maxLength={4000} value={note} onChangeText={setNote} placeholder="集合場所や予約番号など" style={[styles.input, styles.noteInput]} multiline />
+            <Text style={styles.label}>予定</Text><TextInput accessibilityLabel="予定名" maxLength={160} value={title} onChangeText={setTitle} placeholder="空港へ移動" placeholderTextColor={palette.placeholder} style={styles.input} autoFocus />
+            <Text style={styles.label}>メモ</Text><TextInput accessibilityLabel="メモ" maxLength={4000} value={note} onChangeText={setNote} placeholder="集合場所や予約番号など" placeholderTextColor={palette.placeholder} style={[styles.input, styles.noteInput]} multiline />
             {editingId && canEdit ? <Pressable onPress={remove} style={styles.deleteButton}><Text style={styles.deleteText}>この予定を削除</Text></Pressable> : null}
       </FormSheet>
     </SafeAreaView>
@@ -456,9 +460,10 @@ const styles = StyleSheet.create({
   emptyMark: { color: palette.accent, fontSize: 42, fontWeight: '900' },
   emptyTitle: { color: palette.ink, fontSize: 28, lineHeight: 30, fontWeight: '900', letterSpacing: -0.8, marginTop: 14 },
   emptyBody: { color: palette.slate, textAlign: 'center', marginTop: 7 },
-  timeline: { marginTop: 10, marginHorizontal: -20 },
+  timeline: { marginHorizontal: -20 },
   daySection: { backgroundColor: palette.paper },
-  dateBar: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: palette.mist, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.ash, paddingHorizontal: 20, position: 'relative', zIndex: 2 },
+  dateBar: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: palette.mist, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.ash, paddingHorizontal: 20, position: 'relative', zIndex: 2 },
+  dateBarDivider: { borderTopWidth: StyleSheet.hairlineWidth },
   date: { flex: 1, color: palette.ink, fontSize: 12, lineHeight: 18, fontWeight: '700', marginRight: 12 },
   dateDay: { color: palette.ocean, fontFamily: mono, fontSize: 10, lineHeight: 14, fontWeight: '700' },
   itemRow: { minHeight: 104, flexDirection: 'row', alignItems: 'stretch', paddingHorizontal: 16 },
@@ -489,7 +494,8 @@ const styles = StyleSheet.create({
   connectionNext: { color: palette.slate, fontSize: 11, lineHeight: 17 },
   connectionChevron: { color: palette.ocean, alignSelf: 'center', fontSize: 22, marginLeft: 8 },
   connectionAction: { paddingLeft: 130, paddingRight: 16, paddingBottom: 12, backgroundColor: palette.soft },
-  itemCopy: { flex: 1, justifyContent: 'center', paddingVertical: 18, paddingLeft: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
+  itemCopy: { flex: 1, justifyContent: 'center', paddingVertical: 18, paddingLeft: 8 },
+  itemDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
   bookingTag: { color: palette.ocean, fontWeight: '700' },
   itemTitle: { color: palette.ink, fontSize: 17, lineHeight: 22, fontWeight: '800' },
   note: { color: palette.slate, fontSize: 12, lineHeight: 17, marginTop: 3 },

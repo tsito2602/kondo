@@ -94,5 +94,5 @@ const styles = StyleSheet.create({
   menu: { width: 236, borderRadius: 18, padding: 6, backgroundColor: palette.paper },
   menuRow: { minHeight: 52, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 12 },
   menuText: { color: palette.ink, fontSize: 14, fontWeight: '600' },
-  deleteRow: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.ash },
+  deleteRow: { borderRadius: 0, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.ash },
 });

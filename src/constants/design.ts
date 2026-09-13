@@ -10,6 +10,7 @@ export const palette = {
   mist: '#E6ECEF',
   ash: '#C9D3D9',
   smoke: '#7E8C95',
+  placeholder: '#7E8C95',
   slate: '#465A67',
   sky: '#D7E2E8',
   accent: '#6F8FA2',

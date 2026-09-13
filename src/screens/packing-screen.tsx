@@ -14,7 +14,6 @@ import { PackingItem, TravelTask } from '@/data/types';
 import { confirmDeletion } from '@/utils/confirm-deletion';
 
 const CATEGORIES = ['衣類', '洗面・衛生', '電子機器', '書類', '薬', 'その他'];
-const TASK_HINTS = ['休暇を申請する', 'eSIMを用意する', '両替する', 'ペットの預け先を決める'];
 const today = localDate();
 
 type Mode = 'tasks' | 'packing';
@@ -62,7 +61,6 @@ export default function PackingScreen() {
     category,
     items: packingItems.filter((item) => item.category === category),
   })).filter((group) => group.items.length), [packingItems]);
-  const availableHints = TASK_HINTS.filter((hint) => !tasks.some((task) => task.title === hint));
 
   const changeMode = (nextMode: Mode) => {
     setMode(nextMode);
@@ -268,20 +266,8 @@ export default function PackingScreen() {
       <FormSheet visible={formOpen} title={editingId ? (isTasks ? 'やることを編集' : '持ち物を編集') : (isTasks ? 'やることを追加' : '持ち物を追加')} onClose={() => setFormOpen(false)} onSave={canEdit ? save : undefined} canSave={Boolean(isTasks ? taskDraft.title.trim() : packingDraft.name.trim())} dirty={JSON.stringify(isTasks ? [taskDraft, hasDueDate] : packingDraft) !== initialDraft} error={formError}>
               {isTasks ? (
                 <>
-                  {!editingId && availableHints.length ? (
-                    <>
-                      <Text style={styles.label}>入力候補</Text>
-                      <View style={styles.hints}>
-                        {availableHints.map((hint) => (
-                          <Pressable key={hint} onPress={() => setTaskDraft((current) => ({ ...current, title: hint }))} style={[styles.hint, taskDraft.title === hint && styles.hintSelected]}>
-                            <Text style={[styles.hintText, taskDraft.title === hint && styles.hintTextSelected]}>{hint}</Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    </>
-                  ) : null}
                   <Text style={styles.label}>やること</Text>
-                  <TextInput accessibilityLabel="やること" autoFocus maxLength={160} onChangeText={(title) => setTaskDraft((current) => ({ ...current, title }))} placeholder="例：eSIMを用意する" placeholderTextColor={palette.smoke} style={styles.input} value={taskDraft.title} />
+                  <TextInput accessibilityLabel="やること" autoFocus maxLength={160} onChangeText={(title) => setTaskDraft((current) => ({ ...current, title }))} placeholder="例：eSIMを用意する" placeholderTextColor={palette.placeholder} style={styles.input} value={taskDraft.title} />
                   <Pressable accessibilityRole="checkbox" aria-checked={hasDueDate} onPress={() => setHasDueDate((current) => !current)} style={styles.optionalToggle}>
                     <View style={[styles.miniCheck, hasDueDate && styles.miniCheckSelected]}>{hasDueDate ? <Text style={styles.miniCheckText}>✓</Text> : null}</View>
                     <Text style={styles.optionalToggleText}>期限を設定する</Text>
@@ -296,12 +282,12 @@ export default function PackingScreen() {
                     />
                   ) : null}
                   <Text style={styles.label}>担当（任意）</Text>
-                  <TextInput accessibilityLabel="担当" maxLength={80} onChangeText={(assignee) => setTaskDraft((current) => ({ ...current, assignee }))} placeholder="名前を入力" placeholderTextColor={palette.smoke} style={styles.input} value={taskDraft.assignee} />
+                  <TextInput accessibilityLabel="担当" maxLength={80} onChangeText={(assignee) => setTaskDraft((current) => ({ ...current, assignee }))} placeholder="名前を入力" placeholderTextColor={palette.placeholder} style={styles.input} value={taskDraft.assignee} />
                 </>
               ) : (
                 <>
                   <Text style={styles.label}>持ち物</Text>
-                  <TextInput accessibilityLabel="持ち物" autoFocus maxLength={120} onChangeText={(name) => setPackingDraft((current) => ({ ...current, name }))} placeholder="例：モバイルバッテリー" placeholderTextColor={palette.smoke} style={styles.input} value={packingDraft.name} />
+                  <TextInput accessibilityLabel="持ち物" autoFocus maxLength={120} onChangeText={(name) => setPackingDraft((current) => ({ ...current, name }))} placeholder="例：モバイルバッテリー" placeholderTextColor={palette.placeholder} style={styles.input} value={packingDraft.name} />
                   <Text style={styles.label}>カテゴリー</Text>
                   <View style={styles.categoryList}>
                     {CATEGORIES.map((category) => <Pressable key={category} onPress={() => setPackingDraft((current) => ({ ...current, category }))} style={[styles.categoryButton, packingDraft.category === category && styles.categorySelected]}><Text style={[styles.categoryText, packingDraft.category === category && styles.categoryTextSelected]}>{category}</Text></Pressable>)}
@@ -369,11 +355,6 @@ const styles = StyleSheet.create({
   close: { color: palette.ink, fontSize: 26, lineHeight: 28 },
   label: { color: palette.ink, fontSize: 13, lineHeight: 18, fontWeight: '800', marginBottom: 8, marginTop: 17 },
   input: { minHeight: 52, backgroundColor: palette.mist, borderRadius: 14, color: palette.ink, fontSize: 16, lineHeight: 22, paddingHorizontal: 16, paddingVertical: 14 },
-  hints: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  hint: { backgroundColor: palette.mist, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 },
-  hintSelected: { backgroundColor: palette.ocean },
-  hintText: { color: palette.slate, fontSize: 13, lineHeight: 17, fontWeight: '700' },
-  hintTextSelected: { color: palette.paper },
   optionalToggle: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 18 },
   miniCheck: { width: 22, height: 22, borderRadius: 7, borderWidth: 2, borderColor: palette.accent, alignItems: 'center', justifyContent: 'center' },
   miniCheckSelected: { backgroundColor: palette.ocean, borderColor: palette.ocean },

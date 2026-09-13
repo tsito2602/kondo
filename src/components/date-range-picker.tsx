@@ -203,7 +203,7 @@ function TimeSelector({ label, onChange, value }: { label: string; onChange: (va
         maxLength={5}
         onChangeText={onChange}
         placeholder="--:--"
-        placeholderTextColor={palette.smoke}
+        placeholderTextColor={palette.placeholder}
         selectTextOnFocus
         style={[styles.timeInput, !validTime(value) && styles.timeInputInvalid]}
         value={value}
