@@ -198,6 +198,7 @@ function TimeSelector({ label, onChange, value }: { label: string; onChange: (va
         type="time"
         step={60}
         value={value}
+        onInput={(event) => onChange(event.currentTarget.value)}
         onChange={(event) => onChange(event.currentTarget.value)}
       />
       {value ? <Pressable accessibilityRole="button" accessibilityLabel={`${label}をクリア`} onPress={() => onChange('')} style={styles.iconButton}><Text style={styles.clearText}>×</Text></Pressable> : null}
