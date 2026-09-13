@@ -1,111 +1,70 @@
-import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useDesktop } from '@/hooks/use-desktop';
+import { PwaControls } from '@/components/pwa';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-const itinerary = [
-  { time: '10:30', title: '羽田空港を出発', detail: '第2ターミナル・保安検査は9:45まで' },
-  { time: '12:05', title: '福岡空港に到着', detail: '地下鉄で博多へ' },
-  { time: '13:30', title: '博多でランチ', detail: '博多一双 本店' },
-];
+import { useAuth } from '@/auth/auth-provider';
+import { SyncStatus } from '@/components/sync-status';
+import { TripEditor } from '@/components/trip-editor';
+import { TripTicket } from '@/components/trip-ticket';
+import { palette } from '@/constants/design';
+import { useTravel } from '@/data/travel-provider';
+import { localDate } from '@/utils/dates';
 
 export default function HomeScreen() {
-  return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.eyebrow}>次の旅まであと18日</Text>
-            <Text style={styles.title}>福岡、ふたり旅</Text>
-            <Text style={styles.date}>9月14日 — 9月16日・2泊3日</Text>
-          </View>
-          <View style={styles.avatarRow}>
-            <View style={[styles.avatar, styles.avatarFirst]}><Text style={styles.avatarText}>つ</Text></View>
-            <View style={[styles.avatar, styles.avatarSecond]}><Text style={styles.avatarText}>み</Text></View>
-          </View>
-        </View>
-
-        <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>DAY 1 · 9月14日</Text>
-          <Text style={styles.heroTitle}>福岡へ出発</Text>
-          <Text style={styles.heroBody}>羽田 10:30 → 福岡 12:05</Text>
-          <View style={styles.weatherRow}>
-            <Text style={styles.weather}>☀︎ 28°</Text>
-            <Text style={styles.weatherNote}>歩きやすい靴がおすすめ</Text>
-          </View>
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>今日の予定</Text>
-          <Text style={styles.sectionLink}>すべて見る</Text>
-        </View>
-        <View style={styles.timelineCard}>
-          {itinerary.map((item, index) => (
-            <View key={item.time} style={styles.timelineRow}>
-              <Text style={styles.time}>{item.time}</Text>
-              <View style={styles.timelineRail}>
-                <View style={styles.dot} />
-                {index < itinerary.length - 1 && <View style={styles.line} />}
-              </View>
-              <View style={styles.timelineCopy}>
-                <Text style={styles.itemTitle}>{item.title}</Text>
-                <Text style={styles.itemDetail}>{item.detail}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.quickRow}>
-          <Pressable onPress={() => router.push('/packing')} style={({ pressed }) => [styles.quickCard, pressed && styles.pressed]}>
-            <Text style={styles.quickIcon}>✓</Text>
-            <Text style={styles.quickValue}>12 / 18</Text>
-            <Text style={styles.quickLabel}>持ち物</Text>
-          </Pressable>
-          <Pressable onPress={() => router.push('/bookings')} style={({ pressed }) => [styles.quickCard, pressed && styles.pressed]}>
-            <Text style={styles.quickIcon}>⌁</Text>
-            <Text style={styles.quickValue}>4件</Text>
-            <Text style={styles.quickLabel}>予約済み</Text>
-          </Pressable>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
+  const desktop = useDesktop();
+  const [search, setSearch] = useState('');
+  const { invite } = useLocalSearchParams<{ invite?: string | string[] }>();
+  const { trips, selectTrip, acceptInvite, ready, syncing, sync } = useTravel();
+  const { isDemo, exitDemo, signOut } = useAuth();
+  const acceptingInvite = useRef(false);
+  const [creating, setCreating] = useState(false);
+  const [notice, setNotice] = useState('');
+  useEffect(() => {
+    const token = Array.isArray(invite) ? invite[0] : invite;
+    if (!ready || !token || acceptingInvite.current || isDemo) return;
+    acceptingInvite.current = true;
+    void acceptInvite(token).then(() => setNotice('旅行に参加しました')).catch((cause) => setNotice(cause instanceof Error ? cause.message : '招待リンクを確認してください')).finally(() => router.replace('/'));
+  }, [acceptInvite, invite, ready, isDemo]);
+  const openTrip = (tripId: string) => {
+    selectTrip(tripId);
+    router.push({ pathname: '/trips/[tripId]/itinerary', params: { tripId } });
+  };
+  const today = localDate();
+  const matchingTrips = trips.filter((trip) => `${trip.name} ${trip.destination}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+  const groups = [{ label: 'これからの旅行', trips: matchingTrips.filter((trip) => trip.endsOn >= today).sort((a,b) => a.startsOn.localeCompare(b.startsOn)) }, { label: 'これまでの旅行', trips: matchingTrips.filter((trip) => trip.endsOn < today).sort((a,b) => b.startsOn.localeCompare(a.startsOn)) }];
+  return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+    <ScrollView testID="home-scroll" contentContainerStyle={styles.content} refreshControl={!isDemo ? <RefreshControl refreshing={syncing} onRefresh={() => void sync()} tintColor={palette.ocean} /> : undefined}>
+      <View testID="home-header" style={styles.header}>
+        <View><Text style={styles.eyebrow}>TABI</Text><Text accessibilityRole="header" style={styles.title}>旅行</Text></View>
+        <Pressable accessibilityRole="button" accessibilityLabel="旅行を追加する" disabled={!ready} onPress={() => setCreating(true)} style={({ pressed }) => [styles.add, pressed && styles.pressed]}><Text style={styles.addText}>＋ 旅行</Text></Pressable>
+      </View>
+      {desktop && trips.length ? <TextInput accessibilityLabel="旅行を検索" placeholder="旅行名・行き先で検索" placeholderTextColor={palette.placeholder} value={search} onChangeText={setSearch} style={{ padding: 14, backgroundColor: palette.paper, borderRadius: 10, color: palette.ink, fontSize: 14, marginVertical: 16, maxWidth: 420 }} /> : null}
+      {desktop && trips.length > 0 && !matchingTrips.length ? <Text style={styles.notice}>該当する旅行がありません</Text> : null}
+      <SyncStatus />
+      <PwaControls />
+      {notice ? <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text> : null}
+      {!ready ? <View style={styles.loading}><ActivityIndicator color={palette.ocean} /></View> : !trips.length ? <View style={styles.empty}>
+        <View style={styles.emptyTicket}><Text style={styles.emptyTicketText}>TABI / 01</Text><View style={styles.perforation} /><Text style={styles.emptyPlus}>＋</Text></View>
+        <Text style={styles.emptyTitle}>最初の旅行を作成</Text>
+        <Text style={styles.body}>行き先と日程が決まったら、旅行を作成できます。</Text>
+        <Pressable accessibilityRole="button" onPress={() => setCreating(true)} style={styles.primary}><Text style={styles.addText}>旅行を作る</Text></Pressable>
+      </View> : groups.filter((group) => group.trips.length).map((group) => <View key={group.label} style={styles.group}>
+        <Text style={styles.groupTitle}>{group.label}<Text style={styles.count}>　{group.trips.length}</Text></Text>
+        <View testID="trip-grid" style={{ gap: 18 }}>{group.trips.map((trip) => <Pressable key={trip.id} accessibilityRole="button" accessibilityLabel={trip.name} accessibilityHint="旅行のしおりを開きます" onPress={() => openTrip(trip.id)} style={({pressed}) => [pressed && styles.pressed]}><TripTicket trip={trip} /></Pressable>)}</View>
+      </View>)}
+      <Pressable testID="home-exit" accessibilityRole="button" onPress={() => isDemo ? exitDemo() : void signOut()} style={styles.exit}><Text style={styles.exitText}>{isDemo ? 'サンプルを終了' : 'ログアウト'}</Text></Pressable>
+    </ScrollView>
+    {creating ? <TripEditor onClose={() => setCreating(false)} onSaved={openTrip} /> : null}
+  </SafeAreaView>;
 }
-
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F6F4EF' },
-  content: { padding: 20, paddingBottom: 120, gap: 18 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  eyebrow: { color: '#C65338', fontSize: 13, fontWeight: '700', marginBottom: 7 },
-  title: { color: '#20332C', fontSize: 29, lineHeight: 35, fontWeight: '800', letterSpacing: -0.7 },
-  date: { color: '#6E756F', fontSize: 14, marginTop: 6 },
-  avatarRow: { flexDirection: 'row', paddingTop: 2 },
-  avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#F6F4EF' },
-  avatarFirst: { backgroundColor: '#355E52' },
-  avatarSecond: { backgroundColor: '#D17A5B', marginLeft: -10 },
-  avatarText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
-  heroCard: { backgroundColor: '#2F5A4E', borderRadius: 26, padding: 22, minHeight: 190, justifyContent: 'flex-end', shadowColor: '#19372F', shadowOpacity: 0.2, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 5 },
-  heroLabel: { color: '#D3E4DD', fontSize: 12, fontWeight: '800', letterSpacing: 1.1 },
-  heroTitle: { color: '#FFFFFF', fontSize: 28, fontWeight: '800', marginTop: 8 },
-  heroBody: { color: '#E7F0EC', fontSize: 15, marginTop: 5 },
-  weatherRow: { flexDirection: 'row', gap: 12, marginTop: 20, alignItems: 'center' },
-  weather: { color: '#20332C', backgroundColor: '#F3D79D', overflow: 'hidden', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6, fontSize: 13, fontWeight: '800' },
-  weatherNote: { color: '#D3E4DD', fontSize: 13 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
-  sectionTitle: { color: '#20332C', fontSize: 20, fontWeight: '800' },
-  sectionLink: { color: '#C65338', fontSize: 13, fontWeight: '700' },
-  timelineCard: { backgroundColor: '#FFFFFF', borderRadius: 22, padding: 18, gap: 2 },
-  timelineRow: { minHeight: 72, flexDirection: 'row' },
-  time: { width: 52, color: '#6E756F', fontSize: 13, fontWeight: '700', paddingTop: 1 },
-  timelineRail: { width: 22, alignItems: 'center' },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#D56B4B', marginTop: 3 },
-  line: { width: 2, flex: 1, backgroundColor: '#E6E3DC', marginVertical: 4 },
-  timelineCopy: { flex: 1, paddingBottom: 18 },
-  itemTitle: { color: '#20332C', fontSize: 15, fontWeight: '800' },
-  itemDetail: { color: '#777D78', fontSize: 13, lineHeight: 19, marginTop: 3 },
-  quickRow: { flexDirection: 'row', gap: 12 },
-  quickCard: { flex: 1, backgroundColor: '#ECE8DD', borderRadius: 20, padding: 17 },
-  quickIcon: { color: '#C65338', fontSize: 20, fontWeight: '800' },
-  quickValue: { color: '#20332C', fontSize: 18, fontWeight: '800', marginTop: 13 },
-  quickLabel: { color: '#777D78', fontSize: 13, marginTop: 2 },
-  pressed: { opacity: 0.65, transform: [{ scale: 0.98 }] },
+  screen: { flex: 1, backgroundColor: palette.canvas }, content: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 20, paddingBottom: 32 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }, eyebrow: { color: palette.ocean, fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 8 }, title: { color: palette.ink, fontSize: 36, lineHeight: 44, fontWeight: '800', letterSpacing: -1 },
+  add: { minHeight: 48, paddingHorizontal: 18, borderRadius: 12, backgroundColor: palette.ocean, justifyContent: 'center' }, addText: { color: palette.paper, fontSize: 15, fontWeight: '700' }, pressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },
+  group: { gap: 18, marginTop: 24 }, groupTitle: { color: palette.slate, fontSize: 13, fontWeight: '600' }, count: { color: palette.ocean },
+  notice: { color: palette.ocean, paddingVertical: 12, fontSize: 14 }, loading: { padding: 80 }, empty: { paddingVertical: 56, alignItems: 'center', gap: 12 },
+  emptyTicket: { width: 190, height: 90, backgroundColor: palette.paper, borderRadius: 18, transform: [{ rotate: '-6deg' }], padding: 18, marginBottom: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, emptyTicketText: { fontSize: 11, color: palette.ocean, letterSpacing: 1 }, perforation: { height: 64, borderLeftWidth: 1, borderStyle: 'dashed', borderColor: palette.ash }, emptyPlus: { color: palette.ocean, fontSize: 28 },
+  emptyTitle: { color: palette.ink, fontSize: 23, fontWeight: '700' }, body: { color: palette.slate, fontSize: 14, lineHeight: 22, textAlign: 'center', maxWidth: 270 }, primary: { marginTop: 12, backgroundColor: palette.ocean, padding: 16, borderRadius: 10 }, exit: { minHeight: 48, marginTop: 32, alignItems: 'center', justifyContent: 'center' }, exitText: { color: palette.slate, fontSize: 13 },
 });
