@@ -91,10 +91,14 @@ export type Place = {
   reservationStatus: ReservationStatus;
   location: string;
   referenceLinks?: PlaceReferenceLink[];
+  itineraryItemId?: string | null;
   status: PlaceStatus;
   updatedAt?: number;
 };
 export type PlaceInput = Omit<Place, 'id' | 'updatedAt'>;
+
+export type TravelNote = { id: string; body: string; pinned: boolean; updatedAt: number };
+export type NoteInput = Pick<TravelNote, 'body' | 'pinned'>;
 
 export type PendingMutation = {
   id: string;
@@ -113,6 +117,7 @@ export type TravelCache = {
   packingByTrip: Record<string, PackingItem[]>;
   tasksByTrip: Record<string, TravelTask[]>;
   placesByTrip: Record<string, Place[]>;
+  notesByTrip?: Record<string, TravelNote[]>;
   membersByTrip?: Record<string, TripMember[]>;
   pending: PendingMutation[];
 };
@@ -127,12 +132,14 @@ export const emptyTravelCache = (): TravelCache => ({
   packingByTrip: {},
   tasksByTrip: {},
   placesByTrip: {},
+  notesByTrip: {},
   pending: [],
 });
 
 export const normalizeTravelCache = (value: TravelCache): TravelCache => ({
   ...value,
   placesByTrip: value.placesByTrip ?? {},
+  notesByTrip: value.notesByTrip ?? {},
   documentsByBooking: Object.fromEntries(
     Object.entries(value.documentsByBooking ?? {}).map(([bookingId, documents]) => [
       bookingId,
