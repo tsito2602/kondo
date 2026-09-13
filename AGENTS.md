@@ -9,3 +9,10 @@
 - Google OAuthのClient Secret、Cloudflare API token、セッション秘密鍵をリポジトリへ保存しない。
 - Google ID tokenはサーバーで署名・issuer・audience・有効期限を検証する。decodeしたpayloadだけで信用しない。
 - stagingとproductionのD1・R2は完全に分離する。
+
+## バージョン更新
+
+- バージョンは`package.json`を正として、`package-lock.json`と`app.json`の`expo.version`を同期する。
+- 1リリースにつき1回、修正はPATCH、後方互換の機能追加はMINOR、互換性を壊す変更はMAJORとし、含まれる変更のうち最も大きい区分を採用する。
+- 配信する挙動が変わらない文書・テスト・CI等のみの変更では上げない。
+- バージョン変更は検証・コミットより前に含める。Git tag・GitHub Releaseは別途指示がある場合だけ作成する。
