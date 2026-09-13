@@ -20,7 +20,8 @@ export function AuthGate({ children }: PropsWithChildren) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.content}>
-        <Image source={require('../../assets/brand/logo.png')} style={styles.logo} contentFit="contain" accessibilityLabel="tabi" accessible />
+        <Image source={require('../../assets/brand/logo.png')} style={styles.logo} contentFit="contain" accessible={false} />
+        <Text accessibilityRole="header" style={styles.wordmark}>tabi</Text>
         <Text style={styles.body}>しおり、予約、旅の準備をひとつに。</Text>
         <Pressable
           accessibilityRole="button"
@@ -42,6 +43,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.canvas },
   content: { width: '100%', maxWidth: 720, alignSelf: 'center', flex: 1, justifyContent: 'center', padding: 28 },
   logo: { width: 200, height: 200, alignSelf: 'center' },
+  wordmark: { alignSelf: 'center', color: palette.ink, fontSize: 48, lineHeight: 56, fontWeight: '800', letterSpacing: -1.5, marginTop: -20 },
   sampleButton: { minHeight: 56, justifyContent: 'center', alignItems: 'center', marginTop: 12, backgroundColor: palette.paper, borderRadius: 8 },
   sampleText: { color: palette.ocean, fontSize: 15, fontWeight: '700' },
   body: { maxWidth: 460, alignSelf: 'center', textAlign: 'center', color: palette.slate, fontSize: 16, lineHeight: 24, marginTop: 16, marginBottom: 40 },
