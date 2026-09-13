@@ -49,8 +49,7 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
       <View style={styles.topRow}>
         <Pressable accessibilityRole="button" accessibilityLabel={managing ? 'しおりへ戻る' : '旅行一覧へ戻る'} onPress={() => managing ? router.replace({ pathname: '/trips/[tripId]/itinerary', params: { tripId } }) : router.replace('/')} testID="trip-back" style={styles.backButton}><Text style={styles.backMark}>‹</Text></Pressable>
         <View testID="trip-heading" style={styles.title}><Text numberOfLines={1} style={styles.tripName}>{managing ? 'メンバー' : selectedTrip?.name}</Text><Text style={styles.tripDates}>{managing ? selectedTrip?.name : `${selectedTrip?.startsOn.replaceAll('-', '.')} — ${selectedTrip?.endsOn.replaceAll('-', '.')}`}</Text></View>
-        {desktop && action ? <Pressable testID="desktop-page-action" accessibilityRole="button" accessibilityLabel={action.label} onPress={action.run} style={{ position: 'absolute', right: 104, paddingHorizontal: 18, height: 44, borderRadius: 10, backgroundColor: palette.ocean, justifyContent: 'center' }}><Text style={{ color: palette.paper, fontSize: 14, fontWeight: '700' }}>＋ {action.label.replace(/する$/, '')}</Text></Pressable> : null}
-        {!managing ? <Pressable accessibilityRole="button" accessibilityLabel="メンバーを管理" onPress={() => router.push({ pathname: '/trips/[tripId]/members', params: { tripId } })} style={styles.membersButton}><SymbolView name={{ ios: 'person.2', android: 'group', web: 'group' }} size={23} tintColor={palette.ocean} /></Pressable> : null}
+        {desktop && action ? <Pressable testID="desktop-page-action" accessibilityRole="button" accessibilityLabel={action.label} onPress={action.run} style={{ position: 'absolute', right: 56, paddingHorizontal: 18, height: 44, borderRadius: 10, backgroundColor: palette.ocean, justifyContent: 'center' }}><Text style={{ color: palette.paper, fontSize: 14, fontWeight: '700' }}>＋ {action.label.replace(/する$/, '')}</Text></Pressable> : null}
         <Pressable accessibilityRole="button" accessibilityLabel="旅行メニュー" onPress={() => setMenu(true)} style={styles.menuButton}><Text style={styles.menuMark}>⋯</Text></Pressable>
       </View>
       {!managing ? <>
@@ -67,6 +66,7 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
         <Pressable accessibilityLabel="メニューを閉じる" onPress={() => setMenu(false)} style={StyleSheet.absoluteFill} />
         <View testID="trip-menu-position" style={[styles.menuPosition, { top: insets.top + 58 }]} pointerEvents="box-none">
           <View testID="trip-menu" style={styles.menu}>
+            {!managing ? <Pressable accessibilityRole="button" accessibilityLabel="メンバーを管理" onPress={() => { setMenu(false); router.push({ pathname: '/trips/[tripId]/members', params: { tripId } }); }} style={styles.menuRow}><SymbolView name={{ ios: 'person.2', android: 'group', web: 'group' }} size={19} tintColor={palette.ocean} /><Text style={styles.menuText}>メンバーを管理</Text></Pressable> : null}
             <Pressable accessibilityRole="button" onPress={() => { setMenu(false); router.push('/settings'); }} style={styles.menuRow}><SymbolView name={{ ios: 'gearshape', android: 'settings', web: 'settings' }} size={19} tintColor={palette.ocean} /><Text style={styles.menuText}>設定</Text></Pressable>
             {canEdit ? <Pressable accessibilityRole="button" onPress={() => { setMenu(false); setEditing(true); }} style={styles.menuRow}><SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={19} tintColor={palette.ocean} /><Text style={styles.menuText}>旅行を編集</Text></Pressable> : null}
             {Platform.OS === 'web' ? <Pressable accessibilityRole="button" disabled={offline.busy} onPress={() => { setMenu(false); void offline.save(); }} style={styles.menuRow}><SymbolView name={{ ios: 'arrow.down.circle', android: 'download', web: 'download' }} size={19} tintColor={palette.ocean} /><Text style={styles.menuText}>{offline.busy ? offline.progress : 'オフライン保存'}</Text></Pressable> : null}
@@ -85,10 +85,9 @@ const styles = StyleSheet.create({
   topRow: { minHeight: 64, justifyContent: 'center', position: 'relative' },
   backButton: { position: 'absolute', left: 0, width: 40, height: 48, justifyContent: 'center' },
   backMark: { color: palette.ocean, fontSize: 32, lineHeight: 36 },
-  title: { marginLeft: 42, marginRight: 88, minHeight: 60, justifyContent: 'center' },
+  title: { marginLeft: 42, marginRight: 48, minHeight: 60, justifyContent: 'center' },
   tripName: { color: palette.ink, fontSize: 16, lineHeight: 22, fontWeight: '800' },
   tripDates: { color: palette.slate, fontSize: 10, marginTop: 4 },
-  membersButton: { position: 'absolute', right: 42, width: 40, height: 44, alignItems: 'center', justifyContent: 'center' },
   menuButton: { position: 'absolute', right: 0, width: 40, height: 44, alignItems: 'center', justifyContent: 'center' },
   menuMark: { color: palette.ocean, fontSize: 26, fontWeight: '800' },
   tabs: { minHeight: 52, flexDirection: 'row', padding: 4, borderRadius: 16, backgroundColor: palette.paper },

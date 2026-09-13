@@ -72,7 +72,6 @@ a:focus-visible, button:focus-visible, [role="button"]:focus-visible, [role="tab
   [data-testid="route-transition"] { animation: none; }
   [data-testid="home-scroll"] > div, [data-testid="bookings-scroll"] > div, [data-testid="places-scroll"] > div, [data-testid="packing-scroll"] > div, [data-testid="members-scroll"] > div { max-width: 1280px !important; padding-left: 32px !important; padding-right: 32px !important; padding-bottom: 48px !important; }
   [data-testid="home-scroll"] > div { padding-top: 32px !important; }
-  [data-testid="home-exit"] { display: none !important; }
   [data-testid="home-header"] { margin-bottom: 20px; }
   [data-testid="trip-grid"], [data-testid="booking-grid"], [data-testid="place-grid"], [data-testid="preparation-groups"] { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px !important; align-items: start; }
   [data-testid="trip-grid"] { grid-template-columns: repeat(auto-fit, minmax(min(100%, 370px), 1fr)); }
@@ -83,7 +82,7 @@ a:focus-visible, button:focus-visible, [role="button"]:focus-visible, [role="tab
   [data-testid="trip-header-inner"] { max-width: 1280px !important; padding: 16px 32px !important; }
   [data-testid="trip-header-inner"] > div:first-child { min-height: 54px !important; }
   [data-testid="trip-back"], [data-testid="trip-tabs"] { display: none !important; }
-  [data-testid="trip-heading"] { margin-left: 0 !important; margin-right: 310px !important; min-height: 54px !important; }
+  [data-testid="trip-heading"] { margin-left: 0 !important; margin-right: 262px !important; min-height: 54px !important; }
   [data-testid="trip-heading"] > div:first-child { font-size: 18px !important; }
   [data-testid="trip-heading"] > div:last-child { font-size: 12px !important; }
   [data-testid="trip-menu-position"] { max-width: none !important; padding-right: 32px !important; }

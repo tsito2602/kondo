@@ -53,7 +53,6 @@ export default function HomeScreen() {
         <Text style={styles.groupTitle}>{group.label}<Text style={styles.count}>　{group.trips.length}</Text></Text>
         <View testID="trip-grid" style={{ gap: 18 }}>{group.trips.map((trip) => <Pressable key={trip.id} accessibilityRole="button" accessibilityLabel={trip.name} accessibilityHint="旅行のしおりを開きます" onPress={() => openTrip(trip.id)} style={({pressed}) => [pressed && styles.pressed]}><TripTicket trip={trip} /></Pressable>)}</View>
       </View>)}
-      <Pressable testID="home-exit" accessibilityRole="button" onPress={() => router.push('/settings')} style={styles.exit}><Text style={styles.exitText}>設定</Text></Pressable>
     </ScrollView>
     {creating ? <TripEditor onClose={() => setCreating(false)} onSaved={openTrip} /> : null}
   </SafeAreaView>;
@@ -65,5 +64,5 @@ const styles = StyleSheet.create({
   group: { gap: 18, marginTop: 24 }, groupTitle: { color: palette.slate, fontSize: 13, fontWeight: '600' }, count: { color: palette.ocean },
   notice: { color: palette.ocean, paddingVertical: 12, fontSize: 14 }, loading: { padding: 80 }, empty: { paddingVertical: 56, alignItems: 'center', gap: 12 },
   emptyTicket: { width: 190, height: 90, backgroundColor: palette.paper, borderRadius: 18, transform: [{ rotate: '-6deg' }], padding: 18, marginBottom: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, emptyTicketText: { fontSize: 11, color: palette.ocean, letterSpacing: 1 }, perforation: { height: 64, borderLeftWidth: 1, borderStyle: 'dashed', borderColor: palette.ash }, emptyPlus: { color: palette.ocean, fontSize: 28 },
-  emptyTitle: { color: palette.ink, fontSize: 23, fontWeight: '700' }, body: { color: palette.slate, fontSize: 14, lineHeight: 22, textAlign: 'center', maxWidth: 270 }, primary: { marginTop: 12, backgroundColor: palette.ocean, padding: 16, borderRadius: 10 }, exit: { minHeight: 48, marginTop: 32, alignItems: 'center', justifyContent: 'center' }, exitText: { color: palette.slate, fontSize: 13 },
+  emptyTitle: { color: palette.ink, fontSize: 23, fontWeight: '700' }, body: { color: palette.slate, fontSize: 14, lineHeight: 22, textAlign: 'center', maxWidth: 270 }, primary: { marginTop: 12, backgroundColor: palette.ocean, padding: 16, borderRadius: 10 },
 });
