@@ -1,0 +1,125 @@
+import { useTripHeaderHeight } from '@/components/trip-header-context';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '@/auth/auth-provider';
+import { BookingSheet, BOOKING_KINDS } from '@/components/booking-sheet';
+import { BookingRoute } from '@/components/booking-route';
+import { FloatingAddButton } from '@/components/floating-add-button';
+import { FlightConnectionLink, FlightConnectionSheet } from '@/components/flight-connection-sheet';
+import { palette, mono } from '@/constants/design';
+import { findFlightConnections, hasLikelyFlightConnection } from '@/data/flight-connections';
+import { useTravel } from '@/data/travel-provider';
+import { formatDate } from '@/utils/dates';
+
+export default function BookingsScreen() {
+  const { selectedTrip } = useTravel();
+  const { user } = useAuth();
+  return <TripBookingsScreen key={`${user?.id}:${selectedTrip?.id}:${selectedTrip?.startsOn}:${selectedTrip?.endsOn}`} />;
+}
+
+function TripBookingsScreen() {
+  const headerHeight = useTripHeaderHeight();
+  const { booking: requestedBooking } = useLocalSearchParams<{ booking?: string | string[] }>();
+  const { canEdit, bookings, documentsByBooking, selectedTrip } = useTravel();
+  const [openedBooking, setOpenedBooking] = useState<string | 'new' | null>(null);
+  const [connectionBookingId, setConnectionBookingId] = useState<string | null>(null);
+  const connections = useMemo(() => new Map(findFlightConnections(bookings).map((connection) => [connection.arrivalBookingId, connection])), [bookings]);
+  const openCreate = () => setOpenedBooking('new');
+  const selectedBooking = bookings.find((booking) => booking.id === openedBooking);
+
+  useEffect(() => {
+    const bookingId = Array.isArray(requestedBooking) ? requestedBooking[0] : requestedBooking;
+    if (!bookingId || !bookings.some((booking) => booking.id === bookingId)) return;
+    const timeout = setTimeout(() => {
+      setOpenedBooking(bookingId);
+      router.setParams({ booking: undefined });
+    }, 0);
+    return () => clearTimeout(timeout);
+  }, [bookings, requestedBooking]);
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={[]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingTop: headerHeight + 20 }]} showsVerticalScrollIndicator={false}>
+        {!selectedTrip ? (
+          <View style={styles.empty}><Text style={styles.emptyTitle}>旅行を作成してください</Text><Text style={styles.emptyBody}>予約は選択中の旅行ごとに保存されます。</Text></View>
+        ) : bookings.length === 0 ? (
+          <Pressable disabled={!canEdit} onPress={openCreate} style={({ pressed }) => [styles.empty, pressed && styles.pressed]}>
+            <View style={styles.emptyMark}><Text style={styles.emptyMarkText}>＋</Text></View>
+            <Text style={styles.emptyTitle}>予約はまだありません</Text>
+            <Text style={styles.emptyBody}>＋ 航空券・ホテル・チケットを追加</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.ticketList}>
+            {bookings.map((booking, index) => {
+              const kind = BOOKING_KINDS.find((entry) => entry.value === booking.kind) ?? BOOKING_KINDS[BOOKING_KINDS.length - 1];
+              const hasRoute = Boolean(booking.origin || booking.destination || booking.originCode || booking.destinationCode);
+              const documentCount = documentsByBooking[booking.id]?.length ?? 0;
+              const connection = connections.get(booking.id);
+              return (
+                <View key={booking.id}>
+                <Pressable onPress={() => setOpenedBooking(booking.id)} style={({ pressed }) => [styles.ticket, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel={`${booking.title}の詳細`}>
+                  <View style={styles.copy}>
+                    <View style={styles.ticketTop}>
+                      <View style={styles.typeTag}><Text style={styles.type}>{kind.short}</Text></View>
+                      <View style={styles.ticketTopMeta}>{documentCount ? <Text style={styles.documentCount}>書類 {documentCount}</Text> : null}<Text style={styles.serial}>TABI/{String(index + 1).padStart(2, '0')}</Text></View>
+                    </View>
+                    <Text numberOfLines={2} style={styles.cardTitle}>{booking.title}</Text>
+                    {hasRoute ? <BookingRoute booking={booking} compact /> : booking.detail ? <Text style={styles.detail}>{booking.detail}</Text> : null}
+                    {hasRoute && booking.detail ? <Text numberOfLines={1} style={styles.detail}>{booking.detail}</Text> : null}
+                    <Text style={styles.meta}>{formatDate(booking.day)}　{booking.time}{booking.endDay !== booking.day ? ` → ${formatDate(booking.endDay)}` : booking.endTime && booking.endTime !== booking.time ? ` – ${booking.endTime}` : ''}</Text>
+                  </View>
+                  <View style={styles.stub}>
+                    <Text style={styles.icon}>{kind.icon}</Text>
+                    <Text style={styles.stubNo}>{String(index + 1).padStart(2, '0')}</Text>
+                    <Text style={styles.stubLabel}>PASS</Text>
+                  </View>
+                  <View style={[styles.notch, styles.notchTop]} />
+                  <View style={[styles.notch, styles.notchBottom]} />
+                </Pressable>
+                {booking.kind === 'flight' && (connection || (canEdit && hasLikelyFlightConnection(booking, bookings))) ? <FlightConnectionLink disabled={!canEdit} booking={booking} connection={connection} nextFlight={bookings.find((flight) => flight.id === connection?.departureBookingId)} onPress={() => setConnectionBookingId(booking.id)} /> : null}
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </ScrollView>
+
+      {selectedTrip && canEdit ? <FloatingAddButton label="予約を追加する" onPress={openCreate} /> : null}
+      {connectionBookingId ? <FlightConnectionSheet bookingId={connectionBookingId} onClose={() => setConnectionBookingId(null)} /> : null}
+
+      {openedBooking === 'new' || selectedBooking ? <BookingSheet key={openedBooking} booking={selectedBooking} onClose={() => setOpenedBooking(null)} /> : null}
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: palette.canvas },
+  content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 112 },
+  empty: { minHeight: 260, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.paper, borderRadius: 32, padding: 28, marginTop: 24 },
+  emptyMark: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.sky, marginBottom: 18 },
+  emptyMarkText: { color: palette.ocean, fontSize: 27, fontWeight: '700' },
+  emptyTitle: { color: palette.ink, fontSize: 19, fontWeight: '900', textAlign: 'center' },
+  emptyBody: { color: palette.slate, fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 8 },
+  ticketList: { gap: 16, marginTop: 24 },
+  ticket: { minHeight: 174, flexDirection: 'row', position: 'relative', overflow: 'hidden', borderRadius: 28, backgroundColor: palette.paper },
+  copy: { flex: 1, minWidth: 0, padding: 20 },
+  ticketTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  ticketTopMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  documentCount: { color: palette.ocean, fontSize: 9, fontWeight: '800' },
+  typeTag: { alignSelf: 'flex-start', backgroundColor: palette.sky, borderRadius: 64, paddingHorizontal: 10, paddingVertical: 5 },
+  type: { color: palette.ink, fontFamily: mono, fontSize: 9, letterSpacing: 0.8 },
+  serial: { color: palette.smoke, fontFamily: mono, fontSize: 9 },
+  cardTitle: { color: palette.ink, fontSize: 18, lineHeight: 25, fontWeight: '900', letterSpacing: -0.4, marginTop: 18 },
+  detail: { color: palette.slate, fontSize: 14, marginTop: 6 },
+  meta: { color: palette.slate, fontFamily: mono, fontSize: 10, lineHeight: 16, marginTop: 12 },
+  stub: { width: 60, borderLeftWidth: 1, borderStyle: 'dashed', borderLeftColor: palette.ocean, backgroundColor: palette.sky, alignItems: 'center', justifyContent: 'center' },
+  icon: { color: palette.ocean, fontSize: 24, fontWeight: '900' },
+  stubNo: { color: palette.ink, fontSize: 24, lineHeight: 27, fontWeight: '900', marginTop: 12 },
+  stubLabel: { color: palette.smoke, fontFamily: mono, fontSize: 8, marginTop: 2 },
+  notch: { position: 'absolute', right: 66, width: 20, height: 20, borderRadius: 10, backgroundColor: palette.canvas, zIndex: 2 },
+  notchTop: { top: -10 },
+  notchBottom: { bottom: -10 },
+  pressed: { opacity: 0.62 },
+});

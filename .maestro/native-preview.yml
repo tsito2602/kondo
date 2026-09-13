@@ -1,0 +1,38 @@
+appId: com.tsito2602.tabi.preview
+---
+- launchApp:
+    clearState: true
+- assertVisible: サンプルの旅行で試す
+- takeScreenshot: 01-welcome
+- tapOn: サンプルの旅行で試す
+- assertVisible: ウィーンの街を歩く
+- takeScreenshot: 02-trips
+- tapOn: ウィーンの街を歩く
+- assertVisible: しおり
+- takeScreenshot: 03-itinerary
+- tapOn: 予約
+- tapOn: サンプル航空 101の詳細
+- assertVisible: 予約の詳細
+- takeScreenshot: 04-booking
+- tapOn: 編集
+- tapOn:
+    id: booking-title
+- eraseText
+- inputText: QA Flight 101
+- takeScreenshot: 05-keyboard
+- tapOn: 保存
+- assertVisible: QA Flight 101
+- tapOn: 閉じる
+- tapOn: 準備
+- tapOn: 持ち物.*
+- tapOn: パスポートを準備済みにする
+- assertVisible: パスポートを未準備にする
+- takeScreenshot: 06-packing
+- tapOn: 旅行一覧へ戻る
+- stopApp
+- launchApp
+- tapOn: サンプルの旅行で試す
+- tapOn: ウィーンの街を歩く
+- tapOn: 予約
+- assertVisible: QA Flight 101の詳細
+- takeScreenshot: 07-persisted
