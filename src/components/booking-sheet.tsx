@@ -259,11 +259,11 @@ function BookingDocuments({ bookingId, documents }: { bookingId: string; documen
     {Platform.OS === 'web' && canEdit ? <FileDrop label="この予約に書類をドロップ" hint="画像・PDF / 1ファイル20MBまで・複数選択可" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif" multiple disabled={Boolean(busy)} onFiles={uploadFiles} /> : null}
     {documents.length ? <View style={styles.documentList}>{documents.map((document) => <View key={document.id} style={styles.documentRow}>
       <View style={styles.documentIcon}><Text style={styles.documentIconText}>{document.contentType === 'application/pdf' ? 'PDF' : 'IMG'}</Text></View>
-      <Pressable accessibilityLabel={`${document.filename}を開く`} disabled={Boolean(busy)} onPress={() => openDocument(document)} style={({ pressed }) => [styles.documentCopy, pressed && styles.pressed]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${document.filename}を開く`} disabled={Boolean(busy)} onPress={() => openDocument(document)} style={({ pressed }) => [styles.documentCopy, pressed && styles.pressed]}>
         <Text numberOfLines={1} style={styles.documentName}>{document.filename}</Text><Text style={styles.documentMeta}>{formatFileSize(document.size)} · {getCachedDocumentUri(document.id, document.filename) ? '端末に保存済み' : '開いて確認'}</Text>
       </Pressable>
       {Platform.OS === 'web' ? <Pressable accessibilityRole="button" accessibilityLabel={`${document.filename}をダウンロード`} disabled={Boolean(busy)} onPress={() => void downloadDocument(document)} style={{ padding: 12 }}><Text style={{ color: palette.ocean, fontSize: 12, fontWeight: '600' }}>保存 ↓</Text></Pressable> : null}
-      {busy === document.id ? <ActivityIndicator color={palette.ocean} size="small" /> : canEdit ? <Pressable accessibilityLabel={`${document.filename}を削除`} disabled={Boolean(busy)} onPress={() => removeDocument(document)} style={styles.documentDelete}><Text style={styles.documentDeleteText}>×</Text></Pressable> : null}
+      {busy === document.id ? <ActivityIndicator color={palette.ocean} size="small" /> : canEdit ? <Pressable accessibilityRole="button" accessibilityLabel={`${document.filename}を削除`} disabled={Boolean(busy)} onPress={() => removeDocument(document)} style={styles.documentDelete}><Text style={styles.documentDeleteText}>×</Text></Pressable> : null}
     </View>)}</View> : Platform.OS !== 'web' || !canEdit ? <View style={styles.documentEmpty}><Text style={styles.documentEmptyText}>画像やPDFを追加できます</Text></View> : null}
     {progress ? <Text accessibilityLiveRegion="polite" style={styles.documentMeta}>{progress}</Text> : null}
     {busy === 'upload' ? <View style={styles.uploading}><ActivityIndicator color={palette.ocean} size="small" /><Text style={styles.uploadingText}>アップロード中</Text></View> : null}
@@ -356,7 +356,7 @@ function AirportField({ code, label, onChange, onChangeText, placeholder, value 
       {code ? <View style={styles.codeBadge}><Text style={styles.codeText}>{code}</Text></View> : null}
     </View>
     {!selected && matches.length ? <View style={styles.suggestions}>
-      {matches.map((airport) => <Pressable accessibilityLabel={`${airport.name} ${airport.code}を選択`} key={airport.code} onPress={() => onChange(airport)} style={({ pressed }) => [styles.suggestion, pressed && styles.pressed]}>
+      {matches.map((airport) => <Pressable accessibilityRole="button" accessibilityLabel={`${airport.name} ${airport.code}を選択`} key={airport.code} onPress={() => onChange(airport)} style={({ pressed }) => [styles.suggestion, pressed && styles.pressed]}>
         <View style={styles.suggestionCopy}><Text style={styles.suggestionName}>{airport.name}</Text><Text style={styles.suggestionCity}>{airport.city}</Text></View>
         <Text style={styles.suggestionCode}>{airport.code}</Text>
       </Pressable>)}

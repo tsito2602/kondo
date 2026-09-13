@@ -88,9 +88,6 @@ a:focus-visible, button:focus-visible, [role="button"]:focus-visible, [role="tab
   [data-testid="trip-heading"] > div:first-child { font-size: 18px !important; }
   [data-testid="trip-heading"] > div:last-child { font-size: 12px !important; }
   [data-testid="trip-menu-position"] { max-width: none !important; padding-right: 32px !important; }
-  [data-testid="page-add-action"] > div { max-width: 1280px !important; padding: 0 136px 0 32px !important; justify-content: center !important; }
-  [data-testid="page-add-action"] [role="button"] { width: auto !important; height: 44px !important; min-height: 44px; flex-direction: row !important; gap: 8px; padding: 0 18px; border-radius: 10px !important; }
-  [data-testid="page-add-action"] [role="button"] > div:first-child { font-size: 21px !important; }
   [data-testid="places-heading"] { min-height: 56px; padding-right: 200px; margin-bottom: 6px; }
   [data-testid="places-heading"] > div:first-child > div:first-child { display: none; }
   [data-testid="places-heading"] > div:first-child > div:last-child { font-size: 28px !important; }
@@ -112,8 +109,8 @@ a:focus-visible, button:focus-visible, [role="button"]:focus-visible, [role="tab
   [data-testid="form-sheet-scroll"] { flex: 0 1 auto !important; max-height: calc(100dvh - 140px); overscroll-behavior: contain; }
   [data-testid="form-sheet-scroll"] > div { padding: 28px 32px !important; }
   [data-testid="sheet-header"] { padding: 6px 20px !important; flex-shrink: 0; }
-  [data-testid="sheet-header"] > div:last-child[role="button"] { background: #496B80; border-radius: 9px; min-height: 38px !important; }
-  [data-testid="sheet-header"] > div:last-child[role="button"] > div { color: white !important; font-size: 14px !important; }
+  [data-testid="sheet-header"] > [role="button"]:last-child { background: #496B80; border-radius: 9px; min-height: 38px !important; }
+  [data-testid="sheet-header"] > [role="button"]:last-child > * { color: white !important; font-size: 14px !important; }
   [data-testid="detail-modal-viewport"] { align-items: flex-end !important; padding: 0 !important; }
   [data-testid="detail-modal-viewport"] [data-testid="form-sheet"] { width: min(580px, 55vw) !important; max-height: 100% !important; border-radius: 0 !important; animation: none; box-shadow: -16px 0 60px #12232d22; }
   [data-testid="detail-modal-viewport"] [data-testid="form-sheet-scroll"] { flex: 1 !important; max-height: none; }

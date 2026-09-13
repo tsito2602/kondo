@@ -164,13 +164,13 @@ export default function PackingScreen() {
           style={[styles.check, task.done && styles.checkDone]}>
           <Text style={[styles.checkText, task.done && styles.checkTextDone]}>{task.done ? '✓' : ''}</Text>
         </Pressable>
-        <Pressable accessibilityLabel={`${task.title}を編集`} disabled={!canEdit} onPress={() => openTaskEdit(task)} style={({ pressed }) => [styles.rowCopy, pressed && styles.pressed]}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`${task.title}を編集`} disabled={!canEdit} onPress={() => openTaskEdit(task)} style={({ pressed }) => [styles.rowCopy, pressed && styles.pressed]}>
           <View style={styles.itemCopy}>
             <Text style={[styles.itemName, task.done && styles.itemDone]}>{task.title}</Text>
             {metadata ? <Text style={styles.itemMeta}>{metadata}</Text> : null}
           </View>
         </Pressable>
-        <Pressable accessibilityLabel={`${task.title}を編集`} hitSlop={8} disabled={!canEdit} onPress={() => openTaskEdit(task)}><Text style={styles.editMark}>•••</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={`${task.title}を編集`} hitSlop={8} disabled={!canEdit} onPress={() => openTaskEdit(task)}><Text style={styles.editMark}>•••</Text></Pressable>
       </View>
     );
   };
@@ -212,13 +212,13 @@ export default function PackingScreen() {
         {!selectedTrip ? (
           <View style={styles.empty}><Text style={styles.emptyTitle}>旅行を作成してください</Text><Text style={styles.emptyBody}>準備は選択中の旅行ごとに保存されます。</Text></View>
         ) : isTasks && tasks.length === 0 ? (
-          <Pressable disabled={!canEdit} onPress={openCreate} style={({ pressed }) => [styles.empty, pressed && styles.pressed]}>
+          <Pressable accessibilityRole="button" disabled={!canEdit} onPress={openCreate} style={({ pressed }) => [styles.empty, pressed && styles.pressed]}>
             <View style={styles.emptyMark}><Text style={styles.emptyMarkText}>＋</Text></View>
             <Text style={styles.emptyTitle}>やることはまだありません</Text>
             <Text style={styles.emptyBody}>＋ やることを追加</Text>
           </Pressable>
         ) : !isTasks && packingItems.length === 0 ? (
-          <Pressable disabled={!canEdit} onPress={openCreate} style={({ pressed }) => [styles.empty, pressed && styles.pressed]}>
+          <Pressable accessibilityRole="button" disabled={!canEdit} onPress={openCreate} style={({ pressed }) => [styles.empty, pressed && styles.pressed]}>
             <View style={styles.emptyMark}><Text style={styles.emptyMarkText}>＋</Text></View>
             <Text style={styles.emptyTitle}>最初の持ち物を追加</Text>
             <Text style={styles.emptyBody}>＋ 持ち物を追加</Text>
@@ -249,11 +249,11 @@ export default function PackingScreen() {
                       <Pressable accessibilityLabel={`${item.name}を${item.packed ? '未準備' : '準備済み'}にする`} accessibilityRole="checkbox" aria-checked={item.packed} hitSlop={8} disabled={!canEdit} onPress={() => togglePacking(item)} style={[styles.check, item.packed && styles.checkDone]}>
                         <Text style={[styles.checkText, item.packed && styles.checkTextDone]}>{item.packed ? '✓' : ''}</Text>
                       </Pressable>
-                      <Pressable accessibilityLabel={`${item.name}を編集`} disabled={!canEdit} onPress={() => openPackingEdit(item)} style={({ pressed }) => [styles.rowCopy, pressed && styles.pressed]}>
+                      <Pressable accessibilityRole="button" accessibilityLabel={`${item.name}を編集`} disabled={!canEdit} onPress={() => openPackingEdit(item)} style={({ pressed }) => [styles.rowCopy, pressed && styles.pressed]}>
                         <Text style={[styles.itemName, item.packed && styles.itemDone]}>{item.name}</Text>
                         {item.quantity > 1 ? <Text style={styles.quantity}>× {item.quantity}</Text> : null}
                       </Pressable>
-                      <Pressable accessibilityLabel={`${item.name}を編集`} hitSlop={8} disabled={!canEdit} onPress={() => openPackingEdit(item)}><Text style={styles.editMark}>•••</Text></Pressable>
+                      <Pressable accessibilityRole="button" accessibilityLabel={`${item.name}を編集`} hitSlop={8} disabled={!canEdit} onPress={() => openPackingEdit(item)}><Text style={styles.editMark}>•••</Text></Pressable>
                     </View>
                   ))}
                 </View>
@@ -292,13 +292,13 @@ export default function PackingScreen() {
                   <TextInput accessibilityLabel="持ち物" autoFocus maxLength={120} onChangeText={(name) => setPackingDraft((current) => ({ ...current, name }))} placeholder="例：モバイルバッテリー" placeholderTextColor={palette.placeholder} style={styles.input} value={packingDraft.name} />
                   <Text style={styles.label}>カテゴリー</Text>
                   <View style={styles.categoryList}>
-                    {CATEGORIES.map((category) => <Pressable key={category} onPress={() => setPackingDraft((current) => ({ ...current, category }))} style={[styles.categoryButton, packingDraft.category === category && styles.categorySelected]}><Text style={[styles.categoryText, packingDraft.category === category && styles.categoryTextSelected]}>{category}</Text></Pressable>)}
+                    {CATEGORIES.map((category) => <Pressable accessibilityRole="button" key={category} onPress={() => setPackingDraft((current) => ({ ...current, category }))} style={[styles.categoryButton, packingDraft.category === category && styles.categorySelected]}><Text style={[styles.categoryText, packingDraft.category === category && styles.categoryTextSelected]}>{category}</Text></Pressable>)}
                   </View>
                   <Text style={styles.label}>個数</Text>
                   <View style={styles.stepper}>
-                    <Pressable accessibilityLabel="個数を減らす" disabled={packingDraft.quantity <= 1} onPress={() => setPackingDraft((current) => ({ ...current, quantity: Math.max(1, current.quantity - 1) }))} style={({ pressed }) => [styles.stepButton, pressed && styles.pressed]}><Text style={styles.stepText}>−</Text></Pressable>
+                    <Pressable accessibilityRole="button" accessibilityLabel="個数を減らす" disabled={packingDraft.quantity <= 1} onPress={() => setPackingDraft((current) => ({ ...current, quantity: Math.max(1, current.quantity - 1) }))} style={({ pressed }) => [styles.stepButton, pressed && styles.pressed]}><Text style={styles.stepText}>−</Text></Pressable>
                     <Text accessibilityLiveRegion="polite" style={styles.stepValue}>{packingDraft.quantity}</Text>
-                    <Pressable accessibilityLabel="個数を増やす" disabled={packingDraft.quantity >= 99} onPress={() => setPackingDraft((current) => ({ ...current, quantity: Math.min(99, current.quantity + 1) }))} style={({ pressed }) => [styles.stepButton, pressed && styles.pressed]}><Text style={styles.stepText}>＋</Text></Pressable>
+                    <Pressable accessibilityRole="button" accessibilityLabel="個数を増やす" disabled={packingDraft.quantity >= 99} onPress={() => setPackingDraft((current) => ({ ...current, quantity: Math.min(99, current.quantity + 1) }))} style={({ pressed }) => [styles.stepButton, pressed && styles.pressed]}><Text style={styles.stepText}>＋</Text></Pressable>
                   </View>
                 </>
               )}

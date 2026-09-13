@@ -1,7 +1,9 @@
 import { useModalViewport } from '@/hooks/use-modal-viewport';
 import { router, usePathname } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useState } from 'react';
+import { useContext, useState } from 'react';
+import { PageActionContext } from './page-action-context';
+import { useDesktop } from '@/hooks/use-desktop';
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TripEditor } from './trip-editor';
@@ -21,6 +23,8 @@ const tabs = [
 
 export function TripTopTabs({ tripId }: { tripId: string }) {
   const pathname = usePathname();
+  const desktop = useDesktop();
+  const { action } = useContext(PageActionContext);
   const managing = pathname.endsWith('/members');
   const { selectedTrip, deleteTrip } = useTravel();
   const [editing, setEditing] = useState(false);
@@ -45,6 +49,7 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
       <View style={styles.topRow}>
         <Pressable accessibilityRole="button" accessibilityLabel={managing ? 'しおりへ戻る' : '旅行一覧へ戻る'} onPress={() => managing ? router.replace({ pathname: '/trips/[tripId]/itinerary', params: { tripId } }) : router.replace('/')} testID="trip-back" style={styles.backButton}><Text style={styles.backMark}>‹</Text></Pressable>
         <View testID="trip-heading" style={styles.title}><Text numberOfLines={1} style={styles.tripName}>{managing ? 'メンバー' : selectedTrip?.name}</Text><Text style={styles.tripDates}>{managing ? selectedTrip?.name : `${selectedTrip?.startsOn.replaceAll('-', '.')} — ${selectedTrip?.endsOn.replaceAll('-', '.')}`}</Text></View>
+        {desktop && action ? <Pressable testID="desktop-page-action" accessibilityRole="button" accessibilityLabel={action.label} onPress={action.run} style={{ position: 'absolute', right: 104, paddingHorizontal: 18, height: 44, borderRadius: 10, backgroundColor: palette.ocean, justifyContent: 'center' }}><Text style={{ color: palette.paper, fontSize: 14, fontWeight: '700' }}>＋ {action.label.replace(/する$/, '')}</Text></Pressable> : null}
         {!managing ? <Pressable accessibilityRole="button" accessibilityLabel="メンバーを管理" onPress={() => router.push({ pathname: '/trips/[tripId]/members', params: { tripId } })} style={styles.membersButton}><SymbolView name={{ ios: 'person.2', android: 'group', web: 'group' }} size={23} tintColor={palette.ocean} /></Pressable> : null}
         <Pressable accessibilityRole="button" accessibilityLabel="旅行メニュー" onPress={() => setMenu(true)} style={styles.menuButton}><Text style={styles.menuMark}>⋯</Text></Pressable>
       </View>

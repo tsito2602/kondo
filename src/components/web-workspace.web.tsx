@@ -27,9 +27,17 @@ export function WebWorkspace({ children }: PropsWithChildren) {
     const preventFileNavigation = (event: DragEvent) => {
       if (event.dataTransfer?.types.includes('Files')) event.preventDefault();
     };
+    // RN Web handles Enter on these roles, but only handles Space for buttons.
+    const pressSpace = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (event.key !== ' ' || !(target instanceof HTMLElement) || !target.matches('[role="checkbox"], [role="radio"], [role="tab"]') || ['INPUT', 'BUTTON'].includes(target.tagName)) return;
+      event.preventDefault();
+      if (!event.repeat && target.getAttribute('aria-disabled') !== 'true' && !target.hasAttribute('disabled')) target.click();
+    };
+    window.addEventListener('keydown', pressSpace);
     window.addEventListener('dragover', preventFileNavigation);
     window.addEventListener('drop', preventFileNavigation);
-    return () => { window.removeEventListener('dragover', preventFileNavigation); window.removeEventListener('drop', preventFileNavigation); };
+    return () => { window.removeEventListener('keydown', pressSpace); window.removeEventListener('dragover', preventFileNavigation); window.removeEventListener('drop', preventFileNavigation); };
   }, []);
   return <View testID="web-workspace" style={styles.workspace}>
     {desktop ? <a href="#workspace-main" className="skip-link">本文へ移動</a> : null}

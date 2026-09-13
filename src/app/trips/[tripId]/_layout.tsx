@@ -1,3 +1,4 @@
+import { PageActionContext, type PageAction } from '@/components/page-action-context';
 import { useDesktop } from '@/hooks/use-desktop';
 import { Redirect, Slot, useLocalSearchParams, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -12,6 +13,7 @@ import { useTravel } from '@/data/travel-provider';
 
 export default function TripLayout() {
   const desktop = useDesktop();
+  const [action, setAction] = useState<PageAction | null>(null);
   const insets = useSafeAreaInsets();
   const [headerHeight, setHeaderHeight] = useState(160);
   const pathname = usePathname();
@@ -36,7 +38,7 @@ export default function TripLayout() {
   if (!tripId || !tripExists) return <Redirect href="/" />;
 
   return (
-    <View style={styles.safeArea}>
+    <PageActionContext.Provider value={{ action, setAction }}><View style={styles.safeArea}>
       {showHero && selectedTrip ? <TripHero trip={selectedTrip} height={heroHeight} scrollY={scrollY} /> : null}
       {showHero ? <Animated.View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: headerHeight + insets.top, backgroundColor: palette.canvas, opacity: scrollY.interpolate({ inputRange: [Math.max(0, pinAt - 100), Math.max(1, pinAt)], outputRange: [0, 1], extrapolate: 'clamp' }) }} /> : null}
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
@@ -47,7 +49,7 @@ export default function TripLayout() {
           </TripHeaderHeight.Provider>
         </TripHeroContext.Provider>
       </SafeAreaView>
-    </View>
+    </View></PageActionContext.Provider>
   );
 }
 
