@@ -6,93 +6,120 @@ import {
   TabTriggerSlotProps,
   TabListProps,
 } from 'expo-router/ui';
-import { Pressable, View, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { ThemedText } from './themed-text';
-import { ThemedView } from './themed-view';
+import { palette } from '@/constants/design';
 
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+type TabButtonProps = TabTriggerSlotProps & {
+  icon: string;
+};
 
 export default function AppTabs() {
   return (
     <Tabs>
-      <TabSlot style={{ height: '100%' }} />
+      <TabSlot style={styles.slot} />
       <TabList asChild>
-        <CustomTabList>
+        <BottomTabList>
           <TabTrigger name="home" href="/" asChild>
-            <TabButton>旅</TabButton>
+            <TabButton icon="⌂">旅</TabButton>
           </TabTrigger>
           <TabTrigger name="itinerary" href="/itinerary" asChild>
-            <TabButton>日程</TabButton>
+            <TabButton icon="≡">日程</TabButton>
           </TabTrigger>
           <TabTrigger name="packing" href="/packing" asChild>
-            <TabButton>持ち物</TabButton>
+            <TabButton icon="✓">準備</TabButton>
           </TabTrigger>
           <TabTrigger name="bookings" href="/bookings" asChild>
-            <TabButton>予約</TabButton>
+            <TabButton icon="⌁">予約</TabButton>
           </TabTrigger>
-        </CustomTabList>
+        </BottomTabList>
       </TabList>
     </Tabs>
   );
 }
 
-export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps) {
+function TabButton({ children, icon, isFocused, ...props }: TabButtonProps) {
   return (
-    <Pressable {...props} style={({ pressed }) => pressed && styles.pressed}>
-      <ThemedView
-        type={isFocused ? 'backgroundSelected' : 'backgroundElement'}
-        style={styles.tabButtonView}>
-        <ThemedText type="small" themeColor={isFocused ? 'text' : 'textSecondary'}>
-          {children}
-        </ThemedText>
-      </ThemedView>
+    <Pressable
+      {...props}
+      style={({ pressed }) => [styles.tabButton, pressed && styles.pressed]}>
+      <View style={[styles.iconWrap, isFocused && styles.iconWrapSelected]}>
+        <Text style={[styles.icon, isFocused && styles.selectedText]}>{icon}</Text>
+      </View>
+      <Text style={[styles.label, isFocused && styles.selectedText]}>{children}</Text>
     </Pressable>
   );
 }
 
-export function CustomTabList(props: TabListProps) {
+function BottomTabList(props: TabListProps) {
   return (
     <View {...props} style={styles.tabListContainer}>
-      <ThemedView type="backgroundElement" style={styles.innerContainer}>
-        <ThemedText type="smallBold" style={styles.brandText}>
-          tabi
-        </ThemedText>
-
-        {props.children}
-      </ThemedView>
+      <View style={styles.innerContainer}>{props.children}</View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  slot: {
+    flex: 1,
+  },
   tabListContainer: {
     position: 'absolute',
-    width: '100%',
-    padding: Spacing.three,
-    justifyContent: 'center',
+    left: 0,
+    right: 0,
+    bottom: 14,
+    zIndex: 100,
     alignItems: 'center',
-    flexDirection: 'row',
+    paddingHorizontal: 12,
   },
   innerContainer: {
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.five,
-    borderRadius: Spacing.five,
+    width: '100%',
+    maxWidth: 520,
+    minHeight: 70,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    borderRadius: 48,
+    backgroundColor: palette.paper,
     flexDirection: 'row',
     alignItems: 'center',
-    flexGrow: 1,
-    gap: Spacing.two,
-    maxWidth: MaxContentWidth,
   },
-  brandText: {
-    marginRight: 'auto',
+  tabButton: {
+    flex: 1,
+    minWidth: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    borderRadius: 32,
+    paddingVertical: 3,
+  },
+  iconWrap: {
+    minWidth: 32,
+    height: 27,
+    paddingHorizontal: 8,
+    borderRadius: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconWrapSelected: {
+    backgroundColor: palette.sky,
+  },
+  icon: {
+    color: palette.smoke,
+    fontSize: 18,
+    lineHeight: 20,
+    fontWeight: '700',
+  },
+  label: {
+    color: palette.slate,
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '500',
+  },
+  selectedText: {
+    color: palette.ink,
+    fontWeight: '700',
   },
   pressed: {
-    opacity: 0.7,
-  },
-  tabButtonView: {
-    paddingVertical: Spacing.one,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.three,
+    opacity: 0.62,
   },
 });

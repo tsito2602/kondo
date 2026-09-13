@@ -7,3 +7,33 @@
   --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
 }
+
+html, body { background: #EEF2F4; overscroll-behavior-y: none; }
+body { -webkit-tap-highlight-color: transparent; }
+[role="button"], [role="tab"], button { transition: background-color 180ms ease, color 180ms ease, opacity 160ms ease, transform 220ms cubic-bezier(.2,.8,.2,1); touch-action: manipulation; }
+[role="button"]:active, button:active { transform: scale(.975); }
+input, textarea { transition: background-color 180ms ease, box-shadow 180ms ease; }
+input:focus, textarea:focus { outline: none; box-shadow: 0 0 0 2px #92ADB766; }
+[data-testid="trip-header"] { backdrop-filter: blur(24px) saturate(150%); -webkit-backdrop-filter: blur(24px) saturate(150%); border-bottom: 1px solid #ffffff66; }
+[data-testid="home-header"] { position: sticky; top: 0; z-index: 10; padding: 10px 0; background: #eef2f4bb; backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+[data-testid="route-transition"] { animation: page-enter 260ms cubic-bezier(.2,.8,.2,1) both; }
+[data-testid="form-sheet"] { animation: sheet-enter 280ms cubic-bezier(.2,.8,.2,1) both; }
+[data-testid="sheet-header"] { background: #eef2f4d9; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+[data-testid="place-card"] { animation: card-enter 240ms ease both; }
+[data-testid="ticket-photo-shade"] { background: linear-gradient(105deg, rgba(9,27,37,.72), rgba(9,27,37,.24) 70%, rgba(9,27,37,.4)); }
+[data-testid="trip-hero-shade"] { background: linear-gradient(180deg, rgba(9,27,37,.1) 30%, rgba(9,27,37,.12) 45%, rgba(9,27,37,.65)); }
+[data-testid="trip-hero-photo"] { will-change: transform, filter; }
+[data-testid="journal-sheet"] { box-shadow: 0 -14px 44px rgba(9,27,37,.12); }
+[data-testid="delete-trip-dialog"] { animation: card-enter 180ms ease both; box-shadow: 0 24px 80px rgba(9,27,37,.2); }
+@keyframes page-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes card-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes sheet-enter { from { opacity: 0; transform: translateY(22px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (max-width: 600px) {
+  [data-testid="form-sheet"] { border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; max-height: 94dvh !important; margin-top: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-testid="route-transition"], [data-testid="form-sheet"], [data-testid="place-card"] { animation: none; }
+}
+
+[data-testid="trip-menu"] { animation: menu-enter 170ms cubic-bezier(.2,.8,.2,1) both; transform-origin: top right; box-shadow: 0 12px 40px #12232d22; }
+@keyframes menu-enter { from { opacity: 0; transform: scale(.94) translateY(-4px); } to { opacity: 1; transform: scale(1) translateY(0); } }
