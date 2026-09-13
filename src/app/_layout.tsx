@@ -1,15 +1,43 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
+import { AppThemeProvider, useAppTheme } from '@/theme/theme-provider';
+import '@/global.css';
+import { WebWorkspace } from '@/components/web-workspace';
+import { ToastProvider } from '@/components/toast';
+import { PwaSetup } from '@/components/pwa';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme } from 'react-native';
 
-import AppTabs from '@/components/app-tabs';
+import { AuthGate } from '@/auth/auth-gate';
+import { AuthProvider, useAuth } from '@/auth/auth-provider';
+import { TravelProvider } from '@/data/travel-provider';
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+export default function RootLayout() {
+  return <AppThemeProvider><AppFrame /></AppThemeProvider>;
+}
+
+function AppFrame() {
+  const { scheme, palette } = useAppTheme();
+  const navigationTheme = scheme === 'dark' ? DarkTheme : DefaultTheme;
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <StatusBar style="dark" />
-      <AppTabs />
+    <ThemeProvider value={{ ...navigationTheme, colors: { ...navigationTheme.colors, background: palette.canvas, card: palette.paper, text: palette.ink, border: palette.ash, primary: palette.ocean } }}>
+      <PwaSetup />
+      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      <ToastProvider><AuthProvider>
+        <AuthGate>
+          <TravelRoot />
+        </AuthGate>
+      </AuthProvider></ToastProvider>
     </ThemeProvider>
   );
+}
+
+function TravelRoot() {
+  const { palette } = useAppTheme();
+  const { isDemo, user } = useAuth();
+  return <TravelProvider key={isDemo ? 'demo' : user?.id}>
+            <WebWorkspace><Stack screenOptions={{ contentStyle: { backgroundColor: palette.canvas }, headerShown: false }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="settings" />
+              <Stack.Screen name="trips/[tripId]" options={{ animation: 'slide_from_right' }} />
+            </Stack></WebWorkspace>
+          </TravelProvider>;
 }
