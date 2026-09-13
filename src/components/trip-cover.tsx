@@ -1,3 +1,4 @@
+import { SymbolView } from 'expo-symbols';
 import { useThemedStyles } from '@/theme/theme-provider';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { type Palette } from '@/constants/design';
@@ -9,7 +10,7 @@ export function TripCover({ image, compact = false, fill = false }: { image?: st
     {image ? <Image source={{ uri: image }} resizeMode="cover" style={StyleSheet.absoluteFill} /> : <>
       <View style={styles.sun} /><View style={styles.hillBack} /><View style={styles.hillFront} />
       <Text style={styles.mark}>TABI</Text>
-      <View style={styles.route}><View style={styles.dot} /><View style={styles.line} /><Text style={styles.arrow}>↗</Text></View>
+      <View style={styles.route}><View style={styles.dot} /><View style={styles.line} /><SymbolView name={{ ios: 'mappin.circle.fill', android: 'location_on', web: 'location_on' }} size={22} tintColor="#F2E7D5" /></View>
     </>}
   </View>;
 }
@@ -21,5 +22,5 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   hillFront: { width: '120%', height: 160, backgroundColor: '#557984', borderRadius: 150, position: 'absolute', right: '-35%', top: 122, transform: [{ rotate: '-20deg' }] },
   mark: { position: 'absolute', top: 22, left: 22, fontSize: 11, fontWeight: '700', letterSpacing: 4, color: palette.ink },
   route: { position: 'absolute', bottom: 22, left: 22, flexDirection: 'row', alignItems: 'center', width: 100, gap: 8 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#F2E7D5' }, line: { flex: 1, borderTopWidth: 1, borderStyle: 'dashed', borderColor: '#F2E7D5' }, arrow: { color: '#F2E7D5', fontSize: 22 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#F2E7D5' }, line: { flex: 1, borderTopWidth: 1, borderStyle: 'dashed', borderColor: '#F2E7D5' },
 });

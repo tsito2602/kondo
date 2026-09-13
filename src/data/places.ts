@@ -1,7 +1,7 @@
 import type { PlaceStatus, ReservationStatus } from './types';
-export const placeStatuses: { value: PlaceStatus; label: string; mark: string }[] = [
-  { value: 'want', label: '行きたい', mark: '○' }, { value: 'planned', label: '行く予定', mark: '↗' },
-  { value: 'visited', label: '行った', mark: '✓' }, { value: 'skipped', label: '見送り', mark: '−' },
+export const placeStatuses: { value: PlaceStatus; label: string }[] = [
+  { value: 'want', label: '行きたい' }, { value: 'planned', label: '行く予定' },
+  { value: 'visited', label: '行った' }, { value: 'skipped', label: '見送り' },
 ];
 export const reservationStatuses: { value: ReservationStatus; label: string }[] = [
   { value: 'not_needed', label: '予約不要' }, { value: 'needed', label: '要予約' },

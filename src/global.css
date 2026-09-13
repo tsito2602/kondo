@@ -101,10 +101,6 @@ a:focus-visible, button:focus-visible, [role="button"]:focus-visible, [role="tab
   [data-testid="trip-heading"] > div:first-child { font-size: 18px !important; }
   [data-testid="trip-heading"] > div:last-child { font-size: 12px !important; }
   [data-testid="trip-menu-position"] { max-width: none !important; padding-right: 32px !important; }
-  [data-testid="places-heading"] { min-height: 56px; padding-right: 200px; margin-bottom: 6px; }
-  [data-testid="places-heading"] > div:first-child > div:first-child { display: none; }
-  [data-testid="places-heading"] > div:first-child > div:last-child { font-size: 28px !important; }
-  [data-testid="places-heading"] > div:last-child { font-size: 16px !important; }
   [data-testid="places-scroll"] input, [data-testid="booking-filters"] > input { max-width: 480px; }
   [data-testid="preparation-tabs"] { max-width: 420px; margin-bottom: 20px; }
   [data-testid="preparation-progress"] { margin-top: 0 !important; margin-bottom: 24px; }
