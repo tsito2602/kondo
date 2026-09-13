@@ -51,7 +51,6 @@ input:focus, textarea:focus { outline: none; box-shadow: 0 0 0 2px #92ADB766; }
 /* Browser controls keep the same palette as the native app. */
 a { -webkit-tap-highlight-color: transparent; }
 a:focus-visible, button:focus-visible, [role="button"]:focus-visible, [role="tab"]:focus-visible, [role="checkbox"]:focus-visible, select:focus-visible { outline: 2px solid #496B80; outline-offset: 3px; }
-.trip-switcher { width: 100%; min-width: 0; padding: 12px; border: 1px solid #D9E1E5; border-radius: 10px; background: #fff; color: #182A36; font: 600 13px var(--font-display); cursor: pointer; text-overflow: ellipsis; }
 .skip-link { position: fixed; top: -60px; left: 250px; z-index: 1000; padding: 12px; background: white; color: #182A36; border-radius: 8px; }
 .skip-link:focus { top: 12px; }
 .file-drop { min-width: 0; border: 1.5px dashed #92ADB7; border-radius: 14px; padding: 12px; background: #FFFFFF80; transition: background 160ms ease, border-color 160ms ease; }

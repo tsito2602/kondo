@@ -1,8 +1,8 @@
 import { MemberAvatar } from './member-avatar';
 import { PropsWithChildren, useEffect } from 'react';
-import { Link, router, usePathname } from 'expo-router';
+import { Link, usePathname } from 'expo-router';
 import { Image } from 'expo-image';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { useAuth } from '@/auth/auth-provider';
 import { useTravel } from '@/data/travel-provider';
@@ -20,7 +20,7 @@ const pages = [
 export function WebWorkspace({ children }: PropsWithChildren) {
   const desktop = useDesktop();
   const pathname = usePathname();
-  const { trips, selectedTrip, syncing, sync } = useTravel();
+  const { selectedTrip, syncing, sync } = useTravel();
   const { user, isDemo } = useAuth();
   const trip = pathname.startsWith('/trips/') ? selectedTrip : null;
   useEffect(() => {
@@ -46,16 +46,9 @@ export function WebWorkspace({ children }: PropsWithChildren) {
       <Link href="/" style={styles.brand} accessibilityLabel="tabi 旅行一覧"><Image source={require('../../assets/brand/logo.png')} style={{ width: 50, height: 50 }} contentFit="contain" /><Text style={styles.wordmark}>tabi</Text></Link>
       <Link href="/" style={[styles.nav, pathname === '/' && styles.selected]}><SymbolView name={{ web: 'luggage' }} size={21} tintColor={palette.ocean} /><Text style={styles.navText}>すべての旅行</Text></Link>
       {trip ? <View style={styles.section}>
-        <Text style={styles.label}>旅行</Text>
-        <select aria-label="旅行を切り替え" className="trip-switcher" value={trip.id} onChange={(event) => router.push({ pathname: '/trips/[tripId]/itinerary', params: { tripId: event.target.value } })}>
-          {trips.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
-        </select>
         <View style={styles.links}>{pages.map((page) => <Link key={page.key} href={{ pathname: `/trips/[tripId]/${page.key}`, params: { tripId: trip.id } }} style={[styles.nav, pathname.endsWith(`/${page.key}`) && styles.selected]} aria-current={pathname.endsWith(`/${page.key}`) ? 'page' : undefined}><SymbolView name={{ web: page.icon }} size={21} tintColor={palette.ocean} /><Text style={styles.navText}>{page.label}</Text></Link>)}</View>
       </View> : null}
-      <ScrollView style={styles.tripList} contentContainerStyle={{ gap: 4 }}>
-        <Text style={styles.label}>旅行一覧</Text>
-        {trips.map((entry) => <Link nativeID={`trip-link-${entry.id}`} key={entry.id} href={{ pathname: '/trips/[tripId]/itinerary', params: { tripId: entry.id } }} style={[styles.tripLink, trip?.id === entry.id && styles.currentTrip]}><Text numberOfLines={2} style={styles.tripName}>{entry.name}</Text><Text style={styles.tripDate}>{entry.startsOn.replaceAll('-', '.')}</Text></Link>)}
-      </ScrollView>
+      <View style={{ flex: 1 }} />
       <View style={styles.account}>
         <Link href="/settings" style={[styles.nav, pathname === '/settings' && styles.selected]}><MemberAvatar name={user?.name || 'あなた'} avatarUrl={user?.avatarUrl} size={32} /><View style={{ flex: 1, gap: 4 }}><Text numberOfLines={1} style={{ color: palette.ink, fontSize: 12, fontWeight: '600' }}>{user?.name || (isDemo ? 'サンプルの旅行' : 'アカウント')}</Text><Text style={styles.accountText}>設定</Text></View></Link>
         {!isDemo ? <Pressable accessibilityRole="button" disabled={syncing} onPress={() => void sync()} style={styles.accountAction}><Text style={styles.accountText}>{syncing ? '同期中…' : '最新の情報に更新'}</Text></Pressable> : null}
@@ -72,9 +65,7 @@ const styles = StyleSheet.create({
   wordmark: { color: palette.ink, fontSize: 30, fontWeight: '800', letterSpacing: -1 },
   nav: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 46, paddingHorizontal: 13, paddingVertical: 12, borderRadius: 10, textDecorationLine: 'none' },
   navText: { color: palette.ink, fontSize: 14, fontWeight: '600' }, selected: { backgroundColor: palette.sky },
-  section: { marginTop: 26 }, label: { color: palette.smoke, fontSize: 11, fontWeight: '600', paddingHorizontal: 12, marginBottom: 10 }, links: { gap: 4, marginTop: 18 },
-  tripList: { flex: 1, marginTop: 30 }, tripLink: { display: 'flex', padding: 12, gap: 5, borderRadius: 10, textDecorationLine: 'none' }, currentTrip: { backgroundColor: palette.canvas },
-  tripName: { color: palette.slate, fontSize: 12, lineHeight: 18, fontWeight: '600' }, tripDate: { color: palette.smoke, fontSize: 10 },
-  account: { paddingVertical: 18, borderTopWidth: 1, borderColor: palette.ash, marginTop: 16 }, accountName: { color: palette.ink, fontSize: 12, fontWeight: '600', padding: 10 }, accountAction: { padding: 10, borderRadius: 8 }, accountText: { color: palette.slate, fontSize: 12 },
+  section: { marginTop: 26 }, links: { gap: 4 },
+  account: { paddingVertical: 18, borderTopWidth: 1, borderColor: palette.ash, marginTop: 16 }, accountAction: { padding: 10, borderRadius: 8 }, accountText: { color: palette.slate, fontSize: 12 },
   main: { flex: 1, minWidth: 0 },
 });
