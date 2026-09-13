@@ -1,3 +1,4 @@
+import { useModalViewport } from '@/hooks/use-modal-viewport';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { palette } from '@/constants/design';
 
@@ -12,9 +13,10 @@ export function ConfirmationDialog({ visible, name, title, description, confirmL
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const viewport = useModalViewport(visible);
   const cancel = () => { if (!busy) onCancel(); };
   return <Modal visible={visible} transparent animationType="fade" onRequestClose={cancel}>
-    <View style={styles.overlay}>
+    <View testID="modal-viewport" style={[styles.overlay, viewport]}>
       <Pressable style={StyleSheet.absoluteFill} onPress={cancel} accessibilityLabel="削除をキャンセル" />
       <View testID="delete-trip-dialog" accessibilityViewIsModal style={styles.card}>
         <Text style={styles.title}>{title}</Text>

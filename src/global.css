@@ -29,7 +29,13 @@ input:focus, textarea:focus { outline: none; box-shadow: 0 0 0 2px #92ADB766; }
 @keyframes card-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes sheet-enter { from { opacity: 0; transform: translateY(22px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @media (max-width: 600px) {
-  [data-testid="form-sheet"] { border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; max-height: 94dvh !important; margin-top: auto; }
+  [data-testid="form-modal-viewport"] { padding: 0 !important; padding-top: max(12px, env(safe-area-inset-top)) !important; justify-content: flex-end !important; }
+  [data-testid="form-sheet"] { border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; max-height: 100% !important; margin-top: auto; }
+  [data-testid="form-modal-viewport"]:has(input:focus, textarea:focus) [data-testid="form-sheet"] { padding-bottom: 0 !important; }
+  [data-testid="modal-viewport"]:has(input:focus, textarea:focus) { padding: 0 !important; padding-top: max(12px, env(safe-area-inset-top)) !important; justify-content: flex-end !important; }
+  [data-testid="modal-viewport"]:has(input:focus, textarea:focus) [data-testid="picker-sheet"] { max-height: 100% !important; border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; }
+  /* Keep Safari from zooming the viewport when a compact form field gains focus. */
+  [data-testid="form-sheet"] input, [data-testid="form-sheet"] textarea, [data-testid="picker-sheet"] input { font-size: 16px !important; }
 }
 @media (prefers-reduced-motion: reduce) {
   [data-testid="route-transition"], [data-testid="form-sheet"], [data-testid="place-card"] { animation: none; }
@@ -37,3 +43,7 @@ input:focus, textarea:focus { outline: none; box-shadow: 0 0 0 2px #92ADB766; }
 
 [data-testid="trip-menu"] { animation: menu-enter 170ms cubic-bezier(.2,.8,.2,1) both; transform-origin: top right; box-shadow: 0 12px 40px #12232d22; }
 @keyframes menu-enter { from { opacity: 0; transform: scale(.94) translateY(-4px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+.native-time-input { box-sizing: border-box; min-width: 132px; min-height: 48px; padding: 10px 12px; border: 0; border-radius: 10px; background: #E6ECEF; color: #182A36; font: 600 20px var(--font-display); font-variant-numeric: tabular-nums; color-scheme: light; }
+.native-time-input:focus-visible { outline: 2px solid #496B80; outline-offset: 2px; }
+[data-testid="form-sheet"], [data-testid="picker-sheet"] { min-height: 0; }

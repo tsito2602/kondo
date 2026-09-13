@@ -1,3 +1,4 @@
+import { useModalViewport } from '@/hooks/use-modal-viewport';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -40,6 +41,7 @@ function ConnectionEditor({ booking, bookings, onClose, onSave }: {
   booking: Booking; bookings: Booking[]; onClose: () => void;
   onSave: (id: string, mode: FlightConnectionMode, nextFlightId?: string | null) => void;
 }) {
+  const viewport = useModalViewport(true);
   const [mode, setMode] = useState<FlightConnectionMode>(booking.connectionMode ?? 'auto');
   const [target, setTarget] = useState<string | null>(booking.nextFlightId ?? null);
   const [error, setError] = useState('');
@@ -57,9 +59,9 @@ function ConnectionEditor({ booking, bookings, onClose, onSave }: {
   const select = (nextMode: FlightConnectionMode, nextTarget: string | null = null) => { setMode(nextMode); setTarget(nextTarget); setError(''); };
 
   return <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-    <SafeAreaView style={styles.backdrop}>
+    <SafeAreaView testID="modal-viewport" style={[styles.backdrop, viewport]}>
       <Pressable accessibilityLabel="乗り継ぎの変更をキャンセル" onPress={onClose} style={StyleSheet.absoluteFill} />
-      <View accessibilityViewIsModal style={styles.sheet}>
+      <View testID="picker-sheet" accessibilityViewIsModal style={styles.sheet}>
         <View style={styles.header}>
           <View><Text style={styles.heading}>乗り継ぎ便</Text><Text style={styles.subtitle}>次に乗る便を選択</Text></View>
           <Pressable accessibilityRole="button" accessibilityLabel="閉じる" onPress={onClose} style={styles.closeButton}><Text style={styles.close}>×</Text></Pressable>

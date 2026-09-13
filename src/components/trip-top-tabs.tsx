@@ -1,3 +1,4 @@
+import { useModalViewport } from '@/hooks/use-modal-viewport';
 import { router, usePathname } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
@@ -24,6 +25,7 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
   const { selectedTrip, deleteTrip } = useTravel();
   const [editing, setEditing] = useState(false);
   const [menu, setMenu] = useState(false);
+  const viewport = useModalViewport(menu);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
@@ -56,7 +58,7 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
       {offline.busy ? <Text style={styles.progress}>{offline.progress}</Text> : null}
     </View>
     <Modal visible={menu} transparent animationType="fade" onRequestClose={() => setMenu(false)}>
-      <View style={styles.menuOverlay}>
+      <View testID="modal-viewport" style={[styles.menuOverlay, viewport]}>
         <Pressable accessibilityLabel="メニューを閉じる" onPress={() => setMenu(false)} style={StyleSheet.absoluteFill} />
         <View style={[styles.menuPosition, { top: insets.top + 58 }]} pointerEvents="box-none">
           <View testID="trip-menu" style={styles.menu}>

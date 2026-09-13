@@ -59,7 +59,7 @@ function TripBookingsScreen() {
               const connection = connections.get(booking.id);
               return (
                 <View key={booking.id}>
-                <Pressable onPress={() => setOpenedBooking(booking.id)} style={({ pressed }) => [styles.ticket, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel={`${booking.title}の詳細`}>
+                <Pressable testID="booking-ticket" onPress={() => setOpenedBooking(booking.id)} style={({ pressed }) => [styles.ticket, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel={`${booking.title}の詳細`}>
                   <View style={styles.copy}>
                     <View style={styles.ticketTop}>
                       <View style={styles.typeTag}><Text style={styles.type}>{kind.short}</Text></View>
@@ -70,7 +70,7 @@ function TripBookingsScreen() {
                     {hasRoute && booking.detail ? <Text numberOfLines={1} style={styles.detail}>{booking.detail}</Text> : null}
                     <Text style={styles.meta}>{formatDate(booking.day)}　{booking.time}{booking.endDay !== booking.day ? ` → ${formatDate(booking.endDay)}` : booking.endTime && booking.endTime !== booking.time ? ` – ${booking.endTime}` : ''}</Text>
                   </View>
-                  <View style={styles.stub}>
+                  <View testID="ticket-stub" style={styles.stub}>
                     <Text style={styles.icon}>{kind.icon}</Text>
                     <Text style={styles.stubNo}>{String(index + 1).padStart(2, '0')}</Text>
                     <Text style={styles.stubLabel}>PASS</Text>
@@ -94,6 +94,9 @@ function TripBookingsScreen() {
   );
 }
 
+const STUB_WIDTH = 60;
+const NOTCH_RADIUS = 10;
+
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.canvas },
   content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 112 },
@@ -114,12 +117,12 @@ const styles = StyleSheet.create({
   cardTitle: { color: palette.ink, fontSize: 18, lineHeight: 25, fontWeight: '900', letterSpacing: -0.4, marginTop: 18 },
   detail: { color: palette.slate, fontSize: 14, marginTop: 6 },
   meta: { color: palette.slate, fontFamily: mono, fontSize: 10, lineHeight: 16, marginTop: 12 },
-  stub: { width: 60, borderLeftWidth: 1, borderStyle: 'dashed', borderLeftColor: palette.ocean, backgroundColor: palette.sky, alignItems: 'center', justifyContent: 'center' },
+  stub: { width: STUB_WIDTH, flexShrink: 0, borderLeftWidth: 1, borderStyle: 'dashed', borderLeftColor: palette.ocean, backgroundColor: palette.sky, alignItems: 'center', justifyContent: 'center' },
   icon: { color: palette.ocean, fontSize: 24, fontWeight: '900' },
   stubNo: { color: palette.ink, fontSize: 24, lineHeight: 27, fontWeight: '900', marginTop: 12 },
   stubLabel: { color: palette.smoke, fontFamily: mono, fontSize: 8, marginTop: 2 },
-  notch: { position: 'absolute', right: 66, width: 20, height: 20, borderRadius: 10, backgroundColor: palette.canvas, zIndex: 2 },
-  notchTop: { top: -10 },
-  notchBottom: { bottom: -10 },
+  notch: { position: 'absolute', right: STUB_WIDTH - NOTCH_RADIUS - 0.5, width: NOTCH_RADIUS * 2, height: NOTCH_RADIUS * 2, borderRadius: NOTCH_RADIUS, backgroundColor: palette.canvas, zIndex: 2 },
+  notchTop: { top: -NOTCH_RADIUS },
+  notchBottom: { bottom: -NOTCH_RADIUS },
   pressed: { opacity: 0.62 },
 });

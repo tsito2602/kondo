@@ -3,6 +3,9 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 import { palette, mono } from '@/constants/design';
 import type { Trip } from '@/data/types';
 
+const STUB_WIDTH = 96;
+const NOTCH_RADIUS = 10;
+
 const bars = [1, 2, 1, 3, 1, 2, 2, 1, 3, 1, 1, 2, 3, 1, 2, 1, 3, 2];
 
 function ticketDate(value: string) {
@@ -16,9 +19,9 @@ export function TripTicket({ trip }: { trip: Trip }) {
   const serial = trip.id.replaceAll('-', '').slice(0, 8).toUpperCase();
 
   return (
-    <View style={styles.ticket} accessibilityLabel={`${trip.name}、${trip.startsOn}から${trip.endsOn}まで`}>
-      {photo ? <><Image source={{ uri: trip.coverImage }} resizeMode="cover" style={StyleSheet.absoluteFill} /><View testID="ticket-photo-shade" style={[StyleSheet.absoluteFill, styles.photoShade]} /></> : null}
+    <View testID="trip-ticket" style={styles.ticket} accessibilityLabel={`${trip.name}、${trip.startsOn}から${trip.endsOn}まで`}>
       <View style={styles.main}>
+        {photo ? <><Image source={{ uri: trip.coverImage }} resizeMode="cover" style={StyleSheet.absoluteFill} /><View testID="ticket-photo-shade" style={[StyleSheet.absoluteFill, styles.photoShade]} /></> : null}
         <View style={styles.issuerRow}>
           <View style={[styles.issuerTag, photo && styles.photoTag]}><Text style={[styles.issuer, photo && styles.photoText]}>TABI TRIP TICKET</Text></View>
           <Text style={[styles.serial, photo && styles.photoText]}>NO. {serial}</Text>
@@ -46,13 +49,13 @@ export function TripTicket({ trip }: { trip: Trip }) {
         </View>
       </View>
 
-      <View style={[styles.stub, photo && styles.photoStub]}>
-        <Text style={[styles.stubLabel, photo && styles.photoText]}>TRAVELLERS</Text>
-        <Text style={[styles.memberCount, photo && styles.photoText]}>{String(trip.memberCount).padStart(2, '0')}</Text>
+      <View testID="ticket-stub" style={styles.stub}>
+        <Text style={styles.stubLabel}>TRAVELLERS</Text>
+        <Text style={styles.memberCount}>{String(trip.memberCount).padStart(2, '0')}</Text>
         <View style={styles.barcode} accessibilityElementsHidden>
-          {bars.map((width, index) => <View key={index} style={[styles.bar, { width }, photo && styles.photoRule]} />)}
+          {bars.map((width, index) => <View key={index} style={[styles.bar, { width }]} />)}
         </View>
-        <Text style={[styles.stubCode, photo && styles.photoText]}>{serial.slice(0, 4)}</Text>
+        <Text style={styles.stubCode}>{serial.slice(0, 4)}</Text>
       </View>
 
       <View style={[styles.notch, styles.notchTop]} />
@@ -62,13 +65,12 @@ export function TripTicket({ trip }: { trip: Trip }) {
 }
 
 const styles = StyleSheet.create({
-  ticket: { minHeight: 206, flexDirection: 'row', overflow: 'hidden', position: 'relative', borderRadius: 24, backgroundColor: palette.paper, borderWidth: StyleSheet.hairlineWidth, borderColor: palette.ash },
+  ticket: { minHeight: 206, flexDirection: 'row', overflow: 'hidden', position: 'relative', borderRadius: 24, backgroundColor: palette.paper },
   photoShade: { backgroundColor: 'rgba(13,32,43,0.52)' },
   photoText: { color: '#FFFFFF' },
   photoTag: { backgroundColor: 'rgba(255,255,255,0.18)' },
-  photoStub: { backgroundColor: 'rgba(13,32,43,0.20)', borderLeftColor: '#FFFFFF88' },
   photoRule: { backgroundColor: '#FFFFFFCC' },
-  main: { flex: 1, minWidth: 0, padding: 20, justifyContent: 'space-between' },
+  main: { overflow: 'hidden', flex: 1, minWidth: 0, padding: 20, justifyContent: 'space-between' },
   issuerRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 4 },
   issuerTag: { alignSelf: 'flex-start', backgroundColor: palette.sky, borderRadius: 64, paddingHorizontal: 10, paddingVertical: 5 },
   issuer: { color: palette.ink, fontSize: 9, lineHeight: 13, fontWeight: '700', letterSpacing: 1.1 },
@@ -84,13 +86,13 @@ const styles = StyleSheet.create({
   routeRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: palette.ocean },
   routeArrow: { color: palette.accent, fontSize: 15, lineHeight: 17, marginLeft: -2 },
   arrival: { alignItems: 'flex-end' },
-  stub: { width: 96, borderLeftWidth: 1, borderStyle: 'dashed', borderLeftColor: palette.ocean, backgroundColor: palette.sky, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  stub: { width: STUB_WIDTH, flexShrink: 0, borderLeftWidth: 1, borderStyle: 'dashed', borderLeftColor: palette.ocean, backgroundColor: palette.sky, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   stubLabel: { color: palette.ink, fontFamily: mono, fontSize: 8, lineHeight: 12, fontWeight: '400', letterSpacing: 0.7 },
   memberCount: { color: palette.ink, fontSize: 42, lineHeight: 46, fontWeight: '900', letterSpacing: -1.6, marginTop: 2 },
   barcode: { height: 31, width: 60, marginTop: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'stretch' },
   bar: { height: '100%', backgroundColor: palette.ink },
   stubCode: { color: palette.ink, fontFamily: mono, fontSize: 8, lineHeight: 12, letterSpacing: 2, marginTop: 4 },
-  notch: { position: 'absolute', right: 86, width: 20, height: 20, borderRadius: 10, backgroundColor: palette.canvas, zIndex: 2 },
-  notchTop: { top: -10 },
-  notchBottom: { bottom: -10 },
+  notch: { position: 'absolute', right: STUB_WIDTH - NOTCH_RADIUS - 0.5, width: NOTCH_RADIUS * 2, height: NOTCH_RADIUS * 2, borderRadius: NOTCH_RADIUS, backgroundColor: palette.canvas, zIndex: 2 },
+  notchTop: { top: -NOTCH_RADIUS },
+  notchBottom: { bottom: -NOTCH_RADIUS },
 });

@@ -1,5 +1,6 @@
+import { useModalViewport } from '@/hooks/use-modal-viewport';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { palette, mono } from '@/constants/design';
@@ -13,11 +14,6 @@ const WEEKDAY_HEIGHT = 32;
 const ROW_HEIGHT = 46;
 const MARKER_SIZE = 36;
 const BAND_HEIGHT = MARKER_SIZE;
-const WHEEL_ITEM_HEIGHT = 36;
-const WHEEL_CYCLES = 5;
-const WHEEL_MIDDLE_CYCLE = Math.floor(WHEEL_CYCLES / 2);
-const HOURS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, '0'));
-const MINUTES = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, '0'));
 
 function validTime(value: string) {
   return !value || /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
@@ -62,6 +58,7 @@ export function DateRangePicker({ startDate, endDate, startTime = '', endTime = 
 }
 
 function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', startLabel = '出発日', endLabel = '帰着日', label = '期間', mode, showTime = false, close, onChange }: Props & { close: () => void }) {
+  const viewport = useModalViewport(true);
   const initial = startDate || endDate || todayValue();
   const [range, setRange] = useState<DateRange>({ startDate, endDate });
   const [anchorDate, setAnchorDate] = useState(startDate);
@@ -121,9 +118,9 @@ function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', sta
 
   return (
     <Modal transparent animationType="fade" visible onRequestClose={close}>
-      <SafeAreaView style={styles.backdrop}>
+      <SafeAreaView testID="modal-viewport" style={[styles.backdrop, viewport]}>
         <Pressable accessibilityLabel="日付選択を閉じる" onPress={close} style={StyleSheet.absoluteFill} />
-        <View accessibilityViewIsModal style={styles.dialog}>
+        <View testID="picker-sheet" accessibilityViewIsModal style={styles.dialog}>
           <ScrollView contentContainerStyle={styles.dialogContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.heading}>
             <Text style={styles.dialogTitle}>{label}</Text>
@@ -192,90 +189,19 @@ function DateRangeDialog({ startDate, endDate, startTime = '', endTime = '', sta
 }
 
 function TimeSelector({ label, onChange, value }: { label: string; onChange: (value: string) => void; value: string }) {
-  const parts = validTime(value) && value ? value.split(':') : ['10', '00'];
-  const setPart = (part: 'hour' | 'minute', next: string) => onChange(part === 'hour' ? `${next}:${parts[1]}` : `${parts[0]}:${next}`);
   return <View style={styles.timeSection}>
     <View style={styles.timeHeading}>
       <Text style={styles.timeLabel}>{label}</Text>
-      <TextInput
-        accessibilityLabel={`${label}を直接入力`}
-        keyboardType="numbers-and-punctuation"
-        maxLength={5}
-        onChangeText={onChange}
-        placeholder="--:--"
-        placeholderTextColor={palette.placeholder}
-        selectTextOnFocus
-        style={[styles.timeInput, !validTime(value) && styles.timeInputInvalid]}
+      <input
+        aria-label={label}
+        className="native-time-input"
+        type="time"
+        step={60}
         value={value}
+        onChange={(event) => onChange(event.currentTarget.value)}
       />
+      {value ? <Pressable accessibilityRole="button" accessibilityLabel={`${label}をクリア`} onPress={() => onChange('')} style={styles.iconButton}><Text style={styles.clearText}>×</Text></Pressable> : null}
     </View>
-    <View style={styles.wheelRow}>
-      <TimeWheel accessibilityLabel={`${label}の時`} onChange={(next) => setPart('hour', next)} selected={parts[0]} values={HOURS} />
-      <Text style={styles.timeColon}>:</Text>
-      <TimeWheel accessibilityLabel={`${label}の分`} onChange={(next) => setPart('minute', next)} selected={parts[1]} values={MINUTES} />
-    </View>
-    {!validTime(value) ? <Text style={styles.timeError}>時刻は24時間表記（例 09:30）で入力してください。</Text> : null}
-  </View>;
-}
-
-function TimeWheel({ accessibilityLabel, onChange, selected, values }: { accessibilityLabel: string; onChange: (value: string) => void; selected: string; values: string[] }) {
-  const scrollRef = useRef<ScrollView>(null);
-  const selectedIndex = Math.max(0, values.indexOf(selected));
-  const activeIndex = useRef(selectedIndex);
-  const internalSelection = useRef<number | null>(null);
-  const loopValues = useMemo(
-    () => Array.from({ length: values.length * WHEEL_CYCLES }, (_, index) => values[index % values.length]),
-    [values],
-  );
-  const middleIndex = WHEEL_MIDDLE_CYCLE * values.length + selectedIndex;
-  useEffect(() => {
-    activeIndex.current = selectedIndex;
-    if (internalSelection.current === selectedIndex) {
-      internalSelection.current = null;
-      return;
-    }
-    scrollRef.current?.scrollTo({ y: middleIndex * WHEEL_ITEM_HEIGHT, animated: false });
-  }, [middleIndex, selectedIndex]);
-  const rawIndexFromScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    return Math.max(0, Math.min(loopValues.length - 1, Math.round(event.nativeEvent.contentOffset.y / WHEEL_ITEM_HEIGHT)));
-  };
-  const indexFromScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const rawIndex = rawIndexFromScroll(event);
-    return rawIndex % values.length;
-  };
-  const selectFromScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = indexFromScroll(event);
-    if (activeIndex.current === index) return;
-    activeIndex.current = index;
-    internalSelection.current = index;
-    onChange(values[index]);
-  };
-  const settleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = indexFromScroll(event);
-    selectFromScroll(event);
-    const centeredIndex = WHEEL_MIDDLE_CYCLE * values.length + index;
-    scrollRef.current?.scrollTo({ y: centeredIndex * WHEEL_ITEM_HEIGHT, animated: false });
-  };
-  const snapScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const rawIndex = rawIndexFromScroll(event);
-    selectFromScroll(event);
-    scrollRef.current?.scrollTo({ y: rawIndex * WHEEL_ITEM_HEIGHT, animated: true });
-  };
-  return <View accessibilityLabel={accessibilityLabel} style={styles.wheelFrame}>
-    <View pointerEvents="none" style={styles.wheelSelection} />
-    <ScrollView
-      bounces={false}
-      contentContainerStyle={styles.wheelContent}
-      decelerationRate="fast"
-      disableIntervalMomentum
-      onMomentumScrollEnd={settleScroll}
-      onScrollEndDrag={snapScroll}
-      overScrollMode="never"
-      ref={scrollRef}
-      showsVerticalScrollIndicator={false}
-      snapToInterval={WHEEL_ITEM_HEIGHT}>
-      {loopValues.map((entry, index) => <Pressable key={`${entry}-${index}`} onPress={() => onChange(entry)} style={styles.wheelItem}><Text style={[styles.wheelText, entry === selected && styles.wheelTextSelected]}>{entry}</Text></Pressable>)}
-    </ScrollView>
   </View>;
 }
 
@@ -395,17 +321,6 @@ const styles = StyleSheet.create({
   timeSection: { backgroundColor: palette.paper, borderRadius: 16, padding: 12, marginTop: 10 },
   timeHeading: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   timeLabel: { flex: 1, color: palette.ink, fontSize: 13, fontWeight: '800' },
-  timeInput: { width: 82, height: 38, color: palette.ink, backgroundColor: palette.mist, borderRadius: 8, fontFamily: mono, fontSize: 16, fontWeight: '800', textAlign: 'center', padding: 0, borderWidth: 1, borderColor: 'transparent' },
-  timeInputInvalid: { borderColor: palette.danger },
-  wheelRow: { height: 108, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  wheelFrame: { width: 78, height: 108, position: 'relative', overflow: 'hidden' },
-  wheelContent: { paddingVertical: WHEEL_ITEM_HEIGHT },
-  wheelSelection: { position: 'absolute', left: 4, right: 4, top: WHEEL_ITEM_HEIGHT, height: WHEEL_ITEM_HEIGHT, backgroundColor: palette.sky, borderRadius: 8, zIndex: 0 },
-  wheelItem: { height: WHEEL_ITEM_HEIGHT, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
-  wheelText: { color: palette.smoke, fontFamily: mono, fontSize: 15 },
-  wheelTextSelected: { color: palette.ink, fontSize: 18, fontWeight: '900' },
-  timeColon: { color: palette.ink, fontFamily: mono, fontSize: 22, fontWeight: '900', marginHorizontal: 6 },
-  timeError: { color: palette.danger, fontSize: 10, textAlign: 'center', marginTop: 4 },
   actions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 },
   clearButton: { minWidth: 72, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   clearText: { color: palette.slate, fontSize: 14, fontWeight: '700' },

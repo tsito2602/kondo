@@ -1,3 +1,4 @@
+import { useModalViewport } from '@/hooks/use-modal-viewport';
 import { PropsWithChildren, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,6 +18,7 @@ type Props = PropsWithChildren<{
 }>;
 
 export function FormSheet({ visible, title, onClose, onSave, saveLabel = '保存', canSave = true, dirty = false, error, children }: Props) {
+  const viewport = useModalViewport(visible);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const scroll = useRef<ScrollView>(null);
@@ -36,7 +38,7 @@ export function FormSheet({ visible, title, onClose, onSave, saveLabel = '保存
     ]);
   };
   return <><Modal visible={visible} transparent={Platform.OS === 'web'} presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : 'fullScreen'} animationType={reduceMotion ? 'none' : Platform.OS === 'web' ? 'fade' : 'slide'} onRequestClose={close}>
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} testID="form-modal-viewport" style={[styles.overlay, viewport]}>
       {Platform.OS === 'web' ? <Pressable accessibilityLabel="シートを閉じる" onPress={close} style={StyleSheet.absoluteFill} /> : null}
       <SafeAreaView testID="form-sheet" edges={['top', 'bottom']} style={styles.sheet}>
         <View accessibilityViewIsModal style={styles.fill}>
@@ -55,7 +57,7 @@ export function FormSheet({ visible, title, onClose, onSave, saveLabel = '保存
     </KeyboardAvoidingView>
   </Modal>
     {Platform.OS === 'web' ? <Modal visible={visible && confirmClose} transparent animationType={reduceMotion ? 'none' : 'fade'} onRequestClose={() => setConfirmClose(false)}>
-      <View style={styles.overlay}>
+      <View testID="modal-viewport" style={[styles.overlay, viewport]}>
         <View accessibilityViewIsModal style={styles.confirmCard}>
           <Text accessibilityRole="header" style={styles.confirmTitle}>変更を保存せずに閉じますか？</Text>
           <Text style={styles.confirmBody}>入力した内容は保存されません。</Text>
