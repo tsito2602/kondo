@@ -31,10 +31,9 @@ export function WebWorkspace({ children }: PropsWithChildren) {
     window.addEventListener('drop', preventFileNavigation);
     return () => { window.removeEventListener('dragover', preventFileNavigation); window.removeEventListener('drop', preventFileNavigation); };
   }, []);
-  if (!desktop) return children;
   return <View testID="web-workspace" style={styles.workspace}>
-    <a href="#workspace-main" className="skip-link">本文へ移動</a>
-    <View role="navigation" accessibilityLabel="メインナビゲーション" style={styles.sidebar}>
+    {desktop ? <a href="#workspace-main" className="skip-link">本文へ移動</a> : null}
+    {desktop ? <View role="navigation" accessibilityLabel="メインナビゲーション" style={styles.sidebar}>
       <Link href="/" style={styles.brand} accessibilityLabel="tabi 旅行一覧"><Image source={require('../../assets/brand/logo.png')} style={{ width: 50, height: 50 }} contentFit="contain" /><Text style={styles.wordmark}>tabi</Text></Link>
       <Link href="/" style={[styles.nav, !trip && styles.selected]}><SymbolView name={{ web: 'luggage' }} size={21} tintColor={palette.ocean} /><Text style={styles.navText}>すべての旅行</Text></Link>
       {trip ? <View style={styles.section}>
@@ -53,7 +52,7 @@ export function WebWorkspace({ children }: PropsWithChildren) {
         {!isDemo ? <Pressable accessibilityRole="button" disabled={syncing} onPress={() => void sync()} style={styles.accountAction}><Text style={styles.accountText}>{syncing ? '同期中…' : '最新の情報に更新'}</Text></Pressable> : null}
         <Pressable accessibilityRole="button" onPress={() => isDemo ? exitDemo() : void signOut()} style={styles.accountAction}><Text style={styles.accountText}>{isDemo ? 'サンプルを終了' : 'ログアウト'}</Text></Pressable>
       </View>
-    </View>
+    </View> : null}
     <View nativeID="workspace-main" role="main" style={styles.main}>{children}</View>
   </View>;
 }
