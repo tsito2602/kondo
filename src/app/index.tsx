@@ -1,6 +1,5 @@
 import { MemberAvatar } from '@/components/member-avatar';
 import { useDesktop } from '@/hooks/use-desktop';
-import { PwaControls } from '@/components/pwa';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -44,7 +43,6 @@ export default function HomeScreen() {
       {desktop && trips.length ? <TextInput accessibilityLabel="旅行を検索" placeholder="旅行名・行き先で検索" placeholderTextColor={palette.placeholder} value={search} onChangeText={setSearch} style={{ padding: 14, backgroundColor: palette.paper, borderRadius: 10, color: palette.ink, fontSize: 14, marginVertical: 16, maxWidth: 420 }} /> : null}
       {desktop && trips.length > 0 && !matchingTrips.length ? <Text style={styles.notice}>該当する旅行がありません</Text> : null}
       <SyncStatus />
-      <PwaControls />
       {notice ? <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text> : null}
       {!ready ? <View style={styles.loading}><ActivityIndicator color={palette.ocean} /></View> : !trips.length ? <View style={styles.empty}>
         <View style={styles.emptyTicket}><Text style={styles.emptyTicketText}>TABI / 01</Text><View style={styles.perforation} /><Text style={styles.emptyPlus}>＋</Text></View>
