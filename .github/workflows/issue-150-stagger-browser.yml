@@ -1,0 +1,54 @@
+name: Detail stagger remaining browser verification
+on:
+  push:
+    branches: [feat/issue-150-detail-expansion]
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci > /tmp/stagger-browser-install.log 2>&1
+      - name: Build the unchanged checked application
+        env:
+          EXPO_PUBLIC_ENABLE_DEMO: 'true'
+        run: npm run build:web > /tmp/stagger-browser-build.log 2>&1
+      - name: Verify remaining desktop, WebKit and reduced-motion cases
+        run: |
+          npm install --prefix /tmp/stagger-browser --no-audit --no-fund playwright@1.56.1 > /tmp/stagger-browser-tools.log 2>&1
+          /tmp/stagger-browser/node_modules/.bin/playwright install --with-deps chromium webkit >> /tmp/stagger-browser-tools.log 2>&1
+          node <<'JS'
+          const fs = require('node:fs'), { execFileSync } = require('node:child_process');
+          const yaml = execFileSync('git', ['show', 'ad42f6e50472de4665acb9eea07a9493007f2df0:.github/workflows/issue-150-stagger-browser.yml'], { encoding: 'utf8' });
+          const match = yaml.match(/cat > \/tmp\/stagger-browser\/check\.cjs <<'JS'\n([\s\S]*?)\n {10}JS\n/);
+          if (!match) throw new Error('Browser scenario block not found');
+          let script = match[1].split('\n').map(line => line.slice(10)).join('\n');
+          function replace(from, to) { if (script.split(from).length !== 2) throw new Error(`Expected one test match: ${from}`); script = script.replace(from, to); }
+          replace("await page.getByRole('button',{name:'変更を破棄',exact:true}).click();await page.locator('[data-testid=\"form-sheet\"]:visible').waitFor({state:'hidden'});", "await page.getByRole('button',{name:'変更を破棄',exact:true}).click();await sheet().getByTestId('detail-target-title').waitFor();assert.equal(await sheet().getByTestId('detail-target-title').innerText(),'展示をめぐる','discard returns to unchanged detail');await close();");
+          // Icon text is included in the accessible link name. Use its actual
+          // route rather than incorrectly assuming the link has a text-only name.
+          replace("page.getByRole('navigation').getByRole('link',{name,exact:true})", "page.locator('[role=\"navigation\"] a').filter({has: page.locator('text='+name)}).first()");
+          // Prefer an exact route suffix over the icon's engine-specific name.
+          replace("page.locator('[role=\"navigation\"] a').filter({has: page.locator('text='+name)}).first()", "page.locator('[role=\"navigation\"] a[href$=\"/'+({'予約':'bookings','行きたい場所':'places'}[name])+'\"]')");
+          replace("const context=await browser.newContext", "if(engine==='chromium'&&(label==='phone'||label==='dark'))continue;\n      const context=await browser.newContext");
+          fs.writeFileSync('/tmp/stagger-browser/check.cjs', script);
+          console.log('Reuse successful Chromium phone/dark scenarios from run 34836780657; identical application tree. Run the remaining six cases.');
+          JS
+          if node /tmp/stagger-browser/check.cjs > /tmp/stagger-browser-result.log 2>&1; then cat /tmp/stagger-browser-result.log; else tail -n 55 /tmp/stagger-browser-result.log; exit 1; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: detail-stagger-browser
+          path: |
+            /tmp/stagger-browser-result.log
+            /tmp/stagger-browser/check.cjs
+            /tmp/stagger-shots
+          retention-days: 3
