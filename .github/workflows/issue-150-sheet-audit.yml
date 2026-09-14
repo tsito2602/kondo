@@ -1,0 +1,25 @@
+name: Scoped sheet motion audit
+on:
+  push:
+    branches: [feat/issue-150-detail-expansion]
+    paths: [.github/workflows/issue-150-sheet-audit.yml]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect modal entry points and scoped implementation files
+        run: |
+          mkdir -p /tmp/sheet-audit
+          git grep -nE '<(Modal|MotionModal|FormSheet)|createDetailMotion' -- src > /tmp/sheet-audit/entrypoints.txt
+          git grep -lE '<(Modal|MotionModal|FormSheet)|createDetailMotion' -- src > /tmp/sheet-audit/paths.txt
+          printf '%s\n' src/detail-motion.css src/motion.css src/transitions.css src/global.css src/utils/detail-origin.ts src/utils/detail-origin.web.ts src/utils/web-motion.ts scripts/test-detail-motion.mjs scripts/test-motion.mjs scripts/test-ui-boundaries.mjs package.json >> /tmp/sheet-audit/paths.txt
+          sort -u /tmp/sheet-audit/paths.txt | xargs tar -czf /tmp/sheet-audit/source.tgz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sheet-motion-audit
+          path: /tmp/sheet-audit
+          retention-days: 1
