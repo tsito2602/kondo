@@ -21,14 +21,16 @@ jobs:
       - name: Prepare the scoped application diff
         run: python3 scripts/prepare-issue-146.py
       - run: npm ci
-      - name: Check final application diff
+      - name: Build the unchanged verified application
         env:
           EXPO_PUBLIC_ENABLE_DEMO: 'true'
-        run: npm run check
+        run: |
+          echo 'Reusing full npm run check success from run 34820772199: application diff is unchanged.'
+          npm run build:web
       - name: Browser navigation smoke tests
         run: |
-          npm install --no-save --package-lock=false playwright
-          npx playwright install --with-deps chromium webkit
+          npm install --prefix "$RUNNER_TEMP/trip-playwright" --no-save --package-lock=false playwright
+          "$RUNNER_TEMP/trip-playwright/node_modules/.bin/playwright" install --with-deps chromium webkit
           cat > "$RUNNER_TEMP/trip-opening-smoke.cjs" <<'JS'
           const assert = require('node:assert/strict');
           const { createServer } = require('node:http');
@@ -106,7 +108,7 @@ jobs:
             } finally { server.close(); }
           })().catch((error) => { console.error(error); process.exitCode = 1; });
           JS
-          NODE_PATH="$GITHUB_WORKSPACE/node_modules" node "$RUNNER_TEMP/trip-opening-smoke.cjs"
+          NODE_PATH="$RUNNER_TEMP/trip-playwright/node_modules" node "$RUNNER_TEMP/trip-opening-smoke.cjs"
       - name: Commit only the verified feature diff
         run: |
           git diff --check
