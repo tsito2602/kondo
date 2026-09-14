@@ -2,7 +2,7 @@ name: Issue 145 cloud implementation check
 on:
   push:
     branches: [feat/issue-145-trip-ticket-transition]
-    paths: ['.github/workflows/issue-145-check.yml', 'scripts/issue-145-apply.cjs', 'scripts/issue-145-browser.cjs', 'src/utils/trip-transition*', 'src/components/trip-transitions*', 'src/trip-transitions.css', 'scripts/test-trip-transition.mjs']
+    paths: ['.github/workflows/issue-145-check.yml', 'scripts/issue-145-*.cjs', 'src/utils/trip-transition*', 'src/components/trip-transitions*', 'src/trip-transitions.css', 'scripts/test-trip-transition.mjs']
 permissions:
   contents: write
 jobs:
@@ -19,9 +19,10 @@ jobs:
       - run: npm ci
       - name: Integrate the scoped change and synchronize the release version
         run: |
+          node scripts/issue-145-fix.cjs
           node scripts/issue-145-apply.cjs
           cp scripts/issue-145-browser.cjs /tmp/tabi-145-browser.cjs
-          rm scripts/issue-145-apply.cjs scripts/issue-145-browser.cjs .github/workflows/issue-145-check.yml
+          rm scripts/issue-145-apply.cjs scripts/issue-145-browser.cjs scripts/issue-145-fix.cjs .github/workflows/issue-145-check.yml
           git diff --check
       - name: Check the final application diff
         env:
