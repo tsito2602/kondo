@@ -21,8 +21,9 @@ jobs:
         run: |
           node scripts/issue-145-fix.cjs
           node scripts/issue-145-apply.cjs
+          node scripts/issue-145-finalize.cjs
           cp scripts/issue-145-browser.cjs /tmp/tabi-145-browser.cjs
-          rm scripts/issue-145-apply.cjs scripts/issue-145-browser.cjs scripts/issue-145-fix.cjs .github/workflows/issue-145-check.yml
+          rm scripts/issue-145-apply.cjs scripts/issue-145-browser.cjs scripts/issue-145-fix.cjs scripts/issue-145-finalize.cjs .github/workflows/issue-145-check.yml
           git diff --check
       - name: Check the final application diff
         env:
