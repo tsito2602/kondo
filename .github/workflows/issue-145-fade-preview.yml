@@ -2,33 +2,50 @@ name: Trip fade preview
 on:
   push:
     branches: [feat/issue-145-trip-ticket-transition]
-    paths: [.github/workflows/issue-145-fade-preview.yml]
+    paths: [.github/workflows/issue-145-fade-preview.yml, scripts/issue-145-fade-apply.py, scripts/issue-145-fade-browser.cjs]
 permissions:
-  contents: read
+  contents: write
 jobs:
   preview:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: bdbeb52b7244cdf1b55df7c526ffb23b28a305e2
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
+      - name: Prepare final scoped diff
+        run: |
+          python3 scripts/issue-145-fade-apply.py
+          cp scripts/issue-145-fade-browser.cjs /tmp/tabi-fade-browser.cjs
+          rm scripts/issue-145-fade-apply.py scripts/issue-145-fade-browser.cjs .github/workflows/issue-145-fade-preview.yml
+          git diff --check
       - run: npm ci > /tmp/fade-install.log 2>&1
-      - name: Build isolated demo preview
+      - name: Check final application diff
         env:
           EXPO_PUBLIC_ENABLE_DEMO: 'true'
         run: |
-          if npm run build:web > /tmp/fade-build.log 2>&1; then tail -n 5 /tmp/fade-build.log; else tail -n 70 /tmp/fade-build.log; exit 1; fi
+          if npm run check > /tmp/fade-check.log 2>&1; then tail -n 5 /tmp/fade-check.log; else tail -n 90 /tmp/fade-check.log; exit 1; fi
+      - name: Verify built browser opening and closing
+        run: |
+          npm install --prefix /tmp/fade-browser --no-audit --no-fund playwright@1.56.1 > /tmp/fade-browser-install.log 2>&1
+          /tmp/fade-browser/node_modules/.bin/playwright install --with-deps chromium webkit >> /tmp/fade-browser-install.log 2>&1
+          NODE_PATH="$GITHUB_WORKSPACE/node_modules:/tmp/fade-browser/node_modules" node /tmp/tabi-fade-browser.cjs > /tmp/fade-browser.log 2>&1 || { tail -n 70 /tmp/fade-browser.log; exit 1; }
+          cat /tmp/fade-browser.log
+      - name: Commit verified feature files only
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -u
+          git commit -m 'fix: fade trip foreground through opening and closing (#145)'
+          git push origin HEAD:feat/issue-145-trip-ticket-transition
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: trip-fade-preview
-          retention-days: 1
+          name: trip-fade-verification
+          retention-days: 3
           path: |
-            dist
-            src/utils/trip-transition.web.ts
-            src/trip-transitions.css
-            scripts/test-trip-transition.mjs
+            /tmp/fade-check.log
+            /tmp/fade-browser.log
+            /tmp/fade-shots
