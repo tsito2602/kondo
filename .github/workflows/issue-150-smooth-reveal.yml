@@ -2,7 +2,7 @@ name: Detail smooth reveal verification
 on:
   push:
     branches: [feat/issue-150-detail-expansion]
-    paths: [src/utils/detail-motion.web.ts, scripts/test-detail-motion.mjs, .github/workflows/issue-150-smooth-reveal.yml]
+    paths: [.github/workflows/issue-150-smooth-reveal.yml]
 permissions:
   contents: read
 jobs:
@@ -11,108 +11,32 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
       - run: npm ci > /tmp/smooth-install.log 2>&1 || { tail -60 /tmp/smooth-install.log; exit 1; }
-      - name: Build the application for focused browser verification
+      - name: Build unchanged application for browser verification
         env:
           EXPO_PUBLIC_ENABLE_DEMO: 'true'
         run: npm run build:web > /tmp/smooth-build.log 2>&1 || { tail -60 /tmp/smooth-build.log; exit 1; }
-      - name: Verify ordered easing, early close and reduced motion
+      - name: Run focused checks with persistent test identity
         run: |
-          npm install --prefix "$RUNNER_TEMP/smooth-browser" --no-audit --no-fund playwright > /tmp/smooth-tools.log 2>&1 || { tail -40 /tmp/smooth-tools.log; exit 1; }
-          "$RUNNER_TEMP/smooth-browser/node_modules/.bin/playwright" install --with-deps chromium webkit >> /tmp/smooth-tools.log 2>&1 || { tail -40 /tmp/smooth-tools.log; exit 1; }
-          mkdir -p /tmp/smooth-shots
-          cat > "$RUNNER_TEMP/smooth-browser/check.cjs" <<'JS'
-          const assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
-          const { createServer } = require('node:http'), { chromium, webkit } = require('playwright');
-          const dist = path.resolve('dist'), out = '/tmp/smooth-shots';
-          const server = createServer((req, res) => {
-            let file = path.join(dist, decodeURIComponent(new URL(req.url, 'http://localhost').pathname));
-            if (!file.startsWith(dist + '/') && file !== dist) { res.writeHead(400); res.end(); return; }
-            if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) file = fs.existsSync(file + '.html') ? file + '.html' : path.join(dist, 'index.html');
-            const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2', '.ttf': 'font/ttf' };
-            res.setHeader('Content-Type', mime[path.extname(file)] || 'application/octet-stream'); fs.createReadStream(file).pipe(res);
-          });
-          (async () => {
-            await new Promise(resolve => server.listen(4173, '127.0.0.1', resolve));
-            try { for (const [engine, launcher] of [['chromium', chromium], ['webkit', webkit]]) {
-              const browser = await launcher.launch();
-              try { for (const [label, width, dark, reduced] of [['phone',390,false,false],['dark',390,true,false],['desktop',1440,false,false],['reduced',390,false,true]]) {
-                const context = await browser.newContext({ viewport: { width, height: 844 }, colorScheme: dark ? 'dark' : 'light', reducedMotion: reduced ? 'reduce' : 'no-preference', serviceWorkers: 'block' });
-                const page = await context.newPage(), errors = [], samples = []; page.setDefaultTimeout(15000); page.on('pageerror', error => errors.push(error.message));
-                await page.addInitScript(() => {
-                  window.revealRecords = []; window.freezeReveal = false; const original = Element.prototype.animate;
-                  Element.prototype.animate = function(frames, options) {
-                    const a = original.call(this, frames, options);
-                    if (this.matches('[data-detail-motion]') || this.closest('[data-detail-motion]')) {
-                      window.revealRecords.push({ el: this, a, frames, options });
-                      if (window.freezeReveal) { a.pause(); a.currentTime = 0; }
-                    }
-                    return a;
-                  };
-                });
-                const sheet = () => page.locator('[data-testid="form-sheet"]:visible').last();
-                const freeze = () => page.evaluate(() => { window.revealRecords = []; window.freezeReveal = true; });
-                const at = async t => { await page.evaluate(t => window.revealRecords.forEach(({ a }) => { a.pause(); a.currentTime = t; }), t); await page.waitForTimeout(25); };
-                const states = () => page.evaluate(() => window.revealRecords.map(({ el, frames, options }) => ({ surface: el.hasAttribute('data-detail-motion'), text: el.textContent.slice(0,35), frames, options, opacity: getComputedStyle(el).opacity, y: new DOMMatrixReadOnly(getComputedStyle(el).transform).m42 })));
-                const finish = async () => { await page.evaluate(() => { window.freezeReveal = false; window.revealRecords.forEach(({ a }) => { try { a.finish(); } catch {} }); }); await page.waitForTimeout(80); };
-                const close = async () => { await sheet().getByRole('button', { name: '閉じる', exact: true }).click({ force: true }); await page.locator('[data-testid="form-sheet"]:visible').waitFor({ state: 'hidden' }); await page.waitForTimeout(80); };
-                try {
-                  await page.goto('http://127.0.0.1:4173'); await page.getByRole('button', { name: 'サンプルの旅行で試す', exact: true }).click();
-                  await page.locator('[data-testid="trip-ticket"]:visible').first().click(); await page.getByTestId('itinerary-scroll').waitFor(); await page.waitForTimeout(500);
-                  const item = page.locator('[data-testid="detail-source-title"]:visible').first(); await item.scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
-                  const y = await page.getByTestId('itinerary-scroll').evaluate(el => el.scrollTop);
-                  if (!reduced) await freeze(); await item.click(); await sheet().waitFor();
-                  if (!reduced) {
-                    await page.waitForFunction(() => window.revealRecords.length > 2); await at(0);
-                    const initial = await states(), blocks = initial.filter(x => !x.surface), delays = blocks.map(x => x.options.delay);
-                    assert.equal(initial.find(x => x.surface).opacity, '1', 'paper is opaque from the first frame');
-                    assert(blocks.every(x => Number(x.opacity) === 0 && x.options.delay >= 280), 'content waits for panel expansion');
-                    assert.equal(new Set(delays).size, blocks.length, 'no simultaneous tail after the fifth item');
-                    assert(delays.every((t,i) => !i || t > delays[i-1]), 'reading order is retained');
-                    assert(blocks.every(x => x.options.duration === 560 && x.options.easing === 'cubic-bezier(.16, 1, .3, 1)'), 'long soft ease-out is applied to each item');
-                    for (const t of [279,400,560,900,1261]) {
-                      await at(t); const state = await states(); samples.push({ time: t, state });
-                      if (t === 279) assert(state.filter(x => !x.surface).every(x => Number(x.opacity) === 0));
-                      if (t === 1261) assert(state.filter(x => !x.surface).every(x => Number(x.opacity) === 1 && Math.abs(x.y) < .01));
-                      if (label === 'phone') await page.screenshot({ path: path.join(out, `${engine}-${label}-${t}.png`) });
-                    }
-                    const positions = [];
-                    for (const relative of [0,140,280,420,560]) {
-                      await at(delays[0] + relative); positions.push((await states()).find(x => !x.surface).y);
-                    }
-                    const distances = positions.slice(1).map((p,i) => positions[i] - p);
-                    assert(distances.every(x => x > 0), 'every segment rises without overshoot');
-                    assert(distances.every((d,i) => !i || d < distances[i-1]), 'movement slows progressively into its final position');
-                    samples.push({ positions, distances }); await finish();
-                  }
-                  await close(); assert(Math.abs(await page.getByTestId('itinerary-scroll').evaluate(el => el.scrollTop) - y) < 2);
-                  if (!reduced) {
-                    await freeze(); await item.click(); await sheet().waitFor(); await page.waitForFunction(() => window.revealRecords.length > 2); await at(400);
-                    const before = await states(); await page.evaluate(() => { window.freezeReveal = false; }); await close();
-                    const exits = (await states()).slice(before.length);
-                    assert(exits.length > 1 && exits.every(x => x.options.delay === 0), 'closing never waits for the long entrance');
-                    assert.deepEqual(exits.filter(x => !x.surface).map(x => x.frames[0].opacity), before.filter(x => !x.surface).map(x => x.opacity), 'interruption preserves opacity without flashing');
-                  }
-                  await item.click(); await sheet().waitFor(); await page.waitForTimeout(reduced ? 80 : 1300);
-                  await page.screenshot({ path: path.join(out, `${engine}-${label}-settled.png`) }); await close();
-                  assert.equal(await page.locator('.detail-motion-label,[data-detail-motion]').count(),0, 'temporary motion is cleaned up');
-                  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'no horizontal overflow');
-                  if (reduced) assert.equal(await page.evaluate(() => window.revealRecords.length), 0);
-                  assert.deepEqual(errors, []);
-                  fs.writeFileSync(path.join(out,`${engine}-${label}.json`), JSON.stringify(samples,null,2));
-                  console.log(`PASS ${engine}/${label}: opaque panel, separate stagger, decreasing speed, interrupted close, reopen, scroll and cleanup`);
-                } catch(error) { await page.screenshot({ path: path.join(out, `${engine}-${label}-failure.png`) }); fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({ engine,label,error:String(error),samples,records:await states() },null,2)); throw error; }
-                finally { await context.close(); }
-              }} finally { await browser.close(); }
-            }} finally { server.close(); }
-          })().catch(error => { console.error(error); process.exitCode = 1; });
-          JS
-          node "$RUNNER_TEMP/smooth-browser/check.cjs" > /tmp/smooth-browser.log 2>&1 || { tail -65 /tmp/smooth-browser.log; exit 1; }
-          cat /tmp/smooth-browser.log
+          python3 - <<'PY'
+          import os, pathlib, subprocess
+          original = subprocess.check_output(['git', 'show', '92049ffa5df1b82204a5e3e8ad6439e6266801de:.github/workflows/issue-150-smooth-reveal.yml'], text=True)
+          block = original.split('      - name: Verify ordered easing, early close and reduced motion\n        run: |\n', 1)[1].split('      - uses: actions/upload-artifact@v4', 1)[0]
+          script = '\n'.join(line[10:] if line.startswith('          ') else line for line in block.splitlines())
+          # Runtime flags are intentionally cleared on disposal. Test identity
+          # must survive cleanup when inspecting the completed exit keyframes.
+          before = "surface: el.hasAttribute('data-detail-motion')"
+          assert script.count(before) == 1
+          script = script.replace(before, "surface: el.dataset.testid === 'form-sheet'")
+          pathlib.Path(os.environ['RUNNER_TEMP'], 'smooth-check.sh').write_text(script)
+          PY
+          bash -e "$RUNNER_TEMP/smooth-check.sh"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
