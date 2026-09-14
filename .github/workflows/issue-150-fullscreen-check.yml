@@ -1,0 +1,94 @@
+name: Fullscreen modal layout verification
+on:
+  push:
+    branches: [feat/issue-150-detail-expansion]
+    paths: [.github/workflows/issue-150-fullscreen-check.yml]
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci > /tmp/fullscreen-install.log 2>&1 || { tail -50 /tmp/fullscreen-install.log; exit 1; }
+      - name: Build current application with isolated sample data
+        env:
+          EXPO_PUBLIC_ENABLE_DEMO: 'true'
+        run: npm run build:web > /tmp/fullscreen-build.log 2>&1 || { tail -60 /tmp/fullscreen-build.log; exit 1; }
+      - name: Verify layouts, keyboard viewport and preserved transitions
+        run: |
+          npm install --prefix "$RUNNER_TEMP/fullscreen-browser" --no-audit --no-fund playwright > /tmp/fullscreen-tools.log 2>&1
+          "$RUNNER_TEMP/fullscreen-browser/node_modules/.bin/playwright" install --with-deps chromium webkit >> /tmp/fullscreen-tools.log 2>&1
+          mkdir -p /tmp/fullscreen-shots
+          cat > "$RUNNER_TEMP/fullscreen-browser/check.cjs" <<'JS'
+          const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+          const {createServer}=require('node:http'),{chromium,webkit}=require('playwright');
+          const root=path.resolve('dist'),out='/tmp/fullscreen-shots';
+          const server=createServer((req,res)=>{
+            let file=path.join(root,decodeURIComponent(new URL(req.url,'http://localhost').pathname));
+            if(file!==root&&!file.startsWith(root+'/')){res.writeHead(400);res.end();return;}
+            if(!fs.existsSync(file)||fs.statSync(file).isDirectory())file=fs.existsSync(file+'.html')?file+'.html':path.join(root,'index.html');
+            res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2','.ttf':'font/ttf'})[path.extname(file)]||'application/octet-stream');fs.createReadStream(file).pipe(res);
+          });
+          (async()=>{
+            await new Promise(r=>server.listen(4173,'127.0.0.1',r));let failures=0;
+            for(const [engine,launch] of [['chromium',chromium],['webkit',webkit]]){
+              const browser=await launch.launch();
+              try{for(const [label,width,dark,reduced] of [['phone',390,false,false],['dark',390,true,false],['desktop',1440,false,false],['reduced',390,false,true]]){
+                const context=await browser.newContext({viewport:{width,height:844},colorScheme:dark?'dark':'light',reducedMotion:reduced?'reduce':'no-preference',serviceWorkers:'block'});
+                const page=await context.newPage(),errors=[],evidence=[];page.setDefaultTimeout(12000);page.on('pageerror',e=>errors.push(e.message));
+                await page.addInitScript(()=>{window.modalRecords=[];const animate=Element.prototype.animate;Element.prototype.animate=function(frames,options){const a=animate.call(this,frames,options);if(this.matches('[data-detail-motion]')||this.closest('[data-detail-motion]'))window.modalRecords.push({el:this,a,frames,options});return a;};});
+                const sheet=()=>page.locator('[data-testid="form-sheet"]:visible,[data-testid="picker-sheet"]:visible,[data-testid="note-editor"]:visible').last();
+                async function settle(){await page.waitForTimeout(60);await page.evaluate(()=>document.getAnimations().forEach(a=>{const t=a.effect?.getComputedTiming();if(t&&Number.isFinite(t.endTime)&&t.endTime<5000)try{a.finish();}catch{}}));await page.waitForTimeout(60);}
+                async function shape(name){
+                  await sheet().waitFor();await settle();
+                  const state=await sheet().evaluate(el=>{const v=el.closest('[data-testid="form-modal-viewport"],[data-testid="detail-modal-viewport"],[data-testid="note-modal-viewport"],[data-testid="modal-viewport"]');return{r:el.getBoundingClientRect().toJSON(),v:v.getBoundingClientRect().toJSON(),radius:getComputedStyle(el).borderRadius,width:innerWidth,kind:el.dataset.testid};});
+                  if(state.width<1024){for(const key of ['x','y','width','height'])assert(Math.abs(state.r[key]-state.v[key])<1.1,`${name}: ${key} must fill viewport: ${JSON.stringify(state)}`);assert.equal(state.radius,'0px',`${name}: no bottom sheet corners`);}else assert(state.r.width<state.width*.85,`${name}: desktop remains bounded`);
+                  assert(state.r.height>100&&state.r.width>200);evidence.push({name,...state});
+                  if(label==='phone')await page.screenshot({path:path.join(out,`${engine}-${name}.png`)});
+                }
+                async function close(){const el=await sheet().elementHandle();await sheet().getByRole('button',{name:'閉じる',exact:true}).click();await settle();await page.waitForFunction(el=>!el.isConnected,el);}
+                async function nav(name){await page.getByRole(width>=1024?'link':'tab',{name:new RegExp(name+'$')}).click();await page.waitForTimeout(250);}
+                try{
+                  await page.goto('http://127.0.0.1:4173');await page.getByRole('button',{name:'サンプルの旅行で試す',exact:true}).click();await page.locator('[data-testid="trip-ticket"]:visible').first().click();await page.getByTestId('itinerary-scroll').waitFor();await page.waitForTimeout(600);
+                  const item=page.locator('[data-testid="detail-source-title"]:visible').first();await item.scrollIntoViewIfNeeded();await item.click();await shape('booking-detail');
+                  if(!reduced){const records=await page.evaluate(()=>window.modalRecords.filter(r=>r.el.dataset.testid==='form-sheet').map(r=>r.frames));assert(records.some(f=>f[0].clipPath&&f[0].clipPath!=='inset(0px)'),'origin expansion retained');}
+                  await close();
+                  if(!reduced)assert(await page.evaluate(()=>window.modalRecords.some(r=>r.el.dataset.testid==='form-sheet'&&r.frames.length===3)),'reverse contraction retained');
+                  await nav('行きたい場所');const card=()=>page.getByTestId('place-card').filter({hasText:'旧市街でカフェ巡り'});
+                  await card().getByRole('button',{name:'旧市街でカフェ巡りの詳細を開く',exact:true}).click();await shape('place-detail');await close();
+                  await card().getByRole('button',{name:'旧市街でカフェ巡りのステータスを変更',exact:true}).click();await shape('status');
+                  if(label==='phone'){await page.setViewportSize({width:844,height:390});await shape('status-landscape');await page.setViewportSize({width:390,height:844});await shape('status-portrait');}
+                  await close();await card().getByRole('button',{name:/しおりへ/}).click();await shape('planning');
+                  await sheet().getByRole('button',{name:/^日付 /}).click();await shape('date-picker');await sheet().getByText('決定',{exact:true}).click();await settle();await shape('planning-after-picker');await close();
+                  await nav('予約');await page.getByRole('button',{name:'サンプル航空 101の乗り継ぎを変更',exact:true}).click();await shape('connection');await sheet().getByRole('button',{name:'保存',exact:true}).click();await settle();
+                  await page.getByRole('button',{name:'旅行メニュー',exact:true}).click();await page.getByTestId('trip-menu').getByRole('button',{name:/旅行を編集/}).click();await shape('trip-editor');
+                  const field=sheet().getByRole('textbox').first();await field.fill('Fullscreen draft');await shape('focused-editor');
+                  if(width<1024){await page.evaluate(()=>{const v=window.visualViewport;Object.defineProperty(v,'height',{configurable:true,value:430});Object.defineProperty(v,'offsetTop',{configurable:true,value:24});v.dispatchEvent(new Event('resize'));});await page.waitForTimeout(100);await shape('keyboard-viewport');assert.equal(Math.round((await sheet().boundingBox()).height),430);await page.evaluate(()=>{const v=window.visualViewport;delete v.height;delete v.offsetTop;v.dispatchEvent(new Event('resize'));});await page.waitForTimeout(100);}
+                  await sheet().getByRole('button',{name:'閉じる',exact:true}).click();await page.getByTestId('discard-dialog').waitFor();await settle();const confirm=await page.getByTestId('discard-dialog').boundingBox();assert(confirm.height<844*.8,'confirmation stays compact');await page.getByTestId('discard-dialog').getByRole('button',{name:'編集を続ける',exact:true}).click();await settle();assert.equal(await field.inputValue(),'Fullscreen draft');await shape('editor-after-confirm');
+                  await sheet().getByRole('button',{name:'閉じる',exact:true}).click();await page.getByTestId('discard-dialog').getByRole('button',{name:'変更を破棄',exact:true}).click();await settle();await page.locator('[data-testid="form-sheet"]:visible').waitFor({state:'hidden'});
+                  await nav('メモ');await page.getByRole('button',{name:'メモを書く',exact:true}).last().click();await page.getByTestId('note-body').fill('Fullscreen memo\nRetained content');await shape('note-editor');await sheet().getByRole('button',{name:'完了',exact:true}).click();await settle();await page.getByTestId('note-editor').waitFor({state:'hidden'});await page.getByRole('button',{name:'Fullscreen memoを開く',exact:true}).click();await shape('existing-note');assert((await page.getByTestId('note-body').inputValue()).includes('Retained content'));await sheet().getByRole('button',{name:'完了',exact:true}).click();await settle();
+                  assert.equal(await page.locator('[data-detail-motion]').count(),0);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);console.log(`PASS ${engine}/${label}: full viewport for details, actions, picker, editor, notes; nested/keyboard/rotation; compact confirmations; retained open/close motion`);
+                }catch(e){failures++;console.error(`FAIL ${engine}/${label}`,e);await page.screenshot({path:path.join(out,`${engine}-${label}-failure.png`)});evidence.push({failure:String(e),body:await page.locator('body').innerText()});}finally{fs.writeFileSync(path.join(out,`${engine}-${label}.json`),JSON.stringify(evidence,null,2));await context.close();}
+              }}finally{await browser.close();}
+            }
+            assert.equal(failures,0,'all representative modal layouts must pass');
+          })().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>server.close());
+          JS
+          node "$RUNNER_TEMP/fullscreen-browser/check.cjs" > /tmp/fullscreen-browser.log 2>&1 || { tail -80 /tmp/fullscreen-browser.log; exit 1; }
+          cat /tmp/fullscreen-browser.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fullscreen-modal-verification
+          path: |
+            /tmp/fullscreen-browser.log
+            /tmp/fullscreen-build.log
+            /tmp/fullscreen-shots
+          retention-days: 3
+          if-no-files-found: ignore
