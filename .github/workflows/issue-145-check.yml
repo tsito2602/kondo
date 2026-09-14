@@ -1,0 +1,59 @@
+name: Issue 145 cloud implementation check
+on:
+  push:
+    branches: [feat/issue-145-trip-ticket-transition]
+    paths: ['.github/workflows/issue-145-check.yml', 'scripts/issue-145-apply.cjs', 'scripts/issue-145-browser.cjs', 'src/utils/trip-transition*', 'src/components/trip-transitions*', 'src/trip-transitions.css', 'scripts/test-trip-transition.mjs']
+permissions:
+  contents: write
+jobs:
+  check:
+    if: github.repository == 'tsito2602/tabi' && github.ref == 'refs/heads/feat/issue-145-trip-ticket-transition'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Integrate the scoped change and synchronize the release version
+        run: |
+          node scripts/issue-145-apply.cjs
+          cp scripts/issue-145-browser.cjs /tmp/tabi-145-browser.cjs
+          rm scripts/issue-145-apply.cjs scripts/issue-145-browser.cjs .github/workflows/issue-145-check.yml
+          git diff --check
+      - name: Check the final application diff
+        env:
+          EXPO_PUBLIC_ENABLE_DEMO: 'true'
+        run: |
+          if npm run check > /tmp/tabi-145-check.log 2>&1; then
+            tail -n 18 /tmp/tabi-145-check.log
+          else
+            tail -n 100 /tmp/tabi-145-check.log
+            exit 1
+          fi
+      - name: Browser verification on the built application
+        run: |
+          npm install --prefix /tmp/tabi-browser --no-audit --no-fund playwright@1.56.1 > /tmp/tabi-145-browser-install.log 2>&1
+          /tmp/tabi-browser/node_modules/.bin/playwright install --with-deps chromium >> /tmp/tabi-145-browser-install.log 2>&1
+          node /tmp/tabi-145-browser.cjs
+      - name: Commit only to the feature branch
+        run: |
+          git diff --check
+          git diff > /tmp/tabi-145-validated.patch
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat: connect trip tickets to the travel journal (#145)'
+          git push origin HEAD:refs/heads/feat/issue-145-trip-ticket-transition
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: issue-145-verification
+          path: |
+            /tmp/tabi-145-check.log
+            /tmp/tabi-145-browser-install.log
+            /tmp/tabi-145-validated.patch
+            /tmp/tabi-145-screenshots
+          retention-days: 7
