@@ -11,7 +11,7 @@ const dom = new JSDOM('<!doctype html><html><head><style>:root { --modal-close-d
 Object.assign(globalThis, { window: dom.window, document: dom.window.document, getComputedStyle: dom.window.getComputedStyle, MutationObserver: dom.window.MutationObserver, IS_REACT_ACT_ENVIRONMENT: true });
 let reduced = false;
 const mediaListeners = new Set();
-globalThis.matchMedia = () => ({ matches: reduced, addEventListener: (_, fn) => mediaListeners.add(fn), removeEventListener: (_, fn) => mediaListeners.delete(fn) });
+globalThis.matchMedia = () => ({ get matches() { return reduced; }, addEventListener: (_, fn) => mediaListeners.add(fn), removeEventListener: (_, fn) => mediaListeners.delete(fn) });
 const resizes = new Set();
 globalThis.ResizeObserver = class {
   targets = new Set();
@@ -152,14 +152,19 @@ console.log('Motion: actual animation completion and cancellation passed.');
 
 // A confirmation/dropdown can close before the editor underneath it.
 const menu = React.createElement(MotionModal, { motion: 'dropdown' }, React.createElement('div', { 'data-testid': 'modal-viewport' }, React.createElement('section', { 'data-testid': 'trip-menu' }, 'menu')));
+console.log('Motion: mounting nested surfaces');
 await render(presence(React.createElement(React.Fragment, null, editor('stacked'), menu)));
+console.log('Motion: mounted nested surfaces');
 const outer = running(surface(), 350);
 const inner = running(document.querySelector('[data-testid="trip-menu"]'), 150);
 await render(presence(null));
+console.log('Motion: finishing inner surface');
 await act(async () => inner.finish());
+console.log('Motion: inner finished');
 assert(surface(), 'one completed portal cannot unmount another still exiting');
 assert.equal(document.querySelector('[data-testid="trip-menu"]'), null);
 await act(async () => outer.finish());
+console.log('Motion: outer finished');
 assert.equal(surface(), null);
 animations.clear();
 
@@ -167,11 +172,15 @@ await render(presence(editor('preference change')));
 running(surface());
 await render(presence(null));
 reduced = true;
-await act(async () => { for (const fn of mediaListeners) fn(); });
+await act(async () => { for (const fn of [...mediaListeners]) fn(); });
+console.log('Motion: preference applied');
 assert.equal(surface(), null, 'changing reduced motion during exit removes the wait');
 animations.clear();
+console.log('Motion: mounting StrictMode');
 await render(React.createElement(React.StrictMode, null, presence(editor('strict'))));
+console.log('Motion: mounted StrictMode');
 await render(React.createElement(React.StrictMode, null, presence(null)));
+console.log('Motion: closed StrictMode');
 assert.equal(surface(), null, 'StrictMode cleanup cannot leave a retained editor');
 await render(presence(React.createElement('section', { 'data-testid': 'no-modal' })));
 await render(presence(null));
