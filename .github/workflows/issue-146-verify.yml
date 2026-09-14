@@ -1,0 +1,123 @@
+name: Issue 146 cloud verification
+on:
+  push:
+    branches: [feat/issue-146-trip-opening]
+permissions:
+  contents: write
+concurrency:
+  group: issue-146-cloud-verification
+  cancel-in-progress: true
+jobs:
+  verify:
+    if: github.repository == 'tsito2602/tabi' && github.ref == 'refs/heads/feat/issue-146-trip-opening'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Prepare the scoped application diff
+        run: python3 scripts/prepare-issue-146.py
+      - run: npm ci
+      - name: Check final application diff
+        env:
+          EXPO_PUBLIC_ENABLE_DEMO: 'true'
+        run: npm run check
+      - name: Browser navigation smoke tests
+        run: |
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium webkit
+          cat > "$RUNNER_TEMP/trip-opening-smoke.cjs" <<'JS'
+          const assert = require('node:assert/strict');
+          const { createServer } = require('node:http');
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const { chromium, webkit } = require('playwright');
+          const dist = path.resolve('dist');
+          const server = createServer((req, res) => {
+            const url = new URL(req.url, 'http://localhost');
+            let file = path.join(dist, decodeURIComponent(url.pathname));
+            if (!file.startsWith(dist + path.sep) && file !== dist) { res.writeHead(400); res.end(); return; }
+            if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) file = fs.existsSync(file + '.html') ? file + '.html' : path.join(dist, 'index.html');
+            const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2' };
+            res.setHeader('Content-Type', types[path.extname(file)] || 'application/octet-stream');
+            fs.createReadStream(file).pipe(res);
+          });
+          (async () => {
+            await new Promise((resolve) => server.listen(4173, '127.0.0.1', resolve));
+            const out = path.join(process.env.RUNNER_TEMP, 'trip-opening-artifacts');
+            fs.mkdirSync(out, { recursive: true });
+            try {
+              for (const [engine, launcher] of [['chromium', chromium], ['webkit', webkit]]) {
+                const browser = await launcher.launch();
+                try {
+                  for (const [label, width, reduced, unsupported] of [['phone', 390, false, false], ['desktop', 1440, false, false], ['reduced', 390, true, false], ['fallback', 390, false, true]]) {
+                    const context = await browser.newContext({ viewport: { width, height: 844 }, reducedMotion: reduced ? 'reduce' : 'no-preference', serviceWorkers: 'block' });
+                    const page = await context.newPage();
+                    const errors = [];
+                    page.on('pageerror', (error) => errors.push(error.message));
+                    await page.addInitScript(({ unsupported }) => {
+                      window.tripTransitions = [];
+                      const native = document.startViewTransition?.bind(document);
+                      if (unsupported) { document.startViewTransition = undefined; return; }
+                      if (!native) return;
+                      document.startViewTransition = (update) => {
+                        const item = { ready: false, error: null };
+                        window.tripTransitions.push(item);
+                        const transition = native(update);
+                        transition.ready.then(() => { item.ready = true; }, (error) => { item.error = error.message; });
+                        return transition;
+                      };
+                    }, { unsupported });
+                    await page.goto('http://127.0.0.1:4173');
+                    await page.getByRole('button', { name: 'サンプルの旅行で試す', exact: true }).click();
+                    const first = page.getByTestId('trip-ticket').first();
+                    await first.waitFor({ state: 'visible' });
+                    const tripName = await first.getByTestId('trip-ticket-title').innerText();
+                    const supported = await page.evaluate(() => typeof document.startViewTransition === 'function');
+                    await first.locator('..').click();
+                    await page.getByTestId('trip-title').waitFor({ state: 'visible' });
+                    await page.waitForFunction(() => !document.documentElement.dataset.tripTransition);
+                    assert.equal(await page.getByTestId('trip-title').innerText(), tripName);
+                    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${engine}/${label}: horizontal overflow`);
+                    const events = await page.evaluate(() => window.tripTransitions);
+                    if (supported && !reduced) assert(events.length === 1 && events[0].ready && !events[0].error, `${engine}/${label}: opening snapshot failed ${JSON.stringify(events)}`);
+                    else assert.equal(events.length, 0);
+                    await page.screenshot({ path: path.join(out, `${engine}-${label}.png`) });
+                    await page.getByRole('tab', { name: '準備', exact: true }).click();
+                    await page.waitForURL('**/packing');
+                    assert.equal(await page.evaluate(() => window.tripTransitions.length), events.length, 'tab change must not replay trip opening');
+                    await page.getByRole('tab', { name: 'しおり', exact: true }).click();
+                    await page.waitForURL('**/itinerary');
+                    await page.getByTestId('trip-back').click();
+                    await page.getByTestId('trip-ticket').first().waitFor({ state: 'visible' });
+                    await page.waitForFunction(() => !document.documentElement.dataset.tripTransition);
+                    const after = await page.evaluate(() => window.tripTransitions);
+                    if (supported && !reduced) assert(after.length === 2 && after[1].ready && !after[1].error, `${engine}/${label}: closing snapshot failed ${JSON.stringify(after)}`);
+                    assert.equal(errors.length, 0, errors.join('\n'));
+                    assert.equal(await page.evaluate(() => [...document.querySelectorAll('[style]')].filter((element) => element.style.viewTransitionName).length), 0, 'snapshot names leaked');
+                    console.log(`Browser PASS ${engine}/${label}: open, close, tab isolation, viewport bounds, clean snapshot lifecycle`);
+                    await context.close();
+                  }
+                } finally { await browser.close(); }
+              }
+            } finally { server.close(); }
+          })().catch((error) => { console.error(error); process.exitCode = 1; });
+          JS
+          NODE_PATH="$GITHUB_WORKSPACE/node_modules" node "$RUNNER_TEMP/trip-opening-smoke.cjs"
+      - name: Commit only the verified feature diff
+        run: |
+          git diff --check
+          git add src scripts/test-trip-navigation.mjs package.json package-lock.json app.json
+          git add -u scripts/prepare-issue-146.py .github/workflows/issue-146-verify.yml
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'feat: connect trip tickets to itinerary (#146)'
+          git push origin HEAD:refs/heads/feat/issue-146-trip-opening
+          echo "VERIFIED_SHA=$(git rev-parse HEAD)"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trip-opening-browser-checks
+          path: ${{ runner.temp }}/trip-opening-artifacts
+          if-no-files-found: ignore
