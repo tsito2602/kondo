@@ -31,9 +31,10 @@ jobs:
           before=text.split('      - name: Reuse immutable checked build and install isolated browser tools\n        run: |\n',1)[1].split('      - name: Exercise action sheets, nested picker, editing and notes',1)[0]
           body=text.split('      - name: Exercise action sheets, nested picker, editing and notes\n        run: |\n',1)[1].split('      - uses: actions/upload-artifact@v4',1)[0]
           script='\n'.join(line[10:] if line.startswith('          ') else line for line in (before+body).splitlines())
-          for a,b in [("name:'しおりへ',exact:true", "name:/しおりへ/"),("name:'しおりを見る',exact:true", "name:/しおりを見る/")]:
+          for label in ['しおりへ','しおりを見る','旅行を編集','旅行を削除']:
+            a="name:'"+label+"',exact:true"
             assert a in script,a
-            script=script.replace(a,b)
+            script=script.replace(a,'name:/'+label+'/')
           # Preserve all six case results so one selector failure does not hide
           # independent browser/platform failures. App build remains unchanged.
           script=script.replace("const root=path.resolve('dist'), out='/tmp/utility-shots';", "let failures=0; const root=path.resolve('dist'), out='/tmp/utility-shots';")
