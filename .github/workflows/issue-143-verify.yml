@@ -1,0 +1,158 @@
+name: Issue 143 verification
+on:
+  push:
+    branches: [fix/issue-143-selected-date-label]
+    paths: [.github/workflows/issue-143-verify.yml]
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/issue-143-selected-date-label
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies and browser tools
+        run: |
+          npm ci > "$RUNNER_TEMP/install.log" 2>&1
+          npm install --prefix "$RUNNER_TEMP/browser-tools" --no-package-lock --no-save playwright esbuild > "$RUNNER_TEMP/browser-install.log" 2>&1
+          "$RUNNER_TEMP/browser-tools/node_modules/.bin/playwright" install --with-deps chromium webkit > "$RUNNER_TEMP/browser-deps.log" 2>&1
+      - name: Apply focused fix and synchronize patch version
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const file = 'src/global.css';
+          const before = fs.readFileSync(file, 'utf8');
+          const old = '.motion-tabs > .t-tabs-pill { top: 0; }';
+          if (!before.includes(old)) throw new Error('Expected pill rule has changed');
+          fs.writeFileSync(file, before.replace(old, '/* Keep the composited pill behind tab labels within the isolated tab bar. */\n.motion-tabs > .t-tabs-pill { top: 0; z-index: -1; }'));
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const oldVersion = pkg.version;
+          const parts = oldVersion.split('.').map(Number);
+          if (parts.length !== 3 || parts.some((part) => !Number.isInteger(part))) throw new Error('Unexpected version');
+          parts[2] += 1;
+          const version = parts.join('.');
+          for (const path of ['package.json', 'package-lock.json', 'app.json']) {
+            const json = JSON.parse(fs.readFileSync(path, 'utf8'));
+            if (path === 'app.json') json.expo.version = version;
+            else { json.version = version; if (path === 'package-lock.json') json.packages[''].version = version; }
+            fs.writeFileSync(path, JSON.stringify(json, null, 2) + '\n');
+          }
+          console.log(`Version ${oldVersion} -> ${version}`);
+          NODE
+      - name: Check representative WebKit and Chromium tab rendering
+        run: |
+          cat > .issue-143-browser.tsx <<'TSX'
+          import React, { useState } from 'react';
+          import { createRoot } from 'react-dom/client';
+          import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+          import { MotionTabs } from './src/components/motion-tabs.web';
+          import './src/global.css';
+          import './src/motion.css';
+          const styles = StyleSheet.create({
+            row: { flexDirection: 'row', gap: 8, paddingHorizontal: 20 },
+            tab: { minWidth: 68, minHeight: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 14, paddingHorizontal: 12 },
+            label: { fontSize: 13, lineHeight: 17, fontWeight: '800' },
+            date: { fontFamily: 'monospace', fontSize: 9, lineHeight: 13, marginTop: 1 },
+          });
+          function App() {
+            const [selected, setSelected] = useState(0);
+            const [dark, setDark] = useState(true);
+            const ocean = dark ? '#A1BDCC' : '#496B80', onOcean = dark ? '#14232D' : '#FAFCFD';
+            document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+            return <><button id="theme" onClick={() => setDark(!dark)}>theme</button><ScrollView testID="itinerary-day-tabs" horizontal contentContainerStyle={{ flexGrow: 1 }}><MotionTabs style={styles.row}>{Array.from({ length: 10 }, (_, index) => <Pressable key={index} accessibilityRole="tab" aria-selected={selected === index} onPress={() => setSelected(index)} style={[styles.tab, { backgroundColor: selected === index ? ocean : (dark ? '#23333F' : '#E6ECEF') }]}><Text dataSet={{ label: 'day' }} style={[styles.label, { color: selected === index ? onOcean : (dark ? '#B7C5CE' : '#496B80') }]}>{index + 1}日目</Text><Text dataSet={{ label: 'date' }} style={[styles.date, { color: selected === index ? onOcean : (dark ? '#95A7B3' : '#496B80') }]}>11/{21 + index}</Text></Pressable>)}</MotionTabs></ScrollView></>;
+          }
+          createRoot(document.getElementById('fixture')!).render(<App />);
+          TSX
+          cat > "$RUNNER_TEMP/issue-143-browser.cjs" <<'JS'
+          const fs = require('node:fs'), path = require('node:path'), http = require('node:http');
+          const assert = require('node:assert/strict');
+          const tools = path.join(process.env.RUNNER_TEMP, 'browser-tools/node_modules');
+          const { build } = require(path.join(tools, 'esbuild'));
+          const { chromium, webkit } = require(path.join(tools, 'playwright'));
+          const sharp = require(path.join(process.cwd(), 'node_modules/sharp'));
+          (async () => {
+            const out = path.join(process.env.RUNNER_TEMP, 'issue-143-artifacts'); fs.mkdirSync(out, { recursive: true });
+            await build({ entryPoints: ['.issue-143-browser.tsx'], bundle: true, outfile: path.join(out, 'fixture.js'), jsx: 'automatic', alias: { 'react-native': 'react-native-web' }, define: { 'process.env.NODE_ENV': '"production"', __DEV__: 'false' } });
+            fs.unlinkSync('.issue-143-browser.tsx');
+            fs.writeFileSync(path.join(out, 'index.html'), '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/fixture.css"><div id="fixture"></div><script src="/fixture.js"></script>');
+            const server = http.createServer((req, res) => { const name = req.url === '/' ? 'index.html' : path.basename(req.url); res.setHeader('Content-Type', name.endsWith('.css') ? 'text/css' : name.endsWith('.js') ? 'application/javascript' : 'text/html'); res.end(fs.readFileSync(path.join(out, name))); });
+            await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+            const url = `http://127.0.0.1:${server.address().port}`;
+            const report = [];
+            for (const [engine, type] of Object.entries({ chromium, webkit })) {
+              const browser = await type.launch();
+              try {
+                for (const width of [390, 1280]) {
+                  const page = await browser.newPage({ viewport: { width, height: 500 }, deviceScaleFactor: 2 });
+                  await page.goto(url); await page.locator('[aria-selected="true"]').waitFor();
+                  const baseline = await page.addStyleTag({ content: '.motion-tabs > .t-tabs-pill { z-index: 0; }' });
+                  await page.screenshot({ path: path.join(out, `${engine}-${width}-before.png`) });
+                  await baseline.evaluate((node) => node.remove());
+                  for (const theme of ['dark', 'light']) {
+                    if (theme === 'light') await page.locator('#theme').click();
+                    for (const index of [0, 1, 9]) {
+                      const tab = page.locator('[role="tab"]').nth(index);
+                      await tab.scrollIntoViewIfNeeded(); await tab.click(); await page.waitForTimeout(350);
+                      assert.equal(await tab.getAttribute('aria-selected'), 'true');
+                      assert.equal(await page.locator('.motion-tabs > .t-tabs-pill').evaluate((node) => getComputedStyle(node).zIndex), '-1');
+                      const target = theme === 'dark' ? [20, 35, 45] : [250, 252, 253];
+                      const pixels = {};
+                      for (const label of ['day', 'date']) {
+                        const png = await tab.locator(`[data-label="${label}"]`).screenshot();
+                        const { data, info } = await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+                        let matching = 0;
+                        for (let p = 0; p < data.length; p += info.channels) if (target.every((value, channel) => Math.abs(data[p + channel] - value) < 25)) matching++;
+                        assert(matching > 5, `${engine}/${width}/${theme}/${index}/${label}: text hidden (${matching} visible pixels)`);
+                        pixels[label] = matching;
+                      }
+                      assert(await page.locator('.motion-tabs').count(), 'theme change must retain tab styling');
+                      report.push({ engine, width, theme, selected: index + 1, pixels });
+                    }
+                    await page.screenshot({ path: path.join(out, `${engine}-${width}-${theme}-after.png`) });
+                  }
+                  await page.emulateMedia({ reducedMotion: 'reduce' });
+                  assert.equal(await page.locator('.t-tabs-pill').evaluate((node) => getComputedStyle(node).transitionDuration), '0s');
+                  await page.close();
+                }
+              } finally { await browser.close(); }
+            }
+            server.close();
+            fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(report, null, 2));
+            console.log(`Passed ${report.length} label visibility cases, plus reduced-motion checks, in Chromium and WebKit.`);
+          })().catch((error) => { console.error(error); process.exit(1); });
+          JS
+          node "$RUNNER_TEMP/issue-143-browser.cjs"
+      - name: Run required final check
+        run: |
+          rm -f .issue-143-browser.tsx
+          npm run check > "$RUNNER_TEMP/check.log" 2>&1 || { tail -100 "$RUNNER_TEMP/check.log"; exit 1; }
+          git diff --check
+          git diff --stat
+          echo 'npm run check passed'
+      - name: Commit only verified application changes to issue branch
+        run: |
+          test "$GITHUB_REF_NAME" = 'fix/issue-143-selected-date-label'
+          test "$(git ls-remote origin "refs/heads/$GITHUB_REF_NAME" | cut -f1)" = "$GITHUB_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/global.css package.json package-lock.json app.json
+          git commit -m 'fix: keep selected date labels above the animated pill (#143)' -m 'Verified with npm run check and 24 Chromium/WebKit light/dark label visibility cases at phone and desktop widths, including selection, horizontal scrolling and reduced motion.'
+          git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: issue-143-verification
+          path: |
+            ${{ runner.temp }}/issue-143-artifacts/*-before.png
+            ${{ runner.temp }}/issue-143-artifacts/*-after.png
+            ${{ runner.temp }}/issue-143-artifacts/report.json
+            ${{ runner.temp }}/check.log
+            ${{ runner.temp }}/*install.log
+            ${{ runner.temp }}/browser-deps.log
+          retention-days: 3
