@@ -1,5 +1,7 @@
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { AppThemeProvider, useAppTheme } from '@/theme/theme-provider';
 import '@/global.css';
+import '@/motion.css';
 import { WebWorkspace } from '@/components/web-workspace';
 import { ToastProvider } from '@/components/toast';
 import { PwaSetup } from '@/components/pwa';
@@ -31,13 +33,14 @@ function AppFrame() {
 }
 
 function TravelRoot() {
+  const reduced = useReducedMotion();
   const { palette } = useAppTheme();
   const { isDemo, user } = useAuth();
   return <TravelProvider key={isDemo ? 'demo' : user?.id}>
             <WebWorkspace><Stack screenOptions={{ contentStyle: { backgroundColor: palette.canvas }, headerShown: false }}>
               <Stack.Screen name="index" />
               <Stack.Screen name="settings" />
-              <Stack.Screen name="trips/[tripId]" options={{ animation: 'slide_from_right' }} />
+              <Stack.Screen name="trips/[tripId]" options={{ animation: reduced ? 'none' : 'slide_from_right' }} />
             </Stack></WebWorkspace>
           </TravelProvider>;
 }

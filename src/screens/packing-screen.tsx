@@ -1,3 +1,5 @@
+import { MotionCheck } from '@/components/motion-check';
+import { MotionTabs } from '@/components/motion-tabs';
 import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { MemberPicker } from '@/components/member-picker';
 import { MemberAvatar } from '@/components/member-avatar';
@@ -184,7 +186,7 @@ export default function PackingScreen() {
           hitSlop={8}
           disabled={!canEdit} onPress={() => toggleTask(task)}
           style={[styles.check, task.done && styles.checkDone]}>
-          <Text style={[styles.checkText, task.done && styles.checkTextDone]}>{task.done ? '✓' : ''}</Text>
+          <MotionCheck checked={task.done} />
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel={`${task.title}を編集`} disabled={!canEdit} onPress={() => openTaskEdit(task)} style={({ pressed }) => [styles.rowCopy, pressed && styles.pressed]}>
           <View style={styles.itemCopy}>
@@ -201,7 +203,7 @@ export default function PackingScreen() {
     <SafeAreaView edges={[]} style={styles.safeArea}>
       <ScrollView testID="packing-scroll" contentContainerStyle={[styles.content, { paddingTop: headerHeight + 20 }]} showsVerticalScrollIndicator={false}>
       <PageHeading title="準備" />
-        <View testID="preparation-tabs" accessibilityRole="tablist" style={styles.segmented}>
+        <MotionTabs testID="preparation-tabs" accessibilityRole="tablist" style={styles.segmented}>
           <Pressable
             accessibilityRole="tab"
             aria-selected={isTasks}
@@ -216,7 +218,7 @@ export default function PackingScreen() {
             style={[styles.segment, !isTasks && styles.segmentSelected]}>
             <Text style={[styles.segmentText, !isTasks && styles.segmentTextSelected]}>持ち物 {packingItems.filter((item) => !item.packed).length}</Text>
           </Pressable>
-        </View>
+        </MotionTabs>
 
         {selectedTrip ? <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters} contentContainerStyle={styles.filterContent}>
           {filterOptions.map((option) => <Pressable key={option.key} accessibilityRole="button" accessibilityLabel={`${option.label}で絞り込む`} accessibilityState={{ selected: activeFilter.key === option.key }} onPress={() => setFilterKey(option.key)} style={[styles.filterChip, activeFilter.key === option.key && styles.categorySelected]}>
@@ -280,7 +282,7 @@ export default function PackingScreen() {
                   {group.items.map((item, index) => (
                     <View key={item.id} style={[styles.row, index > 0 && styles.rowBorder]}>
                       <Pressable accessibilityLabel={`${item.name}を${item.packed ? '未準備' : '準備済み'}にする`} accessibilityRole="checkbox" aria-checked={item.packed} hitSlop={8} disabled={!canEdit} onPress={() => togglePacking(item)} style={[styles.check, item.packed && styles.checkDone]}>
-                        <Text style={[styles.checkText, item.packed && styles.checkTextDone]}>{item.packed ? '✓' : ''}</Text>
+                        <MotionCheck checked={item.packed} />
                       </Pressable>
                       <Pressable accessibilityRole="button" accessibilityLabel={`${item.name}を編集`} disabled={!canEdit} onPress={() => openPackingEdit(item)} style={({ pressed }) => [styles.rowCopy, pressed && styles.pressed]}>
                         <View style={styles.itemCopy}>
@@ -368,9 +370,9 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   sharedHint: { color: palette.slate, fontSize: 12, lineHeight: 18, marginTop: 8 },
   segmented: { flexDirection: 'row', backgroundColor: palette.sky, borderRadius: 14, padding: 4 },
   segment: { flex: 1, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  segmentSelected: { backgroundColor: palette.paper },
+  segmentSelected: { backgroundColor: palette.ocean },
   segmentText: { color: palette.slate, fontSize: 13, lineHeight: 18, fontWeight: '700' },
-  segmentTextSelected: { color: palette.ink, fontWeight: '900' },
+  segmentTextSelected: { color: palette.onOcean, fontWeight: '900' },
   progressCard: { backgroundColor: palette.sky, borderRadius: 28, padding: 24, marginTop: 18 },
   progressCopy: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   progressLabel: { color: palette.ink, fontSize: 15, lineHeight: 20, fontWeight: '700' },

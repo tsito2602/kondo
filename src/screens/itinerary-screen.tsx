@@ -1,3 +1,6 @@
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
+import { MotionTabs } from '@/components/motion-tabs';
+import { MotionPresence } from '@/components/motion-presence';
 import { bookingDurationLabel } from '@/data/booking-duration';
 import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { useDesktop } from '@/hooks/use-desktop';
@@ -169,6 +172,7 @@ function timeZoneLabel(entry: TimelineEntry) {
 }
 
 export default function ItineraryScreen() {
+  const reduced = useReducedMotion();
   const palette = usePalette();
   const styles = useThemedStyles(createStyles);
 
@@ -237,8 +241,8 @@ export default function ItineraryScreen() {
 
   useEffect(() => {
     const frame = dateTabOffsets.current[visibleActiveDay];
-    if (frame) dateScrollRef.current?.scrollTo({ x: Math.max(0, frame.x - (dateViewport.current - frame.width) / 2), animated: true });
-  }, [visibleActiveDay]);
+    if (frame) dateScrollRef.current?.scrollTo({ x: Math.max(0, frame.x - (dateViewport.current - frame.width) / 2), animated: !reduced });
+  }, [visibleActiveDay, reduced]);
 
   const resumeScrollTracking = useCallback(() => {
     programmaticScrollDay.current = null;
@@ -259,9 +263,9 @@ export default function ItineraryScreen() {
       resumeScrollTracking();
       return;
     }
-    scrollRef.current?.scrollTo({ y: Math.max(0, sheetOffset.current + timelineOffset.current + offset - dayBarHeight - 10), animated: true });
+    scrollRef.current?.scrollTo({ y: Math.max(0, sheetOffset.current + timelineOffset.current + offset - dayBarHeight - 10), animated: !reduced });
     scrollTrackingTimer.current = setTimeout(resumeScrollTracking, 1000);
-  }, [dayBarHeight, resumeScrollTracking]);
+  }, [dayBarHeight, resumeScrollTracking, reduced]);
 
   const scrollToRequestedDay = useCallback(() => {
     const date = pendingScrollDay.current;
@@ -373,7 +377,7 @@ export default function ItineraryScreen() {
           <View style={styles.journalSheet}><View style={styles.content}><View style={styles.sheetIntro}><Text style={styles.journalLabel}>しおり</Text><Text style={styles.journalCount}>{itineraryDates.length}日間</Text></View></View></View>
         </View>
         <View testID="itinerary-day-bar" onLayout={(event) => setDayBarHeight(event.nativeEvent.layout.height)} style={styles.dayNavSticky}>
-          {selectedTrip && itineraryDates.length ? <ScrollView testID="itinerary-day-tabs" ref={dateScrollRef} onLayout={(event) => { dateViewport.current = event.nativeEvent.layout.width; }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayTabs}>
+          {selectedTrip && itineraryDates.length ? <ScrollView testID="itinerary-day-tabs" ref={dateScrollRef} onLayout={(event) => { dateViewport.current = event.nativeEvent.layout.width; }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}><MotionTabs style={styles.dayTabs}>
             {itineraryDates.map((date, index) => {
               const selected = date === visibleActiveDay;
               return <Pressable accessibilityRole="tab" aria-selected={selected} onLayout={(event) => { dateTabOffsets.current[date] = event.nativeEvent.layout; }} key={date} onPress={() => scrollToDay(date)} style={[styles.dayTab, selected && styles.dayTabSelected]}>
@@ -381,7 +385,7 @@ export default function ItineraryScreen() {
                 <Text style={[styles.dayTabDate, selected && styles.dayTabDateSelected]}>{shortDate(date)}</Text>
               </Pressable>;
             })}
-          </ScrollView> : null}
+          </MotionTabs></ScrollView> : null}
         </View>
         <View onLayout={(event) => { sheetOffset.current = event.nativeEvent.layout.y; }} style={[styles.journalBody, { minHeight: windowHeight - headerHeight }]}>
         <View style={[styles.content, { paddingBottom: Math.max(128, windowHeight - headerHeight - dayBarHeight - 100) }]}>
@@ -462,11 +466,11 @@ export default function ItineraryScreen() {
       </ScrollView>
 
       {selectedTrip && canEdit ? <FloatingAddButton label="予定を追加する" onPress={() => openAdd()} /> : null}
-      {connectionBookingId ? <FlightConnectionSheet bookingId={connectionBookingId} onClose={() => setConnectionBookingId(null)} /> : null}
+      <MotionPresence>{connectionBookingId ? <FlightConnectionSheet bookingId={connectionBookingId} onClose={() => setConnectionBookingId(null)} /> : null}</MotionPresence>
 
-      {viewingBooking ? <BookingSheet key={`${selectedTrip?.id}:${viewingBooking.id}`} booking={viewingBooking} onClose={() => setViewingBookingId(null)} /> : null}
+      <MotionPresence>{viewingBooking ? <BookingSheet key={`${selectedTrip?.id}:${viewingBooking.id}`} booking={viewingBooking} onClose={() => setViewingBookingId(null)} /> : null}</MotionPresence>
 
-      {isViewingItem && viewingPlace ? <PlaceSheet key={viewingPlace.id} place={viewingPlace} onClose={() => setViewingItemId(null)} onEditSchedule={() => openEdit(viewingItem!)} /> : null}
+      <MotionPresence>{isViewingItem && viewingPlace ? <PlaceSheet key={viewingPlace.id} place={viewingPlace} onClose={() => setViewingItemId(null)} onEditSchedule={() => openEdit(viewingItem!)} /> : null}</MotionPresence>
 
       <FormSheet visible={adding || (Boolean(viewingItem) && !viewingPlace)} presentation={isViewingItem ? 'detail' : 'form'} title={isViewingItem ? '予定の詳細' : editingPlace ? '予定を編集' : editingId ? '予定を編集' : '予定を追加'} onClose={() => { if (isViewingItem) setViewingItemId(null); else closeEditor(); }} onSave={canEdit ? isViewingItem ? () => openEdit(viewingItem!) : save : undefined} saveLabel={isViewingItem ? '編集' : '保存'} canSave={isViewingItem || moving || Boolean(title.trim())} dirty={!isViewingItem && JSON.stringify([day, time, title, note, planDetails]) !== initialDraft} error={isViewingItem ? undefined : formError}>
         {isViewingItem && viewingItem ? <View testID="itinerary-item-details" style={styles.planDetails}>
@@ -552,13 +556,13 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   journalCount: { color: palette.smoke, fontFamily: mono, fontSize: 10, letterSpacing: 1 },
   content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20 },
   dayNavSticky: { zIndex: 4, paddingVertical: 6, backgroundColor: palette.canvas, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
-  dayTabs: { gap: 8, paddingHorizontal: 20 },
+  dayTabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 20 },
   dayTab: { minWidth: 68, minHeight: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: palette.mist, paddingHorizontal: 12 },
   dayTabSelected: { backgroundColor: palette.ocean },
   dayTabLabel: { color: palette.slate, fontSize: 13, lineHeight: 17, fontWeight: '800' },
   dayTabLabelSelected: { color: palette.onOcean },
   dayTabDate: { color: palette.smoke, fontFamily: mono, fontSize: 9, lineHeight: 13, marginTop: 1 },
-  dayTabDateSelected: { color: palette.sky },
+  dayTabDateSelected: { color: palette.onOcean },
   pending: { color: palette.slate, fontFamily: mono, fontSize: 11, marginTop: 4 },
   empty: { minHeight: 430, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyMark: { color: palette.accent, fontSize: 42, fontWeight: '900' },
