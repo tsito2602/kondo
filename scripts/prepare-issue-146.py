@@ -30,6 +30,21 @@ replace('src/app/_layout.tsx', "import '@/motion.css';", "import '@/motion.css';
 replace('src/app/_layout.tsx', "  const { isDemo, user } = useAuth();", "  const { isDemo, user } = useAuth();\n  useEffect(installTripHistory, [isDemo, user?.id]);")
 replace('src/app/_layout.tsx', "animation: reduced ? 'none' : 'slide_from_right'", "animation: Platform.OS === 'web' || reduced ? 'none' : 'slide_from_right'")
 
+# Desktop's home links are another way back to the same selected ticket.
+replace('src/components/web-workspace.web.tsx', "import { PropsWithChildren, useEffect }", "import { navigateTrip } from '@/utils/trip-navigation';\nimport { ComponentProps, PropsWithChildren, useEffect }")
+replace('src/components/web-workspace.web.tsx', 'Link, usePathname', 'Link, usePathname, useRouter')
+replace('src/components/web-workspace.web.tsx', '  const pathname = usePathname();', '  const pathname = usePathname();\n  const router = useRouter();')
+replace('src/components/web-workspace.web.tsx', "  const trip = pathname.startsWith('/trips/') ? selectedTrip : null;", """  const trip = pathname.startsWith('/trips/') ? selectedTrip : null;
+  const openHome: NonNullable<ComponentProps<typeof Link>['onPress']> = (event) => {
+    const click = event.nativeEvent as MouseEvent;
+    // Preserve modified-click/new-tab semantics of the real anchor.
+    if (!trip || event.defaultPrevented || click.button > 0 || click.metaKey || click.ctrlKey || click.shiftKey || click.altKey) return;
+    event.preventDefault();
+    navigateTrip(trip.id, 'close', () => router.replace('/'));
+  };""")
+replace('src/components/web-workspace.web.tsx', '<Link href="/" style={styles.brand}', '<Link href="/" onPress={openHome} style={styles.brand}')
+replace('src/components/web-workspace.web.tsx', '<Link href="/" style={[styles.nav,', '<Link href="/" onPress={openHome} style={[styles.nav,')
+
 version = '1.7.0'
 pkg_file = Path('package.json')
 pkg = json.loads(pkg_file.read_text())
@@ -45,7 +60,6 @@ app_file = Path('app.json')
 app = json.loads(app_file.read_text())
 app['expo']['version'] = version
 app_file.write_text(json.dumps(app, indent=2, ensure_ascii=False) + '\n')
-
 Path('.github/workflows/issue-146-verify.yml').unlink()
 Path(__file__).unlink()
 print('Prepared the final application diff and synchronized all three versions; temporary preparation files removed.')

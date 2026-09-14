@@ -93,19 +93,19 @@ jobs:
                         assert.equal(await page.evaluate(() => [...document.querySelectorAll('.motion-page-content[data-trip-reveal="settled"]')].some((element) => getComputedStyle(element).animationName !== 'none')), false, 'ordinary reveal must not restart after snapshots');
                       } else assert.equal(events.length, 0);
                       await page.screenshot({ path: path.join(out, `${engine}-${label}.png`) });
-                      await page.getByRole('tab', { name: '準備', exact: true }).click();
+                      await (width >= 1024 ? page.locator('a[href$="/packing"]:visible') : page.getByRole('tab', { name: '準備', exact: true })).click();
                       await page.waitForURL('**/packing');
                       assert.equal(await page.evaluate(() => window.tripTransitions.length), events.length, 'tab change must not replay trip opening');
-                      await page.getByRole('tab', { name: 'しおり', exact: true }).click();
+                      await (width >= 1024 ? page.locator('a[href$="/itinerary"]:visible') : page.getByRole('tab', { name: 'しおり', exact: true })).click();
                       await page.waitForURL('**/itinerary');
-                      await page.locator('[data-testid="trip-back"]:visible').click();
+                      await (width >= 1024 ? page.locator('a[href="/"]:visible').filter({ hasText: 'すべての旅行' }) : page.locator('[data-testid="trip-back"]:visible')).click();
                       await first.waitFor({ state: 'visible' });
                       await page.waitForFunction(() => !document.documentElement.dataset.tripTransition);
                       const after = await page.evaluate(() => window.tripTransitions);
                       if (supported && !reduced) assert(after.length === 2 && after[1].ready && !after[1].error, `${engine}/${label}: closing snapshot failed ${JSON.stringify(after)}`);
                       assert.equal(errors.length, 0, errors.join('\n'));
                       assert.equal(await page.evaluate(() => [...document.querySelectorAll('[style]')].filter((element) => element.style.viewTransitionName).length), 0, 'snapshot names leaked');
-                      console.log(`Browser PASS ${engine}/${label}: open, close, tab isolation, viewport bounds, clean snapshot lifecycle`);
+                      console.log(`Browser PASS ${engine}/${label}: open, close, tab/sidebar isolation, viewport bounds, clean snapshot lifecycle`);
                     } catch (error) {
                       console.error('Browser diagnostic', engine, label, await page.evaluate(() => ({ path: location.pathname, transitions: window.tripTransitions, phase: document.documentElement.dataset.tripTransition, roots: [...document.querySelectorAll('[data-testid="trip-ticket"], [data-testid="trip-workspace"]')].map((element) => ({ id: element.id, hidden: Boolean(element.closest('[aria-hidden="true"]')), width: element.getBoundingClientRect().width })) })), errors);
                       throw error;
@@ -130,4 +130,10 @@ jobs:
         with:
           name: trip-opening-browser-checks
           path: ${{ runner.temp }}/trip-opening-artifacts
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trip-opening-demo-build
+          path: dist
           if-no-files-found: ignore
