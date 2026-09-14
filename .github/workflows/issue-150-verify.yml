@@ -21,6 +21,7 @@ jobs:
           cp scripts/issue-150-browser.cjs /tmp/issue-150-browser.cjs
           rm scripts/issue-150-browser.cjs
           node scripts/issue-150-prepare.cjs
+          node scripts/issue-150-refine.cjs
           git diff --check
       - run: npm ci > /tmp/detail-install.log 2>&1
       - name: Check final application diff
