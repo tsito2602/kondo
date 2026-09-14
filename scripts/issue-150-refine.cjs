@@ -7,6 +7,13 @@ edit(p,'width: `${from.width}px`, transform:', 'width: `${from.width}px`, height
 edit(p,'width: `${to.width}px`, transform:', 'width: `${to.width}px`, height: `${to.height}px`, transform:');
 edit(p,'const y = Math.max(0, (to.height - from.height) / 2), x = Math.max(0, (to.width - from.width) / 2);','const scale = Math.max(1, from.width / to.width, from.height / to.height);\n  const y = Math.max(0, (to.height - from.height / scale) / 2), x = Math.max(0, (to.width - from.width / scale) / 2);');
 edit(p,'- to.height / 2}px, 0px)`, clipPath:', '- to.height / 2}px, 0px)${scale > 1 ? ` scale(${scale})` : \'\'}`, clipPath:');
+edit(p,'    const target = detailRect(surface);','    const target = detailRect(surface);\n    const expanded = { ...normal, clipPath: `inset(0px round ${win.getComputedStyle(surface).borderRadius || \'24px\'})` };');
+edit(p,'open ? normal : { ...pose', 'open ? expanded : { ...pose');
 edit('src/screens/itinerary-screen.tsx','setDetailOrigin(captureDetailOrigin(event)); entry.booking ? setViewingBookingId(entry.booking.id) : setViewingItemId(entry.item!.id);','setDetailOrigin(captureDetailOrigin(event)); if (entry.booking) setViewingBookingId(entry.booking.id); else setViewingItemId(entry.item!.id);');
 edit('src/components/motion-modal.web.tsx','  dismiss.current = onDetailDismiss;','  useLayoutEffect(() => { dismiss.current = onDetailDismiss; }, [onDetailDismiss]);');
+edit('src/utils/detail-origin.ts', "key: 'title' | 'time';", "key: 'title' | 'time' | 'time-end';");
+edit('src/utils/detail-origin.web.ts', "['title', 'time'] as const", "['title', 'time', 'time-end'] as const");
+edit('src/screens/itinerary-screen.tsx','testID="detail-source-time" style={styles.time}>{entry.time', 'testID={entry.bookingEndpoint === \'end\' ? \'detail-source-time-end\' : \'detail-source-time\'} style={styles.time}>{entry.time');
+edit('src/components/booking-sheet.tsx','testID="detail-target-time" style={styles.detailTime}>{booking.endTime', 'testID="detail-target-time-end" style={styles.detailTime}>{booking.endTime');
+edit('/tmp/issue-150-browser.cjs', "await page.getByRole('button',{name:'変更を破棄',exact:true}).click();\n            await page.locator('[data-testid=\"form-sheet\"]:visible').waitFor({state:'hidden'});", "await page.getByRole('button',{name:'変更を破棄',exact:true}).click();\n            await sheet().getByTestId('detail-target-title').waitFor();\n            assert.equal(await sheet().getByTestId('detail-target-title').innerText(),'展示をめぐる','discard returns to the saved plan detail');\n            await close();");
 fs.unlinkSync(__filename);
