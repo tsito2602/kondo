@@ -8,7 +8,6 @@ export const MotionExitContext = createContext<{ register: () => () => void } | 
 export function MotionPresence({ children }: PropsWithChildren) {
   const open = Boolean(children);
   const present = useRef(open);
-  present.current = open;
   const alive = useRef(false);
   const pending = useRef(new Set<symbol>());
   const [previous, setPrevious] = useState(children);
@@ -23,7 +22,11 @@ export function MotionPresence({ children }: PropsWithChildren) {
       pending.current.add(id);
       return () => {
         pending.current.delete(id);
-        if (alive.current && !present.current && pending.current.size === 0) setRetained(null);
+        // Check after the commit: another portal may register or reopen in
+        // the same layout pass (including StrictMode effect replays).
+        queueMicrotask(() => {
+          if (alive.current && !present.current && pending.current.size === 0) setRetained(null);
+        });
       };
     },
   }), []);
@@ -32,6 +35,7 @@ export function MotionPresence({ children }: PropsWithChildren) {
     return () => { alive.current = false; };
   }, []);
   useLayoutEffect(() => {
+    present.current = open;
     if (!open && pending.current.size === 0) setRetained(null);
   }, [open]);
   return <MotionExitContext.Provider value={exits}>

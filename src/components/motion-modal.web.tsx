@@ -45,7 +45,7 @@ export function MotionModal({ children, visible = true, motion = 'modal', onRequ
       viewport.classList.add('motion-viewport');
     }
     const sheet = surface.matches('[data-testid="form-sheet"], [data-testid="picker-sheet"]');
-    root.dataset.presentation = motion === 'dropdown' ? 'dropdown' : sheet ? viewport.dataset.testid === 'detail-modal-viewport' ? 'detail' : 'sheet' : 'dialog';
+    root.setAttribute('data-presentation', motion === 'dropdown' ? 'dropdown' : sheet ? viewport.dataset.testid === 'detail-modal-viewport' ? 'detail' : 'sheet' : 'dialog');
     surface.dataset.motionSurface = '';
     surface.classList.add(`t-${motion}`);
     if (motion === 'dropdown') surface.dataset.origin = 'top-right';
