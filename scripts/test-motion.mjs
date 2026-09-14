@@ -22,12 +22,29 @@ globalThis.ResizeObserver = class {
 };
 const require = createRequire(import.meta.url);
 const cache = new Map();
+// Only source-module timers are virtual. React's scheduler remains real so a
+// slow CI runner cannot finish a 20ms exit before the next assertion runs.
+let now = 0, nextTimer = 0;
+const timers = new Map();
+const setTimer = (callback, delay = 0) => { const id = ++nextTimer; timers.set(id, { callback, at: now + delay }); return id; };
+const clearTimer = (id) => timers.delete(id);
+function advance(ms) {
+  const until = now + ms;
+  let count = 0;
+  for (;;) {
+    const next = [...timers.entries()].filter(([, timer]) => timer.at <= until).sort((a, b) => a[1].at - b[1].at)[0];
+    if (!next) break;
+    assert(++count < 1000, 'timers must settle');
+    timers.delete(next[0]); now = next[1].at; next[1].callback();
+  }
+  now = until;
+}
 function load(path) {
   path = resolve(path);
   if (cache.has(path)) return cache.get(path).exports;
   const module = { exports: {} }; cache.set(path, module);
   const js = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-  new Function('require', 'module', 'exports', js)((name) => {
+  new Function('require', 'module', 'exports', 'setTimeout', 'clearTimeout', js)((name) => {
     if (name === 'react-native') return {
       Platform: { OS: 'web' }, Modal: ({ visible, children }) => visible ? children : null,
       View: React.forwardRef(function View({ children, ...props }, ref) { return React.createElement('div', { ...props, ref }, children); }),
@@ -39,7 +56,7 @@ function load(path) {
       '@/utils/web-motion': 'src/utils/web-motion.ts',
     };
     return paths[name] ? load(paths[name]) : require(name);
-  }, module, module.exports);
+  }, module, module.exports, setTimer, clearTimer);
   return module.exports;
 }
 const { MotionPresence } = load('src/components/motion-presence.web.tsx');
@@ -48,7 +65,7 @@ const { MotionTabs } = load('src/components/motion-tabs.web.tsx');
 const { transitionMilliseconds } = load('src/utils/web-motion.ts');
 const root = createRoot(document.querySelector('main'));
 const render = async (element) => act(async () => root.render(element));
-const flush = async (ms = 40) => act(async () => new Promise((done) => setTimeout(done, ms)));
+const flush = async (ms = 40) => act(async () => { advance(ms); });
 const surface = () => document.querySelector('[data-testid="form-sheet"]');
 function editor(value, visible = true) {
   return React.createElement(MotionModal, { visible }, React.createElement('div', { 'data-testid': 'form-modal-viewport', style: { backgroundColor: 'rgba(24,42,54,.3)' } },
@@ -79,6 +96,7 @@ await render(editor('cleared by save', false));
 assert.equal(surface().querySelector('input').value, 'visible');
 await flush();
 assert.equal(surface(), null);
+console.log('Motion: retained inputs, visible toggles and rapid reopen passed.');
 
 // Fallback reads property lists, seconds, delays and negative delays.
 assert.equal(transitionMilliseconds({ transitionProperty: 'opacity, transform', transitionDuration: '.02s, 70ms', transitionDelay: '10ms, 15ms' }), 85);
@@ -91,6 +109,7 @@ await flush();
 assert(surface(), 'fallback must not unmount before the longest delayed transition');
 await flush(70);
 assert.equal(surface(), null);
+console.log('Motion: CSS delay fallback passed.');
 
 // Model real browser animations with explicit finish/cancel control.
 const animations = new Set();
@@ -129,6 +148,7 @@ assert(surface(), 'a rejected old finished promise cannot remove a reopened moda
 await render(presence(null));
 assert.equal(surface(), null, 'no active animation needs no artificial wait');
 animations.clear();
+console.log('Motion: actual animation completion and cancellation passed.');
 
 // A confirmation/dropdown can close before the editor underneath it.
 const menu = React.createElement(MotionModal, { motion: 'dropdown' }, React.createElement('div', { 'data-testid': 'modal-viewport' }, React.createElement('section', { 'data-testid': 'trip-menu' }, 'menu')));
@@ -156,6 +176,7 @@ assert.equal(surface(), null, 'StrictMode cleanup cannot leave a retained editor
 await render(presence(React.createElement('section', { 'data-testid': 'no-modal' })));
 await render(presence(null));
 assert.equal(document.querySelector('[data-testid="no-modal"]'), null);
+console.log('Motion: nested exits, reduced motion and StrictMode passed.');
 
 // Observe geometry in the DOM; an unchanged ResizeObserver notification should
 // leave an ongoing pill transition untouched, including dynamic tab additions.
@@ -175,6 +196,7 @@ await render(React.createElement(MotionTabs, null, tab('a', false, 0), tab('b', 
 assert.equal(pill.style.transform, 'translate(220px, 0px)');
 assert([...resizes][0].targets.has(document.querySelector('[aria-selected="true"]')), 'new tabs are observed');
 await act(async () => root.unmount());
+assert.equal(timers.size, 0, 'exit timers are cleaned up');
 assert.equal(resizes.size, 0);
 assert.equal(mediaListeners.size, 0);
 dom.window.close();
