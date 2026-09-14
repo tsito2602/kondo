@@ -22,9 +22,10 @@ export function TripTicket({ trip }: { trip: Trip }) {
   const serial = trip.id.replaceAll('-', '').slice(0, 8).toUpperCase();
 
   return (
-    <View testID="trip-ticket" style={styles.ticket} accessibilityLabel={`${trip.name}、${trip.startsOn}から${trip.endsOn}まで`}>
+    <View nativeID={`trip-ticket-${trip.id}`} testID="trip-ticket" style={styles.ticket} accessibilityLabel={`${trip.name}、${trip.startsOn}から${trip.endsOn}まで`}>
+      <View testID="trip-ticket-face" style={styles.face}>
       <View style={styles.main}>
-        {photo ? <><Image source={{ uri: trip.coverImage }} resizeMode="cover" style={StyleSheet.absoluteFill} /><View testID="ticket-photo-shade" style={[StyleSheet.absoluteFill, styles.photoShade]} /></> : null}
+        <View pointerEvents="none" testID="trip-ticket-cover" style={[StyleSheet.absoluteFill, styles.cover]}>{photo ? <><Image source={{ uri: trip.coverImage }} resizeMode="cover" style={StyleSheet.absoluteFill} /><View testID="ticket-photo-shade" style={[StyleSheet.absoluteFill, styles.photoShade]} /></> : null}</View>
         <View style={styles.issuerRow}>
           <View style={[styles.issuerTag, photo && styles.photoTag]}><Text style={[styles.issuer, photo && styles.photoText]}>TABI TRIP TICKET</Text></View>
           <Text style={[styles.serial, photo && styles.photoText]}>NO. {serial}</Text>
@@ -32,7 +33,7 @@ export function TripTicket({ trip }: { trip: Trip }) {
 
         <View style={styles.titleBlock}>
           <Text style={[styles.destination, photo && styles.photoText]}>{trip.destination || 'TRAVEL'}</Text>
-          <Text style={[styles.title, photo && styles.photoText]} numberOfLines={2}>{trip.name}</Text>
+          <Text testID="trip-ticket-title" style={[styles.title, photo && styles.photoText]} numberOfLines={2}>{trip.name}</Text>
         </View>
 
         <View style={styles.route}>
@@ -63,12 +64,15 @@ export function TripTicket({ trip }: { trip: Trip }) {
 
       <View style={[styles.notch, styles.notchTop]} />
       <View style={[styles.notch, styles.notchBottom]} />
+      </View>
     </View>
   );
 }
 
 const createStyles = (palette: Palette) => StyleSheet.create({
   ticket: { minHeight: 206, flexDirection: 'row', overflow: 'hidden', position: 'relative', borderRadius: 24, backgroundColor: palette.paper },
+  face: { flex: 1, minWidth: 0, flexDirection: 'row', borderRadius: 24, overflow: 'hidden' },
+  cover: { backgroundColor: palette.paper, borderTopLeftRadius: 24, borderBottomLeftRadius: 24, overflow: 'hidden' },
   photoShade: { backgroundColor: 'rgba(13,32,43,0.52)' },
   photoText: { color: '#FFFFFF' },
   photoTag: { backgroundColor: 'rgba(255,255,255,0.18)' },
