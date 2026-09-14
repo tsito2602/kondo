@@ -150,4 +150,48 @@ for (const options of [{ reduced: true }, { supported: false }]) {
   assert.equal(f.transitions.length, 0, 'direct loads and ordinary tabs do not start a ticket journey');
   f.close();
 }
+{
+  const f = setup();
+  f.controller.routeDidRender('/');
+  f.controller.run('open', 'a', () => {
+    f.detail();
+    // Model React's layout commit preceding the browser history effect.
+    f.dom.window.history.replaceState({}, '', '/');
+    f.controller.routeDidRender('/trips/a/itinerary');
+  });
+  await tick();
+  assert.equal(f.transitions[0].skipped, false, 'a committed route is not cancelled by stale browser history');
+  assert.equal(f.transitions[0].new.length, 2);
+  f.transitions[0].finish(); await tick(); f.close();
+}
+{
+  const f = setup();
+  f.document.getElementById('trip-list-ready').scrollTop = 360;
+  const retained = f.document.getElementById('trip-list-ready').cloneNode(true);
+  f.controller.run('open', 'a', () => f.detail()); await tick();
+  f.transitions[0].finish(); await tick();
+  f.controller.run('close', 'a', () => {
+    f.home();
+    const hidden = f.document.createElement('section');
+    hidden.setAttribute('aria-hidden', 'true');
+    hidden.append(retained); f.document.body.prepend(hidden);
+  });
+  await tick();
+  const live = f.document.querySelectorAll('#trip-list-ready')[1];
+  assert.equal(f.transitions[1].new.length, 2, 'hidden retained screens cannot steal shared element names');
+  assert.equal(live.scrollTop, 360);
+  assert(live.contains(f.document.activeElement), 'focus returns to the visible copy');
+  f.transitions[1].finish(); await tick(); f.close();
+}
+{
+  const f = setup();
+  f.controller.run('open', 'a', () => {
+    f.detail(); f.document.querySelector('main').className = 'motion-page-content';
+  });
+  await tick();
+  f.transitions[0].finish(); await tick();
+  assert(f.document.querySelector('.motion-page-content').hasAttribute('data-trip-journey-page'), 'snapshot cleanup must not restart this page entrance');
+  assert.equal(f.document.documentElement.hasAttribute('data-trip-transition'), false);
+  f.close();
+}
 console.log('Trip transitions: shared elements, return position/focus, search, reduced motion, unsupported/failed snapshots, rapid navigation, history, timeout and cleanup passed.');

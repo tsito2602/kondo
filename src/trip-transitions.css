@@ -2,7 +2,8 @@
    The sidebar and the router remain live, with no duplicate screens or locks. */
 html[data-trip-transition] { --trip-journey-duration: 420ms; }
 html[data-trip-transition="close"] { --trip-journey-duration: 340ms; }
-html[data-trip-transition] .motion-page-content {
+html[data-trip-transition] .motion-page-content,
+.motion-page-content[data-trip-journey-page] {
   animation: none !important;
   opacity: 1 !important;
   transform: none !important;
