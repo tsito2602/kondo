@@ -4,8 +4,9 @@ import { detailRect, labelStyle } from './detail-origin.web';
 const ease = 'cubic-bezier(.22, 1, .36, 1)';
 const normal = { transform: 'translate3d(0px, 0px, 0px)', clipPath: 'inset(0px)', opacity: '1' };
 export function detailPose(from: DetailRect, to: DetailRect, radius: number) {
-  const y = Math.max(0, (to.height - from.height) / 2), x = Math.max(0, (to.width - from.width) / 2);
-  return { transform: `translate3d(${from.left + from.width / 2 - to.left - to.width / 2}px, ${from.top + from.height / 2 - to.top - to.height / 2}px, 0px)`, clipPath: `inset(${y}px ${x}px round ${radius}px)`, opacity: '1' };
+  const scale = Math.max(1, from.width / to.width, from.height / to.height);
+  const y = Math.max(0, (to.height - from.height / scale) / 2), x = Math.max(0, (to.width - from.width / scale) / 2);
+  return { transform: `translate3d(${from.left + from.width / 2 - to.left - to.width / 2}px, ${from.top + from.height / 2 - to.top - to.height / 2}px, 0px)${scale > 1 ? ` scale(${scale})` : ''}`, clipPath: `inset(${y}px ${x}px round ${radius}px)`, opacity: '1' };
 }
 
 /** Owns one mounted detail surface. CSS still owns layout and the backdrop. */
@@ -87,14 +88,14 @@ export function createDetailMotion(surface: HTMLElement, viewport: HTMLElement, 
       label.className = 'detail-motion-label';
       label.setAttribute('aria-hidden', 'true');
       label.textContent = entry.text;
-      Object.assign(label.style, fromStyle, { left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${Math.max(from.height, to.height)}px` });
-      viewport.append(label); labels.push(label);
+      Object.assign(label.style, fromStyle, { left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px` });
+      viewport.appendChild(label); labels.push(label);
       const previous = target.style.visibility;
       target.style.visibility = 'hidden';
       restoreLabels.push(() => { target.style.visibility = previous; });
       play(label, [
-        { ...fromStyle, width: `${from.width}px`, transform: 'translate(0px, 0px)', opacity: 1 },
-        { ...toStyle, width: `${to.width}px`, transform: `translate(${to.left - from.left}px, ${to.top - from.top}px)`, opacity: 1 },
+        { ...fromStyle, width: `${from.width}px`, height: `${from.height}px`, transform: 'translate(0px, 0px)', opacity: 1 },
+        { ...toStyle, width: `${to.width}px`, height: `${to.height}px`, transform: `translate(${to.left - from.left}px, ${to.top - from.top}px)`, opacity: 1 },
       ], duration);
     }
   };
@@ -104,6 +105,7 @@ export function createDetailMotion(surface: HTMLElement, viewport: HTMLElement, 
     if (!isOpen) { complete?.(); returnFocus(); }
   };
   const animate = (open: boolean, reduced: boolean, done: () => void) => {
+    const interrupted = animations.length > 0 || Boolean(surface.style.transform);
     const current = win.getComputedStyle(surface);
     const start = { transform: current.transform, clipPath: current.clipPath, opacity: current.opacity };
     const contentOpacity = content ? win.getComputedStyle(content).opacity : '1';
@@ -117,6 +119,7 @@ export function createDetailMotion(surface: HTMLElement, viewport: HTMLElement, 
     opened = true;
     const live = source();
     const target = detailRect(surface);
+    const expanded = { ...normal, clipPath: `inset(0px round ${win.getComputedStyle(surface).borderRadius || '24px'})` };
     const pose = live && origin ? detailPose(first ? origin.rect : live.rect, target, origin.radius) : { ...normal, transform: 'translate3d(0px, 16px, 0px)', opacity: '0' };
     const duration = open ? 360 : 260;
     const token = generation;
@@ -124,8 +127,8 @@ export function createDetailMotion(surface: HTMLElement, viewport: HTMLElement, 
     try {
       // Measure labels before transforming their ancestor. The real content is
       // faded separately, preventing stretched glyphs and a final-frame pop.
-      sharedLabels(open, duration);
-      play(surface, [open && first ? pose : start, open ? normal : { ...pose, opacity: '0' }], duration);
+      if (!interrupted) sharedLabels(open, duration);
+      play(surface, [open && first ? pose : start, open ? expanded : { ...pose, opacity: '0' }], duration);
       if (content) play(content, open ? [{ opacity: first ? 0 : contentOpacity }, { opacity: 1 }] : [{ opacity: contentOpacity }, { opacity: 0 }], open ? 230 : 150, open && first ? 90 : 0);
       const work = [...animations];
       void Promise.allSettled(work.map((animation) => animation.finished)).then(() => {

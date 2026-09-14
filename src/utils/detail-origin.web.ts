@@ -15,7 +15,7 @@ export function captureDetailOrigin(event: { currentTarget?: unknown }): DetailO
   const rect = detailRect(element);
   if (!rect.width || !rect.height) return;
   const labels: DetailLabel[] = [];
-  for (const key of ['title', 'time'] as const) {
+  for (const key of ['title', 'time', 'time-end'] as const) {
     const label = element.querySelector<HTMLElement>(`[data-testid="detail-source-${key}"]`);
     if (label?.textContent?.trim()) labels.push({ key, text: label.textContent.trim(), rect: detailRect(label), style: labelStyle(label) });
   }
