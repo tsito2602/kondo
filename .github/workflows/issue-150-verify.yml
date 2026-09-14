@@ -35,26 +35,60 @@ jobs:
           /tmp/detail-browser/node_modules/.bin/playwright install --with-deps chromium webkit >> /tmp/detail-browser-install.log 2>&1
           NODE_PATH=/tmp/detail-browser/node_modules node /tmp/issue-150-browser.cjs > /tmp/detail-browser.log 2>&1 || { tail -n 80 /tmp/detail-browser.log; exit 1; }
           tail -n 20 /tmp/detail-browser.log
-      - name: Store verified tree without moving any branch
+      - name: Store verified feature and integration trees without moving branches
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          git add -A
-          git diff --cached --binary > /tmp/detail-validated.patch
-          python3 - <<'PY'
-          import json,subprocess,pathlib
+          cat > /tmp/detail-store-tree.py <<'PY'
+          import json,subprocess,pathlib,sys
+          base=sys.argv[1]
           tree=[]
-          for line in subprocess.check_output(['git','diff','--cached','--name-status'],text=True).splitlines():
+          for line in subprocess.check_output(['git','diff','--cached','--name-status',base],text=True).splitlines():
             state,path=line.split('\t')
             entry={'path':path,'mode':'100644','type':'blob'}
             if state=='D': entry['sha']=None
             else: entry['content']=pathlib.Path(path).read_text()
             tree.append(entry)
-          base=subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip()
-          pathlib.Path('/tmp/detail-tree-input.json').write_text(json.dumps({'base_tree':base,'tree':tree}))
+          treebase=subprocess.check_output(['git','rev-parse',base+'^{tree}'],text=True).strip()
+          pathlib.Path('/tmp/detail-tree-input.json').write_text(json.dumps({'base_tree':treebase,'tree':tree}))
           PY
+          git add -A
+          git diff --cached --binary > /tmp/detail-validated.patch
+          python3 /tmp/detail-store-tree.py HEAD
           gh api --method POST repos/$GITHUB_REPOSITORY/git/trees --input /tmp/detail-tree-input.json --jq '{sha: .sha}' > /tmp/detail-tree.json
           cat /tmp/detail-tree.json
+          git -c user.name='Verification' -c user.email='verification@tabi.invalid' commit -m 'Local verified detail tree' >/dev/null
+          feature=$(git rev-parse HEAD)
+          git fetch origin staging
+          stage=$(git rev-parse origin/staging)
+          git checkout --detach "$stage"
+          git -c user.name='Verification' -c user.email='verification@tabi.invalid' merge --no-commit --no-ff "$feature" || true
+          python3 - <<'PY'
+          import json,pathlib,re,subprocess
+          conflicts=subprocess.check_output(['git','diff','--name-only','--diff-filter=U'],text=True).splitlines()
+          assert set(conflicts)<= {'package.json','src/screens/itinerary-screen.tsx'}, conflicts
+          for file in conflicts:
+            p=pathlib.Path(file)
+            if file=='package.json':
+              d=json.loads(subprocess.check_output(['git','show',':2:package.json'],text=True))
+              d['scripts']['test:motion']+=' && node scripts/test-detail-motion.mjs'
+              p.write_text(json.dumps(d,indent=2)+'\n')
+            else:
+              def imports(m):
+                a,b=m.group(1),m.group(2)
+                lines=a.splitlines()+b.splitlines()
+                assert all(line.startswith('import ') or not line.strip() for line in lines), lines
+                return '\n'.join(dict.fromkeys(lines))+'\n'
+              p.write_text(re.sub(r'^<<<<<<<[^\n]*\n(.*?)^=======\n(.*?)^>>>>>>>[^\n]*\n',imports,p.read_text(),flags=re.M|re.S))
+          PY
+          git add -A
+          git diff --cached --check
+          test -z "$(git diff --name-only --diff-filter=U)"
+          git diff --cached --binary "$stage" > /tmp/detail-merged.patch
+          python3 /tmp/detail-store-tree.py "$stage"
+          gh api --method POST repos/$GITHUB_REPOSITORY/git/trees --input /tmp/detail-tree-input.json --jq '{sha: .sha}' > /tmp/detail-staging-tree.json
+          python3 -c 'import json,sys; p="/tmp/detail-staging-tree.json"; d=json.load(open(p)); d["base"]=sys.argv[1]; open(p,"w").write(json.dumps(d))' "$stage"
+          cat /tmp/detail-staging-tree.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -64,5 +98,7 @@ jobs:
             /tmp/detail-check.log
             /tmp/detail-browser.log
             /tmp/detail-tree.json
+            /tmp/detail-staging-tree.json
             /tmp/detail-validated.patch
+            /tmp/detail-merged.patch
             /tmp/detail-shots
