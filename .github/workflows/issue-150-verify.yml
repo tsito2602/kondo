@@ -1,0 +1,67 @@
+name: Detail expansion verification
+on:
+  push:
+    branches: [feat/issue-150-detail-expansion]
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Prepare scoped application diff
+        run: |
+          cp scripts/issue-150-browser.cjs /tmp/issue-150-browser.cjs
+          rm scripts/issue-150-browser.cjs
+          node scripts/issue-150-prepare.cjs
+          git diff --check
+      - run: npm ci > /tmp/detail-install.log 2>&1
+      - name: Check final application diff
+        env:
+          EXPO_PUBLIC_ENABLE_DEMO: 'true'
+        run: |
+          if npm run check > /tmp/detail-check.log 2>&1; then tail -n 16 /tmp/detail-check.log; else tail -n 100 /tmp/detail-check.log; exit 1; fi
+      - name: Browser detail interactions
+        run: |
+          npm install --prefix /tmp/detail-browser --no-audit --no-fund playwright@1.56.1 > /tmp/detail-browser-install.log 2>&1
+          /tmp/detail-browser/node_modules/.bin/playwright install --with-deps chromium webkit >> /tmp/detail-browser-install.log 2>&1
+          NODE_PATH=/tmp/detail-browser/node_modules node /tmp/issue-150-browser.cjs > /tmp/detail-browser.log 2>&1 || { tail -n 80 /tmp/detail-browser.log; exit 1; }
+          tail -n 20 /tmp/detail-browser.log
+      - name: Store verified tree without moving any branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git add -A
+          git diff --cached --binary > /tmp/detail-validated.patch
+          python3 - <<'PY'
+          import json,subprocess,pathlib
+          tree=[]
+          for line in subprocess.check_output(['git','diff','--cached','--name-status'],text=True).splitlines():
+            state,path=line.split('\t')
+            entry={'path':path,'mode':'100644','type':'blob'}
+            if state=='D': entry['sha']=None
+            else: entry['content']=pathlib.Path(path).read_text()
+            tree.append(entry)
+          base=subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip()
+          pathlib.Path('/tmp/detail-tree-input.json').write_text(json.dumps({'base_tree':base,'tree':tree}))
+          PY
+          gh api --method POST repos/$GITHUB_REPOSITORY/git/trees --input /tmp/detail-tree-input.json --jq '{sha: .sha}' > /tmp/detail-tree.json
+          cat /tmp/detail-tree.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: detail-expansion-verification
+          retention-days: 3
+          path: |
+            /tmp/detail-check.log
+            /tmp/detail-browser.log
+            /tmp/detail-tree.json
+            /tmp/detail-validated.patch
+            /tmp/detail-shots
