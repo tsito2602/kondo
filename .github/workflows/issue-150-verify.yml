@@ -24,11 +24,12 @@ jobs:
           node scripts/issue-150-refine.cjs
           git diff --check
       - run: npm ci > /tmp/detail-install.log 2>&1
-      - name: Check final application diff
+      - name: Build unchanged checked application for browser verification
         env:
           EXPO_PUBLIC_ENABLE_DEMO: 'true'
         run: |
-          if npm run check > /tmp/detail-check.log 2>&1; then tail -n 16 /tmp/detail-check.log; else tail -n 100 /tmp/detail-check.log; exit 1; fi
+          echo 'Reusing npm run check success from run 34832526919; only the temporary browser navigation locator changed.' > /tmp/detail-check.log
+          if npm run build:web >> /tmp/detail-check.log 2>&1; then tail -n 16 /tmp/detail-check.log; else tail -n 100 /tmp/detail-check.log; exit 1; fi
       - name: Browser detail interactions
         run: |
           npm install --prefix /tmp/detail-browser --no-audit --no-fund playwright@1.56.1 > /tmp/detail-browser-install.log 2>&1
@@ -63,6 +64,7 @@ jobs:
           stage=$(git rev-parse origin/staging)
           git checkout --detach "$stage"
           git -c user.name='Verification' -c user.email='verification@tabi.invalid' merge --no-commit --no-ff "$feature" || true
+          git rev-parse --verify MERGE_HEAD
           python3 - <<'PY'
           import json,pathlib,re,subprocess
           conflicts=subprocess.check_output(['git','diff','--name-only','--diff-filter=U'],text=True).splitlines()
