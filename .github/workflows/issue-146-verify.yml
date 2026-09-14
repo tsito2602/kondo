@@ -20,17 +20,17 @@ jobs:
           cache: npm
       - name: Prepare the scoped application diff
         run: python3 scripts/prepare-issue-146.py
-      - run: npm ci
-      - name: Build the unchanged verified application
+      - run: npm ci > "$RUNNER_TEMP/npm-ci.log" 2>&1 || { tail -60 "$RUNNER_TEMP/npm-ci.log"; exit 1; }
+      - name: Check final application diff
         env:
           EXPO_PUBLIC_ENABLE_DEMO: 'true'
         run: |
-          echo 'Reusing full npm run check success from run 34820772199: application diff is unchanged.'
-          npm run build:web
+          npm run check > "$RUNNER_TEMP/check.log" 2>&1 || { tail -90 "$RUNNER_TEMP/check.log"; exit 1; }
+          echo 'PASS npm run check: typecheck, lint, tests including trip navigation regressions, and web build'
       - name: Browser navigation smoke tests
         run: |
-          npm install --prefix "$RUNNER_TEMP/trip-playwright" --no-save --package-lock=false playwright
-          "$RUNNER_TEMP/trip-playwright/node_modules/.bin/playwright" install --with-deps chromium webkit
+          npm install --prefix "$RUNNER_TEMP/trip-playwright" --no-save --package-lock=false playwright > "$RUNNER_TEMP/playwright-install.log" 2>&1 || { tail -40 "$RUNNER_TEMP/playwright-install.log"; exit 1; }
+          "$RUNNER_TEMP/trip-playwright/node_modules/.bin/playwright" install --with-deps chromium webkit >> "$RUNNER_TEMP/playwright-install.log" 2>&1 || { tail -40 "$RUNNER_TEMP/playwright-install.log"; exit 1; }
           cat > "$RUNNER_TEMP/trip-opening-smoke.cjs" <<'JS'
           const assert = require('node:assert/strict');
           const { createServer } = require('node:http');
@@ -58,50 +58,58 @@ jobs:
                   for (const [label, width, reduced, unsupported] of [['phone', 390, false, false], ['desktop', 1440, false, false], ['reduced', 390, true, false], ['fallback', 390, false, true]]) {
                     const context = await browser.newContext({ viewport: { width, height: 844 }, reducedMotion: reduced ? 'reduce' : 'no-preference', serviceWorkers: 'block' });
                     const page = await context.newPage();
+                    page.setDefaultTimeout(12000);
                     const errors = [];
                     page.on('pageerror', (error) => errors.push(error.message));
-                    await page.addInitScript(({ unsupported }) => {
-                      window.tripTransitions = [];
-                      const native = document.startViewTransition?.bind(document);
-                      if (unsupported) { document.startViewTransition = undefined; return; }
-                      if (!native) return;
-                      document.startViewTransition = (update) => {
-                        const item = { ready: false, error: null };
-                        window.tripTransitions.push(item);
-                        const transition = native(update);
-                        transition.ready.then(() => { item.ready = true; }, (error) => { item.error = error.message; });
-                        return transition;
-                      };
-                    }, { unsupported });
-                    await page.goto('http://127.0.0.1:4173');
-                    await page.getByRole('button', { name: 'サンプルの旅行で試す', exact: true }).click();
-                    const first = page.getByTestId('trip-ticket').first();
-                    await first.waitFor({ state: 'visible' });
-                    const tripName = await first.getByTestId('trip-ticket-title').innerText();
-                    const supported = await page.evaluate(() => typeof document.startViewTransition === 'function');
-                    await first.locator('..').click();
-                    await page.getByTestId('trip-title').waitFor({ state: 'visible' });
-                    await page.waitForFunction(() => !document.documentElement.dataset.tripTransition);
-                    assert.equal(await page.getByTestId('trip-title').innerText(), tripName);
-                    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${engine}/${label}: horizontal overflow`);
-                    const events = await page.evaluate(() => window.tripTransitions);
-                    if (supported && !reduced) assert(events.length === 1 && events[0].ready && !events[0].error, `${engine}/${label}: opening snapshot failed ${JSON.stringify(events)}`);
-                    else assert.equal(events.length, 0);
-                    await page.screenshot({ path: path.join(out, `${engine}-${label}.png`) });
-                    await page.getByRole('tab', { name: '準備', exact: true }).click();
-                    await page.waitForURL('**/packing');
-                    assert.equal(await page.evaluate(() => window.tripTransitions.length), events.length, 'tab change must not replay trip opening');
-                    await page.getByRole('tab', { name: 'しおり', exact: true }).click();
-                    await page.waitForURL('**/itinerary');
-                    await page.getByTestId('trip-back').click();
-                    await page.getByTestId('trip-ticket').first().waitFor({ state: 'visible' });
-                    await page.waitForFunction(() => !document.documentElement.dataset.tripTransition);
-                    const after = await page.evaluate(() => window.tripTransitions);
-                    if (supported && !reduced) assert(after.length === 2 && after[1].ready && !after[1].error, `${engine}/${label}: closing snapshot failed ${JSON.stringify(after)}`);
-                    assert.equal(errors.length, 0, errors.join('\n'));
-                    assert.equal(await page.evaluate(() => [...document.querySelectorAll('[style]')].filter((element) => element.style.viewTransitionName).length), 0, 'snapshot names leaked');
-                    console.log(`Browser PASS ${engine}/${label}: open, close, tab isolation, viewport bounds, clean snapshot lifecycle`);
-                    await context.close();
+                    try {
+                      await page.addInitScript(({ unsupported }) => {
+                        window.tripTransitions = [];
+                        const native = document.startViewTransition?.bind(document);
+                        if (unsupported) { document.startViewTransition = undefined; return; }
+                        if (!native) return;
+                        document.startViewTransition = (update) => {
+                          const item = { ready: false, error: null };
+                          window.tripTransitions.push(item);
+                          const transition = native(update);
+                          transition.ready.then(() => { item.ready = true; }, (error) => { item.error = error.message; });
+                          return transition;
+                        };
+                      }, { unsupported });
+                      await page.goto('http://127.0.0.1:4173');
+                      await page.getByRole('button', { name: 'サンプルの旅行で試す', exact: true }).click();
+                      const first = page.locator('[data-testid="trip-ticket"]:visible').first();
+                      const title = page.locator('[data-testid="trip-title"]:visible');
+                      await first.waitFor({ state: 'visible' });
+                      const tripName = await first.getByTestId('trip-ticket-title').innerText();
+                      const supported = await page.evaluate(() => typeof document.startViewTransition === 'function');
+                      await first.locator('..').click();
+                      await title.waitFor({ state: 'visible' });
+                      await page.waitForFunction(() => !document.documentElement.dataset.tripTransition);
+                      assert.equal(await title.innerText(), tripName);
+                      assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${engine}/${label}: horizontal overflow`);
+                      const events = await page.evaluate(() => window.tripTransitions);
+                      if (supported && !reduced) {
+                        assert(events.length === 1 && events[0].ready && !events[0].error, `${engine}/${label}: opening snapshot failed ${JSON.stringify(events)}`);
+                        assert.equal(await page.evaluate(() => [...document.querySelectorAll('.motion-page-content[data-trip-reveal="settled"]')].some((element) => getComputedStyle(element).animationName !== 'none')), false, 'ordinary reveal must not restart after snapshots');
+                      } else assert.equal(events.length, 0);
+                      await page.screenshot({ path: path.join(out, `${engine}-${label}.png`) });
+                      await page.getByRole('tab', { name: '準備', exact: true }).click();
+                      await page.waitForURL('**/packing');
+                      assert.equal(await page.evaluate(() => window.tripTransitions.length), events.length, 'tab change must not replay trip opening');
+                      await page.getByRole('tab', { name: 'しおり', exact: true }).click();
+                      await page.waitForURL('**/itinerary');
+                      await page.locator('[data-testid="trip-back"]:visible').click();
+                      await first.waitFor({ state: 'visible' });
+                      await page.waitForFunction(() => !document.documentElement.dataset.tripTransition);
+                      const after = await page.evaluate(() => window.tripTransitions);
+                      if (supported && !reduced) assert(after.length === 2 && after[1].ready && !after[1].error, `${engine}/${label}: closing snapshot failed ${JSON.stringify(after)}`);
+                      assert.equal(errors.length, 0, errors.join('\n'));
+                      assert.equal(await page.evaluate(() => [...document.querySelectorAll('[style]')].filter((element) => element.style.viewTransitionName).length), 0, 'snapshot names leaked');
+                      console.log(`Browser PASS ${engine}/${label}: open, close, tab isolation, viewport bounds, clean snapshot lifecycle`);
+                    } catch (error) {
+                      console.error('Browser diagnostic', engine, label, await page.evaluate(() => ({ path: location.pathname, transitions: window.tripTransitions, phase: document.documentElement.dataset.tripTransition, roots: [...document.querySelectorAll('[data-testid="trip-ticket"], [data-testid="trip-workspace"]')].map((element) => ({ id: element.id, hidden: Boolean(element.closest('[aria-hidden="true"]')), width: element.getBoundingClientRect().width })) })), errors);
+                      throw error;
+                    } finally { await context.close(); }
                   }
                 } finally { await browser.close(); }
               }

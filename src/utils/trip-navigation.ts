@@ -19,9 +19,17 @@ function surface(tripId: string, side: 'ticket' | 'workspace'): Surface | undefi
   return { root, title, art: root.querySelector<HTMLElement>(`[data-testid="${side === 'ticket' ? 'trip-ticket-art' : 'trip-hero-art'}"]`), paper: side === 'workspace' ? root.querySelector<HTMLElement>('[data-testid="itinerary-scroll"]') : null };
 }
 
+// Keep these mounted pages settled after the shared snapshot disappears. Merely
+// removing the global override would restart their ordinary entry animation.
+function settlePage(value: Surface) {
+  const parent = value.root.closest<HTMLElement>('.motion-page-content');
+  if (parent) parent.dataset.tripReveal = 'settled';
+  value.root.querySelectorAll<HTMLElement>('.motion-page-content').forEach((page) => { page.dataset.tripReveal = 'settled'; });
+}
+
 function restoreOrigin(tripId: string, target: Surface) {
   const origin = origins.get(tripId);
-  const scroll = document.querySelector<HTMLElement>('[data-testid="home-scroll"]');
+  const scroll = target.root.closest<HTMLElement>('[data-testid="home-scroll"]');
   if (!origin || !scroll) return;
   scroll.scrollTop = origin.scrollTop;
   // Search results or newly added trips may change the list above this ticket.
@@ -38,7 +46,7 @@ export function navigateTrip(tripId: string, direction: Direction, navigate: () 
   active?.cancel();
   const source = surface(tripId, direction === 'open' ? 'ticket' : 'workspace');
   if (direction === 'open' && source) {
-    origins.set(tripId, { scrollTop: document.querySelector<HTMLElement>('[data-testid="home-scroll"]')?.scrollTop ?? 0, ticketTop: source.root.getBoundingClientRect().top });
+    origins.set(tripId, { scrollTop: source.root.closest<HTMLElement>('[data-testid="home-scroll"]')?.scrollTop ?? 0, ticketTop: source.root.getBoundingClientRect().top });
   }
   let cancelled = false, navigated = false, interrupted = false;
   let transition: Transition | undefined;
@@ -96,6 +104,7 @@ export function navigateTrip(tripId: string, direction: Direction, navigate: () 
     else cleanup();
     return;
   }
+  settlePage(source);
   html.dataset.tripTransition = direction;
   const trigger = source.root.closest<HTMLElement>('[role="button"]');
   if (trigger) { trigger.dataset.tripTrigger = ''; restores.push(() => { delete trigger.dataset.tripTrigger; }); }
@@ -113,6 +122,7 @@ export function navigateTrip(tripId: string, direction: Direction, navigate: () 
       navigateOnce();
       target = await waitForTarget();
       if (!target || cancelled) { transition?.skipTransition(); return; }
+      settlePage(target);
       name(target.title, 'tabi-trip-title');
       if (shareArt) name(target.art, 'tabi-trip-art');
       if (direction === 'open') name(target.paper, 'tabi-trip-paper');

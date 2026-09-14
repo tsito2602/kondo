@@ -1,5 +1,6 @@
 /* Only the selected trip gets snapshot names, for one navigation transaction. */
-:root[data-trip-transition] .motion-page-content { animation: none !important; }
+:root[data-trip-transition] .motion-page-content,
+.motion-page-content[data-trip-reveal="settled"] { animation: none !important; }
 [data-trip-trigger] { opacity: 1 !important; transform: none !important; transition: none !important; }
 :root[data-trip-transition] { --trip-travel-duration: 420ms; }
 :root[data-trip-transition="close"] { --trip-travel-duration: 300ms; }

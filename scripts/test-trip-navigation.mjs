@@ -61,6 +61,28 @@ navigateTrip('a', 'close', () => { host.innerHTML = ticket('a', true, 500); });
 await complete();
 assert.equal(document.querySelector('[data-testid="home-scroll"]').scrollTop, 240, 'return restores list position');
 
+// A retained, hidden home is not the scroll container of the visible ticket.
+host.innerHTML = `<aside aria-hidden="true">${ticket('a', true, 900)}</aside>` + ticket('a', true, 500);
+document.querySelector('[aria-hidden="true"] [data-testid="home-scroll"]').scrollTop = 10;
+document.querySelector('main > [data-testid="home-scroll"]').scrollTop = 240;
+navigateTrip('a', 'open', () => { host.innerHTML = workspace(); });
+await complete();
+navigateTrip('a', 'close', () => { host.innerHTML = `<aside aria-hidden="true">${ticket('a', true, 900)}</aside>` + ticket('a', true, 500); });
+await complete();
+assert.equal(document.querySelector('main > [data-testid="home-scroll"]').scrollTop, 240, 'restore the visible ticket, not an old hidden screen');
+assert.equal(document.querySelector('[aria-hidden="true"] [data-testid="home-scroll"]').scrollTop, 0);
+host.innerHTML = ticket('a', true, 500);
+
+// Removing the transaction flag must not restart the default route reveal.
+host.classList.add('motion-page-content');
+navigateTrip('a', 'open', () => { host.innerHTML = workspace().replace('data-testid="itinerary-scroll"', 'class="motion-page-content" data-testid="itinerary-scroll"'); });
+await complete();
+assert.equal(host.dataset.tripReveal, 'settled');
+assert.equal(document.querySelector('[data-testid="itinerary-scroll"]').dataset.tripReveal, 'settled');
+host.classList.remove('motion-page-content');
+delete host.dataset.tripReveal;
+host.innerHTML = ticket('a', true, 500);
+
 // Retained Stack screens must lose their names before the new peer is named.
 navigateTrip('a', 'open', () => { document.querySelector('[data-testid="home-scroll"]').setAttribute('aria-hidden', 'true'); host.insertAdjacentHTML('beforeend', workspace()); });
 await running.updateCallbackDone;
@@ -129,4 +151,4 @@ assert.equal(names().length, 0);
 assert.equal(mediaListeners.size, 0);
 cleanupHistory();
 dom.window.close();
-console.log('Trip opening: round-trip, scroll restoration, retained routes, duplicate activation, interruption, supersession, no photo, reduced motion, failed snapshots, no API, direct links and deadline passed.');
+console.log('Trip opening: round-trip, visible scroll restoration, retained routes, settled pages, duplicate activation, interruption, supersession, no photo, reduced motion, failed snapshots, no API, direct links and deadline passed.');
