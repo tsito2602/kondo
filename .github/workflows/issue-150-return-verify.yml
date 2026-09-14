@@ -11,6 +11,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -20,114 +22,30 @@ jobs:
         env:
           EXPO_PUBLIC_ENABLE_DEMO: 'true'
         run: npm run build:web > /tmp/return-build.log 2>&1 || { tail -60 /tmp/return-build.log; exit 1; }
-      - name: Verify floating content and opaque inverse contraction
+      - name: Verify interpolable return outline and floating content
         run: |
-          npm install --prefix "$RUNNER_TEMP/return-browser" --no-audit --no-fund playwright > /tmp/return-tools.log 2>&1
-          "$RUNNER_TEMP/return-browser/node_modules/.bin/playwright" install --with-deps chromium webkit >> /tmp/return-tools.log 2>&1
-          mkdir -p /tmp/return-shots
-          cat > "$RUNNER_TEMP/return-browser/check.cjs" <<'JS'
-          const assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
-          const {createServer} = require('node:http'), {chromium, webkit} = require('playwright');
-          const dist = path.resolve('dist'), out = '/tmp/return-shots';
-          const server = createServer((req, res) => {
-            let file = path.join(dist, decodeURIComponent(new URL(req.url, 'http://localhost').pathname));
-            if (!file.startsWith(dist + '/') && file !== dist) { res.writeHead(400); res.end(); return; }
-            if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) file = fs.existsSync(file + '.html') ? file + '.html' : path.join(dist, 'index.html');
-            const mime = {'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.json':'application/json','.woff2':'font/woff2','.ttf':'font/ttf'};
-            res.setHeader('Content-Type', mime[path.extname(file)] || 'application/octet-stream'); fs.createReadStream(file).pipe(res);
-          });
-          (async () => {
-            await new Promise(resolve => server.listen(4173, '127.0.0.1', resolve));
-            try { for (const [engine, launcher] of [['chromium',chromium],['webkit',webkit]]) {
-              const browser = await launcher.launch();
-              try { for (const [label,width,dark,reduced] of [['phone',390,false,false],['desktop',1440,false,false], engine === 'chromium' ? ['dark',390,true,false] : ['reduced',390,false,true]]) {
-                const context = await browser.newContext({viewport:{width,height:844},colorScheme:dark?'dark':'light',reducedMotion:reduced?'reduce':'no-preference',serviceWorkers:'block'});
-                const page = await context.newPage(), errors = [], samples = []; page.setDefaultTimeout(15000); page.on('pageerror', e => errors.push(e.message));
-                await page.addInitScript(() => {
-                  window.motionRecords = []; window.freezeMotion = false;
-                  const original = Element.prototype.animate;
-                  Element.prototype.animate = function(frames, options) {
-                    const a = original.call(this,frames,options);
-                    if (this.matches('[data-detail-motion]') || this.closest('[data-detail-motion]')) {
-                      const kind = this.dataset.testid === 'form-sheet' ? 'surface' : ('transform' in frames[0] && !('opacity' in frames[0])) ? 'slide' : ('opacity' in frames[0] && !('transform' in frames[0])) ? 'fade' : 'exit';
-                      window.motionRecords.push({el:this,a,frames,options,kind});
-                      if (window.freezeMotion) { a.pause(); a.currentTime = 0; }
-                    }
-                    return a;
-                  };
-                });
-                const sheet = () => page.locator('[data-testid="form-sheet"]:visible').last();
-                const freeze = () => page.evaluate(() => { window.motionRecords = []; window.freezeMotion = true; });
-                const at = async t => { await page.evaluate(t => window.motionRecords.forEach(({a}) => {a.pause();a.currentTime=t;}),t); await page.waitForTimeout(20); };
-                const states = () => page.evaluate(() => window.motionRecords.map(({el,frames,options,kind}) => ({kind,frames,options,text:el.textContent.slice(0,30),opacity:getComputedStyle(el).opacity,transform:getComputedStyle(el).transform,y:new DOMMatrixReadOnly(getComputedStyle(el).transform || 'none').m42})));
-                const finish = async () => { await page.evaluate(() => {window.freezeMotion=false;window.motionRecords.forEach(({a}) => {try{a.finish();}catch{}});});await page.waitForTimeout(100); };
-                const clickClose = () => sheet().getByRole('button',{name:'閉じる',exact:true}).click({force:true});
-                const hidden = () => page.locator('[data-testid="form-sheet"]:visible').waitFor({state:'hidden'});
-                try {
-                  await page.goto('http://127.0.0.1:4173'); await page.getByRole('button',{name:'サンプルの旅行で試す',exact:true}).click();
-                  await page.locator('[data-testid="trip-ticket"]:visible').first().click(); await page.getByTestId('itinerary-scroll').waitFor(); await page.waitForTimeout(550);
-                  const item = page.locator('[data-testid="detail-source-title"]:visible').first(); await item.scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
-                  const scrollY = await page.getByTestId('itinerary-scroll').evaluate(el=>el.scrollTop);
-                  if (!reduced) await freeze(); await item.click(); await sheet().waitFor();
-                  let opening;
-                  if (!reduced) {
-                    await page.waitForFunction(()=>window.motionRecords.length>2); await at(279);
-                    const initial = await states(), slides = initial.filter(x=>x.kind==='slide'), fades=initial.filter(x=>x.kind==='fade');
-                    opening=initial.find(x=>x.kind==='surface');
-                    assert(slides.length>1 && slides.length===fades.length,'independent tracks per content item');
-                    assert(slides.every(x=>+x.opacity===0),'no content during expansion');
-                    const delays=slides.map(x=>x.options.delay);
-                    assert(delays.every((x,i)=>!i || x>delays[i-1]),'ordered stagger');
-                    assert(slides.every((x,i)=>x.options.delay===fades[i].options.delay && x.options.easing!==fades[i].options.easing),'same start, distinct easing');
-                    await at(delays[0]+140); let state=await states(); const float=state.find(x=>x.kind==='slide');
-                    assert(+float.opacity>0 && +float.opacity<.9 && float.y>0,'soft transparency while floating'); samples.push({time:'reveal-140',state});
-                    if(label==='phone')await page.screenshot({path:path.join(out,`${engine}-float.png`)});
-                    await at(delays[0]+420); state=await states(); const landing=state.find(x=>x.kind==='slide');
-                    assert(+landing.opacity===1 && landing.y>0 && landing.y<float.y,'position continues settling after opacity');
-                    await finish();
-                    await freeze(); await clickClose(); await page.waitForFunction(()=>window.motionRecords.some(x=>x.kind==='surface'));
-                    const returning=(await states()).find(x=>x.kind==='surface');
-                    assert.equal(returning.frames.length,3,'visible contraction then blend');
-                    assert.equal(returning.frames[1].transform,opening.frames[0].transform,'inverse of opening position');
-                    assert.equal(returning.frames[1].clipPath,opening.frames[0].clipPath,'inverse of opening outline');
-                    for(const t of [0,120,240,350,390]) {
-                      await at(t);state=await states();const surface=state.find(x=>x.kind==='surface');
-                      if(t<=350)assert.equal(+surface.opacity,1,'panel must stay visible during its return');
-                      else assert(+surface.opacity>0 && +surface.opacity<1,'short origin handoff');
-                      assert(await sheet().count(),'not unmounted before contraction completes');samples.push({time:`close-${t}`,state});
-                      if(label==='phone' && (t===240 || t===390))await page.screenshot({path:path.join(out,`${engine}-close-${t}.png`)});
-                    }
-                    await finish();await hidden();
-                    assert(Math.abs(await page.getByTestId('itinerary-scroll').evaluate(el=>el.scrollTop)-scrollY)<2,'scroll position retained');
-                    await freeze();await item.click();await sheet().waitFor();await page.waitForFunction(()=>window.motionRecords.length>2);await at(400);
-                    const before=(await states()).filter(x=>x.kind==='slide');await freeze();await clickClose();await page.waitForFunction(()=>window.motionRecords.some(x=>x.kind==='exit'));
-                    const exits=(await states()).filter(x=>x.kind==='exit');
-                    assert.deepEqual(exits.map(x=>x.frames[0].opacity),before.map(x=>x.opacity),'early close cannot flash pending content');
-                    assert(exits.every(x=>x.options.delay===0),'early close does not wait for reveal');await finish();await hidden();
-                    if(width===390) {
-                      await item.click();await sheet().waitFor();await page.waitForTimeout(1450);
-                      const grip=await sheet().getByTestId('detail-dismiss-handle').boundingBox();assert(grip);
-                      const x=grip.x+grip.width/2,y=grip.y+grip.height/2;
-                      await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x,y+140,{steps:5});
-                      const dragged=await sheet().evaluate(el=>getComputedStyle(el).transform);await freeze();await page.mouse.up();
-                      await page.waitForFunction(()=>window.motionRecords.some(x=>x.kind==='surface'));
-                      assert.equal((await states()).find(x=>x.kind==='surface').frames[0].transform,dragged,'drag dismissal starts at finger position');
-                      await finish();await hidden();
-                    }
-                  } else { await clickClose();await hidden();assert.equal(await page.evaluate(()=>window.motionRecords.length),0); }
-                  await item.click();await sheet().waitFor();await page.waitForTimeout(reduced?80:1450);await clickClose();await hidden();
-                  assert.equal(await page.locator('.detail-motion-label,[data-detail-motion]').count(),0,'no leftover motion elements');
-                  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'no horizontal overflow');assert.deepEqual(errors,[]);
-                  fs.writeFileSync(path.join(out,`${engine}-${label}.json`),JSON.stringify(samples,null,2));
-                  console.log(`PASS ${engine}/${label}: floating reveal, opaque inverse contraction, handoff, early close, reopen, drag/scroll and cleanup`);
-                }catch(error){await page.screenshot({path:path.join(out,`${engine}-${label}-failure.png`)});fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({engine,label,error:String(error),samples,records:await states()},null,2));throw error;}
-                finally{await context.close();}
-              }}finally{await browser.close();}
-            }}finally{server.close();}
-          })().catch(error=>{console.error(error);process.exitCode=1;});
-          JS
-          node "$RUNNER_TEMP/return-browser/check.cjs" > /tmp/return-browser.log 2>&1 || { tail -65 /tmp/return-browser.log; exit 1; }
-          cat /tmp/return-browser.log
+          python3 - <<'PY'
+          import os, pathlib, subprocess, textwrap
+          original = subprocess.check_output(['git', 'show', '86a6d9dc16568b03900e4e2d388cb555b1653f8e:.github/workflows/issue-150-return-verify.yml'], text=True)
+          block = original.split('      - name: Verify floating content and opaque inverse contraction\n        run: |\n', 1)[1].split('      - uses: actions/upload-artifact@v4', 1)[0]
+          script = textwrap.dedent(block)
+          before = "y:new DOMMatrixReadOnly(getComputedStyle(el).transform || 'none').m42"
+          assert script.count(before) == 1
+          script = script.replace(before, "clipPath:getComputedStyle(el).clipPath," + before)
+          before = "assert.equal(returning.frames.length,3,'visible contraction then blend');"
+          assert script.count(before) == 1
+          script = script.replace(before, before + "\nassert(returning.frames[0].clipPath.startsWith('inset('),'settled surface retains an interpolable outline');\nconst clips=[];")
+          before = "if(t<=350)assert.equal(+surface.opacity,1,'panel must stay visible during its return');"
+          assert script.count(before) == 1
+          script = script.replace(before, "if(t===120 || t===240)clips.push(parseFloat(surface.clipPath.slice(6)));\n" + before)
+          before = "await finish();await hidden();\n                    assert(Math.abs"
+          # Dedenting the workflow changes indentation, so use a stable token.
+          before = "assert(Math.abs(await page.getByTestId('itinerary-scroll').evaluate(el=>el.scrollTop)-scrollY)<2,'scroll position retained');"
+          assert script.count(before) == 1
+          script = script.replace(before, "assert(clips[0]>0 && clips[1]>clips[0],'outline contracts continuously, without a discrete jump');\n" + before)
+          pathlib.Path(os.environ['RUNNER_TEMP'], 'return-check.sh').write_text(script)
+          PY
+          bash -e "$RUNNER_TEMP/return-check.sh"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
