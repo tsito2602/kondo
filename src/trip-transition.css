@@ -25,11 +25,13 @@
 /* Preserve glyph proportions when a two-line ticket becomes a one-line title. */
 :root[data-trip-transition]::view-transition-old(tabi-trip-title),
 :root[data-trip-transition]::view-transition-new(tabi-trip-title) { width: 100%; height: 100%; object-fit: contain; object-position: left center; mix-blend-mode: normal; }
-:root[data-trip-transition="open"]::view-transition-new(tabi-trip-paper) { animation: trip-paper-open 260ms 60ms cubic-bezier(.22, 1, .36, 1) both; }
+/* Keep the journal opaque above the photo from the first snapshot frame.
+   Only its position changes; a delayed fade exposes the cover through the paper. */
+:root[data-trip-transition="open"]::view-transition-new(tabi-trip-paper) { opacity: 1; animation: trip-paper-open 260ms cubic-bezier(.22, 1, .36, 1) both; }
 :root[data-trip-transition="close"]::view-transition-old(tabi-trip-paper) { animation: trip-paper-close 150ms ease-in both; }
 @keyframes trip-art-open { from { border-radius: 24px 0 0 24px; } to { border-radius: 0; } }
 @keyframes trip-art-close { from { border-radius: 0; } to { border-radius: 24px 0 0 24px; } }
-@keyframes trip-paper-open { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes trip-paper-open { from { transform: translateY(18px); } to { transform: none; } }
 @keyframes trip-paper-close { to { opacity: 0; transform: translateY(10px); } }
 @media (prefers-reduced-motion: reduce) {
   :root[data-trip-transition]::view-transition-group(*),
