@@ -71,7 +71,7 @@ test('gesture intent keeps candidate horizontal swipe as scroll and vertical mov
   assert.equal(plannerGestureIntent(4, 4, true, 'lift'), 'pending');
 });
 test('candidate touch-action leaves horizontal scrolling to the dock and vertical movement to drag', () => {
-  assert.match(css, /\.planner-card-frame\[data-plan-source\]\[data-plan-gesture="lift"\]\s*\{[^}]*touch-action:\s*pan-x;/s);
+  assert.match(css, /\.planner-card-frame\[data-plan-gesture="lift"\]\s*\{[^}]*touch-action:\s*pan-x;/s);
 });
 test('planner observes pointerdown in capture phase before nested Pressable responders', () => {
   const f = fixture();
