@@ -26,7 +26,7 @@ function element(dataset = {}) {
     },
     contains(target) { return target === this || target?.parent === this; },
     hasAttribute(name) { return name === 'disabled' ? Boolean(this.disabled) : false; },
-    setAttribute() {}, removeAttribute() {}, querySelectorAll() { return []; },
+    setAttribute() {}, removeAttribute() {}, remove() {}, querySelectorAll() { return []; },
     getBoundingClientRect() { return this.rect ?? { left: 0, top: 0, right: 152, bottom: 72, width: 152, height: 72 }; },
     cloneNode() { const clone = element({ ...this.dataset }); clone.querySelectorAll = () => []; return clone; },
     setPointerCapture() {}, releasePointerCapture() {}, hasPointerCapture() { return false; },
