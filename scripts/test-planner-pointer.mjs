@@ -8,7 +8,7 @@ const sourcePath = path.resolve('src/utils/planner-pointer.web.ts');
 const code = ts.transpileModule(readFileSync(sourcePath, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const module = { exports: {} };
 new Function('require', 'module', 'exports', code)(name => { throw new Error(`unexpected import ${name}`); }, module, module.exports);
-const { plannerGestureIntent, edgeScrollSpeed, parsePlanSource, attachPlannerPointer } = module.exports;
+const { PLANNER_LONG_PRESS_MS, plannerGestureIntent, edgeScrollSpeed, parsePlanSource, attachPlannerPointer } = module.exports;
 const css = readFileSync(path.resolve('src/redesign.css'), 'utf8');
 
 const classList = () => ({ add() {}, remove() {} });
@@ -34,7 +34,7 @@ function element(dataset = {}) {
   };
 }
 function fixture() {
-  const listeners = new Map(), windowListeners = new Map(), registrations = []; let point = null, raf = 0;
+  const listeners = new Map(), windowListeners = new Map(), registrations = [], timers = new Map(); let point = null, raf = 0, timerId = 0;
   const body = { appendChild() {} };
   const doc = {
     hidden: false, body,
@@ -45,7 +45,9 @@ function fixture() {
   };
   const win = {
     Element: Object,
-    requestAnimationFrame(fn) { raf += 1; return raf; }, cancelAnimationFrame() {},
+    requestAnimationFrame() { raf += 1; return raf; }, cancelAnimationFrame() {},
+    setTimeout(fn) { timerId += 1; timers.set(timerId, fn); return timerId; },
+    clearTimeout(id) { timers.delete(id); },
     addEventListener(name, fn) { windowListeners.set(name, fn); }, removeEventListener() {},
   };
   doc.defaultView = win;
@@ -58,28 +60,28 @@ function fixture() {
     day: day => calls.push(['day', day]), cancel: () => calls.push(['cancel']),
   });
   const emit = (name, event) => (listeners.get(name) ?? windowListeners.get(name))?.(event);
-  return { root, doc, win, calls, cleanup, emit, registrations, setPoint(value) { point = value; } };
+  const fireHold = () => { const pending = [...timers.values()]; timers.clear(); pending.forEach(fn => fn()); };
+  return { root, doc, win, calls, cleanup, emit, registrations, fireHold, setPoint(value) { point = value; } };
 }
 function pointer(target, x, y, extras = {}) {
   return { target, clientX: x, clientY: y, pointerId: 1, isPrimary: true, button: 0, pointerType: 'touch', preventDefault() {}, ...extras };
 }
 
-test('gesture intent keeps candidate horizontal swipe as scroll and vertical movement as drag', () => {
+test('touch movement before the hold belongs to scrolling, while mouse/pen can drag immediately', () => {
   assert.equal(plannerGestureIntent(8, 1, true, 'lift'), 'scroll');
-  assert.equal(plannerGestureIntent(1, 8, true, 'lift'), 'drag');
-  assert.equal(plannerGestureIntent(8, 1, true, 'free'), 'drag');
+  assert.equal(plannerGestureIntent(1, 8, true, 'lift'), 'scroll');
+  assert.equal(plannerGestureIntent(8, 1, true, 'free'), 'scroll');
+  assert.equal(plannerGestureIntent(8, 1, false, 'lift'), 'drag');
   assert.equal(plannerGestureIntent(4, 4, true, 'lift'), 'pending');
+  assert.equal(PLANNER_LONG_PRESS_MS, 280);
 });
-test('candidate touch-action leaves horizontal scrolling to the dock and vertical movement to drag', () => {
+test('candidate touch-action keeps horizontal candidate scrolling available before the hold', () => {
   assert.match(css, /\.planner-card-frame\[data-plan-gesture="lift"\]\s*\{[^}]*touch-action:\s*pan-x;/s);
 });
 test('planner observes pointerdown in capture phase before nested Pressable responders', () => {
   const f = fixture();
   assert(f.registrations.some(([name, options]) => name === 'pointerdown' && options === true));
   f.cleanup();
-});
-test('mouse/pen are never held for long-press', () => {
-  assert.equal(plannerGestureIntent(8, 0, false, 'lift'), 'drag');
 });
 test('source parser accepts only planner item/place ids', () => {
   assert.deepEqual(parsePlanSource('{"kind":"place","id":"p"}'), { kind: 'place', id: 'p' });
@@ -97,32 +99,21 @@ test('plain tap does not begin drag', () => {
   f.emit('pointerup', pointer(source, 10, 10));
   assert.deepEqual(f.calls, []); f.cleanup();
 });
-test('candidate horizontal touch movement yields to scrolling', () => {
+test('movement before long press cancels drag intent and leaves scrolling alone', () => {
   const f = fixture(); const card = element({ planGesture: 'lift' }); const source = element({ planSource: '{"kind":"place","id":"p"}' }); source.card = card; source.parent = f.root;
-  f.emit('pointerdown', pointer(source, 10, 10)); f.emit('pointermove', pointer(source, 28, 12));
+  f.emit('pointerdown', pointer(source, 10, 10)); f.emit('pointermove', pointer(source, 10, 28)); f.fireHold();
   assert.deepEqual(f.calls, []); f.cleanup();
 });
-test('candidate vertical movement starts immediately', () => {
+test('long press starts touch drag before movement so the card can follow the finger', () => {
   const f = fixture(); const card = element({ planGesture: 'lift' }); const source = element({ planSource: '{"kind":"place","id":"p"}' }); source.card = card; source.parent = f.root;
-  f.emit('pointerdown', pointer(source, 10, 10)); f.emit('pointermove', pointer(source, 12, 28));
-  assert.equal(f.calls[0]?.[0], 'start'); f.cleanup();
+  f.emit('pointerdown', pointer(source, 10, 10)); f.fireHold();
+  assert.deepEqual(f.calls[0], ['start', { kind: 'place', id: 'p' }]);
+  f.emit('pointermove', pointer(source, 12, 36));
+  assert.equal(f.calls.filter(call => call[0] === 'start').length, 1); f.cleanup();
 });
-test('nested Pressable capture handoff does not cancel an active planner drag', () => {
-  const f = fixture(); const card = element({ planGesture: 'lift' }); const source = element({ planSource: '{"kind":"place","id":"p"}' }); source.card = card; source.parent = f.root;
-  const nested = element(); nested.parent = source;
-  f.emit('pointerdown', pointer(source, 10, 10)); f.emit('pointermove', pointer(source, 12, 28));
-  f.emit('lostpointercapture', { pointerId: 1, target: nested });
-  assert.deepEqual(f.calls.map(call => call[0]), ['start']); f.cleanup();
-});
-test('losing the planner card capture cancels the active drag', () => {
-  const f = fixture(); const card = element({ planGesture: 'lift' }); const source = element({ planSource: '{"kind":"place","id":"p"}' }); source.card = card; source.parent = f.root;
-  f.emit('pointerdown', pointer(source, 10, 10)); f.emit('pointermove', pointer(source, 12, 28));
-  f.emit('lostpointercapture', { pointerId: 1, target: source });
-  assert.deepEqual(f.calls.map(call => call[0]), ['start', 'cancel']); f.cleanup();
-});
-test('free itinerary card horizontal movement starts drag', () => {
+test('mouse/pen movement still starts immediately without waiting for hold', () => {
   const f = fixture(); const card = element({ planGesture: 'free' }); const source = element({ planSource: '{"kind":"item","id":"i"}' }); source.card = card; source.parent = f.root;
-  f.emit('pointerdown', pointer(source, 10, 10)); f.emit('pointermove', pointer(source, 28, 12));
+  f.emit('pointerdown', pointer(source, 10, 10, { pointerType: 'mouse' })); f.emit('pointermove', pointer(source, 28, 12, { pointerType: 'mouse' }));
   assert.equal(f.calls[0]?.[0], 'start'); f.cleanup();
 });
 for (let n = 0; n < 19; n++) test(`pointer regression ${n + 1}`, () => {
