@@ -41,6 +41,17 @@ async function verify(browser, engine, label, baseURL, out) {
     const url = new URL(route.request().url());
     return /^https?:$/.test(url.protocol) && url.origin !== baseURL ? route.abort() : route.continue();
   });
+  // Observe entry keyframes without changing animation playback or its clock.
+  await context.addInitScript(() => {
+    window.__sheetEntries = [];
+    new MutationObserver(records => {
+      for (const { target } of records) {
+        const animation = target.getAnimations().find(animation =>
+          animation.effect.getKeyframes().some(frame => frame.clipPath));
+        if (animation) window.__sheetEntries.push(animation.effect.getKeyframes()[0]);
+      }
+    }).observe(document, { subtree: true, attributes: true, attributeFilter: ['data-detail-motion'] });
+  });
   const page = await context.newPage();
   const result = { engine, label, playback: 'natural', status: 'running', phase: 'startup', errors: [], evidence: [] };
   page.setDefaultTimeout(12000);
@@ -65,6 +76,19 @@ async function verify(browser, engine, label, baseURL, out) {
     assert(state.r.height > 100 && state.r.width > 200);
     result.evidence.push({ name, ...state });
     if (label === 'phone') await page.screenshot({ path: path.join(out, `${engine}-${name}.png`), animations: 'allow' });
+  }
+  async function openFrom(trigger, name) {
+    result.phase = name;
+    await page.evaluate(() => { window.__sheetEntries = []; });
+    await trigger.click();
+    await shape(name);
+    if (!reduced) {
+      const entry = await page.evaluate(() => window.__sheetEntries[0]);
+      assert(entry, `${name}: entry animation was observed`);
+      assert.equal(Number(entry.opacity), 1, `${name}: surface expands opaquely from its trigger`);
+      assert(entry.clipPath && entry.clipPath !== 'inset(0px)', `${name}: entry uses the trigger bounds`);
+      result.evidence.push({ name: `${name}-origin`, entry });
+    }
   }
   async function close(early = false) {
     const element = await sheet().elementHandle();
@@ -100,7 +124,11 @@ async function verify(browser, engine, label, baseURL, out) {
       await close(true);
       result.evidence.push({ name: 'close-during-reveal', headerOpacity: opacity });
     }
+    await openFrom(page.getByRole('button', { name: '予定を追加する', exact: true }), 'new-itinerary');
+    await close();
     await nav('行きたい場所');
+    await openFrom(page.getByRole('button', { name: '場所を追加', exact: true }), 'new-place');
+    await close();
     const card = () => page.getByTestId('place-card').filter({ hasText: '旧市街でカフェ巡り' });
     await card().getByRole('button', { name: '旧市街でカフェ巡りの詳細を開く', exact: true }).click();
     await shape('place-detail'); await close();
@@ -118,6 +146,8 @@ async function verify(browser, engine, label, baseURL, out) {
     await sheet().getByText('決定', { exact: true }).click();
     await settle(); await shape('planning-after-picker'); await close();
     await nav('予約');
+    await openFrom(page.getByRole('button', { name: '予約を追加する', exact: true }), 'new-booking');
+    await close();
     await page.getByRole('button', { name: 'サンプル航空 101の乗り継ぎを変更', exact: true }).click();
     await shape('connection');
     await sheet().getByRole('button', { name: '保存', exact: true }).click(); await settle();
@@ -159,8 +189,12 @@ async function verify(browser, engine, label, baseURL, out) {
     await sheet().getByRole('button', { name: '閉じる', exact: true }).click();
     await dialog.getByRole('button', { name: '変更を破棄', exact: true }).click(); await settle();
     await page.locator('[data-testid="form-sheet"]:visible').waitFor({ state: 'hidden' });
+    await nav('準備');
+    const addPreparation = page.getByRole('button', { name: /^(持ち物|やること)を追加する$/ });
+    await openFrom(addPreparation, 'new-preparation'); await close();
+    await openFrom(page.getByRole('button', { name: /を編集$/ }).first(), 'edit-preparation'); await close();
     await nav('メモ');
-    await page.getByRole('button', { name: 'メモを書く', exact: true }).last().click();
+    await openFrom(page.getByRole('button', { name: 'メモを書く', exact: true }).last(), 'new-note');
     await page.getByTestId('note-body').fill('Fullscreen memo\nRetained content');
     await shape('note-editor');
     await sheet().getByRole('button', { name: '完了', exact: true }).click(); await settle();
