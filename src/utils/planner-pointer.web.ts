@@ -15,20 +15,35 @@ export function parsePlanSource(raw: string | undefined): PlanSource | null {
     return value && (value.kind === 'place' || value.kind === 'item') && typeof value.id === 'string' && value.id.length > 0 && value.id.length <= 100 ? { kind: value.kind, id: value.id } : null;
   } catch { return null; }
 }
-// Touch always waits for the hold gesture. Any meaningful movement before the
-// hold belongs to scrolling; mouse and pen can begin dragging from movement.
+// Touch waits for the hold gesture. Any meaningful movement before the hold
+// belongs to scrolling; mouse and pen can begin dragging from movement.
 export function plannerGestureIntent(dx: number, dy: number, touch: boolean, _gesture: 'lift' | 'free'): 'pending' | 'scroll' | 'drag' {
   if (!Number.isFinite(dx) || !Number.isFinite(dy) || Math.hypot(dx, dy) <= 7) return 'pending';
   return touch ? 'scroll' : 'drag';
 }
 type Callbacks = { start: (source: PlanSource) => void; drop: (source: PlanSource, slot: PlacementSlot) => void; day: (day: string) => void; cancel: () => void };
+type ActivePointer = {
+  source: PlanSource;
+  sourceElement: HTMLElement;
+  captureElement: HTMLElement;
+  id: number;
+  x: number;
+  y: number;
+  startX: number;
+  startY: number;
+  offsetX: number;
+  offsetY: number;
+  started: boolean;
+  touch: boolean;
+  gesture: 'lift' | 'free';
+};
 
 /** Pointer-only enhancement. Buttons supply the independent tap/keyboard path. */
 export function attachPlannerPointer(root: HTMLElement, callbacks: Callbacks, longPressMs = PLANNER_LONG_PRESS_MS) {
   const doc = root.ownerDocument, win = doc.defaultView!;
   let frame = 0, holdTimer: number | undefined, suppressUntil = 0;
   let suppressedSource: HTMLElement | undefined;
-  let active: { source: PlanSource; handle: HTMLElement; id: number; x: number; y: number; startX: number; startY: number; offsetX: number; offsetY: number; started: boolean; touch: boolean; gesture: 'lift' | 'free' } | undefined;
+  let active: ActivePointer | undefined;
   let ghost: HTMLElement | undefined, over: HTMLElement | undefined, lifted: HTMLElement | undefined;
   let dayHover = '', dayAt = 0, activatedDay = '';
   const clearHold = () => { if (holdTimer !== undefined) win.clearTimeout(holdTimer); holdTimer = undefined; };
@@ -40,9 +55,9 @@ export function attachPlannerPointer(root: HTMLElement, callbacks: Callbacks, lo
     if (lifted) delete lifted.dataset.planLifted; lifted = undefined;
     delete root.dataset.planDragging;
     dayHover = ''; activatedDay = '';
-    if (old?.handle.hasPointerCapture?.(old.id)) try { old.handle.releasePointerCapture(old.id); } catch { /* already released */ }
+    if (old?.captureElement.hasPointerCapture?.(old.id)) try { old.captureElement.releasePointerCapture(old.id); } catch { /* already released */ }
   };
-  const suppressClick = () => { suppressUntil = Date.now() + 350; suppressedSource = active?.handle; };
+  const suppressClick = () => { suppressUntil = Date.now() + 350; suppressedSource = active?.captureElement; };
   const cancel = () => { const started = active?.started; if (started) suppressClick(); clear(); if (started) callbacks.cancel(); };
   const targetAt = (x: number, y: number) => {
     const element = doc.elementFromPoint(x, y);
@@ -57,7 +72,7 @@ export function attachPlannerPointer(root: HTMLElement, callbacks: Callbacks, lo
   };
   const tick = (time: number) => {
     if (!active?.started) return;
-    if (!active.handle.isConnected || doc.querySelector('[aria-modal="true"]')) { cancel(); return; }
+    if (!active.captureElement.isConnected || doc.querySelector('[aria-modal="true"]')) { cancel(); return; }
     const { x, y, offsetX, offsetY, touch } = active;
     if (ghost) ghost.style.transform = `translate3d(${x - offsetX}px, ${y - offsetY - (touch ? 16 : 0)}px, 0)`;
     const hit = doc.elementFromPoint(x, y);
@@ -77,9 +92,9 @@ export function attachPlannerPointer(root: HTMLElement, callbacks: Callbacks, lo
   const begin = () => {
     if (!active || active.started) return;
     clearHold();
-    const card = active.handle.closest<HTMLElement>('[data-plan-card]');
+    const card = active.captureElement.closest<HTMLElement>('[data-plan-card]') ?? active.sourceElement.closest<HTMLElement>('[data-plan-card]');
     if (!card) { cancel(); return; }
-    try { active.handle.setPointerCapture(active.id); } catch { clear(); return; }
+    try { active.captureElement.setPointerCapture(active.id); } catch { clear(); return; }
     active.started = true; root.dataset.planDragging = '';
     const rect = card.getBoundingClientRect();
     active.offsetX = Math.max(0, Math.min(active.x - rect.left, rect.width));
@@ -100,13 +115,19 @@ export function attachPlannerPointer(root: HTMLElement, callbacks: Callbacks, lo
     if (!event.isPrimary || event.button !== 0 || !(event.target instanceof win.Element)) return;
     suppressedSource = undefined;
     if (doc.querySelector('[aria-modal="true"]') || event.target.closest('input, textarea, select, a, [contenteditable="true"], [data-plan-no-drag]')) return;
-    const handle = event.target.closest<HTMLElement>('[data-plan-source]');
-    if (!handle || !root.contains(handle) || handle.hasAttribute('disabled') || handle.closest('[aria-disabled="true"], [aria-hidden="true"], [inert]')) return;
-    const source = parsePlanSource(handle.dataset.planSource);
+    const card = event.target.closest<HTMLElement>('[data-plan-card]');
+    const directSource = event.target.closest<HTMLElement>('[data-plan-source]');
+    // Existing itinerary items expose their source through the hidden keyboard
+    // handle. Treat the whole card as the touch target while editing.
+    const sourceElement = directSource ?? card?.querySelector<HTMLElement>('[data-plan-source]');
+    if (!sourceElement || !root.contains(sourceElement) || sourceElement.hasAttribute('disabled') || sourceElement.closest('[aria-disabled="true"], [aria-hidden="true"], [inert]')) return;
+    const source = parsePlanSource(sourceElement.dataset.planSource);
     if (!source) return;
-    const gesture = handle.closest<HTMLElement>('[data-plan-card]')?.dataset.planGesture === 'lift' ? 'lift' : 'free';
+    const captureElement = card ?? sourceElement;
+    if (!root.contains(captureElement)) return;
+    const gesture = card?.dataset.planGesture === 'lift' ? 'lift' : 'free';
     const touch = event.pointerType === 'touch';
-    active = { source, handle, gesture, id: event.pointerId, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, offsetX: 0, offsetY: 0, started: false, touch };
+    active = { source, sourceElement, captureElement, gesture, id: event.pointerId, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, offsetX: 0, offsetY: 0, started: false, touch };
     if (touch) holdTimer = win.setTimeout(() => { if (active?.id === event.pointerId && !active.started) begin(); }, longPressMs);
   };
   const move = (event: PointerEvent) => {
@@ -133,10 +154,7 @@ export function attachPlannerPointer(root: HTMLElement, callbacks: Callbacks, lo
   };
   const pointerCancelled = (event: PointerEvent) => { if (active?.id === event.pointerId) cancel(); };
   const captureLost = (event: PointerEvent) => {
-    // React Native Web Pressable may already own pointer capture. Moving capture
-    // to the planner card emits lostpointercapture for that nested Pressable;
-    // ignore it and cancel only when the planner's own capture is lost.
-    if (active?.id === event.pointerId && event.target === active.handle) cancel();
+    if (active?.id === event.pointerId && event.target === active.captureElement) cancel();
   };
   const click = (event: MouseEvent) => {
     if (event.detail !== 0 && Date.now() < suppressUntil && event.target instanceof win.Element && suppressedSource?.contains(event.target)) {
