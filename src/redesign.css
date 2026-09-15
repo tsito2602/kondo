@@ -42,12 +42,8 @@ input, textarea, select { caret-color: var(--ocean); }
 .file-drop-button { color: var(--ink); }
 .file-drop-button:not(:disabled):hover { background: var(--soft); }
 .file-drop.is-dragging { border-color: var(--ocean); background: var(--sky); outline-color: var(--ocean); }
-
 .planner-root { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
 .planner-card-frame { display: flex; flex: 1; flex-direction: column; min-width: 0; }
-/* Candidate cards live in a horizontal ScrollView. Let the browser own only
-   horizontal panning so an upward/downward gesture remains available to D&D. */
-.planner-card-frame[data-plan-source][data-plan-gesture="lift"] { touch-action: pan-x; cursor: grab; }
 .planner-day { display: contents; }
 .planner-handle {
   width: 44px; min-height: 48px; flex-shrink: 0; border: 0; border-radius: 10px;
@@ -126,4 +122,39 @@ input, textarea, select { caret-color: var(--ocean); }
 [data-testid="trip-tabs"] [role="tab"] {
   flex-basis: auto !important; flex-shrink: 0 !important;
   min-inline-size: max-content; border-bottom-color: transparent !important;
+}
+[data-testid="trip-tabs"] [role="tab"] > div { white-space: nowrap; overflow: visible; }
+[data-testid="trip-tabs"] .t-tabs-pill {
+  box-sizing: border-box; background: transparent !important;
+  border-radius: 0 !important; border-bottom: 2px solid var(--ocean);
+  transition: transform 260ms cubic-bezier(.2,.9,.2,1), width 260ms cubic-bezier(.2,.9,.2,1);
+}
+[data-testid="trip-workspace"] .motion-page-content {
+  animation: planner-tab-enter 240ms cubic-bezier(.2,.9,.2,1) backwards;
+}
+@keyframes planner-tab-enter {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: none; }
+}
+[data-testid="planner-layout"] { min-width: 0; }
+[data-testid="planner-panel"] { width: 100%; min-width: 0; }
+[data-testid="planner-candidates"] { touch-action: pan-x; overscroll-behavior-x: contain; }
+.planner-card-frame { position: relative; }
+.planner-card-frame[data-plan-source] {
+  cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.planner-card-frame[data-plan-gesture="lift"] { touch-action: pan-x; }
+[data-plan-dragging] .planner-card-frame[data-plan-source] { cursor: grabbing; }
+.planner-keyboard-handle:not(:focus-visible) {
+  position: absolute; width: 1px; height: 1px; min-height: 1px;
+  padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+.planner-keyboard-handle:focus-visible {
+  position: absolute; right: 4px; top: 4px; z-index: 2;
+  background: var(--paper); outline: 2px solid var(--ocean); outline-offset: -2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-testid="trip-workspace"] .motion-page-content { animation: none; }
+  [data-testid="trip-tabs"] .t-tabs-pill { transition: none; }
 }
