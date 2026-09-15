@@ -253,3 +253,37 @@ for (const reason of ['resize', 'reduced', 'unsupported']) {
   f.close();
 }
 console.log('Retained modals: updated/cleared origin, obsolete exit cancellation and hidden terminal exit state passed.');
+
+// A child portal must return focus inside its surviving parent without stealing
+// it from a new modal or an input the user has already moved to.
+for (const scenario of ['parent', 'reduced', 'new-modal', 'nested-new-modal', 'other-input', 'trap-container', 'hidden-modal', 'inert-source', 'removed-source', 'unfocused-modal']) {
+  const f = fixture();
+  const parent = f.doc.createElement('section');
+  parent.setAttribute('aria-modal', 'true');
+  f.doc.body.prepend(parent); parent.append(f.source);
+  const reduced = scenario === 'reduced';
+  f.motion.setOpen(true, reduced, () => {}, 'picker'); await f.finish();
+  let expected = f.source;
+  f.motion.setOpen(false, reduced, () => {
+    f.motion.dispose(); f.surface.parentElement.remove();
+    if (scenario === 'inert-source') { parent.setAttribute('inert', ''); expected = f.doc.body; }
+    if (scenario === 'removed-source') { f.source.remove(); expected = f.doc.body; }
+    if (scenario === 'trap-container') { parent.tabIndex = -1; parent.focus(); }
+    if (scenario === 'other-input') {
+      const input = f.doc.createElement('input'); parent.append(input); input.focus(); expected = input;
+    }
+    if (['new-modal', 'nested-new-modal', 'hidden-modal', 'unfocused-modal'].includes(scenario)) {
+      const next = f.doc.createElement('section'); next.setAttribute('aria-modal', 'true');
+      const button = f.doc.createElement('button'); next.append(button);
+      (scenario === 'nested-new-modal' ? parent : f.doc.body).append(next);
+      if (scenario === 'hidden-modal') next.setAttribute('aria-hidden', 'true');
+      else if (scenario === 'unfocused-modal') expected = f.doc.body;
+      else { button.focus(); expected = button; }
+    }
+  }, 'picker');
+  await f.finish();
+  await new Promise(resolve => f.dom.window.requestAnimationFrame(() => f.dom.window.requestAnimationFrame(resolve)));
+  assert.equal(f.doc.activeElement, expected, `nested focus restoration: ${scenario}`);
+  f.close();
+}
+console.log('Nested modal focus: parent trigger, focus traps, reduced motion, unrelated modals and new input focus passed.');
