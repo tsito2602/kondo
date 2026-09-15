@@ -74,6 +74,7 @@ export function MotionModal({ children, visible = true, motion = 'modal', onRequ
     surface.inert = !open;
     if (presentedDetail || (sheet && typeof surface.animate === 'function')) {
       detailMotion.current ??= createDetailMotion(surface, viewport, presentedOrigin, () => dismiss.current?.());
+      detailMotion.current.setOrigin(presentedOrigin);
       return detailMotion.current.setOpen(open, reduced, finish, presentedDetail ? 'detail' : surface.dataset.testid === 'picker-sheet' ? 'picker' : 'form');
     }
     detailMotion.current?.suspend();
