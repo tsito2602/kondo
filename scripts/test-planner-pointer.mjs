@@ -23,7 +23,7 @@ function element(dataset = {}) {
       if (selector.includes('[data-plan-entry]') && this.dataset.planEntry) return this;
       if (selector.includes('[data-plan-day]') && this.dataset.planDay) return this;
       if (selector.includes('[aria-disabled') && this.ariaDisabled) return this;
-      return null;
+      return this.parent?.closest?.(selector) ?? null;
     },
     contains(target) {
       for (let node = target; node; node = node.parent) if (node === this) return true;
