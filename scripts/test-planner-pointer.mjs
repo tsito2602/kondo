@@ -107,6 +107,19 @@ test('candidate vertical movement starts immediately', () => {
   f.emit('pointerdown', pointer(source, 10, 10)); f.emit('pointermove', pointer(source, 12, 28));
   assert.equal(f.calls[0]?.[0], 'start'); f.cleanup();
 });
+test('nested Pressable capture handoff does not cancel an active planner drag', () => {
+  const f = fixture(); const card = element({ planGesture: 'lift' }); const source = element({ planSource: '{"kind":"place","id":"p"}' }); source.card = card; source.parent = f.root;
+  const nested = element(); nested.parent = source;
+  f.emit('pointerdown', pointer(source, 10, 10)); f.emit('pointermove', pointer(source, 12, 28));
+  f.emit('lostpointercapture', { pointerId: 1, target: nested });
+  assert.deepEqual(f.calls.map(call => call[0]), ['start']); f.cleanup();
+});
+test('losing the planner card capture cancels the active drag', () => {
+  const f = fixture(); const card = element({ planGesture: 'lift' }); const source = element({ planSource: '{"kind":"place","id":"p"}' }); source.card = card; source.parent = f.root;
+  f.emit('pointerdown', pointer(source, 10, 10)); f.emit('pointermove', pointer(source, 12, 28));
+  f.emit('lostpointercapture', { pointerId: 1, target: source });
+  assert.deepEqual(f.calls.map(call => call[0]), ['start', 'cancel']); f.cleanup();
+});
 test('free itinerary card horizontal movement starts drag', () => {
   const f = fixture(); const card = element({ planGesture: 'free' }); const source = element({ planSource: '{"kind":"item","id":"i"}' }); source.card = card; source.parent = f.root;
   f.emit('pointerdown', pointer(source, 10, 10)); f.emit('pointermove', pointer(source, 28, 12));
