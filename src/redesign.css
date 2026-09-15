@@ -103,7 +103,7 @@ input, textarea, select { caret-color: var(--ocean); }
 [data-testid="preparation-groups"] [role="checkbox"][aria-checked="false"] { background: var(--paper) !important; border-color: var(--ash) !important; }
 [data-testid="preparation-groups"] [role="checkbox"][aria-checked="true"] { background: var(--sky) !important; border-color: var(--ocean) !important; }
 [data-testid="preparation-tabs"] { border-radius: 12px !important; background: var(--mist) !important; }
-[data-testid="notes-scroll"] > div > div:last-child > div:has([role="button"][aria-label$="を開く"]) { border-radius: 16px !important; border: 1px solid var(--ash); background: var(--paper); }
+[data-testid="notes-scroll"] > div > div:has([role="button"][aria-label$="を開く"]) { border-radius: 16px !important; border: 1px solid var(--ash); background: var(--paper); }
 [data-testid="notes-scroll"] > div > div:has([role="button"][aria-label$="を開く"]) [role="button"] { padding-block: 16px !important; }
 [data-testid="note-editor"] { background: var(--paper) !important; }
 [data-testid="note-editor"] [data-testid="note-body"] { color: var(--ink) !important; background: var(--paper) !important; }
