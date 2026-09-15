@@ -128,7 +128,13 @@ export function attachPlannerPointer(root: HTMLElement, callbacks: Callbacks) {
       try { callbacks.drop(source, JSON.parse(slot) as PlacementSlot); } catch { callbacks.cancel(); }
     } else callbacks.cancel();
   };
-  const interrupted = (event: PointerEvent) => { if (active?.id === event.pointerId) cancel(); };
+  const pointerCancelled = (event: PointerEvent) => { if (active?.id === event.pointerId) cancel(); };
+  const captureLost = (event: PointerEvent) => {
+    // React Native Web Pressable may already own pointer capture. Moving capture
+    // to the planner card emits lostpointercapture for that nested Pressable;
+    // ignore it and cancel only when the planner's own capture is lost.
+    if (active?.id === event.pointerId && event.target === active.handle) cancel();
+  };
   const click = (event: MouseEvent) => {
     if (event.detail !== 0 && Date.now() < suppressUntil && event.target instanceof win.Element && suppressedSource?.contains(event.target)) {
       event.preventDefault(); event.stopPropagation(); suppressedSource = undefined;
@@ -144,16 +150,16 @@ export function attachPlannerPointer(root: HTMLElement, callbacks: Callbacks) {
   root.addEventListener('contextmenu', contextMenu);
   win.addEventListener('pointermove', move, { passive: false });
   win.addEventListener('pointerup', up);
-  win.addEventListener('pointercancel', interrupted);
-  root.addEventListener('lostpointercapture', interrupted);
+  win.addEventListener('pointercancel', pointerCancelled);
+  root.addEventListener('lostpointercapture', captureLost);
   win.addEventListener('keydown', key);
   win.addEventListener('blur', cancel);
   doc.addEventListener('visibilitychange', visibility);
   return () => {
     clear(); root.removeEventListener('pointerdown', down, true); root.removeEventListener('click', click, true);
     root.removeEventListener('contextmenu', contextMenu);
-    win.removeEventListener('pointermove', move); win.removeEventListener('pointerup', up); win.removeEventListener('pointercancel', interrupted);
-    root.removeEventListener('lostpointercapture', interrupted); win.removeEventListener('keydown', key); win.removeEventListener('blur', cancel);
+    win.removeEventListener('pointermove', move); win.removeEventListener('pointerup', up); win.removeEventListener('pointercancel', pointerCancelled);
+    root.removeEventListener('lostpointercapture', captureLost); win.removeEventListener('keydown', key); win.removeEventListener('blur', cancel);
     doc.removeEventListener('visibilitychange', visibility);
   };
 }
