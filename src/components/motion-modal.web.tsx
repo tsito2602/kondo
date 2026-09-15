@@ -1,6 +1,7 @@
 import type { DetailOrigin } from '@/utils/detail-origin';
 import '@/detail-motion.css';
 import { createDetailMotion } from '@/utils/detail-motion.web';
+import { trackModalViewportInsets } from '@/utils/modal-viewport-insets.web';
 import { useCallback, useContext, useLayoutEffect, useRef, useState } from 'react';
 import { Modal, ModalProps } from 'react-native';
 import { MotionExitContext, MotionPresenceContext } from './motion-presence.web';
@@ -32,7 +33,11 @@ export function MotionModal({ children, visible = true, motion = 'modal', onRequ
   const detailMotion = useRef<ReturnType<typeof createDetailMotion> | null>(null);
   const dismiss = useRef(onDetailDismiss);
   useLayoutEffect(() => { dismiss.current = onDetailDismiss; }, [onDetailDismiss]);
-  useLayoutEffect(() => () => { detailMotion.current?.dispose(); detailMotion.current = null; }, [root]);
+  useLayoutEffect(() => {
+    if (!root) return;
+    const stopInsets = trackModalViewportInsets(root);
+    return () => { stopInsets(); detailMotion.current?.dispose(); detailMotion.current = null; };
+  }, [root]);
   const release = useRef<(() => void) | undefined>(undefined);
   const releaseExit = useCallback(() => {
     const complete = release.current;

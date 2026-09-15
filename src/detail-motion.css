@@ -69,16 +69,9 @@
     border-radius: 0 !important;
     padding-top: env(safe-area-inset-top, 0px) !important;
     padding-right: env(safe-area-inset-right, 0px) !important;
-    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+    padding-bottom: max(0px, calc(env(safe-area-inset-bottom, 0px) - var(--modal-bottom-occlusion, 0px))) !important;
     padding-left: env(safe-area-inset-left, 0px) !important;
   }
   .motion-overlay [data-testid="form-sheet-fill"] { min-height: 0; }
-  .motion-overlay :is(
-    [data-testid="form-sheet"],
-    [data-testid="picker-sheet"],
-    [data-testid="note-editor"]
-  ):has(input:focus, textarea:focus) {
-    padding-bottom: 0 !important;
-  }
   /* Confirmation dialogs and menus intentionally keep their compact UI. */
 }
