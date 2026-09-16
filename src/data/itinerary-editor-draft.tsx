@@ -135,6 +135,7 @@ export function ItineraryDraftProvider({ children }: PropsWithChildren) {
 
   const commit = useCallback(() => {
     if (savingRef.current) return false;
+    if (!dirty) return true;
     if (!root.canEdit || root.selectedTrip?.id !== tripId) {
       setError('旅行または編集権限が変更されました。閉じて開き直してください。');
       return false;
@@ -188,7 +189,7 @@ export function ItineraryDraftProvider({ children }: PropsWithChildren) {
       savingRef.current = false;
       setSaving(false);
     }
-  }, [baseItems, basePlaces, baseSignature, items, places, root, tripId]);
+  }, [baseItems, basePlaces, baseSignature, dirty, items, places, root, tripId]);
 
   const itineraryDraft = useMemo<ItineraryDraftControl>(() => ({ dirty, saving, error, commit, discard }), [commit, dirty, discard, error, saving]);
   const value = useMemo<ItineraryTravelValue>(() => ({
