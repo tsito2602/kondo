@@ -8,9 +8,21 @@ const CSS = `
   -webkit-backdrop-filter: none !important;
 }
 [data-testid="trip-header"],
-[data-testid="home-header"],
 [data-testid="sheet-header"] {
   background: var(--paper) !important;
+}
+/* The trip list heading belongs to the page itself, not to a separate glass
+   surface. Keeping it on the canvas also avoids a visible rectangle in dark mode. */
+[data-testid="home-header"] {
+  background: var(--canvas) !important;
+}
+@media (max-width: 1023px) {
+  [data-testid="home-header"] {
+    position: relative !important;
+    top: auto !important;
+    z-index: auto !important;
+    padding: 0 !important;
+  }
 }
 
 /* Restore the itinerary item form to the same sheet/detail presentation as
