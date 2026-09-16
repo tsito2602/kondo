@@ -1,4 +1,3 @@
-import * as Crypto from 'expo-crypto';
 import { createContext, type PropsWithChildren, useCallback, useContext, useMemo, useRef, useState } from 'react';
 
 import { useTravel } from './travel-provider';
@@ -20,6 +19,7 @@ type ItineraryTravelValue = TravelValue & { itineraryDraft?: ItineraryDraftContr
 
 const ItineraryTravelContext = createContext<ItineraryTravelValue | null>(null);
 const clone = <Value,>(value: Value): Value => JSON.parse(JSON.stringify(value)) as Value;
+const newDraftId = () => `draft-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 
 function itemInput(item: ItineraryItem): ItemInput {
   return {
@@ -106,7 +106,7 @@ export function ItineraryDraftProvider({ children }: PropsWithChildren) {
   const dirty = comparable(items, places) !== baseSignature;
 
   const createItem = useCallback((input: ItemInput) => {
-    const id = `draft-${Crypto.randomUUID()}`;
+    const id = newDraftId();
     setItems((current) => [...current, { id, ...clone(input) }]);
     setError('');
     return id;
