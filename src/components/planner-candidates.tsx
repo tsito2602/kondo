@@ -1,76 +1,251 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SymbolView } from 'expo-symbols';
 import { useTravel } from '@/data/travel-provider';
 import type { PlanSource } from '@/data/planner';
+import type { ItineraryCategory, ItineraryDetails } from '@/data/types';
+import { emptyItineraryDetails, itineraryDetailsError, transportLabel } from '@/data/itinerary';
+import { validDate } from '@/utils/dates';
 import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { type Palette } from '@/constants/design';
-import { captureDetailOrigin, type DetailOrigin } from '@/utils/detail-origin';
 import { MotionPresence } from './motion-presence';
-import { PlaceSheet } from './place-sheet';
+import { MotionModal } from './motion-modal';
 import { FormSheet } from './form-sheet';
-import { PlannerCard, PlannerHandle } from './planner-drag';
-import { ActionButton } from './ui/action-button';
+import { PlacePlanSheet } from './place-plan-sheet';
+import { DateRangePicker } from './date-range-picker';
+import { ItineraryCategoryPicker, ItineraryFields } from './itinerary-fields';
+import { useToast } from './toast';
 
-export function PlannerCandidates({ source, disabled = false }: { source: PlanSource | null; disabled?: boolean; onSelect?: (source: PlanSource | null) => void; onViewItem?: (id: string) => void }) {
-  const { places, items, canEdit } = useTravel();
-  const p = usePalette(), s = useThemedStyles(createStyles);
-  const { height } = useWindowDimensions(), insets = useSafeAreaInsets();
-  const compact = height < 520;
-  const [expanded, setExpanded] = useState(false);
-  const [search, setSearch] = useState(''), [picker, setPicker] = useState(false);
-  const [viewing, setViewing] = useState<string | null>(null), [origin, setOrigin] = useState<DetailOrigin>();
-  const filtered = places.filter(place => `${place.title} ${place.note}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
-  const cards = (searching = false) => <>
-    {(searching ? filtered : places).map(place => {
-      const linked = items.find(item => item.id === place.itineraryItemId);
-      // A saved candidate moves the existing item; it must not make a duplicate.
-      const planSource: PlanSource = linked ? { kind: 'item', id: linked.id } : { kind: 'place', id: place.id };
-      const selected = source?.kind === planSource.kind && source.id === planSource.id;
-      return <View key={place.id} style={s.cell}>
-        <PlannerCard source={canEdit && !searching ? planSource : undefined} gesture="lift" disabled={disabled}>
-          <Pressable testID="planner-candidate" accessibilityRole="button" accessibilityLabel={`${place.title}の詳細を開く`}
-            onPress={event => { setOrigin(captureDetailOrigin(event)); setPicker(false); setViewing(place.id); }}
-            style={[s.card, compact && s.compactCard, selected && s.selected]}>
-            <Text numberOfLines={3} style={s.title}>{place.title}</Text>
-          </Pressable>
-          {canEdit && !searching ? <PlannerHandle label={place.title} source={planSource} disabled={disabled} /> : null}
-        </PlannerCard>
-      </View>;
-    })}
-    {!(searching ? filtered : places).length ? <Text style={s.empty}>{places.length ? '一致する場所がありません' : '行きたい場所はまだありません'}</Text> : null}
-  </>;
-  return <View testID="planner-panel" style={[s.panel, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-    <View style={s.header}>
-      <Pressable testID="planner-panel-toggle" accessibilityRole="button" accessibilityState={{ expanded }}
-        accessibilityLabel={expanded ? '行きたい場所を閉じる' : '行きたい場所を開く'}
-        onPress={() => setExpanded(value => !value)} style={({ pressed }) => [s.toggle, pressed && s.pressed]}>
-        <Text style={s.heading}>行きたい場所</Text>
-        <Text style={s.toggleLabel}>{expanded ? '閉じる' : '開く'}</Text>
-      </Pressable>
-      {expanded ? <ActionButton label="検索" variant="quiet" onPress={event => { setOrigin(captureDetailOrigin(event)); setPicker(true); }} /> : null}
+type Props = {
+  source: PlanSource | null;
+  disabled?: boolean;
+  onSelect?: (source: PlanSource | null) => void;
+  onViewItem?: (id: string) => void;
+};
+
+const PLAN_ICON = { ios: 'calendar.badge.plus', android: 'event', web: 'event' } as const;
+const MOVE_ICON = { ios: 'arrow.triangle.swap', android: 'swap_horiz', web: 'swap_horiz' } as const;
+const PLACE_ICON = { ios: 'heart', android: 'favorite_border', web: 'favorite_border' } as const;
+const CLOSE_ICON = { ios: 'xmark', android: 'close', web: 'close' } as const;
+
+export function PlannerCandidates({ disabled = false, onViewItem }: Props) {
+  const { places, items, canEdit, selectedTrip, createItem } = useTravel();
+  const palette = usePalette();
+  const styles = useThemedStyles(createStyles);
+  const insets = useSafeAreaInsets();
+  const toast = useToast();
+  const [placesOpen, setPlacesOpen] = useState(false);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [planningPlaceId, setPlanningPlaceId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [day, setDay] = useState(selectedTrip?.startsOn ?? '');
+  const [time, setTime] = useState('10:00');
+  const [title, setTitle] = useState('');
+  const [note, setNote] = useState('');
+  const [details, setDetails] = useState<ItineraryDetails>(emptyItineraryDetails('sightseeing'));
+  const [initialDraft, setInitialDraft] = useState('');
+  const [formError, setFormError] = useState('');
+  const moving = details.category === 'transport';
+  const availablePlaces = places.filter((place) => !items.some((item) => item.id === place.itineraryItemId));
+
+  const openNew = (category: ItineraryCategory) => {
+    const startDay = selectedTrip?.startsOn ?? '';
+    const startTime = category === 'transport' ? '' : '10:00';
+    const nextDetails: ItineraryDetails = category === 'transport'
+      ? { ...emptyItineraryDetails('transport'), transport: { mode: 'walk', origin: '', destination: '' } }
+      : emptyItineraryDetails(category);
+    setDay(startDay);
+    setTime(startTime);
+    setTitle('');
+    setNote('');
+    setDetails(nextDetails);
+    setInitialDraft(JSON.stringify([startDay, startTime, '', '', nextDetails]));
+    setFormError('');
+    setAddMenuOpen(false);
+    setAdding(true);
+  };
+
+  const saveNew = () => {
+    const savedTitle = title.trim() || (moving
+      ? [details.transport?.origin, details.transport?.destination].filter(Boolean).join(' → ') || `${transportLabel(details)}で移動`
+      : '');
+    if (!savedTitle || !validDate(day) || !/^([01]\d|2[0-3]):[0-5]\d$|^$/.test(time)) {
+      setFormError('日付、予定名、正しい時刻を入力してください');
+      return;
+    }
+    const normalized: ItineraryDetails = {
+      ...details,
+      ...(moving
+        ? { location: '', transport: details.transport ?? { mode: 'walk', origin: '', destination: '' } }
+        : { transport: undefined }),
+    };
+    const error = itineraryDetailsError(day, time, normalized)
+      || (normalized.endDay && !normalized.endTime ? '終了・到着時刻を入力するか、日時を外してください' : '');
+    if (error) { setFormError(error); return; }
+    const id = createItem({ day, time, kind: '予定', title: savedTitle.slice(0, 160), note: note.trim(), details: normalized });
+    setAdding(false);
+    toast('予定を追加しました');
+    onViewItem?.(id);
+  };
+
+  const openPlacePlan = (id: string) => {
+    setPlacesOpen(false);
+    setPlanningPlaceId(id);
+  };
+
+  return <>
+    <View testID="planner-panel" style={[styles.dockShell, { paddingBottom: Math.max(insets.bottom, 8) + 8 }]}>
+      <View style={styles.dock}>
+        <Pressable
+          testID="planner-places-action"
+          accessibilityRole="button"
+          accessibilityLabel={`行きたい場所から追加${availablePlaces.length ? `、${availablePlaces.length}件` : ''}`}
+          disabled={disabled || !canEdit}
+          onPress={() => setPlacesOpen(true)}
+          style={({ pressed }) => [styles.secondaryAction, pressed && styles.pressed, (disabled || !canEdit) && styles.disabled]}>
+          <SymbolView name={PLACE_ICON} size={18} tintColor={palette.ocean} />
+          <Text style={styles.secondaryText}>行きたい場所</Text>
+          {availablePlaces.length ? <View style={styles.badge}><Text style={styles.badgeText}>{availablePlaces.length}</Text></View> : null}
+        </Pressable>
+        <Pressable
+          testID="planner-add-action"
+          accessibilityRole="button"
+          accessibilityLabel="予定を追加"
+          disabled={disabled || !canEdit}
+          onPress={() => setAddMenuOpen(true)}
+          style={({ pressed }) => [styles.primaryAction, pressed && styles.pressed, (disabled || !canEdit) && styles.disabled]}>
+          <Text style={styles.plus}>＋</Text><Text style={styles.primaryText}>予定を追加</Text>
+        </Pressable>
+      </View>
     </View>
-    {expanded ? <ScrollView testID="planner-candidates" horizontal keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false}
-      style={s.scroller} contentContainerStyle={s.list}>{cards()}</ScrollView> : null}
-    <MotionPresence>{picker ? <FormSheet detailOrigin={origin} visible title="行きたい場所を検索" onClose={() => setPicker(false)}>
-      <TextInput accessibilityLabel="配置する場所を検索" autoFocus value={search} onChangeText={setSearch} placeholder="候補を検索" placeholderTextColor={p.placeholder} style={s.search} />
-      <ScrollView horizontal keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} contentContainerStyle={s.list}>{cards(true)}</ScrollView>
-    </FormSheet> : null}</MotionPresence>
-    <MotionPresence>{viewing && places.some(place => place.id === viewing) ? <PlaceSheet key={viewing} detailOrigin={origin} place={places.find(place => place.id === viewing)} onClose={() => setViewing(null)} /> : null}</MotionPresence>
-  </View>;
+
+    <MotionModal visible={placesOpen} transparent animationType="fade" onRequestClose={() => setPlacesOpen(false)}>
+      <View testID="planner-places-sheet-viewport" style={styles.overlay}>
+        <Pressable accessibilityLabel="行きたい場所を閉じる" onPress={() => setPlacesOpen(false)} style={StyleSheet.absoluteFill} />
+        <SafeAreaView accessibilityViewIsModal edges={['bottom']} style={styles.sheet}>
+          <View style={styles.handle} />
+          <View style={styles.sheetHeader}>
+            <View style={styles.sheetHeading}>
+              <Text accessibilityRole="header" style={styles.sheetTitle}>行きたい場所から追加</Text>
+              <Text style={styles.sheetCaption}>まだしおりに追加していない場所を表示しています。</Text>
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel="閉じる" onPress={() => setPlacesOpen(false)} style={styles.closeButton}>
+              <SymbolView name={CLOSE_ICON} size={17} tintColor={palette.slate} />
+            </Pressable>
+          </View>
+          <ScrollView testID="planner-candidates" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={styles.placeList}>
+            {availablePlaces.map((place) => <Pressable key={place.id} accessibilityRole="button" accessibilityLabel={`${place.title}をしおりに追加`} onPress={() => openPlacePlan(place.id)} style={({ pressed }) => [styles.placeRow, pressed && styles.placeRowPressed]}>
+              <View style={styles.placeIcon}><SymbolView name={{ ios: 'mappin', android: 'location_on', web: 'location_on' }} size={18} tintColor={palette.ocean} /></View>
+              <View style={styles.placeCopy}><Text numberOfLines={2} style={styles.placeTitle}>{place.title}</Text>{place.note ? <Text numberOfLines={1} style={styles.placeMeta}>{place.note}</Text> : null}</View>
+              <View style={styles.rowAdd}><Text style={styles.rowAddText}>＋</Text></View>
+            </Pressable>)}
+            {!availablePlaces.length ? <View style={styles.empty}><Text style={styles.emptyTitle}>追加できる場所はありません</Text><Text style={styles.emptyBody}>行きたい場所に保存した候補は、ここから日付と時刻を決めて追加できます。</Text></View> : null}
+          </ScrollView>
+        </SafeAreaView>
+      </View>
+    </MotionModal>
+
+    <MotionModal visible={addMenuOpen} transparent animationType="fade" onRequestClose={() => setAddMenuOpen(false)}>
+      <View testID="planner-add-sheet-viewport" style={styles.overlay}>
+        <Pressable accessibilityLabel="追加メニューを閉じる" onPress={() => setAddMenuOpen(false)} style={StyleSheet.absoluteFill} />
+        <SafeAreaView accessibilityViewIsModal edges={['bottom']} style={[styles.sheet, styles.addSheet]}>
+          <View style={styles.handle} />
+          <View style={styles.sheetHeader}>
+            <Text accessibilityRole="header" style={styles.sheetTitle}>何を追加しますか？</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="閉じる" onPress={() => setAddMenuOpen(false)} style={styles.closeButton}>
+              <SymbolView name={CLOSE_ICON} size={17} tintColor={palette.slate} />
+            </Pressable>
+          </View>
+          <View style={styles.addChoices}>
+            <AddChoice icon={PLAN_ICON} title="予定" caption="観光・食事・アクティビティなど" onPress={() => openNew('sightseeing')} />
+            <AddChoice icon={MOVE_ICON} title="移動" caption="徒歩・電車・バスなどの移動" onPress={() => openNew('transport')} />
+            <AddChoice icon={PLACE_ICON} title="行きたい場所から" caption="保存済みの候補から追加" onPress={() => { setAddMenuOpen(false); setPlacesOpen(true); }} />
+          </View>
+        </SafeAreaView>
+      </View>
+    </MotionModal>
+
+    <MotionPresence>{planningPlaceId ? <PlacePlanSheet key={planningPlaceId} placeId={planningPlaceId} onClose={() => setPlanningPlaceId(null)} onComplete={(_, itemId) => {
+      setPlanningPlaceId(null);
+      toast('しおりに追加しました');
+      onViewItem?.(itemId);
+    }} /> : null}</MotionPresence>
+
+    <FormSheet visible={adding} title={moving ? '移動を追加' : '予定を追加'} onClose={() => setAdding(false)} onSave={saveNew} saveLabel="保存"
+      canSave={moving || Boolean(title.trim())}
+      dirty={JSON.stringify([day, time, title, note, details]) !== initialDraft} error={formError}>
+      <ItineraryCategoryPicker value={details.category} onChange={(category) => setDetails((current) => ({
+        ...current,
+        category,
+        ...(category === 'transport'
+          ? { transport: current.transport ?? { mode: 'walk', origin: '', destination: '' } }
+          : { transport: undefined }),
+      }))} />
+      <View style={styles.formGap}><DateRangePicker mode="single" showTime label={moving ? '出発' : '開始'} startDate={day} endDate={day} startTime={time} onChange={(range) => { setDay(range.startDate); setTime(range.startTime); }} /></View>
+      {moving ? <ItineraryFields day={day} time={time} details={details} onChange={setDetails} /> : null}
+      <Text style={styles.label}>{moving ? '移動名（任意）' : '予定'}</Text>
+      <TextInput accessibilityLabel="予定名" maxLength={160} value={title} onChangeText={setTitle}
+        placeholder={moving ? '例：空港行きのバス' : details.category === 'meal' ? 'ランチ・夕食など' : details.category === 'shopping' ? 'おみやげを買う' : '美術館を訪れる'}
+        placeholderTextColor={palette.placeholder} style={styles.input} />
+      {!moving ? <ItineraryFields day={day} time={time} details={details} onChange={setDetails} /> : null}
+      <Text style={styles.label}>メモ</Text>
+      <TextInput accessibilityLabel="メモ" maxLength={4000} value={note} onChangeText={setNote}
+        placeholder={moving ? '路線名・乗り場・乗り換えなど' : '当日のメモなど'} placeholderTextColor={palette.placeholder} style={[styles.input, styles.noteInput]} multiline />
+    </FormSheet>
+  </>;
 }
-const createStyles = (p: Palette) => StyleSheet.create({
-  panel: { flexShrink: 0, minHeight: 0, backgroundColor: p.canvas, borderTopWidth: 1, borderColor: p.ash, paddingTop: 4, gap: 4 },
-  header: { minHeight: 48, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 4 },
-  toggle: { flex: 1, minWidth: 0, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 4 },
-  heading: { color: p.ink, fontSize: 15, lineHeight: 22, fontWeight: '600', flexShrink: 1 },
-  toggleLabel: { color: p.ocean, fontSize: 13, lineHeight: 20, fontWeight: '700' },
-  pressed: { opacity: 0.64 },
-  scroller: { flexGrow: 0 }, list: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 4, alignItems: 'stretch' },
-  cell: { width: 152, flexShrink: 0 },
-  card: { minHeight: 88, paddingHorizontal: 14, paddingVertical: 12, justifyContent: 'center', backgroundColor: p.paper, borderRadius: 16, borderWidth: 1, borderColor: p.ash },
-  compactCard: { minHeight: 72 }, selected: { borderColor: p.ocean, backgroundColor: p.sky },
-  title: { color: p.ink, fontSize: 15, lineHeight: 21, fontWeight: '600' },
-  search: { color: p.ink, fontSize: 16, minHeight: 44, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: p.paper, borderWidth: 1, borderColor: p.ash, borderRadius: 12, marginBottom: 12 },
-  empty: { paddingVertical: 20, color: p.smoke, lineHeight: 22, fontSize: 14, maxWidth: 300 },
+
+function AddChoice({ icon, title, caption, onPress }: { icon: typeof PLAN_ICON; title: string; caption: string; onPress: () => void }) {
+  const palette = usePalette();
+  const styles = useThemedStyles(createStyles);
+  return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.addChoice, pressed && styles.placeRowPressed]}>
+    <View style={styles.choiceIcon}><SymbolView name={icon} size={20} tintColor={palette.ocean} /></View>
+    <View style={styles.placeCopy}><Text style={styles.choiceTitle}>{title}</Text><Text style={styles.placeMeta}>{caption}</Text></View>
+    <Text style={styles.chevron}>›</Text>
+  </Pressable>;
+}
+
+const createStyles = (palette: Palette) => StyleSheet.create({
+  dockShell: { flexShrink: 0, backgroundColor: palette.canvas, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.ash, paddingTop: 10, paddingHorizontal: 12 },
+  dock: { width: '100%', maxWidth: 800, alignSelf: 'center', flexDirection: 'row', gap: 10 },
+  secondaryAction: { minHeight: 50, flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 12, backgroundColor: palette.paper },
+  secondaryText: { color: palette.ink, fontSize: 13, fontWeight: '700', flexShrink: 1 },
+  badge: { minWidth: 22, height: 22, paddingHorizontal: 6, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.sky },
+  badgeText: { color: palette.ocean, fontSize: 11, fontWeight: '800' },
+  primaryAction: { minHeight: 50, flex: 1.15, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, backgroundColor: palette.ocean },
+  primaryText: { color: palette.onOcean, fontSize: 14, fontWeight: '800' },
+  plus: { color: palette.onOcean, fontSize: 22, lineHeight: 24, marginTop: -2 },
+  pressed: { opacity: 0.68, transform: [{ scale: 0.98 }] },
+  disabled: { opacity: 0.38 },
+  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(24,42,54,0.24)' },
+  sheet: { width: '100%', maxWidth: 760, maxHeight: '74%', alignSelf: 'center', backgroundColor: palette.canvas, borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden' },
+  addSheet: { maxHeight: '58%' },
+  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 8, marginBottom: 4, backgroundColor: palette.ash },
+  sheetHeader: { minHeight: 68, paddingHorizontal: 20, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  sheetHeading: { flex: 1, minWidth: 0, gap: 3 },
+  sheetTitle: { flex: 1, color: palette.ink, fontSize: 18, lineHeight: 25, fontWeight: '800' },
+  sheetCaption: { color: palette.slate, fontSize: 11, lineHeight: 17 },
+  closeButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.mist },
+  placeList: { paddingHorizontal: 16, paddingBottom: 24, gap: 8 },
+  placeRow: { minHeight: 70, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, backgroundColor: palette.paper },
+  placeRowPressed: { opacity: 0.7, transform: [{ scale: 0.99 }] },
+  placeIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.sky },
+  placeCopy: { flex: 1, minWidth: 0, gap: 2 },
+  placeTitle: { color: palette.ink, fontSize: 15, lineHeight: 21, fontWeight: '700' },
+  placeMeta: { color: palette.slate, fontSize: 11, lineHeight: 17 },
+  rowAdd: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.mist },
+  rowAddText: { color: palette.ocean, fontSize: 21, lineHeight: 23 },
+  empty: { alignItems: 'center', paddingVertical: 44, paddingHorizontal: 24, gap: 7 },
+  emptyTitle: { color: palette.ink, fontSize: 16, fontWeight: '700' },
+  emptyBody: { color: palette.slate, fontSize: 12, lineHeight: 19, textAlign: 'center', maxWidth: 320 },
+  addChoices: { paddingHorizontal: 16, paddingBottom: 24, gap: 8 },
+  addChoice: { minHeight: 74, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, backgroundColor: palette.paper },
+  choiceIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.sky },
+  choiceTitle: { color: palette.ink, fontSize: 15, lineHeight: 21, fontWeight: '800' },
+  chevron: { color: palette.smoke, fontSize: 24, lineHeight: 28 },
+  formGap: { marginTop: 8 },
+  label: { color: palette.slate, fontSize: 12, fontWeight: '600', marginTop: 18, marginBottom: 8 },
+  input: { color: palette.ink, backgroundColor: palette.paper, borderRadius: 10, padding: 14, minHeight: 48, fontSize: 16 },
+  noteInput: { minHeight: 120, textAlignVertical: 'top' },
 });
