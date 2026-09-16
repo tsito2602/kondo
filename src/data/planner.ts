@@ -72,9 +72,9 @@ export function createPlannerCommitter() {
   return {
     get hasPendingLink() { return Boolean(pending); },
     get canUndo() { return Boolean(undo) && !pending; },
-    save(s: PlannerSnapshot, prepared: PreparedPlacement, actions: PlannerActions) {
+    save(s: PlannerSnapshot, prepared: PreparedPlacement, actions: PlannerActions, allowTimeConflict = false) {
       editable(s, prepared.tripId);
-      if (prepared.conflict) throw new Error(prepared.conflict);
+      if (prepared.conflict && !allowTimeConflict) throw new Error(prepared.conflict);
       if (pending && !same(prepared, pending.prepared)) throw new Error('先に作成済みの予定の紐づけを再試行してください。');
       if (prepared.original) {
         const live = s.items.find(i => i.id === prepared.original!.id);
