@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
-import { useTravel } from '@/data/travel-provider';
+import { useItineraryTravel } from '@/data/itinerary-editor-draft';
 import type { PlanSource } from '@/data/planner';
 import type { ItineraryCategory, ItineraryDetails } from '@/data/types';
 import { emptyItineraryDetails, itineraryDetailsError, transportLabel } from '@/data/itinerary';
@@ -28,11 +28,11 @@ type SymbolName = ComponentProps<typeof SymbolView>['name'];
 
 const PLAN_ICON: SymbolName = { ios: 'calendar.badge.plus', android: 'event', web: 'event' };
 const MOVE_ICON: SymbolName = { ios: 'arrow.left.arrow.right', android: 'swap_horiz', web: 'swap_horiz' };
-const PLACE_ICON: SymbolName = { ios: 'heart', android: 'favorite_border', web: 'favorite_border' };
+const PLACE_ICON: SymbolName = { ios: 'mappin.and.ellipse', android: 'location_on', web: 'location_on' };
 const CLOSE_ICON: SymbolName = { ios: 'xmark', android: 'close', web: 'close' };
 
 export function PlannerCandidates({ disabled = false, onViewItem }: Props) {
-  const { places, items, canEdit, selectedTrip, createItem } = useTravel();
+  const { places, items, canEdit, selectedTrip, createItem } = useItineraryTravel();
   const palette = usePalette();
   const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
@@ -87,7 +87,7 @@ export function PlannerCandidates({ disabled = false, onViewItem }: Props) {
     if (error) { setFormError(error); return; }
     const id = createItem({ day, time, kind: '予定', title: savedTitle.slice(0, 160), note: note.trim(), details: normalized });
     setAdding(false);
-    toast('予定を追加しました');
+    toast('編集内容に追加しました');
     onViewItem?.(id);
   };
 
@@ -170,7 +170,7 @@ export function PlannerCandidates({ disabled = false, onViewItem }: Props) {
 
     <MotionPresence>{planningPlaceId ? <PlacePlanSheet key={planningPlaceId} placeId={planningPlaceId} onClose={() => setPlanningPlaceId(null)} onComplete={(_, itemId) => {
       setPlanningPlaceId(null);
-      toast('しおりに追加しました');
+      toast('編集内容に追加しました');
       onViewItem?.(itemId);
     }} /> : null}</MotionPresence>
 
