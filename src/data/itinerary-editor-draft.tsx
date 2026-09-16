@@ -69,7 +69,7 @@ function remapItem(item: ItineraryItem, ids: Map<string, string>): ItineraryItem
     };
   }
   if (details.transport?.afterKey) {
-    details.transport = { ...details.transport, afterKey: remapEntryKey(details.transport.afterKey, ids) };
+    details.transport = { ...details.transport, afterKey: remapEntryKey(details.transport.afterKey, ids) ?? undefined };
   }
   return { ...item, details };
 }
