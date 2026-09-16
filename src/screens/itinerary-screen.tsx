@@ -513,8 +513,10 @@ function ItineraryContent({ editor = false, initialDay, origin, onClose }: { edi
                             accessibilityLabel={`${entry.time || '時刻未定'} ${entryTitle(entry)}${entry.item && editor ? 'を編集' : 'の詳細を開く'}`}
                             onPress={(event) => {
                               setDetailOrigin(captureDetailOrigin(event));
-                              if (entry.booking) setViewingBookingId(entry.booking.id);
-                              else if (editor) openEdit(entry.item!);
+                              if (entry.booking) {
+                                if (editor) toast('予約はしおり編集では変更できません');
+                                else setViewingBookingId(entry.booking.id);
+                              } else if (editor) openEdit(entry.item!);
                               else setViewingItemId(entry.item!.id);
                             }}
                             icon={<SymbolView name={entry.booking?.kind === 'flight'
@@ -559,7 +561,7 @@ function ItineraryContent({ editor = false, initialDay, origin, onClose }: { edi
       {selectedTrip && canEdit && !composer.enabled ? <FloatingAddButton label="予定を追加する" onPress={openAdd} /> : null}
       <MotionPresence>{!editor && connectionBookingId ? <FlightConnectionSheet detailOrigin={connectionOrigin} bookingId={connectionBookingId} onClose={() => setConnectionBookingId(null)} /> : null}</MotionPresence>
 
-      <MotionPresence>{viewingBooking ? <BookingSheet detailOrigin={detailOrigin} key={`${selectedTrip?.id}:${viewingBooking.id}`} booking={viewingBooking} onClose={() => setViewingBookingId(null)} /> : null}</MotionPresence>
+      <MotionPresence>{!editor && viewingBooking ? <BookingSheet detailOrigin={detailOrigin} key={`${selectedTrip?.id}:${viewingBooking.id}`} booking={viewingBooking} onClose={() => setViewingBookingId(null)} /> : null}</MotionPresence>
 
       <MotionPresence>{isViewingItem && viewingPlace ? <PlaceSheet detailOrigin={detailOrigin} key={viewingPlace.id} place={viewingPlace} onClose={() => setViewingItemId(null)} onEditSchedule={() => openEdit(viewingItem!)} /> : null}</MotionPresence>
 
