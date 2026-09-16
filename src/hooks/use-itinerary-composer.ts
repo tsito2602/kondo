@@ -1,10 +1,10 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { useTravel } from '@/data/travel-provider';
+import { useItineraryTravel } from '@/data/itinerary-editor-draft';
 import { createPlannerCommitter, plannerSourceTitle, preparePlacement, type PlanSource, type PreparedPlacement } from '@/data/planner';
 import type { PlacementSlot } from '@/data/itinerary-placement';
 
 export function useItineraryComposer({ initiallyEnabled = false }: { initiallyEnabled?: boolean } = {}) {
-  const travel = useTravel();
+  const travel = useItineraryTravel();
   const live = useRef(travel);
   useLayoutEffect(() => { live.current = travel; }, [travel]);
   const [enabled, setEnabled] = useState(initiallyEnabled);
