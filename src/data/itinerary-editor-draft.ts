@@ -18,5 +18,3 @@ export function useItineraryTravel(): ItineraryTravelValue {
   const root = useTravel();
   return useContext(ItineraryTravelContext) ?? root;
 }
-
-export { ItineraryDraftProvider } from './itinerary-editor-draft-provider';
