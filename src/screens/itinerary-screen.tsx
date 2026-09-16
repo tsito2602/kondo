@@ -38,7 +38,8 @@ import { mono, type Palette } from '@/constants/design';
 import { findAirportByCode } from '@/data/airports';
 import { findFlightConnections, hasLikelyFlightConnection, formatConnectionDuration, type FlightConnection } from '@/data/flight-connections';
 import type { Booking, BookingKind, ItineraryItem, ItineraryDetails } from '@/data/types';
-import { ItineraryDraftProvider, useItineraryTravel } from '@/data/itinerary-editor-draft';
+import { useItineraryTravel } from '@/data/itinerary-editor-draft';
+import { ItineraryDraftProvider } from '@/data/itinerary-editor-draft-provider';
 import { confirmDeletion } from '@/utils/confirm-deletion';
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
