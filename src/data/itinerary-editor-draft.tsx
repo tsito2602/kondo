@@ -1,5 +1,5 @@
 import * as Crypto from 'expo-crypto';
-import { createContext, type PropsWithChildren, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, type PropsWithChildren, useCallback, useContext, useMemo, useRef, useState } from 'react';
 
 import { useTravel } from './travel-provider';
 import type { ItineraryItem, Place } from './types';
@@ -101,6 +101,7 @@ export function ItineraryDraftProvider({ children }: PropsWithChildren) {
   const [items, setItems] = useState(() => clone(root.items));
   const [places, setPlaces] = useState(() => clone(root.places));
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [error, setError] = useState('');
   const dirty = comparable(items, places) !== baseSignature;
 
@@ -133,7 +134,7 @@ export function ItineraryDraftProvider({ children }: PropsWithChildren) {
   }, [baseItems, basePlaces]);
 
   const commit = useCallback(() => {
-    if (saving) return false;
+    if (savingRef.current) return false;
     if (!root.canEdit || root.selectedTrip?.id !== tripId) {
       setError('旅行または編集権限が変更されました。閉じて開き直してください。');
       return false;
@@ -143,6 +144,7 @@ export function ItineraryDraftProvider({ children }: PropsWithChildren) {
       return false;
     }
 
+    savingRef.current = true;
     setSaving(true);
     setError('');
     try {
@@ -183,9 +185,10 @@ export function ItineraryDraftProvider({ children }: PropsWithChildren) {
       setError(cause instanceof Error ? cause.message : 'しおりを保存できませんでした。');
       return false;
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
-  }, [baseItems, basePlaces, baseSignature, items, places, root, saving, tripId]);
+  }, [baseItems, basePlaces, baseSignature, items, places, root, tripId]);
 
   const itineraryDraft = useMemo<ItineraryDraftControl>(() => ({ dirty, saving, error, commit, discard }), [commit, dirty, discard, error, saving]);
   const value = useMemo<ItineraryTravelValue>(() => ({
