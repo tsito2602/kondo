@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { FormSheet } from '@/components/form-sheet';
 import { ItineraryCategoryPicker } from '@/components/itinerary-fields';
-import { useTravel } from '@/data/travel-provider';
+import { useItineraryTravel } from '@/data/itinerary-editor-draft';
 import { itineraryTimeline } from '@/data/itinerary-timeline';
 import { createPlacePlanCommitter, placePlanError, placePlanInput, type PlacePlan } from '@/data/place-plan';
 import { useThemedStyles } from '@/theme/theme-provider';
@@ -18,7 +18,7 @@ export function PlacePlanSheet({ placeId, detailOrigin, onClose, onComplete }: {
   onComplete: (tripId: string, itemId: string, inserted: boolean) => void;
 }) {
   const styles = useThemedStyles(createStyles);
-  const { selectedTrip, places, items, bookings, canEdit, createItem, updatePlace } = useTravel();
+  const { selectedTrip, places, items, bookings, canEdit, createItem, updatePlace } = useItineraryTravel();
   const [tripId] = useState(() => selectedTrip?.id ?? '');
   const [initial] = useState<PlacePlan>(() => ({ day: selectedTrip?.startsOn ?? '', time: '', category: 'sightseeing' }));
   const [plan, setPlan] = useState<PlacePlan>(initial);
