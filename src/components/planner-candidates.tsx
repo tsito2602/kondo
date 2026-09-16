@@ -32,7 +32,8 @@ const PLACE_ICON: SymbolName = { ios: 'mappin.and.ellipse', android: 'location_o
 const CLOSE_ICON: SymbolName = { ios: 'xmark', android: 'close', web: 'close' };
 
 export function PlannerCandidates({ disabled = false, onViewItem }: Props) {
-  const { places, items, canEdit, selectedTrip, createItem } = useItineraryTravel();
+  const travel = useItineraryTravel();
+  const { places, items, canEdit, selectedTrip, createItem } = travel;
   const palette = usePalette();
   const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
@@ -168,7 +169,7 @@ export function PlannerCandidates({ disabled = false, onViewItem }: Props) {
       </View>
     </MotionModal>
 
-    <MotionPresence>{planningPlaceId ? <PlacePlanSheet key={planningPlaceId} placeId={planningPlaceId} onClose={() => setPlanningPlaceId(null)} onComplete={(_, itemId) => {
+    <MotionPresence>{planningPlaceId ? <PlacePlanSheet key={planningPlaceId} placeId={planningPlaceId} travelOverride={travel} onClose={() => setPlanningPlaceId(null)} onComplete={(_, itemId) => {
       setPlanningPlaceId(null);
       toast('編集内容に追加しました');
       onViewItem?.(itemId);
