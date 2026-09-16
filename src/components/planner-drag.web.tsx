@@ -25,7 +25,7 @@ export function PlannerHandle({ source, label, disabled }: PlannerHandleProps) {
   if (!context?.enabled) return null;
   const selected = Boolean(context.source && plannerSourceKey(context.source) === plannerSourceKey(source));
   return <button type="button" className="planner-handle planner-keyboard-handle" data-plan-source={JSON.stringify(source)} disabled={disabled}
-    aria-label={`${label}を移動・配置する`} aria-pressed={selected}
+    aria-label={`${label}を並べ替える`} aria-pressed={selected}
     onClick={e => {
       e.stopPropagation(); context.onSelect(selected ? null : source);
       if (e.detail === 0 && !selected) {
@@ -37,7 +37,7 @@ export function PlannerHandle({ source, label, disabled }: PlannerHandleProps) {
           (visible ?? slots[0])?.focus({ preventScroll: Boolean(visible) });
         });
       }
-    }}>⠿</button>;
+    }}>⋮</button>;
 }
 export function PlannerSlot({ slot, label, disabled }: PlannerSlotProps) {
   const context = useContext(Context);
