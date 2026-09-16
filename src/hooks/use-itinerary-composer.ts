@@ -39,9 +39,13 @@ export function useItineraryComposer({ initiallyEnabled = false }: { initiallyEn
     selectionTrip.current = live.current.selectedTrip?.id;
     setSource(next); setError('');
   };
-  const finish = (prepared: PreparedPlacement) => {
-    const id = committer.current.save(live.current, prepared, live.current);
-    setPlacedId(id); setPlacementSequence(value => value + 1); setNotice(prepared.source.kind === 'place' ? '予定を追加しました' : '予定を移動しました');
+  const finish = (prepared: PreparedPlacement, allowTimeConflict = false) => {
+    const id = committer.current.save(live.current, prepared, live.current, allowTimeConflict);
+    setPlacedId(id);
+    setPlacementSequence(value => value + 1);
+    setNotice(prepared.conflict && allowTimeConflict
+      ? '時刻の順序が前後しています。時刻は変更していません。'
+      : prepared.source.kind === 'place' ? '予定を追加しました' : '予定を移動しました');
     setSource(null); setPending(null); setError('');
   };
   const drop = (next: PlanSource, slot: PlacementSlot) => {
@@ -49,8 +53,8 @@ export function useItineraryComposer({ initiallyEnabled = false }: { initiallyEn
     busy.current = true;
     try {
       const prepared = preparePlacement(live.current, selectionTrip.current ?? '', next, slot);
-      if (prepared.conflict) { setPending(prepared); setSource(null); return; }
-      finish(prepared);
+      if (prepared.conflict && !initiallyEnabled) { setPending(prepared); setSource(null); return; }
+      finish(prepared, Boolean(prepared.conflict && initiallyEnabled));
     } catch (cause) { setError(cause instanceof Error ? cause.message : '予定を配置できませんでした。'); }
     finally { busy.current = false; refreshCommitStatus(); }
   };
