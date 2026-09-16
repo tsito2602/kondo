@@ -12,8 +12,8 @@ export function PlannerDrag({ children, ...props }: PlannerDragProps) {
 export function PlannerHandle({ source, label, disabled }: PlannerHandleProps) {
   const c = useContext(Context), p = usePalette();
   if (!c?.enabled) return null;
-  return <Pressable disabled={disabled} accessibilityRole="button" accessibilityLabel={`${label}を移動・配置する`}
-    onPress={() => c.onSelect(source)} style={{ minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'center' }}><Text style={{ color: p.smoke, fontSize: 24 }}>⠿</Text></Pressable>;
+  return <Pressable disabled={disabled} accessibilityRole="button" accessibilityLabel={`${label}を並べ替える`}
+    onPress={() => c.onSelect(source)} style={{ minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'center' }}><Text style={{ color: p.smoke, fontSize: 24 }}>⋮</Text></Pressable>;
 }
 export function PlannerSlot({ slot, label, disabled }: PlannerSlotProps) {
   const c = useContext(Context), p = usePalette();
