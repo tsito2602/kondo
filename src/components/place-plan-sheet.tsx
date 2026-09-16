@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { FormSheet } from '@/components/form-sheet';
 import { ItineraryCategoryPicker } from '@/components/itinerary-fields';
-import { useItineraryTravel } from '@/data/itinerary-editor-draft';
+import { useTravel } from '@/data/travel-provider';
 import { itineraryTimeline } from '@/data/itinerary-timeline';
 import { createPlacePlanCommitter, placePlanError, placePlanInput, type PlacePlan } from '@/data/place-plan';
 import { useThemedStyles } from '@/theme/theme-provider';
@@ -11,14 +11,18 @@ import { mono, type Palette } from '@/constants/design';
 import type { DetailOrigin } from '@/utils/detail-origin';
 import { formatDate, validDate } from '@/utils/dates';
 
-export function PlacePlanSheet({ placeId, detailOrigin, onClose, onComplete }: {
+type TravelValue = ReturnType<typeof useTravel>;
+
+export function PlacePlanSheet({ placeId, detailOrigin, onClose, onComplete, travelOverride }: {
   placeId: string;
   detailOrigin?: DetailOrigin;
   onClose: () => void;
   onComplete: (tripId: string, itemId: string, inserted: boolean) => void;
+  travelOverride?: TravelValue;
 }) {
   const styles = useThemedStyles(createStyles);
-  const { selectedTrip, places, items, bookings, canEdit, createItem, updatePlace } = useItineraryTravel();
+  const rootTravel = useTravel();
+  const { selectedTrip, places, items, bookings, canEdit, createItem, updatePlace } = travelOverride ?? rootTravel;
   const [tripId] = useState(() => selectedTrip?.id ?? '');
   const [initial] = useState<PlacePlan>(() => ({ day: selectedTrip?.startsOn ?? '', time: '', category: 'sightseeing' }));
   const [plan, setPlan] = useState<PlacePlan>(initial);
