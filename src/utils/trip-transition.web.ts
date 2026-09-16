@@ -20,6 +20,7 @@ export function createTripTransitionController(doc: Document) {
   let renderedPath: string | undefined;
   let saved = { tripId: '', y: 0, search: '' };
   const reduced = () => win.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  const shareTitleSnapshot = () => win.innerWidth >= 1024;
   // Native-stack may retain a hidden copy of the list after replace('/').
   // Resolve the visible screen rather than the first duplicate nativeID.
   const liveById = (id: string) => {
@@ -67,7 +68,13 @@ export function createTripTransitionController(doc: Document) {
   const decorate = (op: Operation, root: HTMLElement | null, isTicket: boolean) => {
     if (!root) return;
     name(op, root.querySelector(isTicket ? '[data-testid="trip-ticket-cover"]' : '[data-testid="trip-hero-cover"]'), 'tabi-trip-cover');
-    name(op, root.querySelector(isTicket ? '[data-testid="trip-ticket-title"]' : '[data-testid="trip-name"]'), 'tabi-trip-title');
+    // A large ticket title shrinking into the compact mobile header is rendered
+    // as a raster snapshot by View Transitions. On iOS/WebKit that can leave a
+    // soft halo around the glyphs, so compact layouts keep the title in the
+    // normal page/header snapshot instead of scaling a separate text bitmap.
+    if (shareTitleSnapshot()) {
+      name(op, root.querySelector(isTicket ? '[data-testid="trip-ticket-title"]' : '[data-testid="trip-name"]'), 'tabi-trip-title');
+    }
     // Foreground must not stay in root's snapshot below the named photo.
     // The transparent ticket face includes its stub/notches, but its named
     // cover and title are extracted into their own snapshots.
