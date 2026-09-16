@@ -22,6 +22,7 @@ export type ItineraryPlacement = {
   afterKey: string | null;
   sequence: number;
   orderKey?: string;
+  keepOrder?: boolean;
 };
 export type ItineraryDetails = {
   category: ItineraryCategory;
