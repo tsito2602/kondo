@@ -26,7 +26,7 @@ import { PlaceSheet } from '@/components/place-sheet';
 import { SymbolView } from 'expo-symbols';
 import { useLocalSearchParams } from 'expo-router';
 import { type ComponentProps, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Alert, NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormSheet } from '@/components/form-sheet';
@@ -38,7 +38,7 @@ import { mono, type Palette } from '@/constants/design';
 import { findAirportByCode } from '@/data/airports';
 import { findFlightConnections, hasLikelyFlightConnection, formatConnectionDuration, type FlightConnection } from '@/data/flight-connections';
 import type { Booking, BookingKind, ItineraryItem, ItineraryDetails } from '@/data/types';
-import { useTravel } from '@/data/travel-provider';
+import { ItineraryDraftProvider, useItineraryTravel } from '@/data/itinerary-editor-draft';
 import { confirmDeletion } from '@/utils/confirm-deletion';
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
@@ -146,7 +146,7 @@ function ItineraryContent({ editor = false, initialDay, origin, onClose }: { edi
   const hero = editor ? null : tripHero;
   const [dayBarHeight, setDayBarHeight] = useState(60);
   const { height: windowHeight } = useWindowDimensions();
-  const { canEdit, selectedTrip, items, places, bookings, createItem, updateItem, deleteItem, pendingCount } = useTravel();
+  const { canEdit, selectedTrip, items, places, bookings, createItem, updateItem, deleteItem, pendingCount, itineraryDraft } = useItineraryTravel();
   const params = useLocalSearchParams<{ itemId?: string | string[]; arrival?: string | string[] }>();
   const itemId = editor ? undefined : Array.isArray(params.itemId) ? params.itemId[0] : params.itemId;
   const arrival = editor ? undefined : Array.isArray(params.arrival) ? params.arrival[0] : params.arrival;
@@ -194,9 +194,6 @@ function ItineraryContent({ editor = false, initialDay, origin, onClose }: { edi
   const connectionByArrival = useMemo(() => new Map(flightConnections.map((connection) => [connection.arrivalBookingId, connection])), [flightConnections]);
 
   const timeline = itineraryTimeline(items, bookings, places);
-  // Continue a layover rail only when the next visible event is that flight.
-  // A manually selected later departure must not appear attached to an
-  // unrelated flight or plan that falls between the two endpoints.
   const connectedDepartures = new Set(flightConnections.filter((connection) => {
     const index = timeline.findIndex((entry) => entry.booking?.id === connection.departureBookingId && entry.bookingEndpoint === 'start');
     const previous = timeline[index - 1];
@@ -269,8 +266,6 @@ function ItineraryContent({ editor = false, initialDay, origin, onClose }: { edi
     resumeScrollTracking();
     programmaticScrollDay.current = date;
     setActiveDay(date);
-    // Arrive at the real slot before revealing the item. No long journey
-    // through unrelated days, no guessed offsets and no duplicated live card.
     scrollRef.current.scrollTo({ y, animated: entering ? false : !reduced });
     setArrivalRow(entering ? { id, playing: true } : null);
     scrollTrackingTimer.current = setTimeout(resumeScrollTracking, 1000);
@@ -290,8 +285,6 @@ function ItineraryContent({ editor = false, initialDay, origin, onClose }: { edi
   useLayoutEffect(() => {
     const key = JSON.stringify([tripId, itemId, arrival]);
     if (preparedRequest.current === key && requestedDay) {
-      // Follow a moved item only while this request is still pending; a later
-      // shared edit must not pull the reader away from their current position.
       if (requestedItem.current === itemId) pendingScrollDay.current = requestedDay;
       scheduleRequestedScroll();
       return;
@@ -355,6 +348,7 @@ function ItineraryContent({ editor = false, initialDay, origin, onClose }: { edi
   };
 
   const openEdit = (item: ItineraryItem) => {
+    setViewingItemId(null);
     setEditingId(item.id);
     setDay(item.day);
     const editTime = item.time;
@@ -386,7 +380,7 @@ function ItineraryContent({ editor = false, initialDay, origin, onClose }: { edi
     const input = editingPlace && originalItem ? { ...originalItem, day, time, details } : { day, time, kind: '予定', title: savedTitle.slice(0, 160), note: note.trim(), details };
     if (editingId) updateItem(editingId, input);
     else createItem(input);
-    closeEditor(); toast('予定を保存しました');
+    closeEditor(); toast(editor ? '編集内容を更新しました' : '予定を保存しました');
   };
 
   const remove = () => {
@@ -398,17 +392,37 @@ function ItineraryContent({ editor = false, initialDay, origin, onClose }: { edi
     });
   };
 
-  const closePlanner = () => { if (!composer.linkPending) onClose?.(); };
+  const discardPlanner = () => {
+    itineraryDraft?.discard();
+    onClose?.();
+  };
+  const closePlanner = () => {
+    if (composer.linkPending || itineraryDraft?.saving) return;
+    if (!itineraryDraft?.dirty) { onClose?.(); return; }
+    if (Platform.OS === 'web') {
+      if (globalThis.confirm('変更を破棄しますか？\n\n保存していない変更は失われます。')) discardPlanner();
+      return;
+    }
+    Alert.alert('変更を破棄しますか？', '保存していない変更は失われます。', [
+      { text: '編集を続ける', style: 'cancel' },
+      { text: '破棄する', style: 'destructive', onPress: discardPlanner },
+    ]);
+  };
+  const savePlanner = () => {
+    if (composer.linkPending || itineraryDraft?.saving) return;
+    if (!itineraryDraft || itineraryDraft.commit()) onClose?.();
+  };
+  const editorBusy = composer.linkPending || Boolean(itineraryDraft?.saving);
 
   const content = (
     <SafeAreaView style={styles.safeArea} edges={[]}>
       {editor ? <View testID="planner-editor-header" style={styles.editorHeader}>
-        <Pressable accessibilityRole="button" accessibilityLabel="閉じる" accessibilityState={{ disabled: composer.linkPending }} disabled={composer.linkPending} onPress={closePlanner} style={styles.editorHeaderButton}>
-          <Text style={[styles.editorClose, composer.linkPending && styles.editorHeaderDisabled]}>閉じる</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="閉じる" accessibilityState={{ disabled: editorBusy }} disabled={editorBusy} onPress={closePlanner} style={styles.editorHeaderButton}>
+          <Text style={[styles.editorClose, editorBusy && styles.editorHeaderDisabled]}>閉じる</Text>
         </Pressable>
         <Text accessibilityRole="header" numberOfLines={1} style={styles.editorTitle}>しおりを編集</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="保存" accessibilityState={{ disabled: composer.linkPending }} disabled={composer.linkPending} onPress={closePlanner} style={styles.editorHeaderButton}>
-          <Text style={[styles.editorSave, composer.linkPending && styles.editorHeaderDisabled]}>保存</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="保存" accessibilityState={{ disabled: editorBusy }} disabled={editorBusy} onPress={savePlanner} style={styles.editorHeaderButton}>
+          <Text style={[styles.editorSave, editorBusy && styles.editorHeaderDisabled]}>保存</Text>
         </Pressable>
       </View> : null}
       <PlannerDrag enabled={composer.enabled} source={composer.source} onSelect={composer.select} onDrop={composer.drop} onDay={scrollToDay}>
@@ -438,6 +452,7 @@ function ItineraryContent({ editor = false, initialDay, origin, onClose }: { edi
           {composer.source ? <View style={styles.composerMessage}><Text accessibilityLiveRegion="polite" style={styles.composerCaption}>{composer.sourceTitle} · 配置先を選択</Text><ActionButton label="キャンセル" variant="quiet" onPress={composer.cancel} /></View> : null}
           {composer.notice ? <View style={styles.composerMessage}><Text accessibilityLiveRegion="polite" style={styles.composerCaption}>{composer.notice}</Text>{composer.canUndo ? <ActionButton label="取り消す" variant="quiet" onPress={composer.undo} /> : null}<ActionButton label="閉じる" variant="quiet" onPress={composer.dismissNotice} /></View> : null}
           {composer.error ? <View style={styles.composerMessage}><Text accessibilityRole="alert" style={[styles.composerCaption, { color: palette.danger }]}>{composer.error}</Text>{composer.linkPending ? <ActionButton label="再試行" onPress={composer.retry} /> : null}</View> : null}
+          {itineraryDraft?.error ? <View style={styles.composerMessage}><Text accessibilityRole="alert" style={[styles.composerCaption, { color: palette.danger }]}>{itineraryDraft.error}</Text></View> : null}
           {selectedTrip && itineraryDates.length ? <ScrollView testID="itinerary-day-tabs" ref={dateScrollRef} onLayout={(event) => { dateViewport.current = event.nativeEvent.layout.width; }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}><View accessibilityRole="tablist" style={styles.dayTabs}>
             {itineraryDates.map((date, index) => {
               const selected = date === visibleActiveDay;
@@ -484,7 +499,10 @@ function ItineraryContent({ editor = false, initialDay, origin, onClose }: { edi
                       disabled={Boolean((composer.source?.kind === 'item' && (entry.item?.id === composer.source.id || previous?.item?.id === composer.source.id)) || (isTransport && itemDetails(entry.item!).transport?.afterKey === previous?.key))}
                       label={`${shortDate(date)} ${entryTitle(entry)}の前に配置`} />
                     <PlannerEntry entryKey={entry.key}>
-                    {isTransport ? <TransportRow item={entry.item!} hasPrevious={Boolean(previous)} hasNext={Boolean(next)} onPress={(event) => { setDetailOrigin(captureDetailOrigin(event)); setViewingItemId(entry.item!.id); }} /> : <View style={styles.itemRow}>
+                    {isTransport ? <TransportRow item={entry.item!} hasPrevious={Boolean(previous)} hasNext={Boolean(next)} onPress={(event) => {
+                      setDetailOrigin(captureDetailOrigin(event));
+                      if (editor) openEdit(entry.item!); else setViewingItemId(entry.item!.id);
+                    }} /> : <View style={styles.itemRow}>
                       <View style={styles.timeColumn}>
                         <Text testID={entry.bookingEndpoint === 'end' ? 'detail-source-time-end' : 'detail-source-time'} style={styles.time}>{entry.time || '未定'}</Text>
                         <Text style={styles.timeZone}>{entry.item ? itemEndLabel(entry.item) ? `〜 ${itemEndLabel(entry.item)}` : '' : timeZoneLabel(entry)}</Text>
@@ -492,8 +510,13 @@ function ItineraryContent({ editor = false, initialDay, origin, onClose }: { edi
                       <PlannerCard><SurfaceCard testID="itinerary-card" selected={Boolean(entry.item && composer.source?.kind === 'item' && composer.source.id === entry.item.id)}>
                         <View style={styles.cardRow}>
                           <CardContent title={entryTitle(entry)}
-                            accessibilityLabel={`${entry.time || '時刻未定'} ${entryTitle(entry)}の詳細を開く`}
-                            onPress={(event) => { setDetailOrigin(captureDetailOrigin(event)); if (entry.booking) setViewingBookingId(entry.booking.id); else setViewingItemId(entry.item!.id); }}
+                            accessibilityLabel={`${entry.time || '時刻未定'} ${entryTitle(entry)}${entry.item && editor ? 'を編集' : 'の詳細を開く'}`}
+                            onPress={(event) => {
+                              setDetailOrigin(captureDetailOrigin(event));
+                              if (entry.booking) setViewingBookingId(entry.booking.id);
+                              else if (editor) openEdit(entry.item!);
+                              else setViewingItemId(entry.item!.id);
+                            }}
                             icon={<SymbolView name={entry.booking?.kind === 'flight'
                               ? isLinkedEnd ? { ios: 'airplane.arrival', android: 'flight_land', web: 'flight_land' } : { ios: 'airplane.departure', android: 'flight_takeoff', web: 'flight_takeoff' }
                               : entry.booking ? BOOKING_ICONS[entry.booking.kind] : { ios: category!.ios, android: category!.icon, web: category!.icon } as SymbolName}
@@ -506,8 +529,8 @@ function ItineraryContent({ editor = false, initialDay, origin, onClose }: { edi
                       </SurfaceCard></PlannerCard>
                     </View>}
                     </PlannerEntry>
-                    {connection ? <ConnectionRow disabled={!canEdit} connection={connection} continueRail={connectedDepartures.has(connection.departureBookingId)} nextFlight={bookings.find((flight) => flight.id === connection.departureBookingId)} onPress={(event) => { setConnectionOrigin(captureDetailOrigin(event)); setConnectionBookingId(connection.arrivalBookingId); }} />
-                      : canEdit && isLinkedEnd && entry.booking?.kind === 'flight' && hasLikelyFlightConnection(entry.booking, bookings)
+                    {connection ? <ConnectionRow disabled={!canEdit || editor} connection={connection} continueRail={connectedDepartures.has(connection.departureBookingId)} nextFlight={bookings.find((flight) => flight.id === connection.departureBookingId)} onPress={(event) => { setConnectionOrigin(captureDetailOrigin(event)); setConnectionBookingId(connection.arrivalBookingId); }} />
+                      : canEdit && !editor && isLinkedEnd && entry.booking?.kind === 'flight' && hasLikelyFlightConnection(entry.booking, bookings)
                         ? <View style={styles.connectionAction}><FlightConnectionLink compact booking={entry.booking} onPress={(event) => { setConnectionOrigin(captureDetailOrigin(event)); setConnectionBookingId(entry.booking!.id); }} /></View> : null}
                     </ItineraryArrivalRow>
                     );
@@ -534,14 +557,14 @@ function ItineraryContent({ editor = false, initialDay, origin, onClose }: { edi
       <MotionPresence>{composer.pending ? <PlannerTimeSheet key={`${composer.pending.source.id}:${composer.pending.slot.day}`} placement={composer.pending} error={composer.error} onClose={composer.cancel} onConfirm={composer.confirmTime} /> : null}</MotionPresence>
 
       {selectedTrip && canEdit && !composer.enabled ? <FloatingAddButton label="予定を追加する" onPress={openAdd} /> : null}
-      <MotionPresence>{connectionBookingId ? <FlightConnectionSheet detailOrigin={connectionOrigin} bookingId={connectionBookingId} onClose={() => setConnectionBookingId(null)} /> : null}</MotionPresence>
+      <MotionPresence>{!editor && connectionBookingId ? <FlightConnectionSheet detailOrigin={connectionOrigin} bookingId={connectionBookingId} onClose={() => setConnectionBookingId(null)} /> : null}</MotionPresence>
 
       <MotionPresence>{viewingBooking ? <BookingSheet detailOrigin={detailOrigin} key={`${selectedTrip?.id}:${viewingBooking.id}`} booking={viewingBooking} onClose={() => setViewingBookingId(null)} /> : null}</MotionPresence>
 
       <MotionPresence>{isViewingItem && viewingPlace ? <PlaceSheet detailOrigin={detailOrigin} key={viewingPlace.id} place={viewingPlace} onClose={() => setViewingItemId(null)} onEditSchedule={() => openEdit(viewingItem!)} /> : null}</MotionPresence>
 
       {!editor ? <MotionPresence>{editorRequest && editorRequest.tripId === tripId && canEdit ?
-        <ItineraryContent editor initialDay={editorRequest.day} origin={editorRequest.origin} onClose={() => setEditorRequest(null)} /> : null}</MotionPresence> : null}
+        <ItineraryDraftProvider><ItineraryContent editor initialDay={editorRequest.day} origin={editorRequest.origin} onClose={() => setEditorRequest(null)} /></ItineraryDraftProvider> : null}</MotionPresence> : null}
       <FormSheet detailOrigin={detailOrigin} visible={adding || (Boolean(viewingItem) && !viewingPlace)} presentation={isViewingItem ? 'detail' : 'form'} title={isViewingItem ? '予定の詳細' : editingPlace ? '予定を編集' : editingId ? '予定を編集' : '予定を追加'} onClose={() => { if (isViewingItem) setViewingItemId(null); else closeEditor(); }} onSave={canEdit ? isViewingItem ? () => openEdit(viewingItem!) : save : undefined} saveLabel={isViewingItem ? '編集' : '保存'} canSave={isViewingItem || moving || Boolean(title.trim())} dirty={!isViewingItem && JSON.stringify([day, time, title, note, planDetails]) !== initialDraft} error={isViewingItem ? undefined : formError}>
         {isViewingItem && viewingItem ? <View testID="itinerary-item-details" style={styles.planDetails}>
           <Text style={styles.bookingTag}>{itemCategory(viewingItem).label}</Text>
