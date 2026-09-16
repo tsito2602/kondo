@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,11 +24,12 @@ type Props = {
   onSelect?: (source: PlanSource | null) => void;
   onViewItem?: (id: string) => void;
 };
+type SymbolName = ComponentProps<typeof SymbolView>['name'];
 
-const PLAN_ICON = { ios: 'calendar.badge.plus', android: 'event', web: 'event' } as const;
-const MOVE_ICON = { ios: 'arrow.triangle.swap', android: 'swap_horiz', web: 'swap_horiz' } as const;
-const PLACE_ICON = { ios: 'heart', android: 'favorite_border', web: 'favorite_border' } as const;
-const CLOSE_ICON = { ios: 'xmark', android: 'close', web: 'close' } as const;
+const PLAN_ICON: SymbolName = { ios: 'calendar.badge.plus', android: 'event', web: 'event' };
+const MOVE_ICON: SymbolName = { ios: 'arrow.left.arrow.right', android: 'swap_horiz', web: 'swap_horiz' };
+const PLACE_ICON: SymbolName = { ios: 'heart', android: 'favorite_border', web: 'favorite_border' };
+const CLOSE_ICON: SymbolName = { ios: 'xmark', android: 'close', web: 'close' };
 
 export function PlannerCandidates({ disabled = false, onViewItem }: Props) {
   const { places, items, canEdit, selectedTrip, createItem } = useTravel();
@@ -196,7 +198,7 @@ export function PlannerCandidates({ disabled = false, onViewItem }: Props) {
   </>;
 }
 
-function AddChoice({ icon, title, caption, onPress }: { icon: typeof PLAN_ICON; title: string; caption: string; onPress: () => void }) {
+function AddChoice({ icon, title, caption, onPress }: { icon: SymbolName; title: string; caption: string; onPress: () => void }) {
   const palette = usePalette();
   const styles = useThemedStyles(createStyles);
   return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.addChoice, pressed && styles.placeRowPressed]}>
