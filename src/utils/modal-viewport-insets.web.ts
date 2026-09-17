@@ -8,6 +8,21 @@ export function modalBottomOcclusion(layoutHeight: number, visual: Pick<VisualVi
   return Number.isFinite(gap) ? Math.max(0, gap) : 0;
 }
 
+type ModalViewport = Pick<VisualViewport, 'height' | 'offsetTop' | 'offsetLeft' | 'width' | 'scale'>;
+export type ModalViewportBounds = { top: number; left: number; width: number; height: number };
+
+// Safari's browser chrome / standalone safe-area can make visualViewport a
+// little shorter even with no keyboard. Only a material occlusion should turn
+// the visual viewport into the modal's outer bounds.
+const MIN_KEYBOARD_OCCLUSION = 120;
+
+export function modalViewportBounds(layoutWidth: number, layoutHeight: number, visual: ModalViewport | null): ModalViewportBounds | null {
+  if (!visual || modalBottomOcclusion(layoutHeight, visual) < MIN_KEYBOARD_OCCLUSION) return null;
+  const { offsetTop: top, offsetLeft: left, width, height } = visual;
+  if (![top, left, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null;
+  return { top, left, width, height };
+}
+
 /** Scoped to a mounted modal; never changes another modal's insets or focus. */
 export function trackModalViewportInsets(root: HTMLElement) {
   const win = root.ownerDocument.defaultView;
