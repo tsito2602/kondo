@@ -66,7 +66,7 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
       <View style={styles.topRow}>
         <Pressable accessibilityRole="button" accessibilityLabel={managing ? 'しおりへ戻る' : '旅行一覧へ戻る'} onPress={() => managing ? router.replace({ pathname: '/trips/[tripId]/itinerary', params: { tripId } }) : closeTripTransition(tripId, () => router.replace('/'))} testID="trip-back" style={styles.backButton}><Text style={styles.backMark}>‹</Text></Pressable>
         <View testID="trip-heading" style={styles.title}><Text testID="trip-name" accessibilityRole="header" numberOfLines={1} style={styles.tripName}>{managing ? 'メンバー' : selectedTrip?.name}</Text><Text style={styles.tripDates}>{managing ? selectedTrip?.name : `${selectedTrip?.startsOn.replaceAll('-', '.')} — ${selectedTrip?.endsOn.replaceAll('-', '.')}`}</Text></View>
-        {desktop && action ? <Pressable testID="desktop-page-action" accessibilityRole="button" accessibilityLabel={action.label} onPress={action.run} style={{ position: 'absolute', right: 56, paddingHorizontal: 18, height: 44, borderRadius: 10, backgroundColor: palette.ocean, justifyContent: 'center' }}><Text style={{ color: palette.onOcean, fontSize: 14, fontWeight: '700' }}>＋ {action.label.replace(/する$/, '')}</Text></Pressable> : null}
+        {desktop && action ? <Pressable testID="desktop-page-action" accessibilityRole="button" accessibilityLabel={action.label} onPress={action.run} style={{ position: 'absolute', right: 56, paddingHorizontal: 18, height: 44, borderRadius: 10, backgroundColor: palette.glassAccent, justifyContent: 'center' }}><Text style={{ color: palette.onOcean, fontSize: 14, fontWeight: '700' }}>＋ {action.label.replace(/する$/, '')}</Text></Pressable> : null}
         <Pressable accessibilityRole="button" accessibilityLabel="旅行メニュー" onPress={() => setMenu(true)} style={styles.menuButton}><Text style={styles.menuMark}>⋯</Text></Pressable>
       </View>
       {!managing ? <>
@@ -96,16 +96,43 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
   </View>;
 }
 const createStyles = (palette: Palette) => StyleSheet.create({
-  shell: { width: '100%', backgroundColor: Platform.OS === 'web' ? palette.glass : palette.glassNative },
+  shell: {
+    width: '100%',
+    backgroundColor: Platform.OS === 'web' ? palette.glass : palette.glassNative,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: palette.glassEdge,
+  },
   inner: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 10 },
   topRow: { minHeight: 64, justifyContent: 'center', position: 'relative' },
-  backButton: { position: 'absolute', left: 0, width: 40, height: 48, justifyContent: 'center' },
-  backMark: { color: palette.ocean, fontSize: 32, lineHeight: 36 },
-  title: { marginLeft: 42, marginRight: 48, minHeight: 60, justifyContent: 'center' },
+  backButton: {
+    position: 'absolute',
+    left: 0,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: palette.glassStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.glassEdge,
+  },
+  backMark: { color: palette.ocean, fontSize: 32, lineHeight: 34, marginTop: -2 },
+  title: { marginLeft: 48, marginRight: 48, minHeight: 60, justifyContent: 'center' },
   tripName: { color: palette.ink, fontSize: 16, lineHeight: 22, fontWeight: '800' },
   tripDates: { color: palette.slate, fontSize: 10, marginTop: 4 },
-  menuButton: { position: 'absolute', right: 0, width: 40, height: 44, alignItems: 'center', justifyContent: 'center' },
-  menuMark: { color: palette.ocean, fontSize: 26, fontWeight: '800' },
+  menuButton: {
+    position: 'absolute',
+    right: 0,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: palette.glassStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.glassEdge,
+  },
+  menuMark: { color: palette.ocean, fontSize: 24, lineHeight: 28, fontWeight: '800', marginTop: -2 },
   tabScroll: { marginHorizontal: -20, flexGrow: 0 },
   tabs: { minHeight: 54, flexDirection: 'row', paddingHorizontal: 20, gap: 8, alignItems: 'center' },
   tab: { flexShrink: 0, minWidth: 76, paddingHorizontal: 20, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
@@ -113,9 +140,21 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   tabText: { color: palette.slate, fontSize: 12, lineHeight: 20, fontWeight: '700' },
   tabTextSelected: { color: palette.ink, fontWeight: '900' },
   progress: { color: palette.ocean, fontSize: 11, paddingTop: 8, textAlign: 'right' },
-  menuOverlay: { flex: 1, backgroundColor: 'rgba(18,35,45,0.16)' },
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(18,35,45,0.12)' },
   menuPosition: { position: 'absolute', width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, alignItems: 'flex-end' },
-  menu: { width: 236, borderRadius: 18, padding: 6, backgroundColor: palette.paper },
+  menu: {
+    width: 236,
+    borderRadius: 18,
+    padding: 6,
+    backgroundColor: palette.glassNative,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.glassEdge,
+    shadowColor: palette.ink,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.18,
+    shadowRadius: 26,
+    elevation: 12,
+  },
   menuRow: { minHeight: 52, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 12 },
   menuText: { color: palette.ink, fontSize: 14, fontWeight: '600' },
   deleteRow: { borderRadius: 0, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.ash },
