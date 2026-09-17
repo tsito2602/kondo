@@ -1,5 +1,5 @@
 import { usePalette, useThemedStyles } from '@/theme/theme-provider';
-import { useToast } from './toast';
+import { useToast } from '@/components/toast';
 import { CoverPicker } from './cover-picker';
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput } from 'react-native';

@@ -1,8 +1,8 @@
 import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { MemberAvatar } from './member-avatar';
-import { type ComponentProps, PropsWithChildren, useEffect } from 'react';
+import { PropsWithChildren } from 'react';
 import { closeTripTransition } from '@/utils/trip-transition';
-import { Link, router, usePathname } from 'expo-router';
+import { usePathname } from 'expo-router';
 import { BrandLogo } from '@/components/brand-logo';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
@@ -10,6 +10,7 @@ import { useAuth } from '@/auth/auth-provider';
 import { useTravel } from '@/data/travel-provider';
 import { type Palette } from '@/constants/design';
 import { useDesktop } from '@/hooks/use-desktop';
+import { useUiNavigation } from '@/ui/navigation';
 
 const pages = [
   { key: 'itinerary', label: 'しおり', icon: 'calendar_month' },
@@ -25,44 +26,26 @@ export function WebWorkspace({ children }: PropsWithChildren) {
   const styles = useThemedStyles(createStyles);
 
   const desktop = useDesktop();
+  const navigation = useUiNavigation();
   const pathname = usePathname();
   const { selectedTrip, syncing, sync } = useTravel();
   const { user, isDemo } = useAuth();
   const trip = pathname.startsWith('/trips/') ? selectedTrip : null;
-  const goHome: NonNullable<ComponentProps<typeof Link>['onPress']> = (event) => {
-    const click = event.nativeEvent as unknown as MouseEvent;
-    if (!trip || event.defaultPrevented || click.button > 0 || click.metaKey || click.ctrlKey || click.shiftKey || click.altKey) return;
-    event.preventDefault();
-    closeTripTransition(trip.id, () => router.replace('/'));
+  const goHome = () => {
+    if (trip) closeTripTransition(trip.id, () => navigation.replace('/'));
+    else navigation.replace('/');
   };
-  useEffect(() => {
-    // A missed drop must never replace the app with a local file.
-    const preventFileNavigation = (event: DragEvent) => {
-      if (event.dataTransfer?.types.includes('Files')) event.preventDefault();
-    };
-    // RN Web handles Enter on these roles, but only handles Space for buttons.
-    const pressSpace = (event: KeyboardEvent) => {
-      const target = event.target;
-      if (event.key !== ' ' || !(target instanceof HTMLElement) || !target.matches('[role="checkbox"], [role="radio"], [role="tab"]') || ['INPUT', 'BUTTON'].includes(target.tagName)) return;
-      event.preventDefault();
-      if (!event.repeat && target.getAttribute('aria-disabled') !== 'true' && !target.hasAttribute('disabled')) target.click();
-    };
-    window.addEventListener('keydown', pressSpace);
-    window.addEventListener('dragover', preventFileNavigation);
-    window.addEventListener('drop', preventFileNavigation);
-    return () => { window.removeEventListener('keydown', pressSpace); window.removeEventListener('dragover', preventFileNavigation); window.removeEventListener('drop', preventFileNavigation); };
-  }, []);
   return <View testID="web-workspace" style={styles.workspace}>
     {desktop ? <a href="#workspace-main" className="skip-link">本文へ移動</a> : null}
     {desktop ? <View role="navigation" accessibilityLabel="メインナビゲーション" style={styles.sidebar}>
-      <Link href="/" onPress={goHome} style={styles.brand} accessibilityLabel="tabi 旅行一覧"><BrandLogo style={{ width: 50, height: 50 }} contentFit="contain" /><Text style={styles.wordmark}>tabi</Text></Link>
-      <Link href="/" onPress={goHome} style={[styles.nav, pathname === '/' && styles.selected]}><SymbolView name={{ web: 'luggage' }} size={21} tintColor={palette.ocean} /><Text style={styles.navText}>すべての旅行</Text></Link>
+      <Pressable accessibilityRole="link" accessibilityLabel="tabi 旅行一覧" onPress={goHome} style={styles.brand}><BrandLogo style={{ width: 50, height: 50 }} contentFit="contain" /><Text style={styles.wordmark}>tabi</Text></Pressable>
+      <Pressable accessibilityRole="link" onPress={goHome} style={[styles.nav, pathname === '/' && styles.selected]}><SymbolView name={{ web: 'luggage' }} size={21} tintColor={palette.ocean} /><Text style={styles.navText}>すべての旅行</Text></Pressable>
       {trip ? <View style={styles.section}>
-        <View style={styles.links}>{pages.map((page) => <Link key={page.key} href={{ pathname: `/trips/[tripId]/${page.key}`, params: { tripId: trip.id } }} style={[styles.nav, pathname.endsWith(`/${page.key}`) && styles.selected]} aria-current={pathname.endsWith(`/${page.key}`) ? 'page' : undefined}><SymbolView name={{ web: page.icon }} size={21} tintColor={palette.ocean} /><Text style={styles.navText}>{page.label}</Text></Link>)}</View>
+        <View style={styles.links}>{pages.map((page) => <Pressable accessibilityRole="link" accessibilityState={{ selected: pathname.endsWith(`/${page.key}`) }} key={page.key} onPress={() => navigation.push({ pathname: `/trips/[tripId]/${page.key}`, params: { tripId: trip.id } })} style={[styles.nav, pathname.endsWith(`/${page.key}`) && styles.selected]}><SymbolView name={{ web: page.icon }} size={21} tintColor={palette.ocean} /><Text style={styles.navText}>{page.label}</Text></Pressable>)}</View>
       </View> : null}
       <View style={{ flex: 1 }} />
       <View style={styles.account}>
-        <Link href="/settings" style={[styles.nav, pathname === '/settings' && styles.selected]}><MemberAvatar name={user?.name || 'あなた'} avatarUrl={user?.avatarUrl} size={32} /><View style={{ flex: 1, gap: 4 }}><Text numberOfLines={1} style={{ color: palette.ink, fontSize: 12, fontWeight: '600' }}>{user?.name || (isDemo ? 'サンプルの旅行' : 'アカウント')}</Text><Text style={styles.accountText}>設定</Text></View></Link>
+        <Pressable accessibilityRole="link" onPress={() => navigation.push('/settings')} style={[styles.nav, pathname === '/settings' && styles.selected]}><MemberAvatar name={user?.name || 'あなた'} avatarUrl={user?.avatarUrl} size={32} /><View style={{ flex: 1, gap: 4 }}><Text numberOfLines={1} style={{ color: palette.ink, fontSize: 12, fontWeight: '600' }}>{user?.name || (isDemo ? 'サンプルの旅行' : 'アカウント')}</Text><Text style={styles.accountText}>設定</Text></View></Pressable>
         {!isDemo ? <Pressable accessibilityRole="button" disabled={syncing} onPress={() => void sync()} style={styles.accountAction}><Text style={styles.accountText}>{syncing ? '同期中…' : '最新の情報に更新'}</Text></Pressable> : null}
 
       </View>

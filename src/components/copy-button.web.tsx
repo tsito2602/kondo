@@ -1,7 +1,8 @@
-import * as Clipboard from 'expo-clipboard';
 import { useEffect, useRef, useState } from 'react';
+import { useUiPlatform } from '@/ui/platform';
 
 export function CopyButton({ value, label = 'コピー' }: { value: string; label?: string }) {
+  const platform = useUiPlatform();
   const [state, setState] = useState<'idle' | 'copied' | 'error'>('idle');
   const busy = useRef(false);
   const active = useRef(true);
@@ -11,7 +12,7 @@ export function CopyButton({ value, label = 'コピー' }: { value: string; labe
     if (busy.current) return;
     busy.current = true;
     let next: 'copied' | 'error';
-    try { next = await Clipboard.setStringAsync(value) ? 'copied' : 'error'; }
+    try { next = await platform.copyText(value) ? 'copied' : 'error'; }
     catch { next = 'error'; }
     finally { busy.current = false; }
     if (!active.current) return;

@@ -1,14 +1,15 @@
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { motionMs } from '@/utils/motion';
 import { useThemedStyles } from '@/theme/theme-provider';
-import * as Clipboard from 'expo-clipboard';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, Text } from 'react-native';
 import { type Palette } from '@/constants/design';
+import { useUiPlatform } from '@/ui/platform';
 
 export function CopyButton({ value, label = 'コピー' }: { value: string; label?: string }) {
   const reduced = useReducedMotion();
   const styles = useThemedStyles(createStyles);
+  const platform = useUiPlatform();
 
   const [state, setState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [motion] = useState(() => new Animated.Value(1));
@@ -18,7 +19,7 @@ export function CopyButton({ value, label = 'コピー' }: { value: string; labe
   const copy = async () => {
     if (busy.current) return;
     busy.current = true;
-    try { setState(await Clipboard.setStringAsync(value) ? 'copied' : 'error'); }
+    try { setState(await platform.copyText(value) ? 'copied' : 'error'); }
     catch { setState('error'); }
     finally { busy.current = false; }
     if (timer.current) clearTimeout(timer.current);

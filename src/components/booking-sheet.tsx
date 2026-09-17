@@ -2,12 +2,9 @@ import { bookingDurationLabel } from '@/data/booking-duration';
 import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { FileDrop, type DroppedFile } from './file-drop';
 import { type ComponentProps, type Dispatch, type SetStateAction, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import * as DocumentPicker from 'expo-document-picker';
-import { File } from 'expo-file-system';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { mapUrl } from '@/data/places';
-import * as Sharing from 'expo-sharing';
 import { useToast } from '@/components/toast';
 import { CopyButton } from '@/components/copy-button';
 import { FormSheet } from '@/components/form-sheet';
@@ -21,6 +18,7 @@ import { useTravel } from '@/data/travel-provider';
 import { Booking, BookingDocument, BookingKind } from '@/data/types';
 import { confirmDeletion } from '@/utils/confirm-deletion';
 import { addDays, formatDate, validDate } from '@/utils/dates';
+import { useUiPlatform } from '@/ui/platform';
 
 export const BOOKING_KINDS: { value: BookingKind; label: string; short: string; icon: string }[] = [
   { value: 'flight', label: '航空券', short: 'FLIGHT', icon: '✈' },
@@ -162,6 +160,7 @@ export function BookingSheet({ booking, onClose }: { booking?: Booking; onClose:
 function BookingDetails({ booking, documents }: { booking: Booking; documents: BookingDocument[] }) {
   const palette = usePalette();
   const toast = useToast();
+  const platform = useUiPlatform();
   const hasLocation = ['hotel', 'restaurant', 'ticket', 'other'].includes(booking.kind);
   const location = booking.location ?? (booking.kind === 'hotel' ? booking.detail : '');
   const url = hasLocation ? mapUrl(location, booking.title) : null;
@@ -184,7 +183,7 @@ function BookingDetails({ booking, documents }: { booking: Booking; documents: B
     </View>
     {hasLocation ? <View style={styles.locationBlock}>
       {location && !/^https?:\/\//i.test(location) ? <Text selectable style={styles.detailBody}>{location}</Text> : null}
-      {url ? <Pressable accessibilityRole="button" accessibilityLabel={`${booking.title}の地図を開く`} onPress={() => { void Linking.openURL(url).catch(() => toast('地図を開けませんでした')); }} style={styles.mapButton}>
+      {url ? <Pressable accessibilityRole="button" accessibilityLabel={`${booking.title}の地図を開く`} onPress={() => { void platform.openURL(url).catch(() => toast('地図を開けませんでした')); }} style={styles.mapButton}>
         <SymbolView name={{ ios: 'map', android: 'map', web: 'map' }} size={20} tintColor={palette.ocean} />
         <Text style={styles.mapButtonText}>地図を開く</Text>
       </Pressable> : null}
@@ -198,6 +197,7 @@ function BookingDetails({ booking, documents }: { booking: Booking; documents: B
 function BookingDocuments({ bookingId, documents, readOnly = false }: { bookingId: string; documents: BookingDocument[]; readOnly?: boolean }) {
   const palette = usePalette();
   const styles = useThemedStyles(createStyles);
+  const platform = useUiPlatform();
 
   const { canEdit: canEditTrip, deleteBookingDocument, downloadBookingDocument, uploadBookingDocument } = useTravel();
   const canEdit = canEditTrip && !readOnly;
@@ -234,9 +234,9 @@ function BookingDocuments({ bookingId, documents, readOnly = false }: { bookingI
   const addDocuments = async () => {
     if (!canEdit || busy || uploadLock.current) return;
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: ['image/*', 'application/pdf'], multiple: true, copyToCacheDirectory: true });
-      if (result.canceled) return;
-      await uploadFiles(result.assets.map((asset) => ({ name: asset.name, type: asset.mimeType ?? '', size: asset.size ?? asset.file?.size ?? 1, arrayBuffer: () => asset.file ? asset.file.arrayBuffer() : new File(asset.uri).arrayBuffer() })));
+      const files = await platform.pickDocuments();
+      if (!files) return;
+      await uploadFiles(files);
     } catch (cause) { setError(cause instanceof Error ? cause.message : '書類を追加できませんでした'); }
   };
   const downloadDocument = async (entry: BookingDocument) => {
@@ -244,10 +244,7 @@ function BookingDocuments({ bookingId, documents, readOnly = false }: { bookingI
     setBusy(entry.id); setError('');
     try {
       const bytes = await downloadBookingDocument(bookingId, entry.id);
-      const url = URL.createObjectURL(new Blob([bytes], { type: entry.contentType }));
-      const link = document.createElement('a'); link.href = url; link.download = entry.filename;
-      document.body.appendChild(link); link.click(); link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      platform.downloadFile({ filename: entry.filename, contentType: entry.contentType, bytes });
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'ダウンロードできませんでした'); }
     finally { setBusy(null); }
   };
@@ -256,29 +253,22 @@ function BookingDocuments({ bookingId, documents, readOnly = false }: { bookingI
     if (busy) return;
     setError('');
     setBusy(document.id);
-    // Reserve the tab within the tap event so mobile browsers allow it.
-    const preview = Platform.OS === 'web' ? window.open('', '_blank') : null;
-    if (preview) preview.opener = null;
     try {
-      if (Platform.OS === 'web' && !preview) throw new Error('書類を開くにはポップアップを許可してください');
-      let uri = getCachedDocumentUri(document.id, document.filename);
-      let bytes: ArrayBuffer | null = null;
-      if (!uri) {
-        bytes = await downloadBookingDocument(bookingId, document.id);
-        uri = cacheBookingDocument(document.id, document.filename, bytes);
-      }
-      if (Platform.OS === 'web') {
-        bytes ??= await downloadBookingDocument(bookingId, document.id);
-        const objectUrl = URL.createObjectURL(new Blob([bytes], { type: document.contentType }));
-        if (preview) preview.location.href = objectUrl;
-        setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
-      } else if (uri && await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { dialogTitle: document.filename, mimeType: document.contentType });
-      } else {
-        throw new Error('この端末では書類を開けません');
-      }
+      await platform.openDocument({
+        filename: document.filename,
+        contentType: document.contentType,
+        load: async () => {
+          let uri = getCachedDocumentUri(document.id, document.filename) ?? undefined;
+          let bytes: ArrayBuffer | undefined;
+          if (!uri) {
+            bytes = await downloadBookingDocument(bookingId, document.id);
+            uri = cacheBookingDocument(document.id, document.filename, bytes);
+          }
+          if (Platform.OS === 'web' && !bytes) bytes = await downloadBookingDocument(bookingId, document.id);
+          return { uri, bytes };
+        },
+      });
     } catch (cause) {
-      preview?.close();
       setError(cause instanceof Error ? cause.message : '書類を開けませんでした');
     } finally {
       setBusy(null);

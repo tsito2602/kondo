@@ -2,7 +2,7 @@ import { MotionPage } from '@/components/motion-page';
 import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { PageActionContext, type PageAction } from '@/components/page-action-context';
 import { useDesktop } from '@/hooks/use-desktop';
-import { Redirect, Slot, useLocalSearchParams, usePathname } from 'expo-router';
+import { Slot, useLocalSearchParams, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Animated, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,12 +12,14 @@ import { TripHero, TripHeroContext } from '@/components/trip-hero';
 import { TripTopTabs } from '@/components/trip-top-tabs';
 import { type Palette } from '@/constants/design';
 import { useTravel } from '@/data/travel-provider';
+import { useUiNavigation } from '@/ui/navigation';
 
 export default function TripLayout() {
   const palette = usePalette();
   const styles = useThemedStyles(createStyles);
 
   const desktop = useDesktop();
+  const navigation = useUiNavigation();
   const [action, setAction] = useState<PageAction | null>(null);
   const insets = useSafeAreaInsets();
   const [headerHeight, setHeaderHeight] = useState(160);
@@ -31,16 +33,18 @@ export default function TripLayout() {
   const { tripId: rawTripId } = useLocalSearchParams<{ tripId: string | string[] }>();
   const tripId = Array.isArray(rawTripId) ? rawTripId[0] : rawTripId;
   const { ready, trips, selectedTrip, selectTrip } = useTravel();
-  const tripExists = trips.some((trip) => trip.id === tripId);
+  const tripExists = Boolean(tripId && trips.some((trip) => trip.id === tripId));
 
   useEffect(() => {
     if (ready && tripExists && selectedTrip?.id !== tripId) selectTrip(tripId);
   }, [ready, selectTrip, selectedTrip?.id, tripExists, tripId]);
+  useEffect(() => {
+    if (ready && !tripExists) navigation.replace('/');
+  }, [navigation, ready, tripExists]);
 
-  if (!ready || (tripExists && selectedTrip?.id !== tripId)) {
+  if (!ready || !tripExists || selectedTrip?.id !== tripId) {
     return <View style={styles.loading}><ActivityIndicator color={palette.ocean} /></View>;
   }
-  if (!tripId || !tripExists) return <Redirect href="/" />;
 
   return (
     <PageActionContext.Provider value={{ action, setAction }}><View testID="trip-workspace" nativeID={`trip-workspace-${tripId}`} style={styles.safeArea}>

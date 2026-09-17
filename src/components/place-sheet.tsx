@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { type Palette } from '@/constants/design';
@@ -10,6 +10,7 @@ import { useTravel } from '@/data/travel-provider';
 import type { Place, PlaceInput } from '@/data/types';
 import { mapUrl, referenceUrl, placeStatuses, reservationStatuses } from '@/data/places';
 import { confirmDeletion } from '@/utils/confirm-deletion';
+import { useUiPlatform } from '@/ui/platform';
 
 const empty: PlaceInput = { title: '', note: '', openingHours: '', reservationStatus: 'not_needed', location: '', referenceLinks: [], status: 'want' };
 
@@ -19,6 +20,7 @@ export function PlaceSheet({ place, onClose, onPlan, onEditSchedule }: Props) {
   const palette = usePalette();
   const styles = useThemedStyles(createStyles);
   const toast = useToast();
+  const platform = useUiPlatform();
   const { canEdit, places, items, createPlace, updatePlace, deletePlace } = useTravel();
   const [editingId, setEditingId] = useState(place?.id);
   const [viewing, setViewing] = useState(Boolean(place));
@@ -53,10 +55,10 @@ export function PlaceSheet({ place, onClose, onPlan, onEditSchedule }: Props) {
         {onEditSchedule && itineraryItem ? <View style={styles.detailSection}><Text style={styles.detailLabel}>予定の日時</Text><Text style={styles.detailValue}>{itineraryItem.day.replaceAll('-', '/')}　{itineraryItem.time || '時刻未定'}</Text>{canEdit ? <Pressable accessibilityRole="button" style={styles.mapButton} onPress={onEditSchedule}><Text style={styles.actionText}>日時を編集</Text></Pressable> : null}</View> : null}
         <View style={styles.detailStatus}><PlaceStatusIcon status={details.status} size={20} /><Text style={styles.statusText}>{placeStatuses.find((item) => item.value === details.status)?.label}</Text></View>
         {details.location ? <View style={styles.detailSection}><Text style={styles.detailLabel}>場所</Text><Text selectable style={styles.detailValue}>{details.location}</Text></View> : null}
-        <Pressable accessibilityRole="button" accessibilityLabel={`${details.title}の地図を開く`} onPress={() => { const url = mapUrl(details.location, details.title); if (url) void Linking.openURL(url); }} style={styles.mapButton}><SymbolView name={{ ios: 'map', android: 'map', web: 'map' }} size={20} tintColor={palette.ocean} /><Text style={styles.actionText}>地図を開く</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={`${details.title}の地図を開く`} onPress={() => { const url = mapUrl(details.location, details.title); if (url) void platform.openURL(url); }} style={styles.mapButton}><SymbolView name={{ ios: 'map', android: 'map', web: 'map' }} size={20} tintColor={palette.ocean} /><Text style={styles.actionText}>地図を開く</Text></Pressable>
         {details.referenceLinks?.length ? <View style={styles.detailSection}><Text style={styles.detailLabel}>参照リンク</Text>{details.referenceLinks.map((link, index) => {
           const url = referenceUrl(link.url);
-          return url ? <Pressable key={index} accessibilityRole="link" accessibilityLabel={`${link.label || new URL(url).hostname}を開く`} onPress={() => { void Linking.openURL(url).catch(() => toast('リンクを開けませんでした')); }} style={styles.referenceButton}>
+          return url ? <Pressable key={index} accessibilityRole="link" accessibilityLabel={`${link.label || new URL(url).hostname}を開く`} onPress={() => { void platform.openURL(url).catch(() => toast('リンクを開けませんでした')); }} style={styles.referenceButton}>
             <SymbolView name={{ ios: 'link', android: 'link', web: 'link' }} size={20} tintColor={palette.ocean} />
             <View style={styles.referenceCopy}><Text style={styles.referenceTitle}>{link.label || new URL(url).hostname}</Text><Text numberOfLines={1} style={styles.referenceUrl}>{url}</Text></View>
           </Pressable> : null;

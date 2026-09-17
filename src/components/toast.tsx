@@ -25,7 +25,7 @@ export function ToastProvider({ children }: PropsWithChildren) {
     }, 3600);
   }, [progress, reduced]);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
-  return <ToastContext.Provider value={{ show, message, progress }}>{children}<ToastHost /></ToastContext.Provider>;
+  return <ToastContext.Provider value={{ show, message, progress }}>{children}</ToastContext.Provider>;
 }
 
 // A sheet has its own native modal layer, so it also hosts the same toast.

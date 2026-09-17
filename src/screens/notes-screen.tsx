@@ -1,4 +1,3 @@
-import * as Crypto from 'expo-crypto';
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -11,6 +10,7 @@ import { useModalViewport } from '@/hooks/use-modal-viewport';
 import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import type { Palette } from '@/constants/design';
 import { confirmDeletion } from '@/utils/confirm-deletion';
+import { useUiPlatform } from '@/ui/platform';
 
 const titleOf = (body: string) => body.trim().split('\n')[0] || '新規メモ';
 const dateOf = (stamp: number) => new Date(stamp * 1000).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
@@ -19,11 +19,12 @@ export default function NotesScreen() {
   const palette = usePalette();
   const styles = useThemedStyles(createStyles);
   const headerHeight = useTripHeaderHeight();
+  const platform = useUiPlatform();
   const { notes, canEdit } = useTravel();
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<TravelNote | null>(null);
   const filtered = useMemo(() => notes.filter((note) => note.body.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())).sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt || a.id.localeCompare(b.id)), [notes, search]);
-  const add = () => setEditing({ id: Crypto.randomUUID(), body: '', pinned: false, updatedAt: Math.floor(Date.now() / 1000) });
+  const add = () => setEditing({ id: platform.uuid(), body: '', pinned: false, updatedAt: Math.floor(Date.now() / 1000) });
   return <View style={styles.screen}>
     <ScrollView testID="notes-scroll" keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingTop: headerHeight + 24 }]}>
       {notes.length ? <TextInput accessibilityLabel="メモを検索" value={search} onChangeText={setSearch} placeholder="検索" placeholderTextColor={palette.placeholder} style={styles.search} /> : null}

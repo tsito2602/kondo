@@ -14,7 +14,7 @@ export function ToastProvider({ children }: PropsWithChildren) {
     timer.current = setTimeout(() => setOpen(false), 3600);
   }, []);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
-  return <ToastContext.Provider value={{ show, message, open }}>{children}<ToastHost /></ToastContext.Provider>;
+  return <ToastContext.Provider value={{ show, message, open }}>{children}</ToastContext.Provider>;
 }
 
 export function ToastHost() {

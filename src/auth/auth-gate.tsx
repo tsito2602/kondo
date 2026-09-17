@@ -5,8 +5,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { type Palette } from '@/constants/design';
-
-import { useAuth } from './auth-provider';
+import { useAuth } from '@/auth/auth-provider';
 
 export function AuthGate({ children }: PropsWithChildren) {
   const palette = usePalette();

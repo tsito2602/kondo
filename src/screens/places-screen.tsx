@@ -1,9 +1,8 @@
 import { MotionPresence } from '@/components/motion-presence';
 import { usePalette, useThemedStyles } from '@/theme/theme-provider';
-import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useMemo, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ItineraryCategoryPicker } from '@/components/itinerary-fields';
 import { emptyItineraryDetails } from '@/data/itinerary';
 import { PlaceStatusIcon } from '@/components/place-status-icon';
@@ -17,6 +16,8 @@ import { PlaceSheet } from '@/components/place-sheet';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { useToast } from '@/components/toast';
 import { useTripHeaderHeight } from '@/components/trip-header-context';
+import { useUiNavigation } from '@/ui/navigation';
+import { useUiPlatform } from '@/ui/platform';
 
 export default function PlacesScreen() {
   const palette = usePalette();
@@ -24,7 +25,8 @@ export default function PlacesScreen() {
 
   const { canEdit, places, items, updatePlace, selectedTrip, createItem } = useTravel();
   const toast = useToast();
-  const router = useRouter();
+  const navigation = useUiNavigation();
+  const platform = useUiPlatform();
   const headerHeight = useTripHeaderHeight();
   const [filter, setFilter] = useState<PlaceStatus | 'all'>('all');
   const [search, setSearch] = useState('');
@@ -64,9 +66,9 @@ export default function PlacesScreen() {
             <Pressable accessibilityRole="button" accessibilityLabel={`${place.title}のステータスを変更`} disabled={!canEdit} onPress={() => setStatusPlace(place)} style={[styles.status, place.status === 'visited' && styles.statusVisited]}><PlaceStatusIcon status={place.status} /><Text style={styles.statusText}>{status.label}</Text></Pressable>
             <View style={styles.cardActions}>{itineraryItem || canEdit ? <Pressable accessibilityRole="button" onPress={() => {
               if (itineraryItem && selectedTrip) {
-                router.push({ pathname: '/trips/[tripId]/itinerary', params: { tripId: selectedTrip.id, itemId: itineraryItem.id } });
+                navigation.push({ pathname: '/trips/[tripId]/itinerary', params: { tripId: selectedTrip.id, itemId: itineraryItem.id } });
               } else { setDay(selectedTrip?.startsOn ?? ''); setCategory('sightseeing'); setPlanning(place); }
-            }} style={styles.action}><SymbolView name={itineraryItem ? { ios: 'book', android: 'menu_book', web: 'menu_book' } : { ios: 'calendar.badge.plus', android: 'event', web: 'event' }} size={16} tintColor={palette.ocean} /><Text style={styles.actionText}>{itineraryItem ? 'しおりを見る' : 'しおりへ'}</Text></Pressable> : null}<Pressable accessibilityRole="button" accessibilityLabel={`${place.title}の地図を開く`} onPress={() => { const url = mapUrl(place.location, place.title); if (url) void Linking.openURL(url); }} style={styles.action}><SymbolView name={{ ios: 'map', android: 'map', web: 'map' }} size={16} tintColor={palette.ocean} /><Text style={styles.actionText}>地図</Text></Pressable></View>
+            }} style={styles.action}><SymbolView name={itineraryItem ? { ios: 'book', android: 'menu_book', web: 'menu_book' } : { ios: 'calendar.badge.plus', android: 'event', web: 'event' }} size={16} tintColor={palette.ocean} /><Text style={styles.actionText}>{itineraryItem ? 'しおりを見る' : 'しおりへ'}</Text></Pressable> : null}<Pressable accessibilityRole="button" accessibilityLabel={`${place.title}の地図を開く`} onPress={() => { const url = mapUrl(place.location, place.title); if (url) void platform.openURL(url); }} style={styles.action}><SymbolView name={{ ios: 'map', android: 'map', web: 'map' }} size={16} tintColor={palette.ocean} /><Text style={styles.actionText}>地図</Text></Pressable></View>
           </View>
         </View>;
       })}</View>}
@@ -75,7 +77,7 @@ export default function PlacesScreen() {
     <MotionPresence>{editing ? <PlaceSheet key={editing === 'new' ? 'new' : editing.id} place={editing === 'new' ? undefined : places.find((place) => place.id === editing.id) ?? editing} onClose={() => setEditing(null)} onPlan={canEdit || (editing !== 'new' && items.some((item) => item.id === editing.itineraryItemId)) ? (place) => {
       setEditing(null);
       const item = items.find((entry) => entry.id === place.itineraryItemId);
-      if (item && selectedTrip) router.push({ pathname: '/trips/[tripId]/itinerary', params: { tripId: selectedTrip.id, itemId: item.id } });
+      if (item && selectedTrip) navigation.push({ pathname: '/trips/[tripId]/itinerary', params: { tripId: selectedTrip.id, itemId: item.id } });
       else { setDay(selectedTrip?.startsOn ?? ''); setCategory('sightseeing'); setPlanning(place); }
     } : undefined} /> : null}</MotionPresence>
     <MotionPresence>{statusPlace ? <FormSheet visible title="ステータスを変更" onClose={() => setStatusPlace(null)}><Text style={styles.placeTitle}>{statusPlace.title}</Text>{placeStatuses.map((entry) => <Pressable accessibilityRole="button" key={entry.value} disabled={!canEdit} onPress={() => { updatePlace(statusPlace.id, { ...statusPlace, status: entry.value }); setStatusPlace(null); }} style={[styles.option, statusPlace.status === entry.value && styles.filterSelected]}><PlaceStatusIcon status={entry.value} /><Text style={styles.optionText}>{entry.label}{statusPlace.status === entry.value ? '　✓' : ''}</Text></Pressable>)}</FormSheet> : null}</MotionPresence>

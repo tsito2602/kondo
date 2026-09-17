@@ -4,11 +4,12 @@ import { useThemedStyles } from '@/theme/theme-provider';
 import { useModalViewport } from '@/hooks/use-modal-viewport';
 import { useFormKeyboard } from '@/hooks/use-form-keyboard';
 import { PropsWithChildren, useEffect, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ToastHost } from './toast';
+import { ToastHost } from '@/components/toast';
 import { type Palette } from '@/constants/design';
+import { useUiPlatform } from '@/ui/platform';
 
 type Props = PropsWithChildren<{
   visible: boolean;
@@ -24,6 +25,7 @@ type Props = PropsWithChildren<{
 
 export function FormSheet({ presentation = 'form', visible, title, onClose, onSave, saveLabel = '保存', canSave = true, dirty = false, error, children }: Props) {
   const styles = useThemedStyles(createStyles);
+  const platform = useUiPlatform();
 
   const viewport = useModalViewport(visible);
   const reduceMotion = useReducedMotion();
@@ -33,12 +35,8 @@ export function FormSheet({ presentation = 'form', visible, title, onClose, onSa
   useEffect(() => { if (error) scroll.current?.scrollToEnd({ animated: !reduceMotion }); }, [error, reduceMotion]);
   const close = () => {
     if (!dirty) return onClose();
-    if (Platform.OS === 'web') {
-      setConfirmClose(true);
-    } else Alert.alert('変更を保存せずに閉じますか？', undefined, [
-      { text: '編集を続ける', style: 'cancel' },
-      { text: '変更を破棄', style: 'destructive', onPress: onClose },
-    ]);
+    if (Platform.OS === 'web') return setConfirmClose(true);
+    void platform.confirmDiscard().then((discard) => { if (discard) onClose(); });
   };
   return <><MotionModal visible={visible} transparent={Platform.OS === 'web'} presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : 'fullScreen'} animationType={reduceMotion ? 'none' : Platform.OS === 'web' ? 'fade' : 'slide'} onRequestClose={close}>
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} testID={presentation === 'detail' ? 'detail-modal-viewport' : 'form-modal-viewport'} style={[styles.overlay, viewport]}>

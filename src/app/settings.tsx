@@ -1,7 +1,6 @@
 import { MotionPage } from '@/components/motion-page';
 import { ThemeSetting } from '@/components/theme-setting';
 import { usePalette, useThemedStyles } from '@/theme/theme-provider';
-import { router } from 'expo-router';
 import { BrandLogo } from '@/components/brand-logo';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
@@ -13,12 +12,14 @@ import { PwaControls } from '@/components/pwa';
 import { useToast } from '@/components/toast';
 import { useTravel } from '@/data/travel-provider';
 import { type Palette } from '@/constants/design';
+import { useUiNavigation } from '@/ui/navigation';
 import packageInfo from '../../package.json';
 
 export default function SettingsScreen() {
   const palette = usePalette();
   const styles = useThemedStyles(createStyles);
 
+  const navigation = useUiNavigation();
   const { user, isDemo, updateProfile, signOut, exitDemo } = useAuth();
   const { trips, selectTrip, sync, syncing, pendingCount, error: syncError } = useTravel();
   const toast = useToast();
@@ -35,13 +36,13 @@ export default function SettingsScreen() {
   };
   const logout = async () => {
     setBusy(true); setError('');
-    try { if (isDemo) exitDemo(); else await signOut(); router.replace('/'); }
+    try { if (isDemo) exitDemo(); else await signOut(); navigation.replace('/'); }
     catch { setError('ログアウトできませんでした'); }
     finally { setBusy(false); }
   };
   return <MotionPage><SafeAreaView style={styles.screen} edges={['top', 'bottom']}><KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-      <View style={styles.header}><Pressable accessibilityRole="button" accessibilityLabel="戻る" onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={styles.back}><Text style={{ fontSize: 32, color: palette.ocean }}>‹</Text></Pressable><Text accessibilityRole="header" style={styles.title}>設定</Text></View>
+      <View style={styles.header}><Pressable accessibilityRole="button" accessibilityLabel="戻る" onPress={() => navigation.backOrReplace('/')} style={styles.back}><Text style={{ fontSize: 32, color: palette.ocean }}>‹</Text></Pressable><Text accessibilityRole="header" style={styles.title}>設定</Text></View>
       <View style={styles.section}><Text style={styles.sectionTitle}>プロフィール</Text><View style={styles.card}>
         <View style={styles.profile}><MemberAvatar name={user?.name || (isDemo ? 'あなた' : user?.email || 'アカウント')} avatarUrl={user?.avatarUrl} size={64} /><View style={{ flex: 1, gap: 6 }}><Text style={styles.name}>{user?.name || (isDemo ? 'あなた' : 'アカウント')}</Text><Text numberOfLines={2} style={styles.meta}>{isDemo ? 'サンプルアカウント' : user?.email}</Text></View></View>
         <Text style={styles.label}>表示名</Text><TextInput accessibilityLabel="表示名" value={name} onChangeText={setName} maxLength={100} editable={!busy} autoComplete="name" returnKeyType="done" onSubmitEditing={() => void save()} style={styles.input} />
@@ -51,7 +52,7 @@ export default function SettingsScreen() {
       </View></View>
       <View style={styles.section}><Text style={styles.sectionTitle}>表示</Text><View style={styles.card}><ThemeSetting /></View></View>
       <View style={styles.section}><Text style={styles.sectionTitle}>旅行のメンバー</Text><View style={styles.card}>
-        {trips.length ? trips.map((trip) => <Pressable accessibilityRole="button" accessibilityLabel={`${trip.name}のメンバー`} key={trip.id} onPress={() => { selectTrip(trip.id); router.push({ pathname: '/trips/[tripId]/members', params: { tripId: trip.id } }); }} style={styles.row}>
+        {trips.length ? trips.map((trip) => <Pressable accessibilityRole="button" accessibilityLabel={`${trip.name}のメンバー`} key={trip.id} onPress={() => { selectTrip(trip.id); navigation.push({ pathname: '/trips/[tripId]/members', params: { tripId: trip.id } }); }} style={styles.row}>
           <SymbolView name={{ ios: 'person.2', android: 'group', web: 'group' }} size={22} tintColor={palette.ocean} /><View style={{ flex: 1, gap: 5 }}><Text style={styles.rowText}>{trip.name}</Text><Text style={styles.meta}>{trip.memberCount}人</Text></View><Text style={styles.chevron}>›</Text>
         </Pressable>) : <Text style={styles.meta}>旅行を作成すると、メンバーを招待できます。</Text>}
       </View></View>

@@ -4,7 +4,7 @@ import { MotionPresence } from '@/components/motion-presence';
 import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { MemberAvatar } from '@/components/member-avatar';
 import { useDesktop } from '@/hooks/use-desktop';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ import { TripEditor } from '@/components/trip-editor';
 import { TripTicket } from '@/components/trip-ticket';
 import { type Palette } from '@/constants/design';
 import { useTravel } from '@/data/travel-provider';
+import { useUiNavigation } from '@/ui/navigation';
 import { localDate } from '@/utils/dates';
 
 export default function HomeScreen() {
@@ -21,6 +22,7 @@ export default function HomeScreen() {
   const styles = useThemedStyles(createStyles);
 
   const desktop = useDesktop();
+  const navigation = useUiNavigation();
   const [search, setSearch] = useState(getTripListSearch);
   const { invite } = useLocalSearchParams<{ invite?: string | string[] }>();
   const { trips, selectTrip, acceptInvite, ready, syncing, sync } = useTravel();
@@ -32,12 +34,12 @@ export default function HomeScreen() {
     const token = Array.isArray(invite) ? invite[0] : invite;
     if (!ready || !token || acceptingInvite.current || isDemo) return;
     acceptingInvite.current = true;
-    void acceptInvite(token).then(() => setNotice('旅行に参加しました')).catch((cause) => setNotice(cause instanceof Error ? cause.message : '招待リンクを確認してください')).finally(() => router.replace('/'));
-  }, [acceptInvite, invite, ready, isDemo]);
+    void acceptInvite(token).then(() => setNotice('旅行に参加しました')).catch((cause) => setNotice(cause instanceof Error ? cause.message : '招待リンクを確認してください')).finally(() => navigation.replace('/'));
+  }, [acceptInvite, invite, ready, isDemo, navigation]);
   const openTrip = (tripId: string) => {
     openTripTransition(tripId, () => {
       selectTrip(tripId);
-      router.push({ pathname: '/trips/[tripId]/itinerary', params: { tripId } });
+      navigation.push({ pathname: '/trips/[tripId]/itinerary', params: { tripId } });
     });
   };
   const today = localDate();
@@ -47,7 +49,7 @@ export default function HomeScreen() {
     <ScrollView nativeID={ready ? "trip-list-ready" : undefined} testID="home-scroll" contentContainerStyle={styles.content} refreshControl={!isDemo ? <RefreshControl refreshing={syncing} onRefresh={() => void sync()} tintColor={palette.ocean} /> : undefined}>
       <View testID="home-header" style={styles.header}>
         <View><Text style={styles.eyebrow}>TABI</Text><Text accessibilityRole="header" style={styles.title}>旅行</Text></View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><Pressable accessibilityRole="button" accessibilityLabel="設定を開く" onPress={() => router.push('/settings')} style={{ padding: 4 }}><MemberAvatar name={user?.name || 'あなた'} avatarUrl={user?.avatarUrl} size={36} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="旅行を追加する" disabled={!ready} onPress={() => setCreating(true)} style={({ pressed }) => [styles.add, pressed && styles.pressed]}><Text style={styles.addText}>＋ 旅行</Text></Pressable></View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><Pressable accessibilityRole="button" accessibilityLabel="設定を開く" onPress={() => navigation.push('/settings')} style={{ padding: 4 }}><MemberAvatar name={user?.name || 'あなた'} avatarUrl={user?.avatarUrl} size={36} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="旅行を追加する" disabled={!ready} onPress={() => setCreating(true)} style={({ pressed }) => [styles.add, pressed && styles.pressed]}><Text style={styles.addText}>＋ 旅行</Text></Pressable></View>
       </View>
       {desktop && trips.length ? <TextInput accessibilityLabel="旅行を検索" placeholder="旅行名・行き先で検索" placeholderTextColor={palette.placeholder} value={search} onChangeText={(value) => { rememberTripListSearch(value); setSearch(value); }} style={{ padding: 14, backgroundColor: palette.paper, borderRadius: 10, color: palette.ink, fontSize: 14, marginVertical: 16, maxWidth: 420 }} /> : null}
       {desktop && trips.length > 0 && !matchingTrips.length ? <Text style={styles.notice}>該当する旅行がありません</Text> : null}

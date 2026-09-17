@@ -4,7 +4,7 @@ import { MotionTabs } from './motion-tabs';
 import { MotionModal } from './motion-modal';
 import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { useModalViewport } from '@/hooks/use-modal-viewport';
-import { router, usePathname } from 'expo-router';
+import { usePathname } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useContext, useEffect, useRef, useState } from 'react';
 import { PageActionContext } from './page-action-context';
@@ -15,9 +15,10 @@ import { TripEditor } from './trip-editor';
 import { DeleteTripDialog } from './delete-trip-dialog';
 import { SyncStatus } from './sync-status';
 import { useOfflineTrip } from './offline-trip';
-import { useToast } from './toast';
+import { useToast } from '@/components/toast';
 import { type Palette } from '@/constants/design';
 import { useTravel } from '@/data/travel-provider';
+import { useUiNavigation } from '@/ui/navigation';
 
 const tabs = [
   { key: 'itinerary', label: 'しおり' },
@@ -32,6 +33,7 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
   const styles = useThemedStyles(createStyles);
 
   const pathname = usePathname();
+  const navigation = useUiNavigation();
   const tabScroll = useRef<ScrollView>(null);
   const tabLayouts = useRef<Record<string, { x: number; width: number }>>({});
   const [tabWidth, setTabWidth] = useState(0);
@@ -57,14 +59,14 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
   const remove = async () => {
     if (deleting) return;
     setDeleting(true); setDeleteError('');
-    try { await deleteTrip(tripId); setConfirmDelete(false); router.replace('/'); toast('旅行を削除しました'); }
+    try { await deleteTrip(tripId); setConfirmDelete(false); navigation.replace('/'); toast('旅行を削除しました'); }
     catch (cause) { setDeleteError(cause instanceof Error ? cause.message : '削除できませんでした'); }
     finally { setDeleting(false); }
   };
   return <View testID="trip-header" style={[styles.shell, { paddingTop: insets.top }]}>
     <View testID="trip-header-inner" style={styles.inner}>
       <View style={styles.topRow}>
-        <Pressable accessibilityRole="button" accessibilityLabel={managing ? 'しおりへ戻る' : '旅行一覧へ戻る'} onPress={() => managing ? router.replace({ pathname: '/trips/[tripId]/itinerary', params: { tripId } }) : closeTripTransition(tripId, () => router.replace('/'))} testID="trip-back" style={styles.backButton}><Text style={styles.backMark}>‹</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={managing ? 'しおりへ戻る' : '旅行一覧へ戻る'} onPress={() => managing ? navigation.replace({ pathname: '/trips/[tripId]/itinerary', params: { tripId } }) : closeTripTransition(tripId, () => navigation.replace('/'))} testID="trip-back" style={styles.backButton}><Text style={styles.backMark}>‹</Text></Pressable>
         <View testID="trip-heading" style={styles.title}><Text testID="trip-name" accessibilityRole="header" numberOfLines={1} style={styles.tripName}>{managing ? 'メンバー' : selectedTrip?.name}</Text><Text style={styles.tripDates}>{managing ? selectedTrip?.name : `${selectedTrip?.startsOn.replaceAll('-', '.')} — ${selectedTrip?.endsOn.replaceAll('-', '.')}`}</Text></View>
         {desktop && action ? <Pressable testID="desktop-page-action" accessibilityRole="button" accessibilityLabel={action.label} onPress={action.run} style={{ position: 'absolute', right: 56, paddingHorizontal: 18, height: 44, borderRadius: 10, backgroundColor: palette.ocean, justifyContent: 'center' }}><Text style={{ color: palette.onOcean, fontSize: 14, fontWeight: '700' }}>＋ {action.label.replace(/する$/, '')}</Text></Pressable> : null}
         <Pressable accessibilityRole="button" accessibilityLabel="旅行メニュー" onPress={() => setMenu(true)} style={styles.menuButton}><Text style={styles.menuMark}>⋯</Text></Pressable>
@@ -73,7 +75,7 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
         <SyncStatus />
         <ScrollView testID="trip-tabs" ref={tabScroll} horizontal showsHorizontalScrollIndicator={false} onLayout={(event) => setTabWidth(event.nativeEvent.layout.width)} onContentSizeChange={revealTab} style={styles.tabScroll} contentContainerStyle={{ flexGrow: 1 }} accessibilityRole="tablist"><MotionTabs style={styles.tabs}>{tabs.map((tab) => {
           const selected = pathname.endsWith(`/${tab.key}`);
-          return <Pressable accessibilityRole="tab" aria-selected={selected} accessibilityState={{ selected }} onLayout={(event) => { tabLayouts.current[tab.key] = event.nativeEvent.layout; if (selected) revealTab(); }} key={tab.key} onPress={() => router.replace({ pathname: `/trips/[tripId]/${tab.key}`, params: { tripId } })} style={[styles.tab, selected && styles.tabSelected]}><Text numberOfLines={1} style={[styles.tabText, selected && styles.tabTextSelected]}>{tab.label}</Text></Pressable>;
+          return <Pressable accessibilityRole="tab" aria-selected={selected} accessibilityState={{ selected }} onLayout={(event) => { tabLayouts.current[tab.key] = event.nativeEvent.layout; if (selected) revealTab(); }} key={tab.key} onPress={() => navigation.replace({ pathname: `/trips/[tripId]/${tab.key}`, params: { tripId } })} style={[styles.tab, selected && styles.tabSelected]}><Text numberOfLines={1} style={[styles.tabText, selected && styles.tabTextSelected]}>{tab.label}</Text></Pressable>;
         })}</MotionTabs></ScrollView>
       </> : null}
       {offline.busy ? <Text style={styles.progress}>{offline.progress}</Text> : null}
@@ -83,7 +85,7 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
         <Pressable accessibilityLabel="メニューを閉じる" onPress={() => setMenu(false)} style={StyleSheet.absoluteFill} />
         <View testID="trip-menu-position" style={[styles.menuPosition, { top: insets.top + 58 }]} pointerEvents="box-none">
           <View testID="trip-menu" style={styles.menu}>
-            {!managing ? <Pressable accessibilityRole="button" accessibilityLabel="メンバーを管理" onPress={() => { setMenu(false); router.push({ pathname: '/trips/[tripId]/members', params: { tripId } }); }} style={styles.menuRow}><SymbolView name={{ ios: 'person.2', android: 'group', web: 'group' }} size={19} tintColor={palette.ocean} /><Text style={styles.menuText}>メンバーを管理</Text></Pressable> : null}
+            {!managing ? <Pressable accessibilityRole="button" accessibilityLabel="メンバーを管理" onPress={() => { setMenu(false); navigation.push({ pathname: '/trips/[tripId]/members', params: { tripId } }); }} style={styles.menuRow}><SymbolView name={{ ios: 'person.2', android: 'group', web: 'group' }} size={19} tintColor={palette.ocean} /><Text style={styles.menuText}>メンバーを管理</Text></Pressable> : null}
             {canEdit ? <Pressable accessibilityRole="button" onPress={() => { setMenu(false); setEditing(true); }} style={styles.menuRow}><SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={19} tintColor={palette.ocean} /><Text style={styles.menuText}>旅行を編集</Text></Pressable> : null}
             {Platform.OS === 'web' ? <Pressable accessibilityRole="button" disabled={offline.busy} onPress={() => { setMenu(false); void offline.save(); }} style={styles.menuRow}><SymbolView name={{ ios: 'arrow.down.circle', android: 'download', web: 'download' }} size={19} tintColor={palette.ocean} /><Text style={styles.menuText}>{offline.busy ? offline.progress : 'オフライン保存'}</Text></Pressable> : null}
             {selectedTrip?.role === 'owner' ? <Pressable accessibilityRole="button" onPress={() => { setMenu(false); setDeleteError(''); setConfirmDelete(true); }} style={[styles.menuRow, styles.deleteRow]}><SymbolView name={{ ios: 'trash', android: 'delete', web: 'delete' }} size={19} tintColor={palette.danger} /><Text style={[styles.menuText, { color: palette.danger }]}>旅行を削除</Text></Pressable> : null}

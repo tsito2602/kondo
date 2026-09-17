@@ -3,6 +3,21 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
+      "@/auth/auth-provider": [
+        "./src/ui/passive/auth-provider"
+      ],
+      "@/components/toast": [
+        "./src/ui/passive/toast"
+      ],
+      "@/data/travel-provider": [
+        "./src/ui/passive/travel-provider"
+      ],
+      "@/theme/theme-provider": [
+        "./src/ui/passive/theme-provider"
+      ],
+      "@/utils/confirm-deletion": [
+        "./src/ui/passive/confirm-deletion"
+      ],
       "@/*": [
         "./src/*"
       ],

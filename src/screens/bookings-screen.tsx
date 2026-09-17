@@ -4,7 +4,7 @@ import { bookingDurationLabel } from '@/data/booking-duration';
 import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { PageHeading } from '@/components/page-heading';
 import { useTripHeaderHeight } from '@/components/trip-header-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +16,7 @@ import { FlightConnectionLink, FlightConnectionSheet } from '@/components/flight
 import { mono, type Palette } from '@/constants/design';
 import { findFlightConnections, hasLikelyFlightConnection } from '@/data/flight-connections';
 import { useTravel } from '@/data/travel-provider';
+import { useUiNavigation } from '@/ui/navigation';
 import { formatDate } from '@/utils/dates';
 
 export default function BookingsScreen() {
@@ -28,6 +29,7 @@ function TripBookingsScreen() {
   const palette = usePalette();
   const styles = useThemedStyles(createStyles);
 
+  const navigation = useUiNavigation();
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState('all');
   const headerHeight = useTripHeaderHeight();
@@ -45,10 +47,10 @@ function TripBookingsScreen() {
     if (!bookingId || !bookings.some((booking) => booking.id === bookingId)) return;
     const timeout = setTimeout(() => {
       setOpenedBooking(bookingId);
-      router.setParams({ booking: undefined });
+      navigation.setParams({ booking: undefined });
     }, 0);
     return () => clearTimeout(timeout);
-  }, [bookings, requestedBooking]);
+  }, [bookings, navigation, requestedBooking]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>

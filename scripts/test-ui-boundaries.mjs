@@ -19,6 +19,8 @@ const element = (tag) => ({ children, accessibilityLabel }) => React.createEleme
 const native = { Platform: { OS: 'web' }, StyleSheet: { create: (x) => x }, View: element('div'), Text: element('span'), Pressable: element('button') };
 const palette = new Proxy({}, { get: () => '#000000' });
 const theme = { usePalette: () => palette, useThemedStyles: (create) => create(palette) };
+const uiPlatform = { useUiPlatform: () => ({ openURL: async () => undefined, openBrowser: async () => undefined, share: async () => undefined, copyText: async () => true, uuid: () => 'uuid', pickDocuments: async () => null, downloadFile: noop, openDocument: async () => undefined, processCoverImage: async () => '', ensureOfflineReady: async () => undefined, persistStorage: async () => true, getPwaStatus: async () => ({ standalone: true, updateAvailable: false, ios: false }), installPwa: async () => false, activatePwaUpdate: async () => ({ activated: false, message: '' }) }) };
+const uiNavigation = { useUiNavigation: () => ({ push: noop, replace: noop, setParams: noop, backOrReplace: noop }) };
 
 test('iPhone uses device-verified transparent C artwork; maskable/store assets remain opaque', async () => {
   const reference = await sharp(readFileSync('assets/brand/symbol.svg'), { density: 384 }).resize(180, 180).png({ compressionLevel: 9, palette: false }).toBuffer();
@@ -85,15 +87,14 @@ test('reservation details retain file viewing but expose mutations only in editi
     const { BookingDocuments } = load('src/components/booking-sheet.tsx', {
       '@/theme/theme-provider': theme, 'react-native': native,
       './file-drop': { FileDrop: () => React.createElement('input', { type: 'file' }) },
-      'expo-document-picker': {}, 'expo-file-system': {}, 'expo-sharing': {},
       'expo-symbols': {}, '@/data/places': {},
-      '@/components/toast': { useToast: () => ({ show: noop }) },
+      '@/components/toast': { useToast: () => noop },
       '@/components/copy-button': {}, '@/components/form-sheet': {}, '@/components/booking-route': {}, '@/components/date-range-picker': {},
       '@/constants/design': {}, '@/data/airports': {}, '@/data/booking-match': {},
       '@/data/booking-duration': { bookingDurationLabel: () => '' },
       '@/data/booking-document-cache': { getCachedDocumentUri: () => null },
       '@/data/travel-provider': { useTravel: () => ({ canEdit }) },
-      '@/utils/confirm-deletion': {}, '@/utils/dates': {},
+      '@/utils/confirm-deletion': {}, '@/utils/dates': {}, '@/ui/platform': uiPlatform,
     }, '\nexport { BookingDocuments };');
     for (const readOnly of [true, false]) {
       const html = renderToStaticMarkup(React.createElement(BookingDocuments, { bookingId: 'test', readOnly, documents: [{ id: 'doc', filename: 'ticket.pdf', size: 100 }] }));
@@ -111,8 +112,7 @@ test('place itinerary actions follow actual additions across every status and pr
   for (const canEdit of [false, true]) for (const status of ['want', 'planned', 'visited', 'skipped']) for (const added of [false, true]) {
     const Screen = load('src/screens/places-screen.tsx', {
       '@/theme/theme-provider': theme,
-      'react-native': { ...native, ScrollView: element('div'), TextInput: element('input'), Linking: {} },
-      'expo-router': { useRouter: () => ({ push: noop }) },
+      'react-native': { ...native, ScrollView: element('div'), TextInput: element('input') },
       'expo-symbols': { SymbolView: () => null },
       '@/components/motion-presence': { MotionPresence: ({ children }) => children },
       '@/components/place-status-icon': { PlaceStatusIcon: () => null },
@@ -124,6 +124,7 @@ test('place itinerary actions follow actual additions across every status and pr
       '@/components/itinerary-fields': { ItineraryCategoryPicker: () => null },
       '@/data/itinerary': load('src/data/itinerary.ts', {}),
       '@/data/travel-provider': { useTravel: () => ({ canEdit, places: [{ id: 'place', title: '美術館', note: '', location: '', status, reservationStatus: 'not_needed', itineraryItemId: 'plan' }], items: added ? [{ id: 'plan', day: '2026-11-23' }] : [] }) },
+      '@/ui/navigation': uiNavigation, '@/ui/platform': uiPlatform,
     }).default;
     const html = renderToStaticMarkup(React.createElement(Screen));
     assert.equal(html.includes('しおりを見る'), added, `${status}: linked plan visible even to viewers`);
@@ -138,7 +139,7 @@ test('shared place sheet shows current source details from either entry point an
     let sheetProps;
     const { PlaceSheet } = load('src/components/place-sheet.tsx', {
       '@/theme/theme-provider': theme,
-      'react-native': { ...native, TextInput: element('input'), Linking: {} },
+      'react-native': { ...native, TextInput: element('input') },
       'expo-symbols': { SymbolView: () => null },
       '@/constants/design': {}, '@/data/places': placeData,
       '@/components/motion-presence': { MotionPresence: ({ children }) => children },
@@ -149,6 +150,7 @@ test('shared place sheet shows current source details from either entry point an
       '@/components/itinerary-fields': { ItineraryCategoryPicker: () => null },
       '@/data/itinerary': load('src/data/itinerary.ts', {}),
       '@/data/travel-provider': { useTravel: () => ({ canEdit, places: [place], items: [{ id: 'plan', day: '2026-11-23', time: '' }] }) },
+      '@/ui/platform': uiPlatform,
     });
     const html = renderToStaticMarkup(React.createElement(PlaceSheet, { place: { ...place, note: '古いメモ' }, onClose: noop, ...(fromItinerary ? { onEditSchedule: noop } : { onPlan: noop }) }));
     for (const detail of ['美術館', '最新の展示メモ', 'ウィーン', '10:00–18:00', '行く予定', '予約済み', '公式サイト', '地図を開く']) assert.ok(html.includes(detail), detail);
