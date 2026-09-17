@@ -128,7 +128,8 @@ export function UiBoundary({ name, middleware, effects, children }: PropsWithChi
   const value = useMemo<UiChainValue>(() => {
     const path = [...parent.path, name];
     const dispatch: UiDispatch = (event) => {
-      const selected = effectsRef.current?.[event.type];
+      const routed = event as RoutedUiEvent;
+      const selected = routed.effect ?? effectsRef.current?.[event.type];
       const decorated: RoutedUiEvent = {
         ...event,
         source: event.source ?? path.join('/'),
