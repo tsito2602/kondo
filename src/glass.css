@@ -1,0 +1,253 @@
+/*
+ * Glass & Layered material system
+ *
+ * Glass is reserved for chrome, overlays and elevated surfaces. Content stays
+ * readable and ticket-shaped; blur, edge light and shadow establish depth.
+ */
+:root {
+  --glass-thin: rgba(250, 252, 253, 0.46);
+  --glass-surface: rgba(250, 252, 253, 0.62);
+  --glass-surface-strong: rgba(250, 252, 253, 0.78);
+  --glass-input: rgba(250, 252, 253, 0.70);
+  --glass-accent: rgba(73, 107, 128, 0.84);
+  --glass-edge: rgba(255, 255, 255, 0.78);
+  --glass-edge-soft: rgba(255, 255, 255, 0.48);
+  --glass-edge-tint: rgba(73, 107, 128, 0.12);
+  --glass-specular: rgba(255, 255, 255, 0.58);
+  --glass-specular-soft: rgba(255, 255, 255, 0.26);
+  --glass-shadow-color: rgba(24, 42, 54, 0.12);
+  --glass-shadow-soft: rgba(24, 42, 54, 0.07);
+  --glass-shadow:
+    0 1px 2px rgba(24, 42, 54, 0.06),
+    0 10px 30px var(--glass-shadow-color),
+    0 30px 70px var(--glass-shadow-soft),
+    inset 0 1px 0 var(--glass-specular),
+    inset 0 -1px 0 var(--glass-edge-tint);
+  --glass-shadow-float:
+    0 2px 6px rgba(24, 42, 54, 0.08),
+    0 14px 34px rgba(24, 42, 54, 0.16),
+    0 34px 80px rgba(24, 42, 54, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    inset 0 -1px 0 rgba(73, 107, 128, 0.14);
+  --glass-blur: 36px;
+  --glass-blur-strong: 46px;
+  --glass-saturate: 175%;
+}
+
+:root[data-theme="dark"] {
+  --glass-thin: rgba(24, 36, 45, 0.46);
+  --glass-surface: rgba(24, 36, 45, 0.62);
+  --glass-surface-strong: rgba(24, 36, 45, 0.78);
+  --glass-input: rgba(35, 51, 63, 0.68);
+  --glass-accent: rgba(111, 143, 162, 0.78);
+  --glass-edge: rgba(233, 240, 244, 0.18);
+  --glass-edge-soft: rgba(233, 240, 244, 0.11);
+  --glass-edge-tint: rgba(8, 18, 24, 0.38);
+  --glass-specular: rgba(233, 240, 244, 0.18);
+  --glass-specular-soft: rgba(233, 240, 244, 0.08);
+  --glass-shadow-color: rgba(0, 0, 0, 0.28);
+  --glass-shadow-soft: rgba(0, 0, 0, 0.18);
+  --glass-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.22),
+    0 12px 34px var(--glass-shadow-color),
+    0 30px 74px var(--glass-shadow-soft),
+    inset 0 1px 0 var(--glass-specular),
+    inset 0 -1px 0 var(--glass-edge-tint);
+  --glass-shadow-float:
+    0 2px 8px rgba(0, 0, 0, 0.28),
+    0 16px 38px rgba(0, 0, 0, 0.34),
+    0 38px 86px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(233, 240, 244, 0.20),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.32);
+}
+
+/* Shared optical recipe: blur + saturation + slight contrast creates a lens,
+   while a bright top edge and darker lower edge make the surface feel thick. */
+:is(
+  [data-testid="trip-ticket"],
+  [data-testid="form-sheet"],
+  [data-testid="picker-sheet"],
+  [data-testid="trip-menu"],
+  [data-testid="delete-trip-dialog"],
+  [data-testid="discard-dialog"],
+  [data-testid="journal-sheet"],
+  [data-testid="place-card"],
+  [data-testid="invite-panel"]
+) {
+  background-color: var(--glass-surface) !important;
+  background-image: linear-gradient(
+    145deg,
+    var(--glass-specular-soft) 0%,
+    rgba(255, 255, 255, 0) 30%,
+    rgba(255, 255, 255, 0) 70%,
+    var(--glass-edge-tint) 100%
+  ) !important;
+  border: 1px solid var(--glass-edge) !important;
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) contrast(1.04);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) contrast(1.04);
+}
+
+/* App chrome is thinner than content surfaces so the photo/content beneath it
+   remains legible and gives the material something to refract. */
+:is([data-testid="trip-header"], [data-testid="home-header"]) {
+  background-color: var(--glass-thin) !important;
+  background-image: linear-gradient(
+    180deg,
+    var(--glass-specular-soft) 0%,
+    rgba(255, 255, 255, 0) 58%,
+    var(--glass-edge-tint) 100%
+  ) !important;
+  border-bottom: 1px solid var(--glass-edge-soft) !important;
+  box-shadow:
+    0 12px 36px var(--glass-shadow-soft),
+    inset 0 1px 0 var(--glass-specular),
+    inset 0 -1px 0 var(--glass-edge-tint);
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(var(--glass-saturate)) contrast(1.05) !important;
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(var(--glass-saturate)) contrast(1.05) !important;
+}
+
+[data-testid="sheet-header"] {
+  background-color: var(--glass-surface-strong) !important;
+  background-image: linear-gradient(180deg, var(--glass-specular-soft), rgba(255, 255, 255, 0) 72%) !important;
+  border-bottom: 1px solid var(--glass-edge-soft) !important;
+  box-shadow: inset 0 1px 0 var(--glass-specular), inset 0 -1px 0 var(--glass-edge-tint);
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(var(--glass-saturate)) !important;
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(var(--glass-saturate)) !important;
+}
+
+/* Menus, dialogs and floating controls sit one optical layer above sheets. */
+:is([data-testid="trip-menu"], [data-testid="delete-trip-dialog"], [data-testid="discard-dialog"]) {
+  background-color: var(--glass-surface-strong) !important;
+  box-shadow: var(--glass-shadow-float) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(185%) contrast(1.05);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(185%) contrast(1.05);
+}
+
+:is([data-testid="form-modal-viewport"], [data-testid="detail-modal-viewport"], [data-testid="modal-viewport"]) {
+  background-color: rgba(18, 35, 45, 0.16) !important;
+  -webkit-backdrop-filter: blur(4px) saturate(118%);
+  backdrop-filter: blur(4px) saturate(118%);
+}
+
+/* Form fields are a denser inner material, not opaque white cut-outs. */
+:is([data-testid="form-sheet"], [data-testid="picker-sheet"]) :is(input, textarea, select),
+.native-time-input {
+  background-color: var(--glass-input) !important;
+  border: 1px solid var(--glass-edge-soft) !important;
+  box-shadow: inset 0 1px 0 var(--glass-specular-soft), inset 0 -1px 0 var(--glass-edge-tint);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+  backdrop-filter: blur(18px) saturate(145%);
+}
+
+/* Pills/tabs use the same material family at a shallower depth. */
+:is([data-testid="trip-tabs"], [data-testid="itinerary-day-tabs"], [data-testid="preparation-tabs"]) .motion-tabs,
+[data-testid="app-tab-bar"] {
+  background-color: var(--glass-thin) !important;
+  border: 1px solid var(--glass-edge-soft) !important;
+  box-shadow:
+    0 8px 22px var(--glass-shadow-soft),
+    inset 0 1px 0 var(--glass-specular-soft),
+    inset 0 -1px 0 var(--glass-edge-tint);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  backdrop-filter: blur(28px) saturate(160%);
+}
+
+[data-testid="page-add-action"] [role="button"] {
+  background-color: var(--glass-surface-strong) !important;
+  background-image: linear-gradient(145deg, var(--glass-specular), rgba(255, 255, 255, 0) 42%, var(--glass-edge-tint)) !important;
+  border: 1px solid var(--glass-edge) !important;
+  box-shadow: var(--glass-shadow-float) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(185%) contrast(1.05);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(185%) contrast(1.05);
+}
+
+[data-testid="desktop-page-action"] {
+  background-color: var(--glass-accent) !important;
+  border: 1px solid var(--glass-edge-soft) !important;
+  box-shadow:
+    0 10px 28px rgba(24, 42, 54, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(24, 42, 54, 0.14);
+  -webkit-backdrop-filter: blur(24px) saturate(165%);
+  backdrop-filter: blur(24px) saturate(165%);
+}
+
+/* Ticket photos remain photographic; the enclosing material gets a lens edge. */
+[data-testid="trip-ticket"] {
+  isolation: isolate;
+  box-shadow: var(--glass-shadow-float);
+}
+[data-testid="trip-ticket"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow:
+    inset 1px 1px 0 var(--glass-specular),
+    inset -1px -1px 0 var(--glass-edge-tint),
+    inset 0 0 18px rgba(255, 255, 255, 0.05);
+}
+
+/* A light lift on hover communicates that elevated glass can be picked up. */
+@media (hover: hover) and (pointer: fine) {
+  :is([data-testid="trip-ticket"], [data-testid="place-card"]) {
+    transition:
+      transform var(--duration-fast) var(--ease-smooth-out),
+      box-shadow var(--duration-quick) var(--ease-smooth-out),
+      border-color var(--duration-quick) var(--ease-smooth-out);
+  }
+  :is([data-testid="trip-ticket"], [data-testid="place-card"]):hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 2px 6px rgba(24, 42, 54, 0.08),
+      0 18px 42px rgba(24, 42, 54, 0.17),
+      0 40px 88px rgba(24, 42, 54, 0.10),
+      inset 0 1px 0 var(--glass-specular),
+      inset 0 -1px 0 var(--glass-edge-tint);
+  }
+}
+
+/* Safari/iOS accessibility can request less transparency. Preserve the layer
+   hierarchy with borders and shadows instead of forcing blur. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-thin: var(--paper);
+    --glass-surface: var(--paper);
+    --glass-surface-strong: var(--paper);
+    --glass-input: var(--mist);
+  }
+  :is(
+    [data-testid="trip-header"],
+    [data-testid="home-header"],
+    [data-testid="sheet-header"],
+    [data-testid="trip-ticket"],
+    [data-testid="form-sheet"],
+    [data-testid="picker-sheet"],
+    [data-testid="trip-menu"],
+    [data-testid="delete-trip-dialog"],
+    [data-testid="discard-dialog"],
+    [data-testid="journal-sheet"],
+    [data-testid="place-card"],
+    [data-testid="invite-panel"],
+    [data-testid="page-add-action"] [role="button"]
+  ) {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :is(
+    [data-testid="trip-header"],
+    [data-testid="home-header"],
+    [data-testid="trip-ticket"],
+    [data-testid="form-sheet"],
+    [data-testid="picker-sheet"],
+    [data-testid="trip-menu"]
+  ) {
+    border-color: var(--ocean) !important;
+  }
+}
