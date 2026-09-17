@@ -63,7 +63,7 @@ function BottomTabList(props: TabListProps) {
 
   return (
     <View {...props} style={styles.tabListContainer}>
-      <View style={styles.innerContainer}>{props.children}</View>
+      <View testID="app-tab-bar" style={styles.innerContainer}>{props.children}</View>
     </View>
   );
 }
@@ -88,7 +88,9 @@ const createStyles = (palette: Palette) => StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 7,
     borderRadius: 48,
-    backgroundColor: palette.paper,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.glassEdge,
+    backgroundColor: palette.glassStrong,
     flexDirection: 'row',
     alignItems: 'center',
   },
