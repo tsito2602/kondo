@@ -12,14 +12,16 @@ type ModalViewport = Pick<VisualViewport, 'height' | 'offsetTop' | 'offsetLeft' 
 export type ModalViewportBounds = { top: number; left: number; width: number; height: number };
 
 // Safari's browser chrome / standalone safe-area can make visualViewport a
-// little shorter even with no keyboard. Only a material occlusion should turn
-// the visual viewport into the modal's outer bounds.
-const MIN_KEYBOARD_OCCLUSION = 120;
+// little shorter even with no keyboard. A software keyboard is materially
+// larger; scale the cutoff down for short landscape viewports.
+function keyboardOcclusionThreshold(layoutHeight: number) {
+  return Math.min(160, Math.max(0, layoutHeight) * .2);
+}
 
 export function modalViewportBounds(layoutWidth: number, layoutHeight: number, visual: ModalViewport | null): ModalViewportBounds | null {
-  if (!visual || modalBottomOcclusion(layoutHeight, visual) < MIN_KEYBOARD_OCCLUSION) return null;
+  if (!visual || modalBottomOcclusion(layoutHeight, visual) < keyboardOcclusionThreshold(layoutHeight)) return null;
   const { offsetTop: top, offsetLeft: left, width, height } = visual;
-  if (![top, left, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null;
+  if (![layoutWidth, top, left, width, height].every(Number.isFinite) || layoutWidth <= 0 || width <= 0 || height <= 0) return null;
   return { top, left, width, height };
 }
 
