@@ -1,44 +1,49 @@
 # tabi Design System
 
-> travel tickets in quiet blue-gray
+> travel tickets behind quiet liquid glass
 
-tabiは、旅程・予約票・持ち物をふたりで編集し、海外でもオフラインで使える旅行アプリである。視覚言語は「旅のチケット」「青いインク」「静かな紙面」。青みを含む無彩色の台紙に、明るい券面と濃淡の異なるブルーグレーだけを置く。
+tabiは、旅程・予約票・持ち物をふたりで編集し、海外でもオフラインで使える旅行アプリである。視覚言語は「旅のチケット」「青いインク」「透明な旅行道具」。白と黒に近い静かな背景を土台に、低彩度のブルーグレーをアクセントとして使い、AppleのLiquid Glassを参照したGlass & Layeredな奥行きを重ねる。
 
 ## 1. Principles
 
 1. **Ticket is structure** — 半券、ミシン目、切り欠き、券面番号、日時欄を情報構造として使う。
-2. **Airy, not heavy** — 濃色は文字と細い線に限定し、大きな黒・濃紺の面を作らない。
-3. **One quiet hue** — 通常UIは低彩度のブルーグレー一系統に絞り、色相ではなく濃淡で階層を作る。
-4. **Flat and physical** — 影とグラデーションを使わず、紙色、罫線、切り取り線で物理感を出す。
-5. **Offline confidence** — オフライン編集は即時反映し、端末保存済み・同期待ちを簡潔に示す。
-6. **Native behavior** — iOSとAndroidの戻る、共有、モーダル、階層遷移を尊重する。
+2. **Glass is material, not decoration** — 透明度だけのglassmorphismにしない。blur、屈折感、エッジ光、内側ハイライト、柔らかい影を組み合わせ、素材の厚みを表現する。
+3. **Layer before effect** — 背景、コンテンツ、chrome、floating surfaceの順に階層を作る。すべてを同じ透明カードにしない。
+4. **Quiet base, one accent hue** — 基本は白〜黒のニュートラル。通常UIのアクセントは低彩度のブルーグレー一系統に絞る。
+5. **Depth with restraint** — 影は浮いているsurfaceだけに使う。本文カードへ一律に強い影を付けない。
+6. **Offline confidence** — オフライン編集は即時反映し、端末保存済み・同期待ちを簡潔に示す。
+7. **Native behavior** — iOSとAndroidの戻る、共有、モーダル、階層遷移を尊重する。
 
-## 2. Color tokens
+## 2. Color and material tokens
 
 | Name | Value | Role |
 | --- | --- | --- |
-| Travel Ink | `#182A36` | 見出し、本文、バーコード。青みのある墨色 |
-| Ocean Slate | `#496B80` | 主要操作、時刻、リンク、アクティブな線 |
-| Ticket Paper | `#FAFCFD` | カード、チケット、入力面。青みを帯びた白 |
-| Canvas Blue Gray | `#EEF2F4` | 全画面の背景。静かな青灰の台紙 |
-| Coastal Mist | `#E6ECEF` | 入力、未選択pill、補助パネル |
+| Travel Ink | `#182A36` | 見出し、本文、バーコード |
+| Ocean Slate | `#496B80` | 主要操作、リンク、アクティブ状態 |
+| Ticket Paper | `#FAFCFD` | 高い可読性が必要な紙面 |
+| Canvas Blue Gray | `#EEF2F4` | light背景 |
+| Coastal Mist | `#E6ECEF` | 入力、補助面 |
 | Ash Blue | `#C9D3D9` | 罫線、無効状態、ミシン目 |
-| Smoke Blue | `#7E8C95` | メタ情報、補助文、未選択アイコン |
+| Smoke Blue | `#7E8C95` | メタ情報、補助文 |
 | Slate Blue | `#465A67` | 二次本文、ナビラベル |
-| Pale Blue | `#D7E2E8` | 選択状態、分類タグ、チケット半券 |
-| Muted Accent | `#6F8FA2` | 進捗、移動方向、極小の注目点 |
-| Soft Blue Gray | `#E9EEF1` | 補助的な面の差 |
+| Pale Blue | `#D7E2E8` | 選択状態、分類タグ、半券 |
+| Muted Accent | `#6F8FA2` | 進捗、移動方向、小さな注目点 |
+| Glass Thin | `rgba(250,252,253,.46)` | header / tab chrome |
+| Glass Surface | `rgba(250,252,253,.62)` | sheet / elevated card |
+| Glass Strong | `rgba(250,252,253,.78)` | menu / dialog / floating control |
+| Glass Accent | `rgba(73,107,128,.84)` | glass上の強い主要操作 |
 | Danger | `#B42318` | 削除、重大エラーのみ |
 
-- 純黒は使わない。最も濃い色はTravel Inkとする。
-- Ocean Slateを大きな面で使うのは主要ボタンのみ。カード全面を濃色にしない。
-- Pale Blueは小〜中面積、Muted Accentは点・線・進捗など小面積に限定する。
+Dark modeでは同じ階層を`#10191F`〜`#23333F`の半透明面へ反転し、明るいエッジを弱く、下側の暗い屈折を強くする。
+
+- 純黒は使わない。最も濃い通常色はTravel Inkとする。
+- Ocean Slateを大きな面で使うのは主要操作かGlass Accentのみ。
 - 通常UIにコーラル、黄、ミント、ベージュなど別色相のアクセントを加えない。
 - 航空会社や施設の色は、ユーザーが保存した原本内でのみ許容する。
 
 ## 3. Typography
 
-見出しは幅の狭いsystem sansを太く使い、実用画面では40–48pxを上限とする。日本語は不自然にuppercase化しない。
+見出しはsystem sansを太く使い、実用画面では40–48pxを上限とする。日本語は不自然にuppercase化しない。
 
 | Role | Mobile | Weight | Line height |
 | --- | ---: | ---: | ---: |
@@ -57,18 +62,40 @@ Monoは券面番号、時刻、予約番号、DAY番号、同期状態に使う�
 | Element | Radius |
 | --- | ---: |
 | Tag | 64px |
-| Card | 24–32px |
-| Ticket | 28px |
-| Button / input | 8px |
-| Bottom nav pill | 48px |
+| Card / ticket | 24–32px |
+| Button / input | 8–12px |
+| Floating glass control | 20–48px |
 
-- 画面左右: 20px mobile / 24px wide
+- 画面左右: 20px mobile / 24–32px wide
 - カードpadding: 20–24px
-- コンテンツ最大幅: 800px
-- 影: 常に0
-- グラデーション: 使用禁止
+- コンテンツ最大幅: 800px（wide layoutは用途に応じて1280pxまで）
+- 強いshadowはmenu / dialog / floating action / hover-liftだけに使う。
+- gradientは装飾的な色面として使わず、Glassのスペキュラー表現と写真shadeに限定する。
 
-## 5. Ticket grammar
+## 5. Glass & Layered grammar
+
+### Material levels
+
+1. **Canvas** — ほぼ不透明な背景。情報の最背面。
+2. **Content surface** — ticketや本文カード。可読性を優先し、透明度は低め。
+3. **Chrome glass** — header、tab、sheet header。`blur 32–46px`程度、薄い半透明素材。
+4. **Floating glass** — menu、dialog、FAB。Chromeより不透明度とshadowを上げ、明確に1段浮かせる。
+
+### Optical recipe
+
+Web/PWAでは、対応ブラウザで以下を組み合わせる。
+
+- `backdrop-filter: blur(36–46px) saturate(160–185%) contrast(1.04–1.05)`
+- 上辺に明るい1px edge、下辺に薄い青灰のedge
+- `inset 0 1px`のspecular highlight
+- 複数段の柔らかいshadowで接地面を作る
+- 必要なsurfaceだけ、ごく薄いlinear-gradientでエッジの厚みを表現する
+
+単に`rgba(..., .5)`とblurを置いただけのglassmorphismは禁止。Glassは背面コンテンツとの重なりで成立させる。
+
+`prefers-reduced-transparency`ではblurを外し、Paper/Mistの不透明面・border・shadowで階層を維持する。高コントラスト設定ではedgeを強める。
+
+## 6. Ticket grammar
 
 角丸カードだけをチケットと呼ばない。最低4要素を備える。
 
@@ -83,53 +110,55 @@ Monoは券面番号、時刻、予約番号、DAY番号、同期状態に使う�
 
 ### Trip ticket
 
-ホームの旅行概要。Ticket Paperの主券とPale Blueの半券を標準とする。Travel Inkは文字とバーコードに、Oceanは罫線に、Coralは出発点と矢印に使う。旅行名、目的地、出発日、帰着日、人数、券面番号を載せる。航空券ではないため、架空の便名、ゲート、QRは載せない。
+ホームの旅行概要。glass edgeを持つTicket Paper相当の主券とPale Blueの半券を標準とする。写真がある場合は写真そのものを透明化せず、外周のedgeとshadowでレンズ感を出す。旅行名、目的地、出発日、帰着日、人数、券面番号を載せる。航空券ではないため、架空の便名、ゲート、QRは載せない。
 
 ### Booking document
 
-航空・鉄道・宿・施設・レストランの予約は、白い主券とMistまたはPale Blueの半券で表現する。確認番号はコピー可能にし、スクリーンショット・画像・PDFの原本へ1タップで到達できるようにする。tabiが利用不能なQRコードを生成しない。
+航空・鉄道・宿・施設・レストランの予約は、明るい主券とMistまたはPale Blueの半券で表現する。確認番号はコピー可能にし、スクリーンショット・画像・PDFの原本へ1タップで到達できるようにする。tabiが利用不能なQRコードを生成しない。
 
-## 6. Components
+## 7. Components
 
 ### Primary button
 
-Ocean Slate背景、Ticket Paper文字、8px radius、16×24px padding、16px/700、影なし。画面内の最重要操作に使う。
+Ocean SlateまたはGlass Accent背景、Ticket Paper文字、8–12px radius、16×24px padding、16px/700。画面内の最重要操作に使う。
 
 ### Secondary button
 
-Ticket Paper背景、Ocean Slateの文字または1px枠、8px radius。黒い反転面を副操作に使わない。
+Glass StrongまたはTicket Paper背景、Ocean Slate文字。透明面ではedgeを必ず持たせ、背景に溶け込ませない。
 
-### Trip top tabs
+### Trip top chrome
 
-旅行一覧を最上位に置き、旅行を選択した後だけ表示する。Ticket Paper背景、16px radius、影なし。「しおり・準備・予約」の3項目を横並びにし、選択項目はPale Blueの面と太字で示す。上段には旅行一覧へ戻る操作、旅行名、共有操作を置く。
+旅行を選択した後だけ表示する。header全体はChrome Glass、戻る・メニューは独立した小さなGlass Strong control。旅行名は左右の操作幅に影響されない位置を維持する。
 
-- 旅行名は左右の操作幅に影響されない画面中央へ置く。
-- 各ページ内にタブ名と同じ大見出しを繰り返さない。
-- 追加操作は右下の固定ボタンに統一し、最終コンテンツと重ならない余白を確保する。
-- しおりは日ごとに別ページへ分割せず、日別タブから同一ページ内の該当日へスクロールする。
+上部タブは「しおり／行きたい場所／準備／予約／メモ」を横スクロール可能にし、選択項目はPale Blueまたは同等のselected materialと太字で示す。
 
 ### Standard card
 
-Ticket Paper背景、24–32px radius、枠と影なし。Canvas Blue Grayとの面差だけで分離する。
+本文カードはPaper寄りの高可読性surface。Glassを使う場合も透明度を上げすぎず、背面が文字のコントラストを損なわないようにする。
 
-### Progress card
+### Modal / sheet
 
-Pale Blue背景、Travel Ink文字。進捗バーはTicket PaperのtrackとMuted Accentのfillを使う。濃色の反転カードは使わない。
+背景overlayをわずかにblurし、その上にGlass Surfaceを置く。sheet headerは本文より1段強いChrome Glass。dialogはGlass Strong＋Floating shadow。
 
 ### Input
 
-Ticket Paper背景、8px radius、16px padding、最小48px、枠なし。フォーカスは2px Ocean Slate。
+Glass InputまたはMist背景、8–12px radius、16px padding、最小48px。フォーカスは2px Ocean Slate。入力面を完全透明にしない。
 
-## 7. Screen rules
+### Floating action
 
-- **Login:** Canvas Blue Gray上に大きなTravel Inkの`TABI`。GoogleログインはOcean Slateのボタン。
-- **Home:** 同期状態、旅行追加、Trip ticketの一覧だけを置く。Trip ticket全体を旅行詳細への入口にする。
-- **Itinerary:** 日付ごとに白い32pxカード。DAY番号はSky、時刻はOcean Slate。
-- **Packing:** 進捗をPale Blueカードに置き、Muted Accentを進捗に使う。チェック済みはPale Blueと記号の両方で示す。
-- **Bookings:** 予約ごとに白いチケットを使い、右側を明るい半券として分離する。
+Glass Strongの円形またはpill。強いedge、specular highlight、Floating shadowを持ち、アイコンはOcean Slate。押下時はscaleとshadowをわずかに下げる。
+
+## 8. Screen rules
+
+- **Login:** 静かなCanvas上にロゴ。主要ログイン操作のみ強いアクセント。
+- **Home:** headerはChrome Glass。Trip ticketはcontent surfaceとして浮かせる。
+- **Itinerary:** 日付・予定の可読性を優先。hero写真上のheaderではblur/refractionを最も活かす。
+- **Packing:** 進捗はPale Blueを中心にし、Glassはタブや操作chromeへ使う。
+- **Bookings:** 予約ごとのticket grammarを保ち、素材効果で情報構造を壊さない。
+- **Places / Notes:** 詳細sheetとfloating actionをGlass階層の基準にする。
 - **Empty state:** 短い見出し、1文、主要操作1つ。
 
-## 8. Accessibility
+## 9. Accessibility
 
 - WCAG AA以上
 - タップ領域44×44px以上
@@ -137,32 +166,41 @@ Ticket Paper背景、8px radius、16px padding、最小48px、枠なし。フォ
 - Dynamic Typeで重要情報を切らない
 - 券面番号・予約番号に読み上げラベルを付ける
 - 原本画像のQR・バーコードには説明ラベルを付ける
+- `prefers-reduced-motion`と`prefers-reduced-transparency`を尊重する
+- blur越しの背景で文字コントラストが不足する場合はsurface opacityを上げる
 
-## 9. Do / Don't
+## 10. Do / Don't
 
 ### Do
 
-- Canvas Blue Grayを全画面背景にする
+- Glassの強度をsurfaceの階層に合わせる
+- edge、specular、shadowをセットで使って素材の厚みを出す
 - Travel Inkは文字、Ocean Slateは操作、Pale Blueは選択、Muted Accentは小さな強調に使う
-- チケットの紙面、半券、ミシン目、ノッチを意味のある情報構造にする
-- カード24–32px、操作8pxの半径差を守る
+- 写真上のchromeでbackdrop blurを活かす
+- light / darkで同じ深度関係を維持する
 
 ### Don't
 
-- 純黒や濃紺をカード全面に使わない
-- カードやボタンに影を付けない
-- グラデーションを使わない
+- すべてのカードを同じ半透明glassにする
+- opacityとblurだけの単純なglassmorphismにする
+- 強いshadowを本文カードへ一律に付ける
+- 読みにくくなるほど背景を透過させる
 - 架空のQR、搭乗券番号、企業ロゴを表示しない
 - 旅行一覧と旅行内の機能を同じナビゲーション階層に並べない
 
-## 10. Implementation tokens
+## 11. Implementation tokens
 
 ```ts
 export const palette = {
   ink: '#182A36', ocean: '#496B80', paper: '#FAFCFD', canvas: '#EEF2F4',
   mist: '#E6ECEF', ash: '#C9D3D9', smoke: '#7E8C95', slate: '#465A67',
   sky: '#D7E2E8', accent: '#6F8FA2', soft: '#E9EEF1', danger: '#B42318',
+  glass: 'rgba(250,252,253,0.58)',
+  glassStrong: 'rgba(250,252,253,0.76)',
+  glassNative: 'rgba(250,252,253,0.88)',
+  glassEdge: 'rgba(255,255,255,0.72)',
+  glassAccent: 'rgba(73,107,128,0.86)',
 } as const;
 ```
 
-この文書を新規画面とUIレビュー、staging確認の基準とする。例外は操作性、アクセシビリティ、OS制約のいずれかを理由として記録する。
+Webの光学効果は`src/glass.css`を正とし、React Native側は同じmaterial hierarchyをtheme token・border・shadowで近似する。この文書を新規画面とUIレビューの基準とする。例外は操作性、アクセシビリティ、OS制約のいずれかを理由として記録する。
