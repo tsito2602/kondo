@@ -6,7 +6,7 @@ const module = { exports: {} };
 const source = readFileSync('src/utils/modal-viewport-insets.web.ts', 'utf8');
 const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 new Function('module', 'exports', js)(module, module.exports);
-const { modalBottomOcclusion, trackModalViewportInsets } = module.exports;
+const { modalBottomOcclusion, modalViewportBounds, trackModalViewportInsets } = module.exports;
 
 assert.equal(modalBottomOcclusion(844, null), 0, 'no visual viewport keeps the safe area');
 assert.equal(modalBottomOcclusion(844, { height: 844, offsetTop: 0, scale: 1 }), 0, 'focus with no keyboard cannot remove padding');
@@ -15,6 +15,12 @@ assert.equal(modalBottomOcclusion(844, { height: 810, offsetTop: 20, scale: 1 })
 assert.equal(modalBottomOcclusion(844, { height: 844, offsetTop: 20, scale: 1 }), 0, 'overscroll cannot produce negative padding');
 assert.equal(modalBottomOcclusion(844, { height: 430, offsetTop: 0, scale: 2 }), 0, 'pinch zoom is not mistaken for a keyboard');
 assert.equal(modalBottomOcclusion(844, { height: NaN, offsetTop: 0, scale: 1 }), 0, 'invalid geometry never becomes a CSS value');
+
+assert.equal(modalViewportBounds(390, 844, null), null, 'no visual viewport leaves the modal on normal flex layout');
+assert.equal(modalViewportBounds(390, 844, { width: 390, height: 760, offsetTop: 0, offsetLeft: 0, scale: 1 }), null, 'browser chrome is not mistaken for a keyboard');
+assert.deepEqual(modalViewportBounds(390, 844, { width: 390, height: 430, offsetTop: 24, offsetLeft: 0, scale: 1 }), { top: 24, left: 0, width: 390, height: 430 }, 'keyboard occlusion constrains the modal to the visible viewport');
+assert.equal(modalViewportBounds(390, 844, { width: 390, height: 430, offsetTop: 0, offsetLeft: 0, scale: 2 }), null, 'zoomed visual viewport never constrains the modal');
+assert.equal(modalViewportBounds(390, 844, { width: NaN, height: 430, offsetTop: 0, offsetLeft: 0, scale: 1 }), null, 'invalid visual viewport geometry is ignored');
 
 const frames = new Map(); let sequence = 0;
 const visual = Object.assign(new EventTarget(), { height: 844, offsetTop: 0, scale: 1 });
@@ -46,4 +52,4 @@ stopParent(); assert.equal(frames.size, 0, 'unmount cancels a pending frame');
 visual.dispatchEvent(new Event('resize')); win.dispatchEvent(new Event('resize'));
 assert.equal(frames.size, 0, 'listeners are removed on unmount');
 assert.doesNotThrow(() => trackModalViewportInsets({ ownerDocument: { defaultView: null } })());
-console.log('Modal insets: focus, keyboard/panning/dismissal, partial inset, zoom, nested isolation, rotation, batching and cleanup passed.');
+console.log('Modal insets: full-height chrome, keyboard/panning/dismissal, partial inset, zoom, nested isolation, rotation, batching and cleanup passed.');
