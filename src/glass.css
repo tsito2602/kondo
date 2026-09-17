@@ -191,22 +191,30 @@
     inset 0 0 18px rgba(255, 255, 255, 0.05);
 }
 
-/* A light lift on hover communicates that elevated glass can be picked up. */
+/* The grid already lifts trip-ticket parents. Only deepen the ticket shadow here
+   so nested transforms do not double the travel distance. */
 @media (hover: hover) and (pointer: fine) {
   :is([data-testid="trip-ticket"], [data-testid="place-card"]) {
     transition:
-      transform var(--duration-fast) var(--ease-smooth-out),
       box-shadow var(--duration-quick) var(--ease-smooth-out),
       border-color var(--duration-quick) var(--ease-smooth-out);
   }
   :is([data-testid="trip-ticket"], [data-testid="place-card"]):hover {
-    transform: translateY(-2px);
     box-shadow:
       0 2px 6px rgba(24, 42, 54, 0.08),
       0 18px 42px rgba(24, 42, 54, 0.17),
       0 40px 88px rgba(24, 42, 54, 0.10),
       inset 0 1px 0 var(--glass-specular),
       inset 0 -1px 0 var(--glass-edge-tint);
+  }
+  [data-testid="place-card"] {
+    transition:
+      transform var(--duration-fast) var(--ease-smooth-out),
+      box-shadow var(--duration-quick) var(--ease-smooth-out),
+      border-color var(--duration-quick) var(--ease-smooth-out);
+  }
+  [data-testid="place-card"]:hover {
+    transform: translateY(-2px);
   }
 }
 
