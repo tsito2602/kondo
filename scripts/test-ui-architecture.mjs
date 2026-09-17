@@ -31,6 +31,7 @@ for (const token of ['<AppMediator>', '<TravelMediator>', '<UiBoundary name="Roo
 const mediator = await read('src/ui/mediator.tsx');
 assert.ok(mediator.includes('path: event.path ?? path'), 'Boundary bubbling must preserve the originating event path');
 assert.ok(mediator.includes('path: event.path ?? chain.path'), 'Emitters must preserve an existing event path');
+assert.ok(mediator.includes('routed.effect ?? effectsRef.current?.[event.type]'), 'The nearest boundary handler must win while an event bubbles to Root');
 
 const viewFiles = [
   ...(await sourceFiles('src/app')),
