@@ -262,7 +262,7 @@ function BookingDocuments({ bookingId, documents, readOnly = false }: { bookingI
           let bytes: ArrayBuffer | undefined;
           if (!uri) {
             bytes = await downloadBookingDocument(bookingId, document.id);
-            uri = cacheBookingDocument(document.id, document.filename, bytes);
+            uri = cacheBookingDocument(document.id, document.filename, bytes) ?? undefined;
           }
           if (Platform.OS === 'web' && !bytes) bytes = await downloadBookingDocument(bookingId, document.id);
           return { uri, bytes };
