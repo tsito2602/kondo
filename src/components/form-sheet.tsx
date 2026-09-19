@@ -73,7 +73,7 @@ export function FormSheet({ presentation = 'form', visible, title, onClose, onSa
 }
 
 const createStyles = (palette: Palette) => StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Platform.OS === 'web' ? 'rgba(24,42,54,0.3)' : palette.canvas, padding: Platform.OS === 'web' ? 16 : 0 },
+  overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Platform.OS === 'web' ? 'rgba(0,0,0,0.3)' : palette.canvas, padding: Platform.OS === 'web' ? 16 : 0 },
   sheet: { width: '100%', flex: 1, maxWidth: 640, maxHeight: Platform.OS === 'web' ? '92%' : '100%', backgroundColor: palette.canvas, borderRadius: Platform.OS === 'web' ? 24 : 0, overflow: 'hidden' },
   fill: { flex: 1 },
   header: { minHeight: 64, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },

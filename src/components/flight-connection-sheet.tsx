@@ -127,7 +127,7 @@ function Radio({ checked }: { checked: boolean }) {
 }
 
 const createStyles = (palette: Palette) => StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(24,42,54,0.34)', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.34)', alignItems: 'center', justifyContent: 'center', padding: 16 },
   sheet: { width: '100%', maxWidth: 520, maxHeight: '94%', backgroundColor: palette.canvas, borderRadius: 28, overflow: 'hidden', flexShrink: 1 },
   header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   heading: { color: palette.ink, fontSize: 23, fontWeight: '800' },

@@ -30,8 +30,8 @@ export function TripHero({ trip, height, scrollY }: { trip: Trip; height: number
 }
 
 const styles = StyleSheet.create({
-  hero: { position: 'absolute', top: 0, left: 0, right: 0, overflow: 'hidden', backgroundColor: '#557984' },
-  shade: { backgroundColor: 'rgba(13,32,43,0.28)' },
+  hero: { position: 'absolute', top: 0, left: 0, right: 0, overflow: 'hidden', backgroundColor: '#525252' },
+  shade: { backgroundColor: 'rgba(0,0,0,0.28)' },
   caption: { position: 'absolute', bottom: 54, width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 28, gap: 10 },
   eyebrow: { color: '#FFFFFFCC', fontSize: 10, fontWeight: '600', letterSpacing: 3 },
   destination: { color: '#FFFFFF', fontSize: 28, lineHeight: 36, fontWeight: '800', letterSpacing: -0.7 },

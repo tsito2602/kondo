@@ -73,7 +73,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   ticket: { minHeight: 206, flexDirection: 'row', overflow: 'hidden', position: 'relative', borderRadius: 24, backgroundColor: palette.paper },
   face: { flex: 1, minWidth: 0, flexDirection: 'row', borderRadius: 24, overflow: 'hidden' },
   cover: { backgroundColor: palette.paper, borderTopLeftRadius: 24, borderBottomLeftRadius: 24, overflow: 'hidden' },
-  photoShade: { backgroundColor: 'rgba(13,32,43,0.52)' },
+  photoShade: { backgroundColor: 'rgba(0,0,0,0.52)' },
   photoText: { color: '#FFFFFF' },
   photoTag: { backgroundColor: 'rgba(255,255,255,0.18)' },
   photoRule: { backgroundColor: '#FFFFFFCC' },

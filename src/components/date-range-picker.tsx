@@ -312,7 +312,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   triggerDash: { color: palette.ash },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.65 },
-  backdrop: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(24,42,54,0.34)', padding: 16 },
+  backdrop: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.34)', padding: 16 },
   dialog: { width: '100%', maxWidth: 500, maxHeight: '96%', backgroundColor: palette.canvas, borderRadius: 28, overflow: 'hidden' },
   dialogContent: { padding: 20 },
   heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

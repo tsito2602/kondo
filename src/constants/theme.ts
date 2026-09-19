@@ -6,23 +6,16 @@
 import '@/global.css';
 
 import { Platform } from 'react-native';
+import { lightPalette, darkPalette } from './design';
 
-export const Colors = {
-  light: {
-    text: '#000000',
-    background: '#F6F4EF',
-    backgroundElement: '#ECE8DD',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#606861',
-  },
-  dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
-  },
-} as const;
+const themeColors = (palette: typeof darkPalette) => ({
+  text: palette.ink,
+  background: palette.canvas,
+  backgroundElement: palette.paper,
+  backgroundSelected: palette.sky,
+  textSecondary: palette.slate,
+});
+export const Colors = { light: themeColors(lightPalette), dark: themeColors(darkPalette) };
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
