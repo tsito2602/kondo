@@ -1,7 +1,9 @@
 import * as Crypto from 'expo-crypto';
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { MotionModal } from '@/components/motion-modal';
+import { MotionPresence } from '@/components/motion-presence';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FloatingAddButton } from '@/components/floating-add-button';
 import { useTripHeaderHeight } from '@/components/trip-header-context';
@@ -28,20 +30,20 @@ export default function NotesScreen() {
     <ScrollView testID="notes-scroll" keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingTop: headerHeight + 24 }]}>
       {notes.length ? <TextInput accessibilityLabel="メモを検索" value={search} onChangeText={setSearch} placeholder="検索" placeholderTextColor={palette.placeholder} style={styles.search} /> : null}
       {!notes.length ? <View style={styles.empty}>
-        <View style={styles.emptyIcon}><SymbolView name={{ ios: 'note.text', android: 'description', web: 'description' }} size={40} tintColor={palette.ocean} /></View>
+        <View style={styles.emptyIcon}><SymbolView name={{ ios: 'note.text', android: 'description', web: 'description' }} size={40} tintColor={palette.slate} /></View>
         <Text style={styles.emptyTitle}>旅のメモ</Text>
         <Text style={styles.muted}>思いついたことを、自由に。</Text>
         {canEdit ? <Pressable accessibilityRole="button" onPress={add} style={styles.primary}><Text style={styles.primaryText}>メモを書く</Text></Pressable> : null}
       </View> : !filtered.length ? <View style={styles.empty}><Text style={styles.emptyTitle}>メモが見つかりません</Text><Pressable accessibilityRole="button" onPress={() => setSearch('')} style={styles.control}><Text style={styles.actionText}>検索をクリア</Text></Pressable></View> : <View style={styles.list}>
         {filtered.map((note, index) => <Pressable accessibilityRole="button" accessibilityLabel={`${titleOf(note.body)}を開く`} key={note.id} onPress={() => setEditing(note)} style={[styles.row, index > 0 && styles.divider]}>
-          <View style={styles.rowHeading}><Text numberOfLines={1} style={styles.rowTitle}>{titleOf(note.body)}</Text>{note.pinned ? <SymbolView name={{ ios: 'pin.fill', android: 'push_pin', web: 'push_pin' }} size={16} tintColor={palette.ocean} /> : null}</View>
+          <View style={styles.rowHeading}><Text numberOfLines={1} style={styles.rowTitle}>{titleOf(note.body)}</Text>{note.pinned ? <SymbolView name={{ ios: 'pin.fill', android: 'push_pin', web: 'push_pin' }} size={16} tintColor={palette.slate} /> : null}</View>
           <View style={styles.preview}><Text style={styles.date}>{dateOf(note.updatedAt)}</Text><Text numberOfLines={1} style={styles.snippet}>{note.body.trim().split('\n').slice(1).filter(Boolean).join(' ') || '本文なし'}</Text></View>
         </Pressable>)}
       </View>}
       {notes.length ? <Text style={styles.count}>{filtered.length}件のメモ</Text> : null}
     </ScrollView>
     {canEdit ? <FloatingAddButton label="メモを書く" onPress={add} /> : null}
-    {editing ? <NoteEditor key={editing.id} initial={editing} onClose={() => setEditing(null)} /> : null}
+    <MotionPresence>{editing ? <NoteEditor key={editing.id} initial={editing} onClose={() => setEditing(null)} /> : null}</MotionPresence>
   </View>;
 }
 
@@ -103,26 +105,26 @@ function NoteEditor({ initial, onClose }: { initial: TravelNote; onClose: () => 
     change({ ...draftRef.current, body: next });
     input.current?.focus();
   };
-  return <Modal visible animationType="slide" onRequestClose={close}>
-    <SafeAreaView style={[styles.editorBackdrop, viewport]}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.editor}>
+  return <MotionModal visible transparent={Platform.OS === 'web'} animationType="slide" onRequestClose={close}>
+    <SafeAreaView testID="note-modal-viewport" style={[styles.editorBackdrop, viewport]}>
+      <KeyboardAvoidingView testID="note-editor" behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.editor}>
         <View style={styles.editorToolbar}>
           <Pressable accessibilityRole="button" onPress={close} style={styles.control}><Text style={styles.actionText}>‹ メモ</Text></Pressable>
           <View style={styles.tools}>
-            {canEdit ? <Pressable accessibilityRole="button" accessibilityLabel={draft.pinned ? 'ピン留めを解除' : 'ピン留め'} accessibilityState={{ selected: draft.pinned }} onPress={() => change({ ...draftRef.current, pinned: !draftRef.current.pinned })} style={styles.control}><SymbolView name={{ ios: draft.pinned ? 'pin.fill' : 'pin', android: 'push_pin', web: 'push_pin' }} size={22} tintColor={draft.pinned ? palette.ocean : palette.smoke} /></Pressable> : null}
-            {canEdit ? <Pressable accessibilityRole="button" accessibilityLabel="メモを削除" onPress={remove} style={styles.control}><SymbolView name={{ ios: 'trash', android: 'delete', web: 'delete' }} size={22} tintColor={palette.ocean} /></Pressable> : null}
+            {canEdit ? <Pressable accessibilityRole="button" accessibilityLabel={draft.pinned ? 'ピン留めを解除' : 'ピン留め'} accessibilityState={{ selected: draft.pinned }} onPress={() => change({ ...draftRef.current, pinned: !draftRef.current.pinned })} style={styles.control}><SymbolView name={{ ios: draft.pinned ? 'pin.fill' : 'pin', android: 'push_pin', web: 'push_pin' }} size={22} tintColor={draft.pinned ? palette.ink : palette.smoke} /></Pressable> : null}
+            {canEdit ? <Pressable accessibilityRole="button" accessibilityLabel="メモを削除" onPress={remove} style={styles.control}><SymbolView name={{ ios: 'trash', android: 'delete', web: 'delete' }} size={22} tintColor={palette.slate} /></Pressable> : null}
             <Pressable accessibilityRole="button" onPress={close} style={styles.control}><Text style={styles.done}>完了</Text></Pressable>
           </View>
         </View>
         <Text style={styles.editorDate}>{dateOf(initial.updatedAt)}</Text>
         <TextInput testID="note-body" ref={input} accessibilityLabel="メモ本文" autoFocus={!initial.body && canEdit} editable={canEdit} value={draft.body} multiline textAlignVertical="top" scrollEnabled maxLength={50000} onChangeText={(body) => change({ ...draftRef.current, body })} onSelectionChange={(event) => { selection.current = event.nativeEvent.selection; }} onBlur={() => { flush(); setDirty(false); }} placeholder="メモを書く" placeholderTextColor={palette.placeholder} style={styles.body} />
         <View style={styles.editorFooter}>
-          {canEdit ? <Pressable accessibilityRole="button" accessibilityLabel="この行をチェックリストにする・チェックを切り替える" onPress={checklist} style={styles.control}><SymbolView name={{ ios: 'checklist', android: 'checklist', web: 'checklist' }} size={24} tintColor={palette.ocean} /></Pressable> : null}
+          {canEdit ? <Pressable accessibilityRole="button" accessibilityLabel="この行をチェックリストにする・チェックを切り替える" onPress={checklist} style={styles.control}><SymbolView name={{ ios: 'checklist', android: 'checklist', web: 'checklist' }} size={24} tintColor={palette.slate} /></Pressable> : null}
           <Text accessibilityLiveRegion="polite" style={[styles.saveState, error ? { color: palette.danger } : null]}>{error || (dirty ? '保存中…' : pendingCount ? '端末に保存済み · 同期待ち' : '自動保存')}</Text>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
-  </Modal>;
+  </MotionModal>;
 }
 
 const createStyles = (palette: Palette) => StyleSheet.create({

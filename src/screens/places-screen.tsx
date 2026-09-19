@@ -46,9 +46,9 @@ export default function PlacesScreen() {
     <ScrollView testID="places-scroll" contentContainerStyle={[styles.content, { paddingTop: headerHeight + 24 }]} showsVerticalScrollIndicator={false}>
       {places.length ? <TextInput value={search} onChangeText={setSearch} placeholder="場所を検索" accessibilityLabel="場所を検索" placeholderTextColor={palette.placeholder} style={styles.search} /> : null}
       {places.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
-        {[{ value: 'all' as const, label: 'すべて' }, ...placeStatuses].map((item) => <Pressable accessibilityRole="button" key={item.value} onPress={() => setFilter(item.value)} style={[styles.filter, filter === item.value && styles.filterSelected]}>{item.value !== 'all' ? <PlaceStatusIcon status={item.value} size={16} /> : null}<Text style={[styles.filterText, filter === item.value && styles.filterTextSelected]}>{item.label} {item.value === 'all' ? places.length : places.filter((place) => place.status === item.value).length}</Text></Pressable>)}
+        {[{ value: 'all' as const, label: 'すべて' }, ...placeStatuses].map((item) => <Pressable accessibilityRole="button" accessibilityState={{ selected: filter === item.value }} key={item.value} onPress={() => setFilter(item.value)} style={[styles.filter, filter === item.value && styles.filterSelected]}>{item.value !== 'all' ? <PlaceStatusIcon status={item.value} size={16} /> : null}<Text style={[styles.filterText, filter === item.value && styles.filterTextSelected]}>{item.label} {item.value === 'all' ? places.length : places.filter((place) => place.status === item.value).length}</Text></Pressable>)}
       </ScrollView> : null}
-      {!places.length ? <View style={styles.empty}><View style={styles.emptyPlaceMark} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><SymbolView name={{ ios: 'mappin.and.ellipse', android: 'location_on', web: 'location_on' }} size={46} tintColor={palette.ocean} /><View style={styles.emptyPlaceAdd}><SymbolView name={{ ios: 'plus', android: 'add', web: 'add' }} size={18} tintColor={palette.onOcean} /></View></View><Text style={styles.emptyTitle}>気になる場所を保存</Text><Pressable accessibilityRole="button" disabled={!canEdit} onPress={() => open()} style={styles.primary}><Text style={styles.primaryText}>＋ 場所を追加</Text></Pressable></View> : !filtered.length ? <View style={styles.empty}><Text style={styles.emptyTitle}>該当する場所がありません</Text><Pressable accessibilityRole="button" onPress={() => { setFilter('all'); setSearch(''); }} style={styles.primary}><Text style={styles.primaryText}>絞り込みを解除</Text></Pressable></View> : <View testID="place-grid" style={{ gap: 16 }}>{filtered.map((place, index) => {
+      {!places.length ? <View style={styles.empty}><View style={styles.emptyPlaceMark} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><SymbolView name={{ ios: 'mappin.and.ellipse', android: 'location_on', web: 'location_on' }} size={46} tintColor={palette.slate} /><View style={styles.emptyPlaceAdd}><SymbolView name={{ ios: 'plus', android: 'add', web: 'add' }} size={18} tintColor={palette.onOcean} /></View></View><Text style={styles.emptyTitle}>気になる場所を保存</Text><Pressable accessibilityRole="button" disabled={!canEdit} onPress={() => open()} style={styles.primary}><Text style={styles.primaryText}>＋ 場所を追加</Text></Pressable></View> : !filtered.length ? <View style={styles.empty}><Text style={styles.emptyTitle}>該当する場所がありません</Text><Pressable accessibilityRole="button" onPress={() => { setFilter('all'); setSearch(''); }} style={styles.primary}><Text style={styles.primaryText}>絞り込みを解除</Text></Pressable></View> : <View testID="place-grid" style={{ gap: 16 }}>{filtered.map((place, index) => {
         const itineraryItem = items.find((item) => item.id === place.itineraryItemId);
         const status = placeStatuses.find((entry) => entry.value === place.status)!;
         const reservation = reservationStatuses.find((entry) => entry.value === place.reservationStatus)!;
@@ -87,8 +87,8 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 110, gap: 16 },
   search: { minHeight: 48, backgroundColor: palette.paper, borderRadius: 12, paddingHorizontal: 16, fontSize: 15, color: palette.ink },
   filters: { gap: 6 },
-  filter: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 24, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: palette.mist },
-  filterSelected: { backgroundColor: palette.sky },
+  filter: { borderWidth: 1, borderColor: 'transparent', flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 24, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: palette.mist },
+  filterSelected: { backgroundColor: palette.selection, borderColor: palette.selectionBorder },
   filterText: { color: palette.slate, fontSize: 12 },
   filterTextSelected: { color: palette.ink, fontWeight: '700' },
   card: { borderRadius: 20, backgroundColor: palette.paper, overflow: 'hidden' },
@@ -96,7 +96,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   cardBody: { padding: 20, gap: 10 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   serial: { color: palette.smoke, fontFamily: mono, fontSize: 10, letterSpacing: 1 },
-  reservation: { color: palette.actionText, fontSize: 11 },
+  reservation: { color: palette.slate, fontSize: 11 },
   needed: { color: palette.warning },
   placeTitle: { color: palette.ink, fontSize: 21, lineHeight: 29, fontWeight: '700' },
   note: { color: palette.slate, fontSize: 14, lineHeight: 23 },
@@ -115,6 +115,6 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   emptyTitle: { color: palette.slate, fontSize: 18, fontWeight: '600' },
   primary: { paddingHorizontal: 20, paddingVertical: 15, backgroundColor: palette.ocean, borderRadius: 12 },
   primaryText: { color: palette.onOcean, fontSize: 14, fontWeight: '700' },
-  option: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: palette.paper, borderRadius: 10 },
+  option: { borderWidth: 1, borderColor: 'transparent', flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: palette.paper, borderRadius: 10 },
   optionText: { color: palette.ink, fontSize: 13 },
 });

@@ -6,7 +6,8 @@ import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { useModalViewport } from '@/hooks/use-modal-viewport';
 import { router, usePathname } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { PageActionContext } from './page-action-context';
 import { useDesktop } from '@/hooks/use-desktop';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -32,14 +33,19 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
   const styles = useThemedStyles(createStyles);
 
   const pathname = usePathname();
+  const reduced = useReducedMotion();
+  const previousPath = useRef(pathname);
   const tabScroll = useRef<ScrollView>(null);
   const tabLayouts = useRef<Record<string, { x: number; width: number }>>({});
   const [tabWidth, setTabWidth] = useState(0);
-  const revealTab = () => {
+  const revealTab = useCallback((animated = false) => {
     const frame = tabLayouts.current[pathname.split('/').pop() ?? ''];
-    if (frame) tabScroll.current?.scrollTo({ x: Math.max(0, frame.x - (tabWidth - frame.width) / 2), animated: false });
-  };
-  useEffect(revealTab, [pathname, tabWidth]);
+    if (frame) tabScroll.current?.scrollTo({ x: Math.max(0, frame.x - (tabWidth - frame.width) / 2), animated: animated && !reduced });
+  }, [pathname, tabWidth, reduced]);
+  useEffect(() => {
+    revealTab(previousPath.current !== pathname);
+    previousPath.current = pathname;
+  }, [pathname, revealTab]);
   const desktop = useDesktop();
   const { action } = useContext(PageActionContext);
   const managing = pathname.endsWith('/members');
@@ -71,7 +77,7 @@ export function TripTopTabs({ tripId }: { tripId: string }) {
       </View>
       {!managing ? <>
         <SyncStatus />
-        <ScrollView testID="trip-tabs" ref={tabScroll} horizontal showsHorizontalScrollIndicator={false} onLayout={(event) => setTabWidth(event.nativeEvent.layout.width)} onContentSizeChange={revealTab} style={styles.tabScroll} contentContainerStyle={{ flexGrow: 1 }} accessibilityRole="tablist"><MotionTabs style={styles.tabs}>{tabs.map((tab) => {
+        <ScrollView testID="trip-tabs" ref={tabScroll} horizontal showsHorizontalScrollIndicator={false} onLayout={(event) => setTabWidth(event.nativeEvent.layout.width)} onContentSizeChange={() => revealTab()} style={styles.tabScroll} contentContainerStyle={{ flexGrow: 1 }} accessibilityRole="tablist"><MotionTabs style={styles.tabs}>{tabs.map((tab) => {
           const selected = pathname.endsWith(`/${tab.key}`);
           return <Pressable accessibilityRole="tab" aria-selected={selected} accessibilityState={{ selected }} onLayout={(event) => { tabLayouts.current[tab.key] = event.nativeEvent.layout; if (selected) revealTab(); }} key={tab.key} onPress={() => router.replace({ pathname: `/trips/[tripId]/${tab.key}`, params: { tripId } })} style={[styles.tab, selected && styles.tabSelected]}><Text numberOfLines={1} style={[styles.tabText, selected && styles.tabTextSelected]}>{tab.label}</Text></Pressable>;
         })}</MotionTabs></ScrollView>
@@ -109,9 +115,9 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   tabScroll: { marginHorizontal: -20, flexGrow: 0 },
   tabs: { minHeight: 54, flexDirection: 'row', paddingHorizontal: 20, gap: 8, alignItems: 'center' },
   tab: { flexShrink: 0, minWidth: 76, paddingHorizontal: 20, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
-  tabSelected: { backgroundColor: palette.sky },
+  tabSelected: { backgroundColor: palette.ocean },
   tabText: { color: palette.slate, fontSize: 12, lineHeight: 20, fontWeight: '700' },
-  tabTextSelected: { color: palette.actionText, fontWeight: '900' },
+  tabTextSelected: { color: palette.onOcean, fontWeight: '900' },
   progress: { color: palette.actionText, fontSize: 11, paddingTop: 8, textAlign: 'right' },
   menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.16)' },
   menuPosition: { position: 'absolute', width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, alignItems: 'flex-end' },

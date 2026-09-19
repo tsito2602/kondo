@@ -129,10 +129,10 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   role: { color: palette.actionText, fontSize: 11 },
   remove: { width: 40, height: 44, alignItems: 'center', justifyContent: 'center' },
   roles: { padding: 4, borderRadius: 12, backgroundColor: palette.canvas, flexDirection: 'row', gap: 4 },
-  roleButton: { flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
-  roleSelected: { backgroundColor: palette.paper },
+  roleButton: { borderWidth: 1, borderColor: 'transparent', flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
+  roleSelected: { backgroundColor: palette.selection, borderColor: palette.selectionBorder },
   roleText: { color: palette.smoke, fontSize: 12 },
-  roleTextSelected: { color: palette.actionText, fontWeight: '700' },
+  roleTextSelected: { color: palette.ink, fontWeight: '700' },
   error: { color: palette.danger, fontSize: 13, lineHeight: 21 },
   disabled: { opacity: 0.5 },
 });

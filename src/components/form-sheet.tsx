@@ -25,6 +25,8 @@ type Props = PropsWithChildren<{
 export function FormSheet({ presentation = 'form', visible, title, onClose, onSave, saveLabel = '保存', canSave = true, dirty = false, error, children }: Props) {
   const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
+  // Editing an open detail keeps its surface in place, including desktop drawers.
+  const [surfacePresentation] = useState(presentation);
 
   const viewport = useModalViewport(visible);
   const reduceMotion = useReducedMotion();
@@ -42,7 +44,7 @@ export function FormSheet({ presentation = 'form', visible, title, onClose, onSa
     ]);
   };
   return <><MotionModal visible={visible} transparent={Platform.OS === 'web'} presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : 'fullScreen'} animationType={reduceMotion ? 'none' : Platform.OS === 'web' ? 'fade' : 'slide'} onRequestClose={close}>
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} testID={presentation === 'detail' ? 'detail-modal-viewport' : 'form-modal-viewport'} style={[styles.overlay, viewport]}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} testID={surfacePresentation === 'detail' ? 'detail-modal-viewport' : 'form-modal-viewport'} style={[styles.overlay, viewport]}>
       {Platform.OS === 'web' ? <Pressable accessibilityLabel="シートを閉じる" onPress={close} style={StyleSheet.absoluteFill} /> : null}
       <SafeAreaView testID="form-sheet" edges={Platform.OS === 'web' ? ['left', 'right'] : ['top', 'bottom']} style={styles.sheet}>
         <View accessibilityViewIsModal testID="form-sheet-fill" style={styles.fill}>
@@ -51,8 +53,8 @@ export function FormSheet({ presentation = 'form', visible, title, onClose, onSa
             <Text accessibilityRole="header" numberOfLines={2} style={styles.title}>{title}</Text>
             {onSave ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: !canSave }} disabled={!canSave} onPress={onSave} style={styles.headerButton}><Text style={[styles.save, !canSave && styles.disabled]}>{saveLabel}</Text></Pressable> : <View style={styles.headerButton} />}
           </View>
-          <ScrollView testID="form-sheet-scroll" ref={scroll} contentContainerStyle={[styles.content, Platform.OS === 'web' && { paddingBottom: Math.max(40, insets.bottom + 16) }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" showsVerticalScrollIndicator={false}>
-            {children}
+          <ScrollView key={presentation} testID="form-sheet-scroll" ref={scroll} style={styles.scroll} contentContainerStyle={[styles.content, Platform.OS === 'web' && { paddingBottom: Math.max(40, insets.bottom + 16) }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" showsVerticalScrollIndicator={false}>
+            <View testID="sheet-content" style={styles.fields}>{children}</View>
             {error ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
           </ScrollView>
         </View>
@@ -76,8 +78,10 @@ export function FormSheet({ presentation = 'form', visible, title, onClose, onSa
 const createStyles = (palette: Palette) => StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Platform.OS === 'web' ? 'rgba(0,0,0,0.3)' : palette.canvas, padding: Platform.OS === 'web' ? 16 : 0 },
   sheet: { width: '100%', flex: 1, maxWidth: 640, maxHeight: Platform.OS === 'web' ? '92%' : '100%', backgroundColor: palette.canvas, borderRadius: Platform.OS === 'web' ? 24 : 0, overflow: 'hidden' },
-  fill: { flex: 1 },
-  header: { minHeight: 64, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
+  fill: { flex: 1, minHeight: 0 },
+  scroll: { flex: 1, minHeight: 0 },
+  fields: { gap: 12 },
+  header: { flexShrink: 0, minHeight: 64, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
   headerButton: { minWidth: 64, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
   close: { fontSize: 15, color: palette.slate },
   save: { fontSize: 16, fontWeight: '700', color: palette.actionText },
