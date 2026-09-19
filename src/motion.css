@@ -101,6 +101,18 @@
 .motion-tabs > .t-tabs-pill {
   transition: transform var(--tabs-dur) var(--tabs-ease), width var(--tabs-dur) var(--tabs-ease), height var(--tabs-dur) var(--tabs-ease), border-radius var(--tabs-dur) var(--tabs-ease);
 }
+/* Content changes keep the toolbar and selection controls still. Only the
+   incoming body moves, so switching detail/edit never slides a whole sheet twice. */
+[data-testid="sheet-content"], [data-testid="preparation-groups"] {
+  animation: motion-page-enter var(--duration-fast) var(--ease-smooth-out) both;
+}
+[data-testid="preparation-progress-fill"] {
+  transition: width var(--duration-fast) var(--ease-smooth-out);
+}
+[role="tab"] > * {
+  transition: color var(--duration-quick) var(--ease-smooth-out);
+}
+[data-testid="note-editor"] { background: var(--paper); }
 /* Press-in is immediate; release has a little more settling time. Tabs keep
    their geometry while the shared selection pill is moving underneath them. */
 [role="button"]:not([aria-disabled="true"]):active, button:not(:disabled):active {

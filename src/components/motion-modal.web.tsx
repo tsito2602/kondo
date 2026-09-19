@@ -5,8 +5,8 @@ import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { motionMs } from '@/utils/motion';
 import { waitForMotion } from '@/utils/web-motion';
 
-const surfaceSelector = '[data-testid="form-sheet"], [data-testid="picker-sheet"], [data-testid="delete-trip-dialog"], [data-testid="trip-menu"], [data-testid="discard-dialog"]';
-const viewportSelector = '[data-testid="form-modal-viewport"], [data-testid="detail-modal-viewport"], [data-testid="modal-viewport"]';
+const surfaceSelector = '[data-testid="form-sheet"], [data-testid="picker-sheet"], [data-testid="note-editor"], [data-testid="delete-trip-dialog"], [data-testid="trip-menu"], [data-testid="discard-dialog"]';
+const viewportSelector = '[data-testid="form-modal-viewport"], [data-testid="detail-modal-viewport"], [data-testid="note-modal-viewport"], [data-testid="modal-viewport"]';
 
 export function MotionModal({ children, visible = true, motion = 'modal', onRequestClose, ...props }: ModalProps & { motion?: 'modal' | 'dropdown' }) {
   const present = useContext(MotionPresenceContext);
@@ -44,7 +44,7 @@ export function MotionModal({ children, visible = true, motion = 'modal', onRequ
       viewport.style.setProperty('--motion-backdrop-color', getComputedStyle(viewport).backgroundColor);
       viewport.classList.add('motion-viewport');
     }
-    const sheet = surface.matches('[data-testid="form-sheet"], [data-testid="picker-sheet"]');
+    const sheet = surface.matches('[data-testid="form-sheet"], [data-testid="picker-sheet"], [data-testid="note-editor"]');
     root.setAttribute('data-presentation', motion === 'dropdown' ? 'dropdown' : sheet ? viewport.dataset.testid === 'detail-modal-viewport' ? 'detail' : 'sheet' : 'dialog');
     surface.dataset.motionSurface = '';
     surface.classList.add(`t-${motion}`);

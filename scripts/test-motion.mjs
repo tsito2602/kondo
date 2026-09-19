@@ -98,6 +98,26 @@ await flush();
 assert.equal(surface(), null);
 console.log('Motion: retained inputs, visible toggles and rapid reopen passed.');
 
+// Every editor uses the same retained exit, including notes and connection pickers.
+for (const [viewportId, surfaceId] of [['note-modal-viewport', 'note-editor'], ['modal-viewport', 'picker-sheet']]) {
+  const child = React.createElement(MotionModal, { visible: true },
+    React.createElement('div', { 'data-testid': viewportId },
+      React.createElement('section', { 'data-testid': surfaceId }, React.createElement('input', { defaultValue: 'draft' }))));
+  await render(presence(child));
+  const panel = document.querySelector(`[data-testid="${surfaceId}"]`);
+  assert.equal(document.querySelector('.motion-overlay').dataset.presentation, 'sheet');
+  const input = panel.querySelector('input');
+  input.value = 'keep during exit';
+  await render(presence(null));
+  assert(panel.classList.contains('is-closing'));
+  assert.equal(panel.inert, true);
+  assert.equal(panel.querySelector('input'), input);
+  assert.equal(input.value, 'keep during exit');
+  await flush();
+  assert.equal(document.querySelector(`[data-testid="${surfaceId}"]`), null);
+}
+console.log('Motion: note and connection editors retain their surface through exit.');
+
 // Fallback reads property lists, seconds, delays and negative delays.
 assert.equal(transitionMilliseconds({ transitionProperty: 'opacity, transform', transitionDuration: '.02s, 70ms', transitionDelay: '10ms, 15ms' }), 85);
 assert.equal(transitionMilliseconds({ transitionProperty: 'opacity, transform, width', transitionDuration: '20ms', transitionDelay: '-10ms, 15ms' }), 35);

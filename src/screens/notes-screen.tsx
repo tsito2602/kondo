@@ -1,7 +1,9 @@
 import * as Crypto from 'expo-crypto';
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { MotionModal } from '@/components/motion-modal';
+import { MotionPresence } from '@/components/motion-presence';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FloatingAddButton } from '@/components/floating-add-button';
 import { useTripHeaderHeight } from '@/components/trip-header-context';
@@ -41,7 +43,7 @@ export default function NotesScreen() {
       {notes.length ? <Text style={styles.count}>{filtered.length}件のメモ</Text> : null}
     </ScrollView>
     {canEdit ? <FloatingAddButton label="メモを書く" onPress={add} /> : null}
-    {editing ? <NoteEditor key={editing.id} initial={editing} onClose={() => setEditing(null)} /> : null}
+    <MotionPresence>{editing ? <NoteEditor key={editing.id} initial={editing} onClose={() => setEditing(null)} /> : null}</MotionPresence>
   </View>;
 }
 
@@ -103,9 +105,9 @@ function NoteEditor({ initial, onClose }: { initial: TravelNote; onClose: () => 
     change({ ...draftRef.current, body: next });
     input.current?.focus();
   };
-  return <Modal visible animationType="slide" onRequestClose={close}>
-    <SafeAreaView style={[styles.editorBackdrop, viewport]}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.editor}>
+  return <MotionModal visible transparent={Platform.OS === 'web'} animationType="slide" onRequestClose={close}>
+    <SafeAreaView testID="note-modal-viewport" style={[styles.editorBackdrop, viewport]}>
+      <KeyboardAvoidingView testID="note-editor" behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.editor}>
         <View style={styles.editorToolbar}>
           <Pressable accessibilityRole="button" onPress={close} style={styles.control}><Text style={styles.actionText}>‹ メモ</Text></Pressable>
           <View style={styles.tools}>
@@ -122,7 +124,7 @@ function NoteEditor({ initial, onClose }: { initial: TravelNote; onClose: () => 
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
-  </Modal>;
+  </MotionModal>;
 }
 
 const createStyles = (palette: Palette) => StyleSheet.create({

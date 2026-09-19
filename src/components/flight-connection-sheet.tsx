@@ -2,7 +2,8 @@ import { usePalette, useThemedStyles } from '@/theme/theme-provider';
 import { useModalViewport } from '@/hooks/use-modal-viewport';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { MotionModal } from './motion-modal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { type Palette } from '@/constants/design';
@@ -64,7 +65,7 @@ function ConnectionEditor({ booking, bookings, onClose, onSave }: {
   };
   const select = (nextMode: FlightConnectionMode, nextTarget: string | null = null) => { setMode(nextMode); setTarget(nextTarget); setError(''); };
 
-  return <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+  return <MotionModal visible transparent animationType="slide" onRequestClose={onClose}>
     <SafeAreaView testID="modal-viewport" style={[styles.backdrop, viewport]}>
       <Pressable accessibilityLabel="乗り継ぎの変更をキャンセル" onPress={onClose} style={StyleSheet.absoluteFill} />
       <View testID="picker-sheet" accessibilityViewIsModal style={styles.sheet}>
@@ -117,7 +118,7 @@ function ConnectionEditor({ booking, bookings, onClose, onSave }: {
         </View>
       </View>
     </SafeAreaView>
-  </Modal>;
+  </MotionModal>;
 }
 
 function Radio({ checked }: { checked: boolean }) {

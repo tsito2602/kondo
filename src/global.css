@@ -43,8 +43,11 @@ input:focus, textarea:focus { outline: none; box-shadow: 0 0 0 2px var(--focus-r
 [data-testid="trip-hero-photo"] { will-change: transform, filter; }
 [data-testid="journal-sheet"] { box-shadow: 0 -14px 44px rgba(0,0,0,.12); }
 @media (max-width: 600px) {
-  :is([data-testid="form-modal-viewport"], [data-testid="detail-modal-viewport"]) { padding: 0 !important; padding-top: max(12px, env(safe-area-inset-top)) !important; justify-content: flex-end !important; }
-  [data-testid="form-sheet"] { border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; max-height: 100% !important; margin-top: auto; }
+  /* The sheet fills the viewport. Only its toolbar owns the top safe area;
+     do not stack a viewport gap, sheet inset and toolbar inset on iPhone. */
+  :is([data-testid="form-modal-viewport"], [data-testid="detail-modal-viewport"]) { padding: 0 !important; justify-content: flex-start !important; }
+  [data-testid="form-sheet"] { flex: 1 1 0% !important; height: 100%; max-height: 100% !important; border-radius: 0 !important; margin: 0; }
+  [data-testid="sheet-header"] { padding-top: env(safe-area-inset-top, 0px); min-height: calc(64px + env(safe-area-inset-top, 0px)); }
   :is([data-testid="form-modal-viewport"], [data-testid="detail-modal-viewport"]):has(input:focus, textarea:focus) [data-testid="form-sheet"] { padding-bottom: 0 !important; }
   [data-testid="modal-viewport"]:has([data-testid="picker-sheet"]) { padding: 0 !important; padding-top: max(12px, env(safe-area-inset-top)) !important; justify-content: flex-end !important; }
   [data-testid="modal-viewport"] [data-testid="picker-sheet"] { max-height: 100% !important; border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; }
@@ -173,7 +176,7 @@ a:focus-visible, button:focus-visible, [role="button"]:focus-visible, [role="tab
   [data-testid="detail-modal-viewport"] .t-modal.is-closing { transform: translateX(var(--distance-base)); }
 }
 .motion-tabs { position: relative; isolation: isolate; }
-[data-testid="itinerary-day-tabs"] .motion-tabs, [data-testid="preparation-tabs"] { --tabs-pill-bg: var(--ocean); }
+[data-testid="trip-tabs"] .motion-tabs, [data-testid="itinerary-day-tabs"] .motion-tabs, [data-testid="preparation-tabs"] { --tabs-pill-bg: var(--ocean); }
 /* Keep the composited pill behind tab labels within the isolated tab bar. */
 .motion-tabs > .t-tabs-pill { top: 0; z-index: -1; }
 .motion-tabs > [role="tab"] { z-index: 1; background-color: transparent !important; }

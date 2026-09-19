@@ -233,7 +233,7 @@ export default function PackingScreen() {
               <Text style={styles.progressValue}>{Math.round(progress * 100)}%</Text>
             </View>
             <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+              <View testID="preparation-progress-fill" style={[styles.progressFill, { width: `${progress * 100}%` }]} />
             </View>
             <Text style={styles.progressMeta}>{activeDone}件完了・残り{activeTotal - activeDone}件</Text>
           </View>
@@ -259,7 +259,7 @@ export default function PackingScreen() {
             <Pressable accessibilityRole="button" onPress={() => setFilterKey('all')} style={styles.resetFilter}><Text style={styles.categoryText}>すべて表示</Text></Pressable>
           </View>
         ) : isTasks ? (
-          <View testID="preparation-groups" style={styles.groups}>
+          <View key={`tasks:${filterKey}`} testID="preparation-groups" style={styles.groups}>
             {taskGroups.map((group) => (
               <View key={group.label} style={styles.group}>
                 <View style={styles.groupHeading}>
@@ -271,7 +271,7 @@ export default function PackingScreen() {
             ))}
           </View>
         ) : (
-          <View testID="preparation-groups" style={styles.groups}>
+          <View key={`packing:${filterKey}`} testID="preparation-groups" style={styles.groups}>
             {packingGroups.map((group) => (
               <View key={group.category} style={styles.group}>
                 <View style={styles.groupHeading}>
