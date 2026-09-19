@@ -40,4 +40,4 @@ export function CoverPicker({ value, onChange }: { value: string; onChange: (val
     {error ? <Text style={styles.remove}>{error}</Text> : null}
   </View>;
 }
-const createStyles = (palette: Palette) => StyleSheet.create({ actions: { flexDirection: 'row', gap: 12 }, button: { minHeight: 40, justifyContent: 'center' }, text: { color: palette.ocean, fontWeight: '700', fontSize: 14 }, remove: { color: palette.danger, fontSize: 13 } });
+const createStyles = (palette: Palette) => StyleSheet.create({ actions: { flexDirection: 'row', gap: 12 }, button: { minHeight: 40, justifyContent: 'center' }, text: { color: palette.actionText, fontWeight: '700', fontSize: 14 }, remove: { color: palette.danger, fontSize: 13 } });

@@ -3,17 +3,17 @@
 
 :root {
   color-scheme: light;
-  --canvas: #F7F7F7; --paper: #FFFFFF; --ink: #171717; --ocean: #3B82F6;
-  --mist: #F0F0F0; --sky: #E8E8E8; --accent: #3B82F6; --danger: #B42318;
-  --on-ocean: #0A0A0A; --glass: #f7f7f7bb; --glass-strong: #f7f7f7d9;
-  --glass-line: #ffffff66; --drop-fill: #ffffff80; --focus-ring: #3B82F666;
+  --canvas: #F7F7F7; --paper: #FFFFFF; --ink: #171717; --ocean: #496B80;
+  --mist: #F0F0F0; --sky: #E8E8E8; --accent: #496B80; --danger: #B42318;
+  --on-ocean: #FFFFFF; --action-text: #496B80; --glass: #f7f7f7bb; --glass-strong: #f7f7f7d9;
+  --glass-line: #ffffff66; --drop-fill: #ffffff80; --focus-ring: #496B8066;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --canvas: #0A0A0A; --paper: #171717; --ink: #F5F5F5; --ocean: #3B82F6;
-  --mist: #1A1A1A; --sky: #1E1E1E; --accent: #3B82F6; --danger: #FFA69D;
-  --on-ocean: #0A0A0A; --glass: #0a0a0abb; --glass-strong: #0a0a0aee;
-  --glass-line: #40404066; --drop-fill: #17171780; --focus-ring: #3B82F666;
+  --canvas: #0A0A0A; --paper: #171717; --ink: #F5F5F5; --ocean: #496B80;
+  --mist: #171717; --sky: #171717; --accent: #496B80; --danger: #FFA69D;
+  --on-ocean: #FFFFFF; --action-text: #D4D4D4; --glass: #0a0a0abb; --glass-strong: #0a0a0aee;
+  --glass-line: #40404066; --drop-fill: #17171780; --focus-ring: #496B8066;
 }
 :root {
   --font-display:
@@ -68,7 +68,7 @@ a:focus-visible, button:focus-visible, [role="button"]:focus-visible, [role="tab
 .file-drop { min-width: 0; border: 1.5px dashed var(--accent); border-radius: 14px; padding: 12px; background: var(--drop-fill); transition: background var(--duration-quick) var(--ease-smooth-out), border-color var(--duration-quick) var(--ease-smooth-out); }
 .file-drop.is-dragging { background: var(--sky); border-color: var(--ocean); outline: 3px solid var(--focus-ring); }
 .file-drop.is-disabled { opacity: .6; }
-.file-drop-button { width: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; min-height: 150px; padding: 18px 12px; border: 0; border-radius: 9px; color: var(--ocean); background: transparent; font: 13px var(--font-display); cursor: pointer; }
+.file-drop-button { width: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; min-height: 150px; padding: 18px 12px; border: 0; border-radius: 9px; color: var(--action-text); background: transparent; font: 13px var(--font-display); cursor: pointer; }
 .file-drop-button strong { font-size: 14px; }
 .file-drop-button span { font-size: 11px; line-height: 18px; }
 .file-drop-button .file-drop-select { margin-top: 4px; font-size: 12px; font-weight: 600; background: var(--mist); padding: 6px 14px; border-radius: 7px; }
@@ -177,7 +177,7 @@ a:focus-visible, button:focus-visible, [role="button"]:focus-visible, [role="tab
 /* Keep the composited pill behind tab labels within the isolated tab bar. */
 .motion-tabs > .t-tabs-pill { top: 0; z-index: -1; }
 .motion-tabs > [role="tab"] { z-index: 1; background-color: transparent !important; }
-.motion-copy { border: 0; min-width: 76px; min-height: 44px; padding: 0 12px; border-radius: 12px; background: var(--sky); color: var(--ocean); font: 700 12px var(--font-display); cursor: pointer; }
+.motion-copy { border: 0; min-width: 76px; min-height: 44px; padding: 0 12px; border-radius: 12px; background: var(--sky); color: var(--action-text); font: 700 12px var(--font-display); cursor: pointer; }
 .motion-copy .t-icon-swap { align-items: center; justify-items: center; }
 .motion-toast-position { position: absolute; left: 24px; right: 24px; display: flex; justify-content: center; z-index: 1000; pointer-events: none; }
 .motion-toast { max-width: 440px; border-radius: 16px; padding: 14px 20px; background: var(--ink); color: var(--canvas); font: 13px/20px var(--font-display); text-align: center; }

@@ -34,7 +34,7 @@ export function CopyButton({ value, label = 'コピー' }: { value: string; labe
 }
 const createStyles = (palette: Palette) => StyleSheet.create({
   button: { minWidth: 76, minHeight: 44, paddingHorizontal: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.sky },
-  text: { color: palette.ocean, fontSize: 12, fontWeight: '700' },
+  text: { color: palette.actionText, fontSize: 12, fontWeight: '700' },
   check: { fontSize: 22, lineHeight: 26 },
   error: { color: palette.danger },
 });

@@ -366,7 +366,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   filterChip: { minHeight: 44, maxWidth: 220, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 999, backgroundColor: palette.mist },
   resetFilter: { minHeight: 44, justifyContent: 'center', marginTop: 12 },
   packingMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  sharedBadge: { overflow: 'hidden', color: palette.ocean, backgroundColor: palette.sky, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, fontSize: 11, fontWeight: '700' },
+  sharedBadge: { overflow: 'hidden', color: palette.actionText, backgroundColor: palette.sky, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, fontSize: 11, fontWeight: '700' },
   sharedHint: { color: palette.slate, fontSize: 12, lineHeight: 18, marginTop: 8 },
   segmented: { flexDirection: 'row', backgroundColor: palette.sky, borderRadius: 14, padding: 4 },
   segment: { flex: 1, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },

@@ -49,7 +49,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   logo: { width: 200, height: 200, alignSelf: 'center' },
   wordmark: { alignSelf: 'center', color: palette.ink, fontSize: 48, lineHeight: 56, fontWeight: '800', letterSpacing: -1.5, marginTop: -20 },
   sampleButton: { minHeight: 56, justifyContent: 'center', alignItems: 'center', marginTop: 12, backgroundColor: palette.paper, borderRadius: 8 },
-  sampleText: { color: palette.ocean, fontSize: 15, fontWeight: '700' },
+  sampleText: { color: palette.actionText, fontSize: 15, fontWeight: '700' },
   body: { maxWidth: 460, alignSelf: 'center', textAlign: 'center', color: palette.slate, fontSize: 16, lineHeight: 24, marginTop: 16, marginBottom: 40 },
   button: { minHeight: 56, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.ocean },
   buttonText: { color: palette.onOcean, fontSize: 16, fontWeight: '700' },

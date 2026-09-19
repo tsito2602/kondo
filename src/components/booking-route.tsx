@@ -28,5 +28,5 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   code: { color: palette.ink, fontSize: 28, lineHeight: 36, fontWeight: '700' },
   compactCode: { fontSize: 22, lineHeight: 30 },
   name: { color: palette.slate, fontSize: 12, lineHeight: 19 },
-  arrow: { color: palette.ocean, fontSize: 22, lineHeight: 30 },
+  arrow: { color: palette.actionText, fontSize: 22, lineHeight: 30 },
 });

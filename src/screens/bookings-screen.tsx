@@ -54,8 +54,8 @@ function TripBookingsScreen() {
     <SafeAreaView style={styles.safeArea} edges={[]}>
       <ScrollView testID="bookings-scroll" contentContainerStyle={[styles.content, { paddingTop: headerHeight + 20 }]} showsVerticalScrollIndicator={false}>
       <PageHeading title="予約" count={`${bookings.length}件`} />
-        {bookings.length ? <View testID="booking-filters" style={{ gap: 12 }}><TextInput accessibilityLabel="予約を検索" placeholder="予約名・空港・予約番号で検索" value={search} onChangeText={setSearch} placeholderTextColor={palette.placeholder} style={{ minHeight: 46, padding: 14, backgroundColor: palette.paper, borderRadius: 10, color: palette.ink, fontSize: 14 }} /><MotionTabs accessibilityRole="tablist" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{[{ value: 'all', label: 'すべて' }, ...BOOKING_KINDS.filter((kind) => bookings.some((booking) => booking.kind === kind.value))].map((kind) => <Pressable accessibilityRole="tab" aria-selected={kindFilter === kind.value} key={kind.value} onPress={() => setKindFilter(kind.value)} style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 9, backgroundColor: kindFilter === kind.value ? palette.sky : palette.paper }}><Text style={{ color: palette.ocean, fontSize: 12, fontWeight: '600' }}>{kind.label}</Text></Pressable>)}</MotionTabs></View> : null}
-        {bookings.length > 0 && !filtered.length ? <View style={styles.empty}><Text style={styles.emptyTitle}>該当する予約がありません</Text><Pressable accessibilityRole="button" onPress={() => { setSearch(''); setKindFilter('all'); }} style={{ padding: 18 }}><Text style={{ color: palette.ocean }}>絞り込みを解除</Text></Pressable></View> : null}
+        {bookings.length ? <View testID="booking-filters" style={{ gap: 12 }}><TextInput accessibilityLabel="予約を検索" placeholder="予約名・空港・予約番号で検索" value={search} onChangeText={setSearch} placeholderTextColor={palette.placeholder} style={{ minHeight: 46, padding: 14, backgroundColor: palette.paper, borderRadius: 10, color: palette.ink, fontSize: 14 }} /><MotionTabs accessibilityRole="tablist" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{[{ value: 'all', label: 'すべて' }, ...BOOKING_KINDS.filter((kind) => bookings.some((booking) => booking.kind === kind.value))].map((kind) => <Pressable accessibilityRole="tab" aria-selected={kindFilter === kind.value} key={kind.value} onPress={() => setKindFilter(kind.value)} style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 9, backgroundColor: kindFilter === kind.value ? palette.sky : palette.paper }}><Text style={{ color: palette.actionText, fontSize: 12, fontWeight: '600' }}>{kind.label}</Text></Pressable>)}</MotionTabs></View> : null}
+        {bookings.length > 0 && !filtered.length ? <View style={styles.empty}><Text style={styles.emptyTitle}>該当する予約がありません</Text><Pressable accessibilityRole="button" onPress={() => { setSearch(''); setKindFilter('all'); }} style={{ padding: 18 }}><Text style={{ color: palette.actionText }}>絞り込みを解除</Text></Pressable></View> : null}
         {!selectedTrip ? (
           <View style={styles.empty}><Text style={styles.emptyTitle}>旅行を作成してください</Text><Text style={styles.emptyBody}>予約は選択中の旅行ごとに保存されます。</Text></View>
         ) : bookings.length === 0 ? (
@@ -120,7 +120,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 112 },
   empty: { minHeight: 260, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.paper, borderRadius: 32, padding: 28, marginTop: 24 },
   emptyMark: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.sky, marginBottom: 18 },
-  emptyMarkText: { color: palette.ocean, fontSize: 27, fontWeight: '700' },
+  emptyMarkText: { color: palette.actionText, fontSize: 27, fontWeight: '700' },
   emptyTitle: { color: palette.ink, fontSize: 19, fontWeight: '900', textAlign: 'center' },
   emptyBody: { color: palette.slate, fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 8 },
   ticketList: { gap: 16, marginTop: 24 },
@@ -128,7 +128,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   copy: { flex: 1, minWidth: 0, padding: 20 },
   ticketTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   ticketTopMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  documentCount: { color: palette.ocean, fontSize: 9, fontWeight: '800' },
+  documentCount: { color: palette.actionText, fontSize: 9, fontWeight: '800' },
   typeTag: { alignSelf: 'flex-start', backgroundColor: palette.sky, borderRadius: 64, paddingHorizontal: 10, paddingVertical: 5 },
   type: { color: palette.ink, fontFamily: mono, fontSize: 9, letterSpacing: 0.8 },
   serial: { color: palette.smoke, fontFamily: mono, fontSize: 9 },
@@ -136,7 +136,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   detail: { color: palette.slate, fontSize: 14, marginTop: 6 },
   meta: { color: palette.slate, fontFamily: mono, fontSize: 10, lineHeight: 16, marginTop: 12 },
   stub: { width: STUB_WIDTH, flexShrink: 0, borderLeftWidth: 1, borderStyle: 'dashed', borderLeftColor: palette.ocean, backgroundColor: palette.sky, alignItems: 'center', justifyContent: 'center' },
-  icon: { color: palette.ocean, fontSize: 24, fontWeight: '900' },
+  icon: { color: palette.actionText, fontSize: 24, fontWeight: '900' },
   stubNo: { color: palette.ink, fontSize: 24, lineHeight: 27, fontWeight: '900', marginTop: 12 },
   stubLabel: { color: palette.smoke, fontFamily: mono, fontSize: 8, marginTop: 2 },
   notch: { position: 'absolute', right: STUB_WIDTH - NOTCH_RADIUS - 0.5, width: NOTCH_RADIUS * 2, height: NOTCH_RADIUS * 2, borderRadius: NOTCH_RADIUS, backgroundColor: palette.canvas, zIndex: 2 },

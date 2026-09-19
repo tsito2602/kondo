@@ -80,7 +80,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   header: { minHeight: 64, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
   headerButton: { minWidth: 64, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
   close: { fontSize: 15, color: palette.slate },
-  save: { fontSize: 16, fontWeight: '700', color: palette.ocean },
+  save: { fontSize: 16, fontWeight: '700', color: palette.actionText },
   disabled: { opacity: 0.35 },
   title: { flex: 1, textAlign: 'center', fontSize: 17, lineHeight: 24, color: palette.ink, fontWeight: '700' },
   content: { padding: 24, paddingBottom: 40, gap: 12 },

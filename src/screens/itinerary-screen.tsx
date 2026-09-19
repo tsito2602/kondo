@@ -357,7 +357,7 @@ export default function ItineraryScreen() {
       {desktop ? <>
         <View style={{ position: 'absolute', top: headerHeight + 20, left: 32, right: 32 }}><PageHeading title="しおり" count={`${itineraryDates.length}日間`} /></View>
         <ScrollView testID="desktop-day-index" style={{ position: 'absolute', top: headerHeight + 100, bottom: 24, left: 32, width: 150 }} contentContainerStyle={{ gap: 6 }}>
-          {itineraryDates.map((date, index) => <Pressable key={date} accessibilityRole="button" accessibilityLabel={`${index + 1}日目 ${shortDate(date)}へ移動`} accessibilityState={{ selected: date === visibleActiveDay }} onPress={() => scrollToDay(date)} style={{ padding: 14, borderRadius: 12, gap: 5, backgroundColor: date === visibleActiveDay ? palette.sky : 'transparent' }}><Text style={{ color: palette.ocean, fontSize: 11, fontWeight: '700' }}>{index + 1}日目</Text><Text style={{ color: palette.ink, fontSize: 18, fontWeight: '700' }}>{shortDate(date)}</Text><Text style={{ color: palette.smoke, fontSize: 11 }}>{grouped[date]?.length ?? 0}件の予定</Text></Pressable>)}
+          {itineraryDates.map((date, index) => <Pressable key={date} accessibilityRole="button" accessibilityLabel={`${index + 1}日目 ${shortDate(date)}へ移動`} accessibilityState={{ selected: date === visibleActiveDay }} onPress={() => scrollToDay(date)} style={{ padding: 14, borderRadius: 12, gap: 5, backgroundColor: date === visibleActiveDay ? palette.sky : 'transparent' }}><Text style={{ color: palette.actionText, fontSize: 11, fontWeight: '700' }}>{index + 1}日目</Text><Text style={{ color: palette.ink, fontSize: 18, fontWeight: '700' }}>{shortDate(date)}</Text><Text style={{ color: palette.smoke, fontSize: 11 }}>{grouped[date]?.length ?? 0}件の予定</Text></Pressable>)}
         </ScrollView>
       </> : null}
       <ScrollView
@@ -552,7 +552,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   journalSheet: { backgroundColor: palette.canvas, borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden' },
   journalBody: { backgroundColor: palette.canvas },
   sheetIntro: { paddingTop: 24, paddingBottom: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  journalLabel: { color: palette.ocean, fontSize: 10, fontWeight: '700', letterSpacing: 2 },
+  journalLabel: { color: palette.actionText, fontSize: 10, fontWeight: '700', letterSpacing: 2 },
   journalCount: { color: palette.smoke, fontFamily: mono, fontSize: 10, letterSpacing: 1 },
   content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20 },
   dayNavSticky: { zIndex: 4, paddingVertical: 6, backgroundColor: palette.canvas, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
@@ -573,12 +573,12 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   transportTime: { width: 64, justifyContent: 'center' },
   transportTimeText: { color: palette.slate, fontFamily: mono, fontSize: 12, fontWeight: '600' },
   transportIcon: { width: 30, height: 30, borderRadius: 15, backgroundColor: palette.paper, alignItems: 'center', justifyContent: 'center' },
-  transportMode: { color: palette.ocean, fontSize: 12, fontWeight: '700' },
+  transportMode: { color: palette.actionText, fontSize: 12, fontWeight: '700' },
   daySection: { backgroundColor: palette.paper },
   dateBar: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: palette.mist, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.ash, paddingHorizontal: 20, position: 'relative', zIndex: 2 },
   dateBarDivider: { borderTopWidth: StyleSheet.hairlineWidth },
   date: { flex: 1, color: palette.ink, fontSize: 12, lineHeight: 18, fontWeight: '700', marginRight: 12 },
-  dateDay: { color: palette.ocean, fontFamily: mono, fontSize: 10, lineHeight: 14, fontWeight: '700' },
+  dateDay: { color: palette.actionText, fontFamily: mono, fontSize: 10, lineHeight: 14, fontWeight: '700' },
   itemRow: { minHeight: 104, flexDirection: 'row', alignItems: 'stretch', paddingHorizontal: 16 },
   linkedBookingRow: { backgroundColor: palette.soft },
   itemPressed: { opacity: 0.55 },
@@ -603,13 +603,13 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   connectionCopy: { flex: 1, justifyContent: 'center', paddingLeft: 8, paddingVertical: 14, gap: 5 },
   connectionHeading: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
   connectionTitle: { color: palette.slate, fontSize: 11, lineHeight: 17, fontWeight: '600' },
-  connectionDuration: { color: palette.ocean, fontSize: 15, lineHeight: 21, fontWeight: '800' },
+  connectionDuration: { color: palette.actionText, fontSize: 15, lineHeight: 21, fontWeight: '800' },
   connectionNext: { color: palette.slate, fontSize: 11, lineHeight: 17 },
-  connectionChevron: { color: palette.ocean, alignSelf: 'center', fontSize: 22, marginLeft: 8 },
+  connectionChevron: { color: palette.actionText, alignSelf: 'center', fontSize: 22, marginLeft: 8 },
   connectionAction: { paddingLeft: 130, paddingRight: 16, paddingBottom: 12, backgroundColor: palette.soft },
   itemCopy: { flex: 1, justifyContent: 'center', paddingVertical: 18, paddingLeft: 8 },
   itemDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
-  bookingTag: { color: palette.ocean, fontWeight: '700' },
+  bookingTag: { color: palette.actionText, fontWeight: '700' },
   itemTitle: { color: palette.ink, fontSize: 17, lineHeight: 22, fontWeight: '800' },
   note: { color: palette.slate, fontSize: 12, lineHeight: 17, marginTop: 3 },
   chevron: { color: palette.smoke, alignSelf: 'center', fontSize: 22, lineHeight: 22, marginLeft: 8 },
@@ -621,7 +621,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
   cancel: { color: palette.slate },
   modalTitle: { color: palette.ink, fontSize: 18, fontWeight: '700' },
-  save: { color: palette.ocean, fontWeight: '700' },
+  save: { color: palette.actionText, fontWeight: '700' },
   form: { padding: 20, gap: 9 },
   label: { color: palette.slate, fontFamily: mono, fontSize: 11, fontWeight: '400', marginTop: 10 },
   input: { minHeight: 50, backgroundColor: palette.paper, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 14, color: palette.ink, fontSize: 16 },

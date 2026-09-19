@@ -83,7 +83,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   issuer: { color: palette.ink, fontSize: 9, lineHeight: 13, fontWeight: '700', letterSpacing: 1.1 },
   serial: { color: palette.smoke, fontFamily: mono, fontSize: 9, lineHeight: 20, letterSpacing: 0.5 },
   titleBlock: { paddingVertical: 20 },
-  destination: { color: palette.ocean, fontSize: 11, lineHeight: 15, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase' },
+  destination: { color: palette.actionText, fontSize: 11, lineHeight: 15, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase' },
   title: { color: palette.ink, fontSize: 26, lineHeight: 33, fontWeight: '900', letterSpacing: -1.1, marginTop: 7 },
   route: { flexDirection: 'row', alignItems: 'flex-end' },
   fieldLabel: { color: palette.smoke, fontFamily: mono, fontSize: 9, lineHeight: 13, fontWeight: '400', letterSpacing: 0.8 },
