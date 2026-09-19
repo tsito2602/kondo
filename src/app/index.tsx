@@ -7,7 +7,7 @@ import { useDesktop } from '@/hooks/use-desktop';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/auth/auth-provider';
 import { SyncStatus } from '@/components/sync-status';
 import { TripEditor } from '@/components/trip-editor';
@@ -18,6 +18,7 @@ import { localDate } from '@/utils/dates';
 
 export default function HomeScreen() {
   const palette = usePalette();
+  const insets = useSafeAreaInsets();
   const styles = useThemedStyles(createStyles);
 
   const desktop = useDesktop();
@@ -43,8 +44,8 @@ export default function HomeScreen() {
   const today = localDate();
   const matchingTrips = trips.filter((trip) => `${trip.name} ${trip.destination}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const groups = [{ label: 'これからの旅行', trips: matchingTrips.filter((trip) => trip.endsOn >= today).sort((a,b) => a.startsOn.localeCompare(b.startsOn)) }, { label: 'これまでの旅行', trips: matchingTrips.filter((trip) => trip.endsOn < today).sort((a,b) => b.startsOn.localeCompare(a.startsOn)) }];
-  return <MotionPage><SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-    <ScrollView nativeID={ready ? "trip-list-ready" : undefined} testID="home-scroll" contentContainerStyle={styles.content} refreshControl={!isDemo ? <RefreshControl refreshing={syncing} onRefresh={() => void sync()} tintColor={palette.ocean} /> : undefined}>
+  return <MotionPage><SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+    <ScrollView nativeID={ready ? "trip-list-ready" : undefined} testID="home-scroll" contentContainerStyle={[styles.content, { paddingBottom: 32 + insets.bottom }]} refreshControl={!isDemo ? <RefreshControl refreshing={syncing} onRefresh={() => void sync()} tintColor={palette.ocean} /> : undefined}>
       <View testID="home-header" style={styles.header}>
         <View><Text style={styles.eyebrow}>TABI</Text><Text accessibilityRole="header" style={styles.title}>旅行</Text></View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><Pressable accessibilityRole="button" accessibilityLabel="設定を開く" onPress={() => router.push('/settings')} style={{ padding: 4 }}><MemberAvatar name={user?.name || 'あなた'} avatarUrl={user?.avatarUrl} size={36} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="旅行を追加する" disabled={!ready} onPress={() => setCreating(true)} style={({ pressed }) => [styles.add, pressed && styles.pressed]}><Text style={styles.addText}>＋ 旅行</Text></Pressable></View>

@@ -3,17 +3,17 @@
 
 :root {
   color-scheme: light;
-  --canvas: #F7F7F7; --paper: #FFFFFF; --ink: #171717; --ocean: #1D4ED8;
-  --mist: #F0F0F0; --sky: #E8E8E8; --accent: #2563EB; --danger: #B42318;
-  --on-ocean: #FFFFFF; --glass: #f7f7f7bb; --glass-strong: #f7f7f7d9;
-  --glass-line: #ffffff66; --drop-fill: #ffffff80; --focus-ring: #2563EB66;
+  --canvas: #F7F7F7; --paper: #FFFFFF; --ink: #171717; --ocean: #3B82F6;
+  --mist: #F0F0F0; --sky: #E8E8E8; --accent: #3B82F6; --danger: #B42318;
+  --on-ocean: #0A0A0A; --glass: #f7f7f7bb; --glass-strong: #f7f7f7d9;
+  --glass-line: #ffffff66; --drop-fill: #ffffff80; --focus-ring: #3B82F666;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --canvas: #0A0A0A; --paper: #171717; --ink: #F5F5F5; --ocean: #75ADFF;
-  --mist: #222222; --sky: #262626; --accent: #75ADFF; --danger: #FFA69D;
+  --canvas: #0A0A0A; --paper: #171717; --ink: #F5F5F5; --ocean: #3B82F6;
+  --mist: #1A1A1A; --sky: #1E1E1E; --accent: #3B82F6; --danger: #FFA69D;
   --on-ocean: #0A0A0A; --glass: #0a0a0abb; --glass-strong: #0a0a0aee;
-  --glass-line: #40404066; --drop-fill: #17171780; --focus-ring: #75ADFF66;
+  --glass-line: #40404066; --drop-fill: #17171780; --focus-ring: #3B82F666;
 }
 :root {
   --font-display:
@@ -26,9 +26,10 @@
 }
 
 html, body { background: var(--canvas); overscroll-behavior-y: none; }
-/* Safari's collapsing toolbar can leave percentage-height app roots shorter
-   than the visible viewport. Fill the current viewport on mobile/PWA too. */
-html body #root { height: 100dvh; min-height: 0; }
+/* Fill the layout viewport on every route, including iOS standalone mode.
+   PwaSetup refreshes the measured height after toolbar/keyboard/app restores. */
+html body #root { position: fixed; inset: 0; height: var(--app-height, 100%); min-height: 0; }
+.motion-overlay { position: fixed; inset: 0; height: var(--app-height, 100%); }
 body { -webkit-tap-highlight-color: transparent; }
 [role="button"], [role="tab"], button { transition: background-color var(--duration-quick) var(--ease-smooth-out), color var(--duration-quick) var(--ease-smooth-out), opacity var(--duration-quick) var(--ease-smooth-out), transform var(--duration-fast) var(--ease-smooth-out); touch-action: manipulation; }
 [role="button"]:not([aria-disabled="true"]):active, button:not(:disabled):active { transform: scale(.975); }

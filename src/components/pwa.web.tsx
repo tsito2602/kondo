@@ -1,3 +1,4 @@
+import { observeWebViewport } from '@/utils/web-viewport';
 import { MotionPresence } from '@/components/motion-presence';
 import { SymbolView } from 'expo-symbols';
 import { usePalette, useThemedStyles } from '@/theme/theme-provider';
@@ -10,6 +11,15 @@ import { useTravel } from '@/data/travel-provider';
 type InstallEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 let promptEvent: InstallEvent | null = null;
 export function PwaSetup() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const stop = observeWebViewport(() => {
+      // All routes and modal portals share the real layout viewport, including
+      // the home-indicator area. Insets belong to controls/scroll content.
+      root.style.setProperty('--app-height', `${Math.max(window.innerHeight, root.clientHeight)}px`);
+    });
+    return () => { stop(); root.style.removeProperty('--app-height'); };
+  }, []);
   useEffect(() => {
     if (!('serviceWorker' in navigator) || process.env.NODE_ENV !== 'production') return;
     void navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => undefined);
