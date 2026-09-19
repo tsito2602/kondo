@@ -10,8 +10,9 @@ export async function buildIconCheck(root, enabled) {
   if (!enabled) return;
   const source = await readFile('assets/brand/symbol.svg');
   // D changes only the pale stub's colour from the white-background control B.
-  // Use tabi's existing accent, not a baked-in imitation of system highlights.
-  const contrastSource = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><title>tabi</title><rect width="1024" height="1024" fill="#FFFFFF"/><g transform="translate(0 0) scale(1)">${source.toString().match(/<g[\s\S]*<\/g>/)[0].replace('#D7E2E8', '#6F8FA2')}</g></svg>`;
+  // Freeze D's source alongside control B so app palette changes do not alter the comparison.
+  const controlSource = await readFile('scripts/fixtures/tabi-symbol-original.svg', 'utf8');
+  const contrastSource = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><title>tabi</title><rect width="1024" height="1024" fill="#FFFFFF"/><g transform="translate(0 0) scale(1)">${controlSource.match(/<g[\s\S]*<\/g>/)[0].replace('#D7E2E8', '#6F8FA2')}</g></svg>`;
   const variants = [
     { key: 'a', name: '検証A', label: 'konogoro', image: await readFile('scripts/fixtures/konogoro-touch.png') },
     { key: 'b', name: '検証B', label: 'tabi・白背景', image: await readFile('scripts/fixtures/tabi-touch-white.png') },

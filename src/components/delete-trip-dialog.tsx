@@ -41,7 +41,7 @@ export function DeleteTripDialog(props: Omit<Parameters<typeof ConfirmationDialo
 }
 
 const createStyles = (palette: Palette) => StyleSheet.create({
-  overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: 'rgba(18,35,45,0.48)' },
+  overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: 'rgba(0,0,0,0.48)' },
   card: { width: '100%', maxWidth: 400, borderRadius: 24, padding: 24, gap: 14, backgroundColor: palette.paper },
   eyebrow: { color: palette.danger, fontSize: 10, fontWeight: '700', letterSpacing: 2 },
   title: { color: palette.ink, fontSize: 21, lineHeight: 30, fontWeight: '800' },

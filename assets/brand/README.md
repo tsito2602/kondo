@@ -2,10 +2,10 @@
 
 `symbol.svg` が文字なしの正本。横棒のチケットと縦棒を分離したT、3つの透過ミシン目、持ち上がった半券を表す。主券の左側には切り欠きを置かない。
 
-- 本体: Ocean Slate `#496B80`
-- 半券: Pale Blue `#D7E2E8`
-- 通常背景: Ticket Paper `#FAFCFD`
-- ダーク背景: Travel Ink `#182A36`
+- 本体: Blue `#3B82F6`
+- 半券: Light Gray `#E5E5E5`
+- 通常背景: White `#FFFFFF`
+- ダーク背景: Black `#000000`
 
 `npm run icons:export` でSVG原本からPNG・SVGを再生成する。PNGの直接編集はしない。通常・ダークで絵柄の色は共通。`logo*.png` と `symbol*.svg` は背景もミシン目も透過。
 

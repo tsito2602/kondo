@@ -404,7 +404,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   itemMeta: { color: palette.smoke, fontSize: 12, lineHeight: 17, fontWeight: '600', marginTop: 2 },
   quantity: { color: palette.smoke, fontSize: 13, lineHeight: 18, fontWeight: '700' },
   editMark: { color: palette.smoke, fontSize: 13, lineHeight: 20, fontWeight: '900', letterSpacing: 1 },
-  backdrop: { flex: 1, backgroundColor: 'rgba(24,42,54,0.48)', justifyContent: 'flex-end', alignItems: 'center' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.48)', justifyContent: 'flex-end', alignItems: 'center' },
   dialog: { width: '100%', maxWidth: 680, maxHeight: '88%', backgroundColor: palette.paper, borderTopLeftRadius: 32, borderTopRightRadius: 32, overflow: 'hidden' },
   form: { paddingHorizontal: 22, paddingTop: 22, paddingBottom: 34 },
   dialogHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },

@@ -3,22 +3,22 @@ import { Platform } from 'react-native';
 export const mono = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
 export const lightPalette = {
-  ink: '#182A36',
-  ocean: '#496B80',
-  paper: '#FAFCFD',
-  canvas: '#EEF2F4',
-  mist: '#E6ECEF',
-  ash: '#C9D3D9',
-  smoke: '#7E8C95',
-  placeholder: '#7E8C95',
-  slate: '#465A67',
-  sky: '#D7E2E8',
-  accent: '#6F8FA2',
-  soft: '#E9EEF1',
+  ink: '#171717',
+  ocean: '#1D4ED8',
+  paper: '#FFFFFF',
+  canvas: '#F7F7F7',
+  mist: '#F0F0F0',
+  ash: '#D4D4D4',
+  smoke: '#737373',
+  placeholder: '#737373',
+  slate: '#525252',
+  sky: '#E8E8E8',
+  accent: '#2563EB',
+  soft: '#F5F5F5',
   danger: '#B42318',
-  onOcean: '#FAFCFD',
-  glass: 'rgba(238,242,244,0.66)',
-  glassNative: 'rgba(238,242,244,0.92)',
+  onOcean: '#FFFFFF',
+  glass: 'rgba(247,247,247,0.66)',
+  glassNative: 'rgba(247,247,247,0.92)',
   success: '#DFEBE4',
   successSurface: '#F4F8F6',
   warning: '#A06839',
@@ -26,11 +26,11 @@ export const lightPalette = {
 
 export type Palette = { [K in keyof typeof lightPalette]: string };
 export const darkPalette: Palette = {
-  ink: '#E9F0F4', ocean: '#A1BDCC', paper: '#18242D', canvas: '#10191F',
-  mist: '#23333F', ash: '#3D505D', smoke: '#9AAEBB', placeholder: '#9AAEBB',
-  slate: '#BECBD4', sky: '#2B4352', accent: '#8FAFBE', soft: '#20313C',
-  danger: '#FFA69D', onOcean: '#14232D', glass: 'rgba(16,25,31,0.72)',
-  glassNative: 'rgba(16,25,31,0.94)', success: '#2B453B', successSurface: '#1B3028', warning: '#DFB184',
+  ink: '#F5F5F5', ocean: '#75ADFF', paper: '#171717', canvas: '#0A0A0A',
+  mist: '#222222', ash: '#404040', smoke: '#A3A3A3', placeholder: '#A3A3A3',
+  slate: '#D4D4D4', sky: '#262626', accent: '#75ADFF', soft: '#202020',
+  danger: '#FFA69D', onOcean: '#0A0A0A', glass: 'rgba(10,10,10,0.72)',
+  glassNative: 'rgba(10,10,10,0.94)', success: '#2B453B', successSurface: '#1B3028', warning: '#DFB184',
 };
 
 export const radii = {

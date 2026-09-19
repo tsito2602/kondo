@@ -2,7 +2,7 @@
   "expo": {
     "name": "tabi",
     "slug": "tabi",
-    "version": "1.7.0",
+    "version": "1.7.1",
     "orientation": "portrait",
     "icon": "./assets/brand/icon.png",
     "scheme": "tabi",
@@ -17,7 +17,7 @@
     "android": {
       "package": "com.tsito2602.tabi",
       "adaptiveIcon": {
-        "backgroundColor": "#FAFCFD",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/brand/adaptive-foreground.png",
         "monochromeImage": "./assets/brand/adaptive-monochrome.png"
       },
@@ -34,11 +34,11 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#EEF2F4",
+          "backgroundColor": "#F7F7F7",
           "image": "./assets/brand/logo.png",
           "imageWidth": 88,
           "dark": {
-            "backgroundColor": "#182A36",
+            "backgroundColor": "#0A0A0A",
             "image": "./assets/brand/logo-dark.png"
           }
         }

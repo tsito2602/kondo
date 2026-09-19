@@ -5,7 +5,7 @@ import sharp from 'sharp';
 const source = await readFile('assets/brand/symbol.svg', 'utf8');
 const body = source.match(/<g[\s\S]*<\/g>/)[0];
 const svg = (background, scale = 1, monochrome = false) => {
-  const shapes = monochrome ? body.replace(/#496B80|#D7E2E8/g, '#FFFFFF') : body;
+  const shapes = monochrome ? body.replace(/#3B82F6|#E5E5E5/g, '#FFFFFF') : body;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><title>tabi</title>${background ? `<rect width="1024" height="1024" fill="${background}"/>` : ''}<g transform="translate(${512 * (1 - scale)} ${512 * (1 - scale)}) scale(${scale})">${shapes}</g></svg>\n`;
 };
 await mkdir('public/icons', { recursive: true });
@@ -15,8 +15,8 @@ const png = async (file, input, size) => {
   if (input.includes('<rect width="1024" height="1024" fill=')) output = output.removeAlpha();
   await writeFile(file, await output.png().toBuffer());
 };
-const light = svg('#FAFCFD');
-const dark = svg('#182A36');
+const light = svg('#FFFFFF');
+const dark = svg('#000000');
 await writeFile('assets/brand/icon.svg', light);
 await writeFile('assets/brand/icon-dark.svg', dark);
 await writeFile('assets/brand/symbol-dark.svg', source);
