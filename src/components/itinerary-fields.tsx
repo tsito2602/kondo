@@ -13,7 +13,7 @@ export function ItineraryCategoryPicker({ value, onChange, linkedPlace = false }
   const palette = usePalette();
   return <View><Text style={styles.label}>カテゴリ</Text><View style={styles.choices}>
     {itineraryCategories.filter((category) => !linkedPlace || category.value !== 'transport').map((category) => <Pressable key={category.value} accessibilityRole="button" accessibilityState={{ selected: category.value === value }} onPress={() => onChange(category.value)} style={[styles.choice, category.value === value && styles.selected]}>
-      <SymbolView name={{ ios: category.ios, android: category.icon, web: category.icon } as IconName} size={19} tintColor={category.value === value ? palette.onOcean : palette.ocean} />
+      <SymbolView name={{ ios: category.ios, android: category.icon, web: category.icon } as IconName} size={19} tintColor={category.value === value ? palette.ink : palette.slate} />
       <Text style={[styles.choiceText, category.value === value && styles.selectedText]}>{category.label}</Text>
     </Pressable>)}
   </View></View>;
@@ -41,8 +41,8 @@ export function ItineraryFields({ day, time, details, onChange, linkedPlace = fa
 const createStyles = (palette: Palette) => StyleSheet.create({
   label: { color: palette.slate, fontSize: 12, fontWeight: '600', marginTop: 18, marginBottom: 8 },
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  choice: { minHeight: 44, paddingHorizontal: 13, paddingVertical: 10, borderRadius: 12, backgroundColor: palette.soft, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  selected: { backgroundColor: palette.ocean }, choiceText: { color: palette.slate, fontSize: 13, fontWeight: '600' }, selectedText: { color: palette.onOcean },
+  choice: { borderWidth: 1, borderColor: 'transparent', minHeight: 44, paddingHorizontal: 13, paddingVertical: 10, borderRadius: 12, backgroundColor: palette.soft, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  selected: { backgroundColor: palette.selection, borderColor: palette.selectionBorder }, choiceText: { color: palette.slate, fontSize: 13, fontWeight: '600' }, selectedText: { color: palette.ink },
   endpoints: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }, field: { flex: 1, minWidth: 140 },
   input: { color: palette.ink, backgroundColor: palette.soft, borderRadius: 10, padding: 14, minHeight: 48, fontSize: 16 },
   endDate: { marginTop: 18 }, textButton: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', paddingVertical: 10 }, actionText: { color: palette.actionText, fontSize: 13, fontWeight: '600' },

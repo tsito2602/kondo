@@ -22,10 +22,12 @@ function luminance(hex) {
 function contrast(a, b) { const values = [luminance(a), luminance(b)].sort((x, y) => y - x); return (values[0] + .05) / (values[1] + .05); }
 test('dark surfaces, text, controls and placeholders retain readable contrast', () => {
   assert.deepEqual(Object.keys(darkPalette).sort(), Object.keys(lightPalette).sort());
-  for (const surface of ['canvas', 'paper', 'sky', 'mist', 'successSurface']) {
+  for (const surface of ['canvas', 'paper', 'sky', 'mist', 'selection', 'successSurface']) {
     for (const text of ['ink', 'slate', 'actionText']) assert.ok(contrast(darkPalette[text], darkPalette[surface]) >= 4.5, `${text} on ${surface}`);
   }
   for (const palette of [lightPalette, darkPalette]) {
+    assert.ok(contrast(palette.ink, palette.selection) >= 4.5, 'neutral selected label');
+    assert.ok(contrast(palette.canvas, palette.slate) >= 4.5, 'neutral checkmark');
     assert.equal(palette.ocean, '#496B80');
     assert.equal(palette.accent, '#496B80');
     for (const surface of ['canvas', 'paper', 'sky', 'mist']) assert.ok(contrast(palette.ocean, palette[surface]) >= 3, `icon on ${surface}`);

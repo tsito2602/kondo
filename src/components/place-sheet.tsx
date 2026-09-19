@@ -84,7 +84,7 @@ export function PlaceSheet({ place, onClose, onPlan, onEditSchedule }: Props) {
   );
 }
 const createStyles = (palette: Palette) => StyleSheet.create({
-  filterSelected: { backgroundColor: palette.sky },
+  filterSelected: { backgroundColor: palette.selection, borderColor: palette.selectionBorder },
   needed: { color: palette.warning },
   statusText: { color: palette.ink, fontSize: 12, fontWeight: '600' },
   actionText: { color: palette.actionText, fontSize: 12, fontWeight: '600' },
@@ -107,7 +107,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   memo: { minHeight: 110, textAlignVertical: 'top' },
   hint: { fontSize: 12, color: palette.smoke, marginTop: -4 },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  option: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: palette.paper, borderRadius: 10 },
+  option: { borderWidth: 1, borderColor: 'transparent', flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: palette.paper, borderRadius: 10 },
   optionText: { color: palette.ink, fontSize: 13 },
   delete: { minHeight: 48, justifyContent: 'center', alignItems: 'center', marginTop: 16 },
   deleteText: { color: palette.danger, fontSize: 14 },
