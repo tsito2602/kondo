@@ -1,3 +1,4 @@
+import { observeWebViewport } from '@/utils/web-viewport';
 import { MotionPresence } from '@/components/motion-presence';
 import { SymbolView } from 'expo-symbols';
 import { usePalette, useThemedStyles } from '@/theme/theme-provider';
@@ -10,6 +11,15 @@ import { useTravel } from '@/data/travel-provider';
 type InstallEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 let promptEvent: InstallEvent | null = null;
 export function PwaSetup() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const stop = observeWebViewport(() => {
+      // All routes and modal portals share the real layout viewport, including
+      // the home-indicator area. Insets belong to controls/scroll content.
+      root.style.setProperty('--app-height', `${Math.max(window.innerHeight, root.clientHeight)}px`);
+    });
+    return () => { stop(); root.style.removeProperty('--app-height'); };
+  }, []);
   useEffect(() => {
     if (!('serviceWorker' in navigator) || process.env.NODE_ENV !== 'production') return;
     void navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => undefined);
@@ -55,4 +65,4 @@ export function PwaControls() {
     <MotionPresence>{guide ? <FormSheet visible title="ホーム画面に追加" onClose={() => setGuide(false)}><Text style={styles.guideTitle}>いつものアプリと同じように。</Text><Text style={styles.guideText}>{/iPhone|iPad|iPod/.test(navigator.userAgent) ? 'Safariの共有メニューから「ホーム画面に追加」を選び、「追加」をタップしてください。' : 'ブラウザーのメニューから「アプリをインストール」または「ホーム画面に追加」を選んでください。'}</Text><Text style={styles.guideText}>旅行のしおりから「オフライン保存」をすると、保存した書類も圏外で開けます。</Text></FormSheet> : null}</MotionPresence>
   </>;
 }
-const createStyles = (palette: Palette) => StyleSheet.create({ row: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 }, button: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 12, backgroundColor: palette.sky, borderRadius: 10 }, text: { color: palette.ocean, fontSize: 12, fontWeight: '600' }, guideTitle: { color: palette.ink, fontSize: 22, fontWeight: '700', marginTop: 12 }, guideText: { color: palette.slate, fontSize: 15, lineHeight: 26 } });
+const createStyles = (palette: Palette) => StyleSheet.create({ row: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 }, button: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 12, backgroundColor: palette.sky, borderRadius: 10 }, text: { color: palette.actionText, fontSize: 12, fontWeight: '600' }, guideTitle: { color: palette.ink, fontSize: 22, fontWeight: '700', marginTop: 12 }, guideText: { color: palette.slate, fontSize: 15, lineHeight: 26 } });

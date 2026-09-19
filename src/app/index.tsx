@@ -7,7 +7,7 @@ import { useDesktop } from '@/hooks/use-desktop';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/auth/auth-provider';
 import { SyncStatus } from '@/components/sync-status';
 import { TripEditor } from '@/components/trip-editor';
@@ -18,6 +18,7 @@ import { localDate } from '@/utils/dates';
 
 export default function HomeScreen() {
   const palette = usePalette();
+  const insets = useSafeAreaInsets();
   const styles = useThemedStyles(createStyles);
 
   const desktop = useDesktop();
@@ -43,8 +44,8 @@ export default function HomeScreen() {
   const today = localDate();
   const matchingTrips = trips.filter((trip) => `${trip.name} ${trip.destination}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const groups = [{ label: 'これからの旅行', trips: matchingTrips.filter((trip) => trip.endsOn >= today).sort((a,b) => a.startsOn.localeCompare(b.startsOn)) }, { label: 'これまでの旅行', trips: matchingTrips.filter((trip) => trip.endsOn < today).sort((a,b) => b.startsOn.localeCompare(a.startsOn)) }];
-  return <MotionPage><SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-    <ScrollView nativeID={ready ? "trip-list-ready" : undefined} testID="home-scroll" contentContainerStyle={styles.content} refreshControl={!isDemo ? <RefreshControl refreshing={syncing} onRefresh={() => void sync()} tintColor={palette.ocean} /> : undefined}>
+  return <MotionPage><SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+    <ScrollView nativeID={ready ? "trip-list-ready" : undefined} testID="home-scroll" contentContainerStyle={[styles.content, { paddingBottom: 32 + insets.bottom }]} refreshControl={!isDemo ? <RefreshControl refreshing={syncing} onRefresh={() => void sync()} tintColor={palette.ocean} /> : undefined}>
       <View testID="home-header" style={styles.header}>
         <View><Text style={styles.eyebrow}>TABI</Text><Text accessibilityRole="header" style={styles.title}>旅行</Text></View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><Pressable accessibilityRole="button" accessibilityLabel="設定を開く" onPress={() => router.push('/settings')} style={{ padding: 4 }}><MemberAvatar name={user?.name || 'あなた'} avatarUrl={user?.avatarUrl} size={36} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="旅行を追加する" disabled={!ready} onPress={() => setCreating(true)} style={({ pressed }) => [styles.add, pressed && styles.pressed]}><Text style={styles.addText}>＋ 旅行</Text></Pressable></View>
@@ -68,10 +69,10 @@ export default function HomeScreen() {
 }
 const createStyles = (palette: Palette) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: palette.canvas }, content: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 20, paddingBottom: 32 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }, eyebrow: { color: palette.ocean, fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 8 }, title: { color: palette.ink, fontSize: 36, lineHeight: 44, fontWeight: '800', letterSpacing: -1 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }, eyebrow: { color: palette.actionText, fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 8 }, title: { color: palette.ink, fontSize: 36, lineHeight: 44, fontWeight: '800', letterSpacing: -1 },
   add: { minHeight: 48, paddingHorizontal: 18, borderRadius: 12, backgroundColor: palette.ocean, justifyContent: 'center' }, addText: { color: palette.onOcean, fontSize: 15, fontWeight: '700' }, pressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },
-  group: { gap: 18, marginTop: 24 }, groupTitle: { color: palette.slate, fontSize: 13, fontWeight: '600' }, count: { color: palette.ocean },
-  notice: { color: palette.ocean, paddingVertical: 12, fontSize: 14 }, loading: { padding: 80 }, empty: { paddingVertical: 56, alignItems: 'center', gap: 12 },
-  emptyTicket: { width: 190, height: 90, backgroundColor: palette.paper, borderRadius: 18, transform: [{ rotate: '-6deg' }], padding: 18, marginBottom: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, emptyTicketText: { fontSize: 11, color: palette.ocean, letterSpacing: 1 }, perforation: { height: 64, borderLeftWidth: 1, borderStyle: 'dashed', borderColor: palette.ash }, emptyPlus: { color: palette.ocean, fontSize: 28 },
+  group: { gap: 18, marginTop: 24 }, groupTitle: { color: palette.slate, fontSize: 13, fontWeight: '600' }, count: { color: palette.actionText },
+  notice: { color: palette.actionText, paddingVertical: 12, fontSize: 14 }, loading: { padding: 80 }, empty: { paddingVertical: 56, alignItems: 'center', gap: 12 },
+  emptyTicket: { width: 190, height: 90, backgroundColor: palette.paper, borderRadius: 18, transform: [{ rotate: '-6deg' }], padding: 18, marginBottom: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, emptyTicketText: { fontSize: 11, color: palette.actionText, letterSpacing: 1 }, perforation: { height: 64, borderLeftWidth: 1, borderStyle: 'dashed', borderColor: palette.ash }, emptyPlus: { color: palette.actionText, fontSize: 28 },
   emptyTitle: { color: palette.ink, fontSize: 23, fontWeight: '700' }, body: { color: palette.slate, fontSize: 14, lineHeight: 22, textAlign: 'center', maxWidth: 270 }, primary: { marginTop: 12, backgroundColor: palette.ocean, padding: 16, borderRadius: 10 },
 });

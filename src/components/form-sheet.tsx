@@ -5,7 +5,7 @@ import { useModalViewport } from '@/hooks/use-modal-viewport';
 import { useFormKeyboard } from '@/hooks/use-form-keyboard';
 import { PropsWithChildren, useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ToastHost } from './toast';
 import { type Palette } from '@/constants/design';
@@ -24,6 +24,7 @@ type Props = PropsWithChildren<{
 
 export function FormSheet({ presentation = 'form', visible, title, onClose, onSave, saveLabel = '保存', canSave = true, dirty = false, error, children }: Props) {
   const styles = useThemedStyles(createStyles);
+  const insets = useSafeAreaInsets();
 
   const viewport = useModalViewport(visible);
   const reduceMotion = useReducedMotion();
@@ -43,14 +44,14 @@ export function FormSheet({ presentation = 'form', visible, title, onClose, onSa
   return <><MotionModal visible={visible} transparent={Platform.OS === 'web'} presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : 'fullScreen'} animationType={reduceMotion ? 'none' : Platform.OS === 'web' ? 'fade' : 'slide'} onRequestClose={close}>
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} testID={presentation === 'detail' ? 'detail-modal-viewport' : 'form-modal-viewport'} style={[styles.overlay, viewport]}>
       {Platform.OS === 'web' ? <Pressable accessibilityLabel="シートを閉じる" onPress={close} style={StyleSheet.absoluteFill} /> : null}
-      <SafeAreaView testID="form-sheet" edges={['top', 'bottom']} style={styles.sheet}>
+      <SafeAreaView testID="form-sheet" edges={Platform.OS === 'web' ? ['left', 'right'] : ['top', 'bottom']} style={styles.sheet}>
         <View accessibilityViewIsModal testID="form-sheet-fill" style={styles.fill}>
           <View testID="sheet-header" style={styles.header}>
             <Pressable accessibilityRole="button" accessibilityLabel="閉じる" onPress={close} style={styles.headerButton}><Text style={styles.close}>閉じる</Text></Pressable>
             <Text accessibilityRole="header" numberOfLines={2} style={styles.title}>{title}</Text>
             {onSave ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: !canSave }} disabled={!canSave} onPress={onSave} style={styles.headerButton}><Text style={[styles.save, !canSave && styles.disabled]}>{saveLabel}</Text></Pressable> : <View style={styles.headerButton} />}
           </View>
-          <ScrollView testID="form-sheet-scroll" ref={scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" showsVerticalScrollIndicator={false}>
+          <ScrollView testID="form-sheet-scroll" ref={scroll} contentContainerStyle={[styles.content, Platform.OS === 'web' && { paddingBottom: Math.max(40, insets.bottom + 16) }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" showsVerticalScrollIndicator={false}>
             {children}
             {error ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
           </ScrollView>
@@ -79,7 +80,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   header: { minHeight: 64, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash },
   headerButton: { minWidth: 64, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
   close: { fontSize: 15, color: palette.slate },
-  save: { fontSize: 16, fontWeight: '700', color: palette.ocean },
+  save: { fontSize: 16, fontWeight: '700', color: palette.actionText },
   disabled: { opacity: 0.35 },
   title: { flex: 1, textAlign: 'center', fontSize: 17, lineHeight: 24, color: palette.ink, fontWeight: '700' },
   content: { padding: 24, paddingBottom: 40, gap: 12 },

@@ -139,7 +139,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   primary: { minHeight: 48, borderRadius: 12, backgroundColor: palette.ocean, paddingHorizontal: 24, justifyContent: 'center', marginTop: 8 }, primaryText: { color: palette.onOcean, fontSize: 15, fontWeight: '700' },
   editorBackdrop: { flex: 1, backgroundColor: palette.paper }, editor: { flex: 1, width: '100%', maxWidth: 860, alignSelf: 'center' },
   editorToolbar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 12, minHeight: 56 }, tools: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  control: { minHeight: 44, minWidth: 44, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center' }, actionText: { color: palette.ocean, fontSize: 17 }, done: { fontSize: 17, fontWeight: '700', color: palette.ocean },
+  control: { minHeight: 44, minWidth: 44, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center' }, actionText: { color: palette.actionText, fontSize: 17 }, done: { fontSize: 17, fontWeight: '700', color: palette.actionText },
   editorDate: { textAlign: 'center', color: palette.smoke, fontSize: 12, marginVertical: 10 },
   body: { flex: 1, paddingHorizontal: 24, paddingVertical: 14, color: palette.ink, backgroundColor: palette.paper, fontSize: 18, lineHeight: 30, textAlignVertical: 'top' },
   editorFooter: { minHeight: 52, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.ash }, saveState: { flex: 1, textAlign: 'right', fontSize: 12, color: palette.smoke, paddingHorizontal: 10 },

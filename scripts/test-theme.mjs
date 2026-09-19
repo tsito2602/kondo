@@ -23,7 +23,12 @@ function contrast(a, b) { const values = [luminance(a), luminance(b)].sort((x, y
 test('dark surfaces, text, controls and placeholders retain readable contrast', () => {
   assert.deepEqual(Object.keys(darkPalette).sort(), Object.keys(lightPalette).sort());
   for (const surface of ['canvas', 'paper', 'sky', 'mist', 'successSurface']) {
-    for (const text of ['ink', 'slate', 'ocean']) assert.ok(contrast(darkPalette[text], darkPalette[surface]) >= 4.5, `${text} on ${surface}`);
+    for (const text of ['ink', 'slate', 'actionText']) assert.ok(contrast(darkPalette[text], darkPalette[surface]) >= 4.5, `${text} on ${surface}`);
+  }
+  for (const palette of [lightPalette, darkPalette]) {
+    assert.equal(palette.ocean, '#496B80');
+    assert.equal(palette.accent, '#496B80');
+    for (const surface of ['canvas', 'paper', 'sky', 'mist']) assert.ok(contrast(palette.ocean, palette[surface]) >= 3, `icon on ${surface}`);
   }
   assert.ok(contrast(darkPalette.onOcean, darkPalette.ocean) >= 4.5);
   assert.ok(contrast(darkPalette.placeholder, darkPalette.paper) >= 4.5);

@@ -6,7 +6,7 @@ import { BrandLogo } from '@/components/brand-logo';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/auth/auth-provider';
 import { MemberAvatar } from '@/components/member-avatar';
 import { PwaControls } from '@/components/pwa';
@@ -17,6 +17,7 @@ import packageInfo from '../../package.json';
 
 export default function SettingsScreen() {
   const palette = usePalette();
+  const insets = useSafeAreaInsets();
   const styles = useThemedStyles(createStyles);
 
   const { user, isDemo, updateProfile, signOut, exitDemo } = useAuth();
@@ -39,9 +40,9 @@ export default function SettingsScreen() {
     catch { setError('ログアウトできませんでした'); }
     finally { setBusy(false); }
   };
-  return <MotionPage><SafeAreaView style={styles.screen} edges={['top', 'bottom']}><KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-      <View style={styles.header}><Pressable accessibilityRole="button" accessibilityLabel="戻る" onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={styles.back}><Text style={{ fontSize: 32, color: palette.ocean }}>‹</Text></Pressable><Text accessibilityRole="header" style={styles.title}>設定</Text></View>
+  return <MotionPage><SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}><KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingBottom: 48 + insets.bottom }]}>
+      <View style={styles.header}><Pressable accessibilityRole="button" accessibilityLabel="戻る" onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={styles.back}><Text style={{ fontSize: 32, color: palette.actionText }}>‹</Text></Pressable><Text accessibilityRole="header" style={styles.title}>設定</Text></View>
       <View style={styles.section}><Text style={styles.sectionTitle}>プロフィール</Text><View style={styles.card}>
         <View style={styles.profile}><MemberAvatar name={user?.name || (isDemo ? 'あなた' : user?.email || 'アカウント')} avatarUrl={user?.avatarUrl} size={64} /><View style={{ flex: 1, gap: 6 }}><Text style={styles.name}>{user?.name || (isDemo ? 'あなた' : 'アカウント')}</Text><Text numberOfLines={2} style={styles.meta}>{isDemo ? 'サンプルアカウント' : user?.email}</Text></View></View>
         <Text style={styles.label}>表示名</Text><TextInput accessibilityLabel="表示名" value={name} onChangeText={setName} maxLength={100} editable={!busy} autoComplete="name" returnKeyType="done" onSubmitEditing={() => void save()} style={styles.input} />

@@ -161,3 +161,52 @@ test('shared place sheet shows current source details from either entry point an
     assert.equal(html.includes('しおりを見る'), !fromItinerary);
   }
 });
+
+
+test('iOS viewport fills restored layout while keyboard and pinch zoom remain visible', () => {
+  const previous = { window: globalThis.window, document: globalThis.document };
+  const visual = { height: 828, width: 402, offsetTop: 0, offsetLeft: 0, scale: 1 };
+  globalThis.window = { innerHeight: 874, innerWidth: 402, visualViewport: visual };
+  globalThis.document = { documentElement: { clientHeight: 874 } };
+  try {
+    const { readWebViewport } = load('src/utils/web-viewport.ts', {});
+    assert.deepEqual(readWebViewport(), { top: 0, left: 0, width: 402, height: 874 });
+    Object.assign(visual, { height: 490, offsetTop: 62 });
+    assert.deepEqual(readWebViewport(), { top: 62, left: 0, width: 402, height: 490 });
+    Object.assign(visual, { height: 828, offsetTop: 0 });
+    assert.equal(readWebViewport().height, 874, 'closing the keyboard restores the full page');
+    Object.assign(visual, { height: 790, width: 360, scale: 1.1, offsetLeft: 12 });
+    assert.equal(readWebViewport().width, 360, 'pinch zoom is not treated as a toolbar gap');
+    assert.equal(readWebViewport().left, 12);
+    globalThis.window.visualViewport = null;
+    assert.equal(readWebViewport().height, 874);
+    globalThis.window.innerHeight = globalThis.document.documentElement.clientHeight = 402;
+    globalThis.window.innerWidth = 874;
+    assert.deepEqual(readWebViewport(), { top: 0, left: 0, width: 874, height: 402 });
+  } finally { Object.assign(globalThis, previous); }
+});
+
+test('viewport observer refreshes on resume and delayed keyboard resize and cleans up', () => {
+  const previous = { window: globalThis.window, document: globalThis.document, requestAnimationFrame: globalThis.requestAnimationFrame, cancelAnimationFrame: globalThis.cancelAnimationFrame };
+  const visual = new EventTarget();
+  const win = new EventTarget();
+  const doc = new EventTarget();
+  const frames = new Map(), timers = new Map();
+  let next = 0, updates = 0;
+  Object.assign(win, { visualViewport: visual, setTimeout: (fn) => { timers.set(++next, fn); return next; }, clearTimeout: (id) => timers.delete(id) });
+  Object.assign(globalThis, { window: win, document: doc, requestAnimationFrame: (fn) => { frames.set(++next, fn); return next; }, cancelAnimationFrame: (id) => frames.delete(id) });
+  const flush = (queue) => { const work = [...queue.values()]; queue.clear(); work.forEach((fn) => fn()); };
+  try {
+    const { observeWebViewport } = load('src/utils/web-viewport.ts', {});
+    const stop = observeWebViewport(() => updates++);
+    flush(frames); assert.equal(updates, 1);
+    visual.dispatchEvent(new Event('resize')); flush(frames); assert.equal(updates, 2);
+    flush(timers); assert.equal(updates, 3, 're-read after Safari settles');
+    win.dispatchEvent(new Event('pageshow')); flush(frames); assert.equal(updates, 4);
+    doc.dispatchEvent(new Event('visibilitychange')); flush(frames); assert.equal(updates, 5);
+    stop();
+    visual.dispatchEvent(new Event('scroll')); win.dispatchEvent(new Event('resize'));
+    win.dispatchEvent(new Event('pageshow')); doc.dispatchEvent(new Event('visibilitychange'));
+    flush(frames); flush(timers); assert.equal(updates, 5, 'unmount cancels listeners and pending callbacks');
+  } finally { Object.assign(globalThis, previous); }
+});

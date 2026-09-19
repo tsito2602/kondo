@@ -17,4 +17,4 @@ export function SyncStatus() {
     {error && !isDemo ? <Pressable accessibilityRole="button" onPress={() => void sync()} style={styles.retry}><Text style={styles.retryText}>再試行</Text></Pressable> : null}
   </View>;
 }
-const createStyles = (palette: Palette) => StyleSheet.create({ row: { minHeight: 28, flexDirection: 'row', gap: 7, alignItems: 'center' }, dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: palette.ocean }, pendingDot: { backgroundColor: palette.slate }, text: { color: palette.slate, fontSize: 11 }, retry: { paddingHorizontal: 10, minHeight: 44, justifyContent: 'center' }, retryText: { color: palette.ocean, fontSize: 12, fontWeight: '700' } });
+const createStyles = (palette: Palette) => StyleSheet.create({ row: { minHeight: 28, flexDirection: 'row', gap: 7, alignItems: 'center' }, dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: palette.ocean }, pendingDot: { backgroundColor: palette.slate }, text: { color: palette.slate, fontSize: 11 }, retry: { paddingHorizontal: 10, minHeight: 44, justifyContent: 'center' }, retryText: { color: palette.actionText, fontSize: 12, fontWeight: '700' } });

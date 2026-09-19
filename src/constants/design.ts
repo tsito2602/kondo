@@ -2,9 +2,11 @@ import { Platform } from 'react-native';
 
 export const mono = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
+export const brandBlue = '#496B80';
+
 export const lightPalette = {
   ink: '#171717',
-  ocean: '#1D4ED8',
+  ocean: brandBlue,
   paper: '#FFFFFF',
   canvas: '#F7F7F7',
   mist: '#F0F0F0',
@@ -13,7 +15,8 @@ export const lightPalette = {
   placeholder: '#737373',
   slate: '#525252',
   sky: '#E8E8E8',
-  accent: '#2563EB',
+  actionText: brandBlue,
+  accent: brandBlue,
   soft: '#F5F5F5',
   danger: '#B42318',
   onOcean: '#FFFFFF',
@@ -26,11 +29,11 @@ export const lightPalette = {
 
 export type Palette = { [K in keyof typeof lightPalette]: string };
 export const darkPalette: Palette = {
-  ink: '#F5F5F5', ocean: '#75ADFF', paper: '#171717', canvas: '#0A0A0A',
-  mist: '#222222', ash: '#404040', smoke: '#A3A3A3', placeholder: '#A3A3A3',
-  slate: '#D4D4D4', sky: '#262626', accent: '#75ADFF', soft: '#202020',
-  danger: '#FFA69D', onOcean: '#0A0A0A', glass: 'rgba(10,10,10,0.72)',
-  glassNative: 'rgba(10,10,10,0.94)', success: '#2B453B', successSurface: '#1B3028', warning: '#DFB184',
+  ink: '#F5F5F5', ocean: brandBlue, paper: '#171717', canvas: '#0A0A0A',
+  mist: '#171717', ash: '#404040', smoke: '#A3A3A3', placeholder: '#A3A3A3',
+  slate: '#D4D4D4', actionText: '#D4D4D4', sky: '#171717', accent: brandBlue, soft: '#1E1E1E',
+  danger: '#FFA69D', onOcean: '#FFFFFF', glass: 'rgba(10,10,10,0.72)',
+  glassNative: 'rgba(10,10,10,0.94)', success: '#2B453B', successSurface: '#141C17', warning: '#DFB184',
 };
 
 export const radii = {

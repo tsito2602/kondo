@@ -45,6 +45,6 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   selected: { backgroundColor: palette.ocean }, choiceText: { color: palette.slate, fontSize: 13, fontWeight: '600' }, selectedText: { color: palette.onOcean },
   endpoints: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }, field: { flex: 1, minWidth: 140 },
   input: { color: palette.ink, backgroundColor: palette.soft, borderRadius: 10, padding: 14, minHeight: 48, fontSize: 16 },
-  endDate: { marginTop: 18 }, textButton: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', paddingVertical: 10 }, actionText: { color: palette.ocean, fontSize: 13, fontWeight: '600' },
+  endDate: { marginTop: 18 }, textButton: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', paddingVertical: 10 }, actionText: { color: palette.actionText, fontSize: 13, fontWeight: '600' },
   duration: { color: palette.slate, fontSize: 14, paddingVertical: 8 },
 });

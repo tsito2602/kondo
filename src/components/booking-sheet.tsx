@@ -300,7 +300,7 @@ function BookingDocuments({ bookingId, documents, readOnly = false }: { bookingI
       <Pressable accessibilityRole="button" accessibilityLabel={`${document.filename}を開く`} disabled={Boolean(busy)} onPress={() => openDocument(document)} style={({ pressed }) => [styles.documentCopy, pressed && styles.pressed]}>
         <Text numberOfLines={1} style={styles.documentName}>{document.filename}</Text><Text style={styles.documentMeta}>{formatFileSize(document.size)} · {getCachedDocumentUri(document.id, document.filename) ? '端末に保存済み' : '開いて確認'}</Text>
       </Pressable>
-      {Platform.OS === 'web' ? <Pressable accessibilityRole="button" accessibilityLabel={`${document.filename}をダウンロード`} disabled={Boolean(busy)} onPress={() => void downloadDocument(document)} style={{ padding: 12 }}><Text style={{ color: palette.ocean, fontSize: 12, fontWeight: '600' }}>保存 ↓</Text></Pressable> : null}
+      {Platform.OS === 'web' ? <Pressable accessibilityRole="button" accessibilityLabel={`${document.filename}をダウンロード`} disabled={Boolean(busy)} onPress={() => void downloadDocument(document)} style={{ padding: 12 }}><Text style={{ color: palette.actionText, fontSize: 12, fontWeight: '600' }}>保存 ↓</Text></Pressable> : null}
       {busy === document.id ? <ActivityIndicator color={palette.ocean} size="small" /> : canEdit ? <Pressable accessibilityRole="button" accessibilityLabel={`${document.filename}を削除`} disabled={Boolean(busy)} onPress={() => removeDocument(document)} style={styles.documentDelete}><Text style={styles.documentDeleteText}>×</Text></Pressable> : null}
     </View>)}</View> : Platform.OS !== 'web' || !canEdit ? <View style={styles.documentEmpty}><Text style={styles.documentEmptyText}>{canEdit ? '画像やPDFを追加できます' : '書類はありません'}</Text></View> : null}
     {progress ? <Text accessibilityLiveRegion="polite" style={styles.documentMeta}>{progress}</Text> : null}
@@ -423,7 +423,7 @@ function Field({ label, ...props }: { label: string } & ComponentProps<typeof Te
 
 const createStyles = (palette: Palette) => StyleSheet.create({
   detailTicket: { backgroundColor: palette.paper, borderRadius: 20, padding: 22, gap: 12 },
-  detailKind: { color: palette.ocean, fontSize: 12, fontWeight: '700' },
+  detailKind: { color: palette.actionText, fontSize: 12, fontWeight: '700' },
   detailTitle: { color: palette.ink, fontSize: 25, fontWeight: '800', lineHeight: 34 },
   placeName: { color: palette.slate, fontSize: 12, lineHeight: 19 },
   detailDates: { flexDirection: 'row', flexWrap: 'wrap', gap: 20, borderTopWidth: 1, borderStyle: 'dashed', borderTopColor: palette.ash, paddingTop: 18 },
@@ -432,12 +432,12 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   confirmation: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 20, borderRadius: 16, backgroundColor: palette.sky },
   confirmationCopy: { flex: 1 },
   confirmationCode: { color: palette.ink, fontSize: 21, fontWeight: '700', marginTop: 8 },
-  journeyDuration: { color: palette.ocean, fontSize: 14, lineHeight: 22, fontWeight: '600', marginTop: 12 },
+  journeyDuration: { color: palette.actionText, fontSize: 14, lineHeight: 22, fontWeight: '600', marginTop: 12 },
   detailBody: { fontSize: 15, color: palette.ink, lineHeight: 24 },
   locationBlock: { gap: 12 },
   locationHint: { color: palette.smoke, fontSize: 11, lineHeight: 17 },
   mapButton: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: palette.sky, borderRadius: 12 },
-  mapButtonText: { color: palette.ocean, fontSize: 14, fontWeight: '700' },
+  mapButtonText: { color: palette.actionText, fontSize: 14, fontWeight: '700' },
   noteBlock: { gap: 8, padding: 8 },
   kindList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: -8 },
   kindButton: { minHeight: 38, justifyContent: 'center', backgroundColor: palette.paper, borderRadius: 64, paddingHorizontal: 14 },
@@ -457,26 +457,26 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   suggestionCopy: { flex: 1, minWidth: 0 },
   suggestionName: { color: palette.ink, fontSize: 13, fontWeight: '700' },
   suggestionCity: { color: palette.smoke, fontSize: 10, marginTop: 2 },
-  suggestionCode: { color: palette.ocean, fontFamily: mono, fontSize: 15, fontWeight: '900', letterSpacing: 1 },
+  suggestionCode: { color: palette.actionText, fontFamily: mono, fontSize: 15, fontWeight: '900', letterSpacing: 1 },
   matchCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, backgroundColor: palette.paper, padding: 14 },
   matchCardSelected: { backgroundColor: palette.sky },
   matchCopy: { flex: 1, minWidth: 0 },
-  matchEyebrow: { color: palette.ocean, fontFamily: mono, fontSize: 9, fontWeight: '800' },
+  matchEyebrow: { color: palette.actionText, fontFamily: mono, fontSize: 9, fontWeight: '800' },
   matchTitle: { color: palette.ink, fontSize: 14, fontWeight: '800', marginTop: 4 },
   matchHelp: { color: palette.slate, fontSize: 10, lineHeight: 15, marginTop: 4 },
   matchButton: { minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: palette.sky, paddingHorizontal: 13 },
   matchButtonSelected: { backgroundColor: palette.ocean },
-  matchButtonText: { color: palette.ocean, fontSize: 11, fontWeight: '800' },
+  matchButtonText: { color: palette.actionText, fontSize: 11, fontWeight: '800' },
   matchButtonTextSelected: { color: palette.onOcean },
   documentNotice: { color: palette.smoke, fontSize: 11, lineHeight: 17 },
   documentsSection: { gap: 10 },
   documentsHeading: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   documentAddButton: { minHeight: 36, justifyContent: 'center', borderRadius: 18, backgroundColor: palette.sky, paddingHorizontal: 13 },
-  documentAddText: { color: palette.ocean, fontSize: 11, fontWeight: '800' },
+  documentAddText: { color: palette.actionText, fontSize: 11, fontWeight: '800' },
   documentList: { overflow: 'hidden', borderRadius: 12, backgroundColor: palette.paper },
   documentRow: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.ash, paddingLeft: 10, paddingRight: 6 },
   documentIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: palette.sky },
-  documentIconText: { color: palette.ocean, fontFamily: mono, fontSize: 9, fontWeight: '900' },
+  documentIconText: { color: palette.actionText, fontFamily: mono, fontSize: 9, fontWeight: '900' },
   documentCopy: { flex: 1, minWidth: 0, paddingVertical: 10 },
   documentName: { color: palette.ink, fontSize: 13, fontWeight: '800' },
   documentMeta: { color: palette.smoke, fontSize: 9, marginTop: 4 },

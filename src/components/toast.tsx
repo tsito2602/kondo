@@ -45,5 +45,5 @@ export function ToastHost() {
 const createStyles = (palette: Palette) => StyleSheet.create({
   position: { position: 'absolute', left: 24, right: 24, alignItems: 'center', zIndex: 1000 },
   toast: { maxWidth: 440, borderRadius: 16, paddingHorizontal: 20, paddingVertical: 14, backgroundColor: palette.ink },
-  text: { color: palette.onOcean, fontSize: 13, lineHeight: 20, textAlign: 'center' },
+  text: { color: palette.canvas, fontSize: 13, lineHeight: 20, textAlign: 'center' },
 });
