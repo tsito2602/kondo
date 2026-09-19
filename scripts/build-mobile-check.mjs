@@ -5,7 +5,7 @@ import path from 'node:path';
 // viewport (media queries, window dimensions, fixed elements and modal portals).
 // It does not emulate Safari, the software keyboard or iOS safe-area values.
 export async function buildMobileCheck(root, enabled) {
-  const file = path.join(root, 'mobile-check.html');
+  const file = path.join(root, '__icon-check', 'mobile.html');
   await rm(file, { force: true });
   if (!enabled) return;
   await writeFile(file, `<!doctype html><html lang="ja"><head>
