@@ -24,7 +24,7 @@ Web/PWAと共有APIは **Cloudflare Workers Builds** で検証・配信する。
 | Root directory | リポジトリのルート `/` | 同左 |
 | Build cache | **ON** | **ON** |
 | Build watch paths: include | `*` | `*` |
-| Build watch paths: exclude | `docs/*`, `.agents/*`, `AGENTS.md`, `README.md`, `DESIGN.md`, `.github/*` | 同左 |
+| Build watch paths: exclude | `docs/*`, `README.md`, `DESIGN.md`, `.github/*` | 同左 |
 
 Build commandを空にするのは検証を省くためではない。Deploy commandの単一スクリプトが、設定確認・インストール・全検証・ビルド・配信・HTTP確認を順に行い、どこかが失敗すれば停止する。`npm run check`にWebビルドが含まれるため、別の`npm run build:web`を設定しない。
 
