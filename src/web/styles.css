@@ -1907,6 +1907,14 @@ input::-webkit-date-and-time-value {
   :root:has(.trip-tabs) {
     --nav-height: 84px;
   }
+  /* View transitions paint above ordinary stacking contexts, including the
+     fixed nav. Keep their snapshots out of its entire safe-area-aware footprint
+     so the live nav and its moving selection indicator remain visible. */
+  :root:has(.trip-tabs)::view-transition {
+    clip-path: inset(
+      0 0 calc(var(--nav-height) + env(safe-area-inset-bottom)) 0
+    );
+  }
   .page {
     padding: 24px 16px
       calc(30px + var(--nav-height) + env(safe-area-inset-bottom));
