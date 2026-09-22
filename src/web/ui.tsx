@@ -6,9 +6,11 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
+import { animateDialog, motionOrigin, reduceMotion } from "./motion";
 import { X, Plus, LoaderCircle } from "lucide-react";
 import { Button } from "./obsidian/button";
 import {
@@ -118,27 +120,54 @@ export function Modal({
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
   const [closing, setClosing] = useState(false);
+  const origin = useRef<HTMLElement | null>(null);
+  const animation = useRef<Animation | null>(null);
+  const closeCallback = useRef(onClose);
+  closeCallback.current = onClose;
   const close = () => setClosing(true);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const dialog = ref.current!;
     const focus = document.activeElement as HTMLElement | null;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    origin.current = motionOrigin();
     dialog.showModal();
+    const enter = animateDialog(dialog, origin.current);
+    animation.current = enter;
+    void enter?.finished.then(() => enter.cancel()).catch(() => undefined);
     return () => {
+      animation.current?.cancel();
       dialog.close();
       document.body.style.overflow = previous;
-      focus?.focus();
+      if (focus?.isConnected) focus.focus({ preventScroll: true });
     };
   }, []);
   useEffect(() => {
     if (!closing) return;
-    const timer = setTimeout(
-      onClose,
-      matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 160,
-    );
-    return () => clearTimeout(timer);
-  }, [closing, onClose]);
+    const current = getComputedStyle(ref.current!);
+    const frame = {
+      clipPath: current.clipPath,
+      transform: current.transform,
+      opacity: current.opacity,
+    };
+    animation.current?.cancel();
+    const exit = animateDialog(ref.current!, origin.current, true, frame);
+    animation.current = exit;
+    let cancelled = false;
+    const finish = () => {
+      if (!cancelled) {
+        cancelled = true;
+        closeCallback.current();
+      }
+    };
+    if (exit) void exit.finished.then(finish).catch(() => undefined);
+    const timer = setTimeout(finish, reduceMotion() ? 0 : 220);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      exit?.cancel();
+    };
+  }, [closing]);
   return (
     <dialog
       ref={ref}

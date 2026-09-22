@@ -32,3 +32,12 @@ stagingでGoogleログイン、既存のPWAからの更新、iPhone/Androidの�
 ### iPhoneの上端表示
 
 `viewport-fit=contain`と不透明な標準ステータスバー設定を使用し、ブラウザ側にノッチ・Dynamic Islandを避けた表示領域の確保を任せる。24px固定の回避用余白・上端オーバーレイは撤去。各ヘッダーの`safe-area-inset-top`も撤去し、サンプルバナーとヘッダーの間に端末用余白を二重加算しない。全画面dialogはその表示領域内のvisualViewportの高さと位置に合わせる。iPhoneのホーム画面起動・縦横回転・キーボード表示は実機確認が必要。
+
+
+### レイヤーとモーション
+
+参考はNick PylのExplorations掲載動画（Document signature / mobile version、Photos interaction / expand and preview）。Tabiでは通常のカード・ヘッダーは鮮明に保ち、開いているdialogの背後だけ8pxのブラーと暗い透過色で沈める。メニューは高い不透明度の面、薄い内側ハイライトと影で前後関係を示す。iPhoneのviewport-fit=contain、下部20px余白、タッチ時のフォーカス抑制は維持。
+
+カード詳細は実際に押した要素の矩形からclip-pathで展開し、閉じる際は元の位置へ収束。文字の拡大縮小や文字自体のブラーは使わない。通常280ms・閉じる180ms、途中で閉じても現在の見た目から戻す。画面遷移は対応ブラウザのView Transitions、非対応時は通常のルーティングと短い登場モーション。タブ選択面は連続移動し、準備パネルは方向をそろえて切り替える。prefers-reduced-motionで動きを省き、prefers-reduced-transparencyで背景ブラー・透過を省く。
+
+参考: https://nickpyl.space/explorations/

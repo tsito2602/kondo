@@ -21,7 +21,7 @@
 }
 :root {
   color-scheme: light;
-  --canvas: #f7f7f7;
+  --canvas: #f3f5f6;
   --paper: #fff;
   --ink: #202326;
   --muted: #697077;
@@ -30,7 +30,11 @@
   --selected: #e5e8ea;
   --brand: #496b80;
   --danger: #b42318;
-  --shadow: 0 2px 5px #1c283009, 0 10px 28px #1c283006;
+  --shadow: 0 1px 2px #182a3806, 0 6px 20px #182a3808;
+  --surface-glow: #ffffffbd;
+  --panel-tint: #ffffffed;
+  --ease-flow: cubic-bezier(0.22, 1, 0.36, 1);
+  --route-direction: 1;
   --trip-header-height: 132px;
   --nav-height: 0px;
   font-family:
@@ -50,7 +54,9 @@
   --selected: #363d43;
   --brand: #a7c4d6;
   --danger: #ffa69d;
-  --shadow: 0 2px 6px #0002;
+  --shadow: 0 1px 2px #0003, 0 8px 24px #0002;
+  --surface-glow: #ffffff0e;
+  --panel-tint: #1b1e21f5;
 }
 * {
   box-sizing: border-box;
@@ -62,7 +68,13 @@ body {
   margin: 0;
   min-width: 0;
   min-height: 100dvh;
-  background: var(--canvas);
+  background:
+    radial-gradient(
+      ellipse at 90% 0%,
+      color-mix(in srgb, var(--brand) 5%, transparent),
+      transparent 60%
+    ),
+    var(--canvas);
 }
 #root {
   min-height: 100dvh;
@@ -195,7 +207,7 @@ strong {
   margin: 0 auto;
   padding: 32px 28px
     calc(48px + var(--nav-height) + env(safe-area-inset-bottom));
-  animation: page-enter 180ms ease-out;
+  animation: page-enter 240ms var(--ease-flow);
 }
 [data-slot="button"] {
   height: auto;
@@ -646,8 +658,11 @@ strong {
   font-size: 11px;
 }
 .trip-tabs {
-  display: flex;
-  gap: 12px;
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
   max-width: 960px;
   padding: 0 8px;
   margin: auto;
@@ -674,7 +689,7 @@ strong {
   stroke-width: 1.7;
 }
 .trip-tabs a.active {
-  border-color: var(--brand);
+  border-color: transparent;
   color: var(--brand);
   font-weight: 650;
 }
@@ -1281,19 +1296,20 @@ progress::-moz-progress-bar {
   background: var(--paper);
   color: var(--ink);
   border-radius: 16px;
-  box-shadow: 0 24px 80px #0003;
+  box-shadow:
+    inset 0 1px 0 var(--surface-glow),
+    0 16px 56px #0a182a30,
+    0 2px 10px #0001;
   overflow: hidden;
-  animation: modal-enter 200ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 .modal::backdrop {
-  background: #11182066;
-  animation: backdrop-enter 180ms ease-out;
-}
-.modal.closing {
-  animation: modal-exit 160ms ease-in forwards;
+  background: #101c2a3d;
+  -webkit-backdrop-filter: blur(8px) saturate(0.85);
+  backdrop-filter: blur(8px) saturate(0.85);
+  animation: backdrop-enter 220ms var(--ease-flow);
 }
 .modal.closing::backdrop {
-  animation: backdrop-enter 160ms reverse forwards;
+  animation: backdrop-enter 180ms reverse forwards;
 }
 .modal-inner {
   display: flex;
@@ -1719,27 +1735,11 @@ input::-webkit-date-and-time-value {
 @keyframes page-enter {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateX(calc(12px * var(--route-direction))) translateY(3px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-@keyframes modal-enter {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-@keyframes modal-exit {
-  to {
-    opacity: 0;
-    transform: translateY(12px);
   }
 }
 @keyframes backdrop-enter {
@@ -1748,6 +1748,168 @@ input::-webkit-date-and-time-value {
   }
   to {
     opacity: 1;
+  }
+}
+
+/* Content is a solid reading layer. Only raised, temporary panels transmit light. */
+.trip-ticket,
+.booking-ticket,
+.place-card,
+.note-card,
+.settings-card {
+  box-shadow:
+    inset 0 1px 0 var(--surface-glow),
+    var(--shadow);
+  transition:
+    transform 180ms var(--ease-flow),
+    box-shadow 180ms,
+    border-color 180ms;
+}
+.trip-stub,
+.ticket-stub {
+  background:
+    linear-gradient(150deg, var(--surface-glow), transparent 70%), var(--soft);
+}
+.modal:not(.full) {
+  background: var(--panel-tint);
+  border-color: color-mix(in srgb, var(--line) 75%, transparent);
+  border-radius: 24px;
+}
+.modal:not(.full) .modal-header {
+  background: transparent;
+}
+.modal-header {
+  box-shadow: 0 1px 0 var(--surface-glow);
+}
+.modal:not(.closing) .modal-body > * {
+  animation: detail-reveal 260ms var(--ease-flow) both;
+}
+@keyframes detail-reveal {
+  from {
+    opacity: 0.25;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.trip-tabs::before {
+  view-transition-name: tab-marker;
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 8px;
+  top: 5px;
+  width: calc((100% - 16px) / 5);
+  height: calc(100% - 10px);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--brand) 9%, var(--paper));
+  box-shadow:
+    inset 0 1px 0 var(--surface-glow),
+    0 2px 5px #1b304008;
+  transform: translateX(calc(var(--active-tab, 0) * 100%));
+  transition: transform 240ms var(--ease-flow);
+  pointer-events: none;
+}
+.segmented {
+  position: relative;
+  isolation: isolate;
+  gap: 0;
+  background: color-mix(in srgb, var(--ink) 5%, var(--paper));
+  box-shadow: inset 0 1px 3px #00000008;
+  border-radius: 14px;
+}
+.segmented::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 4px auto 4px 4px;
+  width: calc((100% - 8px) / 2);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow:
+    inset 0 1px 0 var(--surface-glow),
+    0 2px 6px #0000000d;
+  transition: transform 240ms var(--ease-flow);
+}
+.segmented[data-active-tab="packing"]::before {
+  transform: translateX(100%);
+}
+.segmented [data-state="active"] {
+  background: transparent;
+  box-shadow: none;
+}
+[data-slot="tabs-content"][data-motion-direction] {
+  --panel-shift: 12px;
+  animation: panel-enter 230ms var(--ease-flow);
+}
+[data-slot="tabs-content"][data-motion-direction="back"] {
+  --panel-shift: -12px;
+}
+@keyframes panel-enter {
+  from {
+    opacity: 0.2;
+    transform: translateX(var(--panel-shift));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+#main-content {
+  view-transition-name: route-content;
+}
+.trip-header {
+  view-transition-name: trip-chrome;
+}
+::view-transition-group(*) {
+  animation-duration: 260ms;
+  animation-timing-function: var(--ease-flow);
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-old(route-content) {
+  animation: route-out 180ms var(--ease-flow) both;
+}
+::view-transition-new(route-content) {
+  animation: route-in 260ms var(--ease-flow) both;
+}
+::view-transition {
+  pointer-events: none;
+}
+:root:active-view-transition .trip-tabs::before {
+  transition: none;
+}
+:root:active-view-transition .page {
+  animation: none;
+}
+@keyframes route-out {
+  to {
+    opacity: 0;
+    transform: translateX(calc(-18px * var(--route-direction))) scale(0.99);
+  }
+}
+@keyframes route-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(22px * var(--route-direction))) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .modal:not(.full) {
+    background: var(--paper);
+  }
+  .modal::backdrop {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: #101c2a80;
   }
 }
 @media (hover: hover) {
@@ -1853,6 +2015,10 @@ input::-webkit-date-and-time-value {
     background: var(--paper);
     border-top: 1px solid var(--line);
   }
+  .trip-tabs::before {
+    top: 8px;
+    height: 55px;
+  }
   .trip-tabs a {
     display: flex;
     flex-direction: column;
@@ -1866,15 +2032,6 @@ input::-webkit-date-and-time-value {
   .trip-tabs a svg {
     width: 20px;
     height: 20px;
-  }
-  .trip-tabs a.active::before {
-    content: "";
-    position: absolute;
-    top: 2px;
-    width: 46px;
-    height: 30px;
-    border-radius: 9px;
-    background: color-mix(in srgb, var(--brand) 12%, transparent);
   }
   .trip-tabs a.active svg {
     stroke-width: 2.1;
@@ -1997,9 +2154,6 @@ input::-webkit-date-and-time-value {
     margin: 0;
     border-radius: 0;
   }
-  .modal.full::backdrop {
-    background: var(--paper);
-  }
   .modal.full .modal-inner {
     height: var(--modal-height, 100dvh);
     max-height: var(--modal-height, 100dvh);
@@ -2086,6 +2240,11 @@ input::-webkit-date-and-time-value {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
   *,
   *::before,
   *::after {

@@ -1,3 +1,5 @@
+import { captureMotionOrigin, useMotionNavigation } from "./motion";
+import type { CSSProperties } from "react";
 import { Button } from "./obsidian/button";
 import { Input } from "./obsidian/input";
 import {
@@ -82,9 +84,11 @@ export function App() {
       }
     };
     pointer();
+    document.addEventListener("click", captureMotionOrigin, true);
     document.addEventListener("pointerdown", pointer, true);
     document.addEventListener("keydown", keyboard, true);
     return () => {
+      document.removeEventListener("click", captureMotionOrigin, true);
       document.removeEventListener("pointerdown", pointer, true);
       document.removeEventListener("keydown", keyboard, true);
       delete root.dataset.inputModality;
@@ -180,6 +184,7 @@ function Login() {
   );
 }
 function TravelApp() {
+  useMotionNavigation();
   const travel = useTravel();
   const auth = useAuth();
   const location = useLocation();
@@ -517,7 +522,20 @@ function TripLayout() {
         {trip.role === "viewer" && (
           <div className="viewer-status">閲覧のみ</div>
         )}
-        <nav className="trip-tabs" aria-label="旅行のページ">
+        <nav
+          className="trip-tabs"
+          aria-label="旅行のページ"
+          style={
+            {
+              "--active-tab": Math.max(
+                0,
+                tripTabs.findIndex((tab) =>
+                  location.pathname.endsWith(`/${tab.path}`),
+                ),
+              ),
+            } as CSSProperties
+          }
+        >
           {tripTabs.map((tab) => (
             <NavLink key={tab.path} to={`/trips/${trip.id}/${tab.path}`}>
               <tab.icon size={20} />

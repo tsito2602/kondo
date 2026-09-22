@@ -569,7 +569,11 @@ export function PackingScreen() {
           />
         )}
       </div>
-      <TabsList className="segmented" aria-label="旅の準備">
+      <TabsList
+        className="segmented"
+        data-active-tab={tab}
+        aria-label="旅の準備"
+      >
         <TabsTrigger value="task" aria-label="やること">
           やること<span className="tab-count">{travel.tasks.length}</span>
         </TabsTrigger>
@@ -577,7 +581,11 @@ export function PackingScreen() {
           持ち物<span className="tab-count">{travel.packingItems.length}</span>
         </TabsTrigger>
       </TabsList>
-      <TabsContent value={tab}>
+      <TabsContent
+        key={tab}
+        value={tab}
+        data-motion-direction={tab === "packing" ? "forward" : "back"}
+      >
         <div className="preparation-summary">
           <div>
             <h2>{tab === "task" ? "完了したやること" : "準備できた持ち物"}</h2>

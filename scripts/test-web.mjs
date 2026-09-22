@@ -17,6 +17,7 @@ Object.assign(globalThis, {
   document: dom.window.document,
   localStorage: dom.window.localStorage,
   sessionStorage: dom.window.sessionStorage,
+  Element: dom.window.Element,
   HTMLElement: dom.window.HTMLElement,
   HTMLInputElement: dom.window.HTMLInputElement,
   getComputedStyle: dom.window.getComputedStyle.bind(dom.window),
