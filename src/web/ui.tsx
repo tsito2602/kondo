@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { X, Plus, LoaderCircle } from "lucide-react";
+import { Button } from "./obsidian/button";
 import {
   normalizeThemePreference,
   resolveTheme,
@@ -31,7 +32,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
       document.documentElement.dataset.theme = theme;
       document
         .querySelector('meta[name="theme-color"]')
-        ?.setAttribute("content", theme === "dark" ? "#0A0A0A" : "#F7F7F7");
+        ?.setAttribute("content", theme === "dark" ? "#111315" : "#F7F7F7");
     };
     localStorage.setItem(THEME_KEY, preference);
     update();
@@ -153,9 +154,14 @@ export function Modal({
     >
       <div className="modal-inner">
         <header className="modal-header">
-          <button className="icon-button" aria-label="閉じる" onClick={close}>
+          <Button
+            variant="ghost"
+            className="icon-button"
+            aria-label="閉じる"
+            onClick={close}
+          >
             <X />
-          </button>
+          </Button>
           <h2 id={id}>{title}</h2>
           {action ?? <span className="icon-spacer" />}
         </header>
@@ -190,15 +196,21 @@ export function Loading() {
 export function AddButton({
   onClick,
   label,
+  floating = false,
 }: {
   onClick: () => void;
   label: string;
+  floating?: boolean;
 }) {
   return (
-    <button className="floating-add" onClick={onClick} aria-label={label}>
+    <Button
+      className={floating ? "floating-add" : "primary add-action"}
+      onClick={onClick}
+      aria-label={label}
+    >
       <Plus />
       <span>{label}</span>
-    </button>
+    </Button>
   );
 }
 export function ErrorText({ message }: { message: string }) {
@@ -210,9 +222,9 @@ export function ErrorText({ message }: { message: string }) {
 }
 export function SaveButton({ busy = false }: { busy?: boolean }) {
   return (
-    <button className="primary" type="submit" disabled={busy}>
+    <Button variant="ghost" className="primary" type="submit" disabled={busy}>
       {busy ? "保存しています…" : "保存する"}
-    </button>
+    </Button>
   );
 }
 export function MapLink({ url }: { url: string | null }) {

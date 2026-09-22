@@ -24,7 +24,7 @@ const routes=[['旅行一覧','/'],['設定','/settings'],...['itinerary','booki
 for(const [name,url] of routes){const b=document.createElement('button');b.textContent=name;b.onclick=()=>phone.src=url;document.getElementById('routes').append(b);}
 document.getElementById('measure').onclick=()=>{
  const w=phone.contentWindow,d=phone.contentDocument;
- const selectors=['#root','main','.trip-header','.date-strip','.page','dialog','.modal-inner','.modal-header','.modal-body'];
+ const selectors=['#root','main','.trip-header','.trip-tabs','.trip-ticket','.booking-ticket','.date-strip','.page','dialog','.modal-inner','.modal-header','.modal-body'];
  const rows=selectors.flatMap(s=>Array.from(d.querySelectorAll(s)).map(e=>{const r=e.getBoundingClientRect();return {element:s,top:Math.round(r.top),bottom:Math.round(r.bottom),gap:Math.round(w.innerHeight-r.bottom)};}));
  document.getElementById('result').textContent=JSON.stringify({viewport:[w.innerWidth,w.innerHeight],path:w.location.pathname,scrollWidth:d.documentElement.scrollWidth,rows},null,2);
 };

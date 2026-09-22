@@ -1,3 +1,6 @@
+import { Button } from "./obsidian/button";
+import { Input } from "./obsidian/input";
+import { Textarea } from "./obsidian/textarea";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import {
@@ -11,7 +14,15 @@ import {
   Route as RouteIcon,
   Clock,
   ListChecks,
+  Hotel,
+  TrainFront,
+  Car,
+  Utensils,
+  Ticket,
+  ChevronRight,
 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "./obsidian/tabs";
+import { Badge } from "./obsidian/badge";
 import { useTravel } from "@/data/travel-provider";
 import { addDays, formatDate } from "@/utils/dates";
 import {
@@ -71,6 +82,15 @@ const stages = {
   restaurant: ["予約", "終了"],
   ticket: ["利用", "終了"],
   other: ["予約", "終了"],
+};
+const bookingIcons = {
+  flight: Plane,
+  hotel: Hotel,
+  train: TrainFront,
+  car: Car,
+  restaurant: Utensils,
+  ticket: Ticket,
+  other: BookOpen,
 };
 export function timelineEntries(
   items: ItineraryItem[],
@@ -170,9 +190,21 @@ export function ItineraryScreen() {
     return () => observer.disconnect();
   }, [days]);
   useEffect(() => {
-    document
-      .getElementById(`date-tab-${selectedDay}`)
-      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const tab = document.getElementById(`date-tab-${selectedDay}`);
+    const strip = tab?.parentElement;
+    if (!tab || !strip) return;
+    const bounds = tab.getBoundingClientRect();
+    const container = strip.getBoundingClientRect();
+    if (bounds.left < container.left || bounds.right > container.right) {
+      strip.scrollTo({
+        left:
+          strip.scrollLeft +
+          bounds.left -
+          container.left -
+          (strip.clientWidth - bounds.width) / 2,
+        behavior: "instant",
+      });
+    }
   }, [selectedDay]);
   const connections = findFlightConnections(travel.bookings);
   return (
@@ -213,6 +245,9 @@ export function ItineraryScreen() {
             {entries
               .filter((entry) => entry.day === day)
               .map((entry) => {
+                const BookingIcon = entry.booking
+                  ? bookingIcons[entry.booking.kind]
+                  : BookOpen;
                 const transport =
                   entry.item &&
                   itemDetails(entry.item).category === "transport";
@@ -240,7 +275,7 @@ export function ItineraryScreen() {
                         {transport ? (
                           <RouteIcon size={17} />
                         ) : entry.booking ? (
-                          <Plane size={17} />
+                          <BookingIcon size={17} />
                         ) : (
                           <span />
                         )}
@@ -286,7 +321,11 @@ export function ItineraryScreen() {
         ))}
       </div>
       {travel.canEdit && (
-        <AddButton label="予定を追加" onClick={() => setAdding(true)} />
+        <AddButton
+          floating
+          label="予定を追加"
+          onClick={() => setAdding(true)}
+        />
       )}
       {adding && (
         <ItemEditor day={selectedDay} onClose={() => setAdding(false)} />
@@ -305,16 +344,21 @@ export function BookingsScreen() {
   const [id, setId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   return (
-    <div className="page">
-      <div className="section-heading">
-        <h2>旅の予約</h2>
-        <span className="muted">{bookings.length}件</span>
+    <div className="page bookings-page">
+      <div className="page-toolbar">
+        <div>
+          <h2>予約</h2>
+          <span className="muted">{bookings.length}件</span>
+        </div>
+        {canEdit && (
+          <AddButton label="予約を追加" onClick={() => setAdding(true)} />
+        )}
       </div>
       {!bookings.length ? (
         <Empty>
           <BookOpen />
-          <h2>予約をひとつに。</h2>
-          <p>航空券やホテル、チケットをまとめておきましょう。</p>
+          <h2>予約はまだありません</h2>
+          <p>航空券やホテルの予約を追加できます。</p>
         </Empty>
       ) : (
         <div className="booking-grid">
@@ -331,33 +375,40 @@ export function BookingsScreen() {
               >
                 <div className="ticket-main">
                   <div className="row between">
-                    <span className="eyebrow">
+                    <Badge variant="secondary" className="booking-kind">
                       {
                         bookingKinds.find(
                           (entry) => entry.value === booking.kind,
                         )?.label
                       }
-                    </span>
+                    </Badge>
                     <span className="muted">{formatDate(booking.day)}</span>
                   </div>
                   <h2>{booking.title}</h2>
-                  <p>{booking.detail}</p>
+                  {booking.detail && <p className="clamp">{booking.detail}</p>}
                   {["flight", "train", "car"].includes(booking.kind) ? (
                     <BookingRoute booking={booking} />
                   ) : (
-                    <p className="muted">{booking.location}</p>
+                    booking.location && (
+                      <p className="muted clamp ticket-location">
+                        <MapPin size={12} />
+                        {booking.location}
+                      </p>
+                    )
                   )}
                 </div>
                 <div className="ticket-stub">
-                  <span>{booking.time || "時刻未定"}</span>
-                  <span>{booking.confirmationCode || "予約詳細"}</span>
+                  <strong>{booking.time || "時刻未定"}</strong>
+                  <span className="confirmation-code">
+                    {booking.confirmationCode}
+                  </span>
+                  <span className="ticket-open">
+                    <ChevronRight size={18} />
+                  </span>
                 </div>
               </button>
             ))}
         </div>
-      )}
-      {canEdit && (
-        <AddButton label="予約を追加" onClick={() => setAdding(true)} />
       )}
       {adding && <BookingEditor onClose={() => setAdding(false)} />}
       {id && <BookingDetail id={id} onClose={() => setId(null)} />}
@@ -373,7 +424,16 @@ export function PlacesScreen() {
     (place) => filter === "all" || place.status === filter,
   );
   return (
-    <div className="page">
+    <div className="page places-page">
+      <div className="page-toolbar">
+        <div>
+          <h2>行きたい場所</h2>
+          <span className="muted">{travel.places.length}件</span>
+        </div>
+        {travel.canEdit && (
+          <AddButton label="場所を追加" onClick={() => setAdding(true)} />
+        )}
+      </div>
       <div className="filter-strip" aria-label="訪問ステータス">
         {[{ value: "all", label: "すべて" }, ...placeStatuses].map((entry) => (
           <button
@@ -389,8 +449,16 @@ export function PlacesScreen() {
       {!places.length ? (
         <Empty>
           <MapPin />
-          <h2>次の楽しみを見つけよう。</h2>
-          <p>訪れたい場所をここに集めておけます。</p>
+          <h2>
+            {travel.places.length
+              ? "該当する場所はありません"
+              : "場所はまだありません"}
+          </h2>
+          <p>
+            {travel.places.length
+              ? "絞り込みを変更してください。"
+              : "訪れたい場所を追加できます。"}
+          </p>
         </Empty>
       ) : (
         <div className="place-grid">
@@ -400,16 +468,19 @@ export function PlacesScreen() {
               key={place.id}
               onClick={() => setId(place.id)}
             >
-              <div className="row between">
+              <div className="place-top">
                 <span className={`place-icon status-${place.status}`}>
                   {place.status === "visited" ? <CircleCheck /> : <MapPin />}
                 </span>
-                <span className={`badge status-${place.status}`}>
+                <Badge
+                  variant="secondary"
+                  className={`badge status-${place.status}`}
+                >
                   {
                     placeStatuses.find((entry) => entry.value === place.status)
                       ?.label
                   }
-                </span>
+                </Badge>
               </div>
               <h2>{place.title}</h2>
               <p className="clamp muted">{place.note || place.location}</p>
@@ -432,9 +503,6 @@ export function PlacesScreen() {
             </button>
           ))}
         </div>
-      )}
-      {travel.canEdit && (
-        <AddButton label="場所を追加" onClick={() => setAdding(true)} />
       )}
       {adding && <PlaceEditor onClose={() => setAdding(false)} />}
       {id && <PlaceDetail id={id} onClose={() => setId(null)} />}
@@ -464,143 +532,140 @@ export function PackingScreen() {
     "done" in item ? item.done : item.packed;
   const done = items.filter(complete).length;
   return (
-    <div className="page">
-      <div className="segmented" role="tablist" aria-label="旅の準備">
-        <button
-          role="tab"
-          aria-selected={tab === "task"}
-          onClick={() => {
-            setTab("task");
-            setFilter("all");
-          }}
-        >
-          やること
-        </button>
-        <button
-          role="tab"
-          aria-selected={tab === "packing"}
-          onClick={() => {
-            setTab("packing");
-            setFilter("all");
-          }}
-        >
-          持ち物
-        </button>
-      </div>
-      <div className="preparation-summary">
+    <Tabs
+      className="page preparation-page"
+      value={tab}
+      onValueChange={(value) => {
+        setTab(value as "task" | "packing");
+        setFilter("all");
+      }}
+    >
+      <div className="page-toolbar">
         <div>
-          <h2>
-            {tab === "task"
-              ? "出発までに、ひとつずつ。"
-              : "忘れもののない旅へ。"}
-          </h2>
-          <p className="muted">
-            {done} / {items.length} {tab === "task" ? "完了" : "準備済み"}
-          </p>
+          <h2>準備</h2>
         </div>
-        <strong>
-          {items.length ? Math.round((done / items.length) * 100) : 0}
-          <small>%</small>
-        </strong>
+        {travel.canEdit && (
+          <AddButton
+            label={tab === "task" ? "やることを追加" : "持ち物を追加"}
+            onClick={() => setEditing({ type: tab })}
+          />
+        )}
       </div>
-      <progress
-        max={items.length || 1}
-        value={done}
-        aria-label="準備の完了率"
-      />
-      <div className="filter-strip" aria-label="担当者">
-        {options.map((option) => (
-          <button
-            key={option.key}
-            className={filter === option.key ? "selected" : ""}
-            aria-pressed={filter === option.key}
-            onClick={() => setFilter(option.key)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-      {!items.length ? (
-        <Empty>
-          <ListChecks />
-          <p>{tab === "task" ? "やること" : "持ち物"}を追加しましょう。</p>
-        </Empty>
-      ) : (
-        <div className="check-list">
-          {items.map((item) => (
-            <div
-              className={`check-row ${complete(item) ? "completed" : ""}`}
-              key={item.id}
+      <TabsList className="segmented" aria-label="旅の準備">
+        <TabsTrigger value="task" aria-label="やること">
+          やること<span className="tab-count">{travel.tasks.length}</span>
+        </TabsTrigger>
+        <TabsTrigger value="packing" aria-label="持ち物">
+          持ち物<span className="tab-count">{travel.packingItems.length}</span>
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value={tab}>
+        <div className="preparation-summary">
+          <div>
+            <h2>{tab === "task" ? "完了したやること" : "準備できた持ち物"}</h2>
+            <p className="muted">
+              {done} / {items.length} {tab === "task" ? "完了" : "準備済み"}
+            </p>
+          </div>
+          <strong>
+            {items.length ? Math.round((done / items.length) * 100) : 0}
+            <small>%</small>
+          </strong>
+        </div>
+        <progress
+          max={items.length || 1}
+          value={done}
+          aria-label="準備の完了率"
+        />
+        <div className="filter-strip" aria-label="担当者">
+          {options.map((option) => (
+            <button
+              key={option.key}
+              className={filter === option.key ? "selected" : ""}
+              aria-pressed={filter === option.key}
+              onClick={() => setFilter(option.key)}
             >
-              <input
-                type="checkbox"
-                disabled={!travel.canEdit}
-                checked={complete(item)}
-                aria-label={`${"title" in item ? item.title : item.name}を${complete(item) ? "未完了" : "完了"}にする`}
-                onChange={(event) =>
-                  void run(() =>
-                    "done" in item
-                      ? travel.updateTask(item.id, {
-                          ...item,
-                          done: event.target.checked,
-                        })
-                      : travel.updatePackingItem(item.id, {
-                          ...item,
-                          packed: event.target.checked,
-                        }),
-                  )
-                }
-              />
-              <button
-                className="check-content"
-                onClick={() =>
-                  travel.canEdit && setEditing({ item, type: tab })
-                }
-              >
-                <strong>{"title" in item ? item.title : item.name}</strong>
-                <span>
-                  {"quantity" in item
-                    ? `${item.category} · ${item.quantity}個${item.shared ? " · 共用" : ""}`
-                    : item.dueOn
-                      ? `${formatDate(item.dueOn)}まで`
-                      : "期限なし"}{" "}
-                  · {assigneeName(item.assignee ?? "", travel.members)}
-                </span>
-              </button>
-              {travel.canEdit && (
-                <button
-                  className="icon-button danger"
-                  aria-label={`${"title" in item ? item.title : item.name}を削除`}
-                  onClick={() =>
-                    void run(() => {
-                      if (confirm("削除しますか？")) {
-                        if ("done" in item) travel.deleteTask(item.id);
-                        else travel.deletePackingItem(item.id);
-                      }
-                    })
-                  }
-                >
-                  <Trash2 size={16} />
-                </button>
-              )}
-            </div>
+              {option.label}
+            </button>
           ))}
         </div>
-      )}
-      {travel.canEdit && (
-        <AddButton
-          label={tab === "task" ? "やることを追加" : "持ち物を追加"}
-          onClick={() => setEditing({ type: tab })}
-        />
-      )}
-      {editing && (
-        <PreparationEditor
-          type={editing.type}
-          item={editing.item}
-          onClose={() => setEditing(null)}
-        />
-      )}
-    </div>
+        {!items.length ? (
+          <Empty>
+            <ListChecks />
+            <p>{tab === "task" ? "やること" : "持ち物"}を追加しましょう。</p>
+          </Empty>
+        ) : (
+          <div className="check-list">
+            {items.map((item) => (
+              <div
+                className={`check-row ${complete(item) ? "completed" : ""}`}
+                key={item.id}
+              >
+                <input
+                  type="checkbox"
+                  disabled={!travel.canEdit}
+                  checked={complete(item)}
+                  aria-label={`${"title" in item ? item.title : item.name}を${complete(item) ? "未完了" : "完了"}にする`}
+                  onChange={(event) =>
+                    void run(() =>
+                      "done" in item
+                        ? travel.updateTask(item.id, {
+                            ...item,
+                            done: event.target.checked,
+                          })
+                        : travel.updatePackingItem(item.id, {
+                            ...item,
+                            packed: event.target.checked,
+                          }),
+                    )
+                  }
+                />
+                <button
+                  className="check-content"
+                  onClick={() =>
+                    travel.canEdit && setEditing({ item, type: tab })
+                  }
+                >
+                  <strong>{"title" in item ? item.title : item.name}</strong>
+                  <span>
+                    {"quantity" in item
+                      ? `${item.category} · ${item.quantity}個${item.shared ? " · 共用" : ""}`
+                      : item.dueOn
+                        ? `${formatDate(item.dueOn)}まで`
+                        : "期限なし"}{" "}
+                    · {assigneeName(item.assignee ?? "", travel.members)}
+                  </span>
+                </button>
+                {travel.canEdit && (
+                  <Button
+                    variant="ghost"
+                    className="icon-button danger"
+                    aria-label={`${"title" in item ? item.title : item.name}を削除`}
+                    onClick={() =>
+                      void run(() => {
+                        if (confirm("削除しますか？")) {
+                          if ("done" in item) travel.deleteTask(item.id);
+                          else travel.deletePackingItem(item.id);
+                        }
+                      })
+                    }
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {editing && (
+          <PreparationEditor
+            type={editing.type}
+            item={editing.item}
+            onClose={() => setEditing(null)}
+          />
+        )}
+      </TabsContent>
+    </Tabs>
   );
 }
 export function NotesScreen() {
@@ -614,10 +679,29 @@ export function NotesScreen() {
         Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt,
     );
   return (
-    <div className="page">
+    <div className="page notes-page">
+      <div className="page-toolbar">
+        <div>
+          <h2>メモ</h2>
+          <span className="muted">{travel.notes.length}件</span>
+        </div>
+        {travel.canEdit && (
+          <AddButton
+            label="メモを書く"
+            onClick={() =>
+              setNote({
+                id: crypto.randomUUID(),
+                body: "",
+                pinned: false,
+                updatedAt: Date.now() / 1000,
+              })
+            }
+          />
+        )}
+      </div>
       <label className="search">
         <Search />
-        <input
+        <Input
           aria-label="メモを検索"
           placeholder="メモを検索"
           value={search}
@@ -627,8 +711,14 @@ export function NotesScreen() {
       {!notes.length ? (
         <Empty>
           <FileNoteIcon />
-          <h2>旅のメモ</h2>
-          <p>思いついたことを、自由に。</p>
+          <h2>
+            {search ? "該当するメモはありません" : "メモはまだありません"}
+          </h2>
+          <p>
+            {search
+              ? "別のキーワードで検索してください。"
+              : "メモやチェックリストを残せます。"}
+          </p>
         </Empty>
       ) : (
         <div className="note-list">
@@ -651,19 +741,6 @@ export function NotesScreen() {
             </button>
           ))}
         </div>
-      )}
-      {travel.canEdit && (
-        <AddButton
-          label="メモを書く"
-          onClick={() =>
-            setNote({
-              id: crypto.randomUUID(),
-              body: "",
-              pinned: false,
-              updatedAt: Date.now() / 1000,
-            })
-          }
-        />
       )}
       {note && <NoteEditor initial={note} onClose={() => setNote(null)} />}
     </div>
@@ -727,7 +804,8 @@ function NoteEditor({
       }}
       full
       action={
-        <button
+        <Button
+          variant="ghost"
           className="text-button"
           onClick={() => {
             flush();
@@ -735,7 +813,7 @@ function NoteEditor({
           }}
         >
           完了
-        </button>
+        </Button>
       }
     >
       <div className="note-toolbar">
@@ -749,7 +827,8 @@ function NoteEditor({
             >
               <Pin />
             </button>
-            <button
+            <Button
+              variant="ghost"
               className="secondary"
               onClick={() => {
                 const position =
@@ -761,8 +840,9 @@ function NoteEditor({
             >
               <ListChecks />
               チェックリスト
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
               className="icon-button danger"
               aria-label="メモを削除"
               onClick={() => {
@@ -774,7 +854,7 @@ function NoteEditor({
               }}
             >
               <Trash2 />
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -811,7 +891,7 @@ function NoteEditor({
           )}
         </div>
       )}
-      <textarea
+      <Textarea
         ref={input}
         autoFocus={canEdit}
         readOnly={!canEdit}

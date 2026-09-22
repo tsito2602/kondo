@@ -1,3 +1,6 @@
+import { Button } from "./obsidian/button";
+import { Input } from "./obsidian/input";
+import { Textarea } from "./obsidian/textarea";
 import { type FormEvent, useState } from "react";
 import { Trash2, Plus } from "lucide-react";
 import { findAirports } from "@/data/airports";
@@ -143,18 +146,19 @@ export function TripEditor({
             />
           </label>
           {draft.coverImage && (
-            <button
+            <Button
+              variant="ghost"
               type="button"
               className="icon-button"
               aria-label="カバー画像を削除"
               onClick={() => setDraft({ ...draft, coverImage: "" })}
             >
               <Trash2 />
-            </button>
+            </Button>
           )}
         </div>
         <Field label="旅行名">
-          <input
+          <Input
             autoFocus
             required
             maxLength={120}
@@ -166,7 +170,7 @@ export function TripEditor({
           />
         </Field>
         <Field label="行き先">
-          <input
+          <Input
             maxLength={160}
             placeholder="ウィーン、ミュンヘン"
             value={draft.destination}
@@ -177,7 +181,7 @@ export function TripEditor({
         </Field>
         <div className="form-grid">
           <Field label="出発日">
-            <input
+            <Input
               required
               type="date"
               value={draft.startsOn}
@@ -187,7 +191,7 @@ export function TripEditor({
             />
           </Field>
           <Field label="帰宅日">
-            <input
+            <Input
               required
               type="date"
               min={draft.startsOn}
@@ -297,7 +301,7 @@ export function ItemEditor({
           </select>
         </Field>
         <Field label="タイトル">
-          <input
+          <Input
             autoFocus
             required
             maxLength={160}
@@ -309,7 +313,7 @@ export function ItemEditor({
         </Field>
         <div className="form-grid">
           <Field label="日付">
-            <input
+            <Input
               type="date"
               required
               value={draft.day}
@@ -321,7 +325,7 @@ export function ItemEditor({
           <Field
             label={details.category === "transport" ? "出発時刻" : "開始時刻"}
           >
-            <input
+            <Input
               type="time"
               value={draft.time}
               onChange={(event) =>
@@ -332,7 +336,7 @@ export function ItemEditor({
         </div>
         <div className="form-grid">
           <Field label="終了日">
-            <input
+            <Input
               type="date"
               min={draft.day}
               value={details.endDay}
@@ -344,7 +348,7 @@ export function ItemEditor({
           <Field
             label={details.category === "transport" ? "到着時刻" : "終了時刻"}
           >
-            <input
+            <Input
               type="time"
               value={details.endTime}
               onChange={(event) =>
@@ -377,7 +381,7 @@ export function ItemEditor({
                 </select>
               </Field>
               <Field label="所要時間（分）">
-                <input
+                <Input
                   type="number"
                   min={1}
                   max={10080}
@@ -397,7 +401,7 @@ export function ItemEditor({
               </Field>
             </div>
             <Field label="出発地">
-              <input
+              <Input
                 maxLength={160}
                 value={transport.origin}
                 onChange={(event) =>
@@ -409,7 +413,7 @@ export function ItemEditor({
               />
             </Field>
             <Field label="目的地">
-              <input
+              <Input
                 maxLength={160}
                 value={transport.destination}
                 onChange={(event) =>
@@ -426,7 +430,7 @@ export function ItemEditor({
           </>
         ) : (
           <Field label="場所・Google MapsのURL">
-            <input
+            <Input
               maxLength={160}
               value={details.location}
               onChange={(event) =>
@@ -436,7 +440,7 @@ export function ItemEditor({
           </Field>
         )}
         <Field label="メモ">
-          <textarea
+          <Textarea
             rows={5}
             maxLength={4000}
             value={draft.note}
@@ -529,7 +533,7 @@ export function BookingEditor({
     required = false,
   ) => (
     <Field label={label}>
-      <input
+      <Input
         list={
           key === "originCode" || key === "destinationCode"
             ? `airports-${key}`
@@ -611,7 +615,7 @@ export function BookingEditor({
           <Field
             label={draft.kind === "hotel" ? "チェックイン日" : "開始日（現地）"}
           >
-            <input
+            <Input
               required
               type="date"
               value={draft.day}
@@ -621,7 +625,7 @@ export function BookingEditor({
             />
           </Field>
           <Field label="開始時刻（現地）">
-            <input
+            <Input
               type="time"
               value={draft.time}
               onChange={(event) =>
@@ -636,7 +640,7 @@ export function BookingEditor({
               draft.kind === "hotel" ? "チェックアウト日" : "終了日（現地）"
             }
           >
-            <input
+            <Input
               type="date"
               value={draft.endDay}
               onChange={(event) =>
@@ -645,7 +649,7 @@ export function BookingEditor({
             />
           </Field>
           <Field label="終了時刻（現地）">
-            <input
+            <Input
               type="time"
               value={draft.endTime}
               onChange={(event) =>
@@ -656,7 +660,7 @@ export function BookingEditor({
         </div>
         {["flight", "train"].includes(draft.kind) && (
           <Field label="所要時間（分・空欄なら自動計算）">
-            <input
+            <Input
               type="number"
               min={1}
               max={10080}
@@ -686,7 +690,7 @@ export function BookingEditor({
         )}
         {field("confirmationCode", "予約番号")}
         <Field label="メモ">
-          <textarea
+          <Textarea
             rows={5}
             maxLength={4000}
             value={draft.note}
@@ -742,7 +746,7 @@ export function PlaceEditor({
     >
       <form className="form" onSubmit={submit}>
         <Field label="場所の名前">
-          <input
+          <Input
             autoFocus
             required
             maxLength={160}
@@ -790,7 +794,7 @@ export function PlaceEditor({
           </Field>
         </div>
         <Field label="住所・Google MapsのURL">
-          <input
+          <Input
             maxLength={2000}
             value={draft.location}
             onChange={(event) =>
@@ -799,7 +803,7 @@ export function PlaceEditor({
           />
         </Field>
         <Field label="営業時間">
-          <input
+          <Input
             maxLength={500}
             value={draft.openingHours}
             onChange={(event) =>
@@ -812,7 +816,7 @@ export function PlaceEditor({
           {draft.referenceLinks.map((link, index) => (
             <div className="link-input" key={index}>
               <Field label="名前">
-                <input
+                <Input
                   maxLength={120}
                   value={link.label}
                   onChange={(event) =>
@@ -828,7 +832,7 @@ export function PlaceEditor({
                 />
               </Field>
               <Field label="URL">
-                <input
+                <Input
                   type="url"
                   required
                   maxLength={2000}
@@ -845,7 +849,8 @@ export function PlaceEditor({
                   }
                 />
               </Field>
-              <button
+              <Button
+                variant="ghost"
                 type="button"
                 className="icon-button"
                 aria-label="リンクを削除"
@@ -859,10 +864,11 @@ export function PlaceEditor({
                 }
               >
                 <Trash2 />
-              </button>
+              </Button>
             </div>
           ))}
-          <button
+          <Button
+            variant="ghost"
             type="button"
             className="secondary"
             disabled={draft.referenceLinks.length >= 20}
@@ -878,10 +884,10 @@ export function PlaceEditor({
           >
             <Plus />
             リンクを追加
-          </button>
+          </Button>
         </fieldset>
         <Field label="メモ">
-          <textarea
+          <Textarea
             rows={5}
             value={draft.note}
             maxLength={4000}
@@ -960,7 +966,7 @@ export function PreparationEditor({
     >
       <form className="form" onSubmit={submit}>
         <Field label={task ? "やること" : "持ち物"}>
-          <input
+          <Input
             autoFocus
             required
             maxLength={task ? 160 : 120}
@@ -991,7 +997,7 @@ export function PreparationEditor({
         </Field>
         {task ? (
           <Field label="期限">
-            <input
+            <Input
               type="date"
               value={dueOn}
               onChange={(event) => setDueOn(event.target.value)}
@@ -1001,14 +1007,14 @@ export function PreparationEditor({
           <>
             <div className="form-grid">
               <Field label="カテゴリ">
-                <input
+                <Input
                   maxLength={40}
                   value={category}
                   onChange={(event) => setCategory(event.target.value)}
                 />
               </Field>
               <Field label="個数">
-                <input
+                <Input
                   type="number"
                   min={1}
                   max={99}

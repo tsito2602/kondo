@@ -1,3 +1,4 @@
+import { Button } from "./obsidian/button";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Copy, FileText, Trash2, Download, Pencil } from "lucide-react";
@@ -44,12 +45,16 @@ export function BookingRoute({ booking }: { booking: Booking }) {
   return (
     <div className="booking-route">
       <div>
-        <strong>{booking.originCode || booking.origin || "出発"}</strong>
+        <strong className={booking.originCode ? "route-code" : "route-label"}>
+          {booking.originCode || booking.origin || "出発"}
+        </strong>
         <span>{start?.name ?? booking.origin}</span>
       </div>
       <span aria-hidden="true">→</span>
       <div>
-        <strong>
+        <strong
+          className={booking.destinationCode ? "route-code" : "route-label"}
+        >
           {booking.destinationCode || booking.destination || "到着"}
         </strong>
         <span>{end?.name ?? booking.destination}</span>
@@ -208,9 +213,13 @@ export function BookingDetail({
       full
       action={
         travel.canEdit && (
-          <button className="text-button" onClick={() => setEditing(true)}>
+          <Button
+            variant="ghost"
+            className="text-button"
+            onClick={() => setEditing(true)}
+          >
             編集
-          </button>
+          </Button>
         )
       }
     >
@@ -352,7 +361,8 @@ export function BookingDetail({
               </button>
               <Download size={17} />
               {travel.canEdit && (
-                <button
+                <Button
+                  variant="ghost"
                   disabled={busy}
                   className="icon-button danger"
                   aria-label={`${file.filename}を削除`}
@@ -362,7 +372,7 @@ export function BookingDetail({
                   }}
                 >
                   <Trash2 />
-                </button>
+                </Button>
               )}
             </div>
           ))}
@@ -430,9 +440,13 @@ export function ItemDetail({
       full
       action={
         travel.canEdit && (
-          <button className="text-button" onClick={() => setEditing(true)}>
+          <Button
+            variant="ghost"
+            className="text-button"
+            onClick={() => setEditing(true)}
+          >
             編集
-          </button>
+          </Button>
         )
       }
     >
@@ -517,9 +531,13 @@ export function PlaceDetail({
       full
       action={
         travel.canEdit && (
-          <button className="text-button" onClick={() => setMode("edit")}>
+          <Button
+            variant="ghost"
+            className="text-button"
+            onClick={() => setMode("edit")}
+          >
             編集
-          </button>
+          </Button>
         )
       }
     >
@@ -574,7 +592,8 @@ export function PlaceDetail({
         ) : null}
         {linked ? (
           <>
-            <button
+            <Button
+              variant="ghost"
               className="primary"
               onClick={() => {
                 navigate(
@@ -584,19 +603,27 @@ export function PlaceDetail({
               }}
             >
               しおりを見る
-            </button>
+            </Button>
             {travel.canEdit && (
-              <button className="secondary" onClick={() => setMode("schedule")}>
+              <Button
+                variant="ghost"
+                className="secondary"
+                onClick={() => setMode("schedule")}
+              >
                 <Pencil />
                 予定の日時を編集
-              </button>
+              </Button>
             )}
           </>
         ) : (
           travel.canEdit && (
-            <button className="primary" onClick={() => setMode("schedule")}>
+            <Button
+              variant="ghost"
+              className="primary"
+              onClick={() => setMode("schedule")}
+            >
               しおりへ追加
-            </button>
+            </Button>
           )
         )}
         {travel.canEdit && (

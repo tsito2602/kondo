@@ -1,3 +1,5 @@
+import { Button } from "./obsidian/button";
+import { Input } from "./obsidian/input";
 import {
   type FormEvent,
   useEffect,
@@ -31,7 +33,14 @@ import {
   ChevronRight,
   Copy,
   BookOpen,
+  Plus,
+  MapPin,
+  ListChecks,
+  Ticket,
+  NotebookPen,
+  Check,
 } from "lucide-react";
+import { Card } from "./obsidian/card";
 import { GoogleSignIn, useAuth } from "@/auth/auth-provider";
 import { TravelProvider, useTravel } from "@/data/travel-provider";
 import type { TripMember } from "@/data/types";
@@ -45,7 +54,6 @@ import {
   PlacesScreen,
 } from "./screens";
 import {
-  AddButton,
   Empty,
   Field,
   Loading,
@@ -121,17 +129,12 @@ function Login() {
       </div>
       <div className="login-panel">
         <Logo />
-        <p className="eyebrow">YOUR NEXT CHAPTER</p>
         <h1>
-          旅の楽しみを、
+          旅のしおりを、
           <br />
           ひとつに。
         </h1>
-        <p className="muted">
-          行きたい場所も、予約も、旅の準備も。
-          <br />
-          ふたりでつくる、いつでも開ける旅のしおり。
-        </p>
+        <p className="muted">予定・予約・持ち物を、一緒に旅する人と。</p>
         <GoogleSignIn />
         {auth.error && (
           <p className="error" role="alert">
@@ -139,10 +142,14 @@ function Login() {
           </p>
         )}
         {auth.demoEnabled && (
-          <button className="secondary" onClick={auth.startDemo}>
+          <Button
+            variant="ghost"
+            className="secondary"
+            onClick={auth.startDemo}
+          >
             サンプルの旅を見てみる
             <ChevronRight size={18} />
-          </button>
+          </Button>
         )}
       </div>
     </main>
@@ -163,7 +170,7 @@ function TravelApp() {
       </a>
       {auth.isDemo && (
         <div className="demo-banner">
-          <span>サンプルの旅 · 変更はこの端末に保存されます</span>
+          <span>サンプル · この端末に保存</span>
           <button onClick={auth.exitDemo}>終了</button>
         </div>
       )}
@@ -213,7 +220,11 @@ function SyncStatus() {
       onClick={() => void sync()}
       title={error ?? "同期する"}
     >
-      <RefreshCw size={12} className={syncing ? "spin" : ""} />
+      {syncing || pendingCount || error || !online ? (
+        <RefreshCw size={12} className={syncing ? "spin" : ""} />
+      ) : (
+        <Check size={12} />
+      )}
       <span>
         {isDemo
           ? "この端末に保存"
@@ -244,16 +255,24 @@ function Home() {
     <>
       <header className="home-header">
         <Logo />
-        <Link className="icon-button" aria-label="設定" to="/settings">
-          <Settings />
-        </Link>
+        <div className="row">
+          <SyncStatus />
+          <Link className="icon-button" aria-label="設定" to="/settings">
+            <Settings />
+          </Link>
+        </div>
       </header>
       <main id="main-content" className="page home-page">
-        <div className="home-intro">
-          <p className="eyebrow">LET'S MAKE MEMORIES</p>
-          <h1>次は、どこへ行こう。</h1>
-          <p className="muted">準備する時間も、旅の一部。</p>
-          <SyncStatus />
+        <div className="home-toolbar">
+          <h1>旅行</h1>
+          <Button
+            variant="ghost"
+            className="primary"
+            onClick={() => setEditing(true)}
+          >
+            <Plus size={18} />
+            旅行を作成
+          </Button>
         </div>
         {travel.error && (
           <p className="notice" role="status">
@@ -263,8 +282,8 @@ function Home() {
         {!travel.trips.length && (
           <Empty>
             <BookOpen />
-            <h2>最初の旅をつくろう。</h2>
-            <p>予定を立てて、一緒に旅する人を招待できます。</p>
+            <h2>旅行はまだありません</h2>
+            <p>旅行を作成するか、招待リンクから参加できます。</p>
           </Empty>
         )}
         {[
@@ -294,24 +313,40 @@ function Home() {
                         }
                       >
                         <div className="trip-photo-content">
-                          <span className="eyebrow">
-                            {trip.destination || "YOUR JOURNEY"}
-                          </span>
+                          {trip.destination && (
+                            <span className="trip-destination">
+                              <MapPin size={13} />
+                              {trip.destination}
+                            </span>
+                          )}
                           <h2>{trip.name}</h2>
                           <p>
-                            {formatDate(trip.startsOn)} —{" "}
-                            {formatDate(trip.endsOn)}
+                            {trip.startsOn.slice(0, 4)}
+                            <br />
+                            {trip.startsOn.slice(5).replace("-", ".")} —{" "}
+                            {(trip.endsOn.slice(0, 4) ===
+                            trip.startsOn.slice(0, 4)
+                              ? trip.endsOn.slice(5)
+                              : trip.endsOn
+                            ).replaceAll("-", ".")}
                           </p>
                         </div>
                       </div>
                       <div className="trip-stub">
+                        <strong>
+                          {Math.round(
+                            (Date.parse(trip.endsOn) -
+                              Date.parse(trip.startsOn)) /
+                              86400000,
+                          ) + 1}
+                          <small>日間</small>
+                        </strong>
                         <span>
                           <Users size={14} />
-                          {trip.memberCount}人の旅
+                          {trip.memberCount}人
                         </span>
-                        <span>
-                          しおりを開く
-                          <ChevronRight size={16} />
+                        <span className="ticket-open" aria-label="しおりを開く">
+                          <ChevronRight size={20} />
                         </span>
                       </div>
                     </Link>
@@ -320,10 +355,13 @@ function Home() {
               </section>
             ),
         )}
-        <button className="subtle invite-entry" onClick={() => setInvite(" ")}>
+        <Button
+          variant="ghost"
+          className="subtle invite-entry"
+          onClick={() => setInvite(" ")}
+        >
           招待リンクから参加
-        </button>
-        <AddButton label="旅行を作成" onClick={() => setEditing(true)} />
+        </Button>
         {editing && (
           <TripEditor
             onClose={() => setEditing(false)}
@@ -358,16 +396,21 @@ function Home() {
             >
               <p>共有された旅のしおりに参加します。</p>
               <Field label="招待リンク">
-                <input
+                <Input
                   autoFocus
                   required
                   value={invite.trimStart()}
                   onChange={(event) => setInvite(event.target.value || " ")}
                 />
               </Field>
-              <button type="submit" className="primary" disabled={busy}>
+              <Button
+                variant="ghost"
+                type="submit"
+                className="primary"
+                disabled={busy}
+              >
                 この旅行に参加
-              </button>
+              </Button>
             </form>
           </Modal>
         )}
@@ -376,11 +419,11 @@ function Home() {
   );
 }
 const tripTabs = [
-  { path: "itinerary", label: "しおり" },
-  { path: "places", label: "行きたい場所" },
-  { path: "packing", label: "準備" },
-  { path: "bookings", label: "予約" },
-  { path: "notes", label: "メモ" },
+  { path: "itinerary", label: "しおり", icon: BookOpen },
+  { path: "places", label: "行きたい場所", icon: MapPin },
+  { path: "packing", label: "準備", icon: ListChecks },
+  { path: "bookings", label: "予約", icon: Ticket },
+  { path: "notes", label: "メモ", icon: NotebookPen },
 ];
 function TripLayout() {
   const { tripId } = useParams();
@@ -437,22 +480,24 @@ function TripLayout() {
               {formatDate(trip.startsOn)} — {formatDate(trip.endsOn)}
             </p>
           </div>
-          <button
+          <SyncStatus />
+          <Button
+            variant="ghost"
             className="icon-button"
             aria-label="旅行メニュー"
             onClick={() => setMenu(true)}
           >
             <MoreHorizontal />
-          </button>
+          </Button>
         </div>
-        <div className="trip-status">
-          <SyncStatus />
-          {trip.role === "viewer" && <span className="badge">閲覧のみ</span>}
-        </div>
+        {trip.role === "viewer" && (
+          <div className="viewer-status">閲覧のみ</div>
+        )}
         <nav className="trip-tabs" aria-label="旅行のページ">
           {tripTabs.map((tab) => (
             <NavLink key={tab.path} to={`/trips/${trip.id}/${tab.path}`}>
-              {tab.label}
+              <tab.icon size={20} />
+              <span>{tab.label}</span>
             </NavLink>
           ))}
         </nav>
@@ -585,7 +630,8 @@ function MembersScreen() {
                   <option value="editor">編集可</option>
                   <option value="viewer">閲覧のみ</option>
                 </select>
-                <button
+                <Button
+                  variant="ghost"
                   className="icon-button danger"
                   disabled={busy}
                   aria-label="メンバーを削除"
@@ -595,7 +641,7 @@ function MembersScreen() {
                   }}
                 >
                   <Trash2 />
-                </button>
+                </Button>
               </>
             ) : (
               <span className="badge">
@@ -610,10 +656,11 @@ function MembersScreen() {
         ))}
       </div>
       {owner && (
-        <section className="settings-card">
+        <Card className="settings-card">
           <h3>旅のしおりを共有</h3>
           <p>招待リンクは1回限り、7日間有効です。</p>
-          <button
+          <Button
+            variant="ghost"
             className="primary"
             disabled={busy}
             onClick={() =>
@@ -623,17 +670,18 @@ function MembersScreen() {
             }
           >
             招待リンクを作成
-          </button>
+          </Button>
           {invite && (
             <div className="form">
               <Field label="招待リンク">
-                <input
+                <Input
                   readOnly
                   value={invite}
                   onFocus={(event) => event.target.select()}
                 />
               </Field>
-              <button
+              <Button
+                variant="ghost"
                 className="secondary"
                 onClick={() =>
                   void run(async () => {
@@ -644,10 +692,11 @@ function MembersScreen() {
               >
                 <Copy />
                 リンクをコピー
-              </button>
+              </Button>
             </div>
           )}
-          <button
+          <Button
+            variant="ghost"
             className="subtle danger"
             disabled={busy}
             onClick={() =>
@@ -664,8 +713,8 @@ function MembersScreen() {
             }
           >
             発行済みの招待を無効にする
-          </button>
-        </section>
+          </Button>
+        </Card>
       )}
     </div>
   );
@@ -694,7 +743,7 @@ function SettingsScreen() {
         <h1>設定</h1>
       </header>
       <main id="main-content" className="page settings-page">
-        <section className="settings-card">
+        <Card className="settings-card">
           <h2>アカウント</h2>
           <div className="member-row">
             {auth.user?.avatarUrl && (
@@ -709,19 +758,19 @@ function SettingsScreen() {
           </div>
           <form className="form" onSubmit={save}>
             <Field label="表示名">
-              <input
+              <Input
                 required
                 maxLength={100}
                 value={name}
                 onChange={(event) => setName(event.target.value)}
               />
             </Field>
-            <button className="secondary" disabled={busy}>
+            <Button variant="ghost" className="secondary" disabled={busy}>
               表示名を保存
-            </button>
+            </Button>
           </form>
-        </section>
-        <section className="settings-card">
+        </Card>
+        <Card className="settings-card">
           <h2>外観</h2>
           <div className="segmented" aria-label="表示モード">
             {(
@@ -741,13 +790,14 @@ function SettingsScreen() {
               </button>
             ))}
           </div>
-        </section>
-        <section className="settings-card">
+        </Card>
+        <Card className="settings-card">
           <h2>アプリ</h2>
           <PwaControls />
           <p className="muted small">tabi {import.meta.env.VITE_APP_VERSION}</p>
-        </section>
-        <button
+        </Card>
+        <Button
+          variant="ghost"
           className="secondary danger"
           disabled={busy}
           onClick={() =>
@@ -764,7 +814,7 @@ function SettingsScreen() {
         >
           <LogOut />
           {auth.isDemo ? "サンプルを終了" : "ログアウト"}
-        </button>
+        </Button>
       </main>
     </>
   );
@@ -804,7 +854,8 @@ function PwaControls() {
   return (
     <div className="form">
       {!standalone && (
-        <button
+        <Button
+          variant="ghost"
           className="secondary"
           onClick={() => {
             if (installEvent) void installEvent.prompt();
@@ -817,9 +868,10 @@ function PwaControls() {
           }}
         >
           ホーム画面に追加
-        </button>
+        </Button>
       )}
-      <button
+      <Button
+        variant="ghost"
         className="secondary"
         disabled={pendingCount > 0}
         onClick={() => {
@@ -845,7 +897,7 @@ function PwaControls() {
         }}
       >
         {waiting ? "新しいバージョンに更新" : "更新を確認"}
-      </button>
+      </Button>
       {pendingCount > 0 && (
         <p className="muted">未同期の変更を送信してから更新できます。</p>
       )}

@@ -19,6 +19,10 @@ Object.assign(globalThis, {
   sessionStorage: dom.window.sessionStorage,
   HTMLElement: dom.window.HTMLElement,
   HTMLInputElement: dom.window.HTMLInputElement,
+  getComputedStyle: dom.window.getComputedStyle.bind(dom.window),
+  requestAnimationFrame: dom.window.requestAnimationFrame.bind(dom.window),
+  cancelAnimationFrame: dom.window.cancelAnimationFrame.bind(dom.window),
+  CustomEvent: dom.window.CustomEvent,
   indexedDB,
   IS_REACT_ACT_ENVIRONMENT: true,
 });
@@ -105,7 +109,12 @@ const byText = (tag, text) =>
   );
 const click = async (node) => {
   assert.ok(node, "control exists");
-  await act(async () => node.click());
+  await act(async () => {
+    node.dispatchEvent(
+      new dom.window.MouseEvent("mousedown", { bubbles: true, button: 0 }),
+    );
+    node.click();
+  });
   await tick();
 };
 const field = (label) =>
@@ -309,7 +318,7 @@ test("legacy account cache and pending changes survive React migration; real for
       db.prepare("SELECT COUNT(*) AS n FROM travel_tasks").get().n,
       1,
     );
-    await click(byText('[role="tab"]', "持ち物"));
+    await click(document.querySelector('[role="tab"][aria-label="持ち物"]'));
     await click(document.querySelector('[aria-label="持ち物を追加"]'));
     await fill("持ち物", "充電器");
     await submit();
