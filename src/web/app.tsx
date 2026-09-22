@@ -52,6 +52,7 @@ import { TravelProvider, useTravel } from "@/data/travel-provider";
 import type { TripMember } from "@/data/types";
 import { formatDate, localDate } from "@/utils/dates";
 import { TripEditor } from "./editors";
+import { ThumbDock, ThumbDockProvider, ThumbActions } from "./thumb-dock";
 import {
   BookingsScreen,
   ItineraryScreen,
@@ -139,7 +140,9 @@ export function App() {
   if (!auth.user) return <Login />;
   return (
     <TravelProvider key={auth.isDemo ? "demo" : auth.user.id}>
-      <TravelApp />
+      <ThumbDockProvider>
+        <TravelApp />
+      </ThumbDockProvider>
     </TravelProvider>
   );
 }
@@ -286,6 +289,19 @@ function Home() {
   const past = travel.trips.filter((trip) => trip.endsOn < today);
   return (
     <>
+      <ThumbDock mode="detail">
+        <Link to="/settings" className="thumb-control">
+          <Settings size={20} />
+          設定
+        </Link>
+        <button
+          className="thumb-control primary"
+          onClick={() => setEditing(true)}
+        >
+          <Plus size={20} />
+          旅行を作成
+        </button>
+      </ThumbDock>
       <header className="home-header">
         <Logo />
         <div className="row">
@@ -553,6 +569,39 @@ function TripLayout() {
       <main id="main-content" key={trip.id}>
         <Outlet />
       </main>
+      <ThumbDock mode="browse">
+        <div className="thumb-toolbar">
+          <Link to="/" className="thumb-control" aria-label="旅行一覧へ戻る">
+            <ArrowLeft size={20} />
+          </Link>
+          <ThumbActions />
+          <button
+            className="thumb-control"
+            aria-label="旅行メニュー"
+            onClick={() => setMenu(true)}
+          >
+            <MoreHorizontal size={22} />
+          </button>
+        </div>
+        <nav
+          className="thumb-tabs"
+          aria-label="旅行のページ"
+          style={
+            {
+              "--active-tab": tripTabs.findIndex((tab) =>
+                location.pathname.endsWith(`/${tab.path}`),
+              ),
+            } as CSSProperties
+          }
+        >
+          {tripTabs.map((tab) => (
+            <NavLink key={tab.path} to={`/trips/${trip.id}/${tab.path}`}>
+              <tab.icon size={20} />
+              <span>{tab.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+      </ThumbDock>
       {menu && (
         <Modal title="旅行メニュー" onClose={() => setMenu(false)}>
           <div className="menu-list">
@@ -788,6 +837,12 @@ function SettingsScreen() {
   };
   return (
     <>
+      <ThumbDock mode="detail">
+        <Link to="/" className="thumb-control">
+          <ArrowLeft size={20} />
+          旅行一覧へ
+        </Link>
+      </ThumbDock>
       <header className="simple-header">
         <Link className="icon-button" to="/" aria-label="戻る">
           <ArrowLeft />

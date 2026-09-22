@@ -11,7 +11,19 @@ import {
   useState,
 } from "react";
 import { animateDialog, motionOrigin, reduceMotion } from "./motion";
-import { X, Plus, LoaderCircle } from "lucide-react";
+import {
+  X,
+  Plus,
+  LoaderCircle,
+  ArrowLeft,
+  SlidersHorizontal,
+} from "lucide-react";
+import {
+  ThumbDock,
+  ThumbAction,
+  ThumbFormContext,
+  useThumbForm,
+} from "./thumb-dock";
 import { Button } from "./obsidian/button";
 import {
   normalizeThemePreference,
@@ -120,12 +132,17 @@ export function Modal({
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
   const [closing, setClosing] = useState(false);
+  const [saveAction, setSaveAction] = useState<{
+    formId: string;
+    busy: boolean;
+  } | null>(null);
   const origin = useRef<HTMLElement | null>(null);
   const animation = useRef<Animation | null>(null);
   const backdropAnimation = useRef<Animation | undefined>(undefined);
   const closeCallback = useRef(onClose);
   closeCallback.current = onClose;
   const pendingClose = useRef<(() => void) | null>(null);
+  const swipeStart = useRef<number | null>(null);
   const close = () => setClosing(true);
   useLayoutEffect(() => {
     const dialog = ref.current!;
@@ -201,22 +218,68 @@ export function Modal({
         if (event.target === ref.current) close();
       }}
     >
-      <div className="modal-inner" inert={closing}>
-        <header className="modal-header">
-          <Button
-            variant="ghost"
-            className="icon-button"
-            aria-label="閉じる"
-            onClick={close}
+      <ThumbFormContext.Provider value={setSaveAction}>
+        <div className="modal-inner" inert={closing}>
+          <header
+            className="modal-header"
+            onPointerDown={(event) => {
+              if (
+                event.pointerType === "touch" &&
+                !(event.target as Element).closest("button")
+              ) {
+                swipeStart.current = event.clientY;
+                event.currentTarget.setPointerCapture(event.pointerId);
+              }
+            }}
+            onPointerUp={(event) => {
+              if (
+                swipeStart.current !== null &&
+                event.clientY - swipeStart.current > 72
+              )
+                close();
+              swipeStart.current = null;
+            }}
+            onPointerCancel={() => {
+              swipeStart.current = null;
+            }}
           >
-            <X />
-          </Button>
-          <h2 id={id}>{title}</h2>
-          {action ?? <span className="icon-spacer" />}
-        </header>
-        <div className="modal-body">{children}</div>
-        <ToastMessage />
-      </div>
+            <Button
+              variant="ghost"
+              className="icon-button"
+              aria-label="閉じる"
+              onClick={close}
+            >
+              <X />
+            </Button>
+            <h2 id={id}>{title}</h2>
+            {action ?? <span className="icon-spacer" />}
+          </header>
+          <div className="modal-body">{children}</div>
+          <ToastMessage />
+        </div>
+        <ThumbDock
+          mode={saveAction ? "edit" : "detail"}
+          target={() => ref.current}
+          disabled={closing}
+        >
+          <button className="thumb-control" onClick={close}>
+            <ArrowLeft size={20} />
+            {saveAction ? "キャンセル" : "戻る"}
+          </button>
+          {saveAction ? (
+            <Button
+              className="thumb-control primary"
+              type="submit"
+              form={saveAction.formId}
+              disabled={saveAction.busy}
+            >
+              {saveAction.busy ? "保存中…" : "保存する"}
+            </Button>
+          ) : (
+            action
+          )}
+        </ThumbDock>
+      </ThumbFormContext.Provider>
     </dialog>
   );
 }
@@ -229,6 +292,32 @@ export function Field({
       <span>{label}</span>
       {children}
     </label>
+  );
+}
+export function ThumbTools({
+  title,
+  label = "表示",
+  children,
+}: PropsWithChildren<{ title: string; label?: string }>) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <ThumbAction>
+        <button
+          className="thumb-control"
+          aria-label={title}
+          onClick={() => setOpen(true)}
+        >
+          <SlidersHorizontal size={18} />
+          {label}
+        </button>
+      </ThumbAction>
+      {open && (
+        <Modal title={title} onClose={() => setOpen(false)}>
+          {children}
+        </Modal>
+      )}
+    </>
   );
 }
 export function Empty({ children }: PropsWithChildren) {
@@ -252,14 +341,26 @@ export function AddButton({
   floating?: boolean;
 }) {
   return (
-    <Button
-      className={floating ? "floating-add" : "primary add-action"}
-      onClick={onClick}
-      aria-label={label}
-    >
-      <Plus />
-      <span>{label}</span>
-    </Button>
+    <>
+      <ThumbAction>
+        <button
+          className="thumb-control thumb-add"
+          onClick={onClick}
+          aria-label={label}
+        >
+          <Plus size={18} />
+          <span>{label.replace(/を追加$/, "")}</span>
+        </button>
+      </ThumbAction>
+      <Button
+        className={floating ? "floating-add" : "primary add-action"}
+        onClick={onClick}
+        aria-label={label}
+      >
+        <Plus />
+        <span>{label}</span>
+      </Button>
+    </>
   );
 }
 export function ErrorText({ message }: { message: string }) {
@@ -270,8 +371,16 @@ export function ErrorText({ message }: { message: string }) {
   ) : null;
 }
 export function SaveButton({ busy = false }: { busy?: boolean }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  useThumbForm(ref, busy);
   return (
-    <Button variant="ghost" className="primary" type="submit" disabled={busy}>
+    <Button
+      ref={ref}
+      variant="ghost"
+      className="primary form-save"
+      type="submit"
+      disabled={busy}
+    >
       {busy ? "保存しています…" : "保存する"}
     </Button>
   );

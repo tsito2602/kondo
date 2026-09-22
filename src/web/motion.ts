@@ -26,7 +26,12 @@ export function animateDialog(
   origin: HTMLElement | null,
 ) {
   if (reduceMotion() || !dialog.animate) return null;
-  const bounds = dialog.getBoundingClientRect();
+  // The mobile dock is a sibling in the dialog's top layer; animate only the
+  // reading panel so its material never moves or fades with the page.
+  const panel = matchMedia("(max-width: 759px)").matches
+    ? (dialog.querySelector<HTMLElement>(".modal-inner") ?? dialog)
+    : dialog;
+  const bounds = panel.getBoundingClientRect();
   const source = origin?.isConnected ? origin.getBoundingClientRect() : null;
   const full = {
     clipPath: "inset(0px 0px 0px 0px round 0px)",
@@ -57,7 +62,7 @@ export function animateDialog(
       opacity: 0,
     };
   }
-  return dialog.animate([folded, full], {
+  return panel.animate([folded, full], {
     duration: 320,
     easing: "cubic-bezier(.32, 0, .2, 1)",
     fill: "both",

@@ -1,4 +1,5 @@
 import { dismissModal } from "./motion";
+import { ThumbAction } from "./thumb-dock";
 import { Button } from "./obsidian/button";
 import { Input } from "./obsidian/input";
 import { Textarea } from "./obsidian/textarea";
@@ -21,6 +22,7 @@ import {
   Utensils,
   Ticket,
   ChevronRight,
+  CalendarDays,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./obsidian/tabs";
 import { Badge } from "./obsidian/badge";
@@ -51,7 +53,7 @@ import type {
   TravelTask,
   TravelNote,
 } from "@/data/types";
-import { AddButton, Empty, Modal, useAction } from "./ui";
+import { AddButton, Empty, Modal, ThumbTools, Field, useAction } from "./ui";
 import {
   BookingEditor,
   ItemEditor,
@@ -140,6 +142,7 @@ export function ItineraryScreen() {
     params.get("day") ?? travel.selectedTrip!.startsOn,
   );
   const [adding, setAdding] = useState(false);
+  const [datePicker, setDatePicker] = useState(false);
   const [detail, setDetail] = useState<{
     type: "item" | "booking";
     id: string;
@@ -228,6 +231,43 @@ export function ItineraryScreen() {
   const connections = findFlightConnections(travel.bookings);
   return (
     <>
+      <ThumbAction>
+        <button
+          className="thumb-control"
+          onClick={() => setDatePicker(true)}
+          aria-label="日付を選ぶ"
+        >
+          <CalendarDays size={18} />
+          {selectedDay.slice(5).replace("-", "/")}
+        </button>
+      </ThumbAction>
+      {datePicker && (
+        <Modal title="日付を選ぶ" onClose={() => setDatePicker(false)}>
+          <div className="thumb-date-grid">
+            {days.map((day, index) => (
+              <button
+                key={day}
+                aria-pressed={selectedDay === day}
+                onClick={() =>
+                  dismissModal(() => {
+                    setDatePicker(false);
+                    setSelectedDay(day);
+                    requestAnimationFrame(() =>
+                      document.getElementById(`day-${day}`)?.scrollIntoView({
+                        block: "start",
+                        behavior: "instant",
+                      }),
+                    );
+                  })
+                }
+              >
+                <small>DAY {index + 1}</small>
+                <span>{day.slice(5).replace("-", "/")}</span>
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
       <nav className="date-strip" aria-label="旅の日付">
         {days.map((day, index) => (
           <button
@@ -444,6 +484,22 @@ export function PlacesScreen() {
   );
   return (
     <div className="page places-page">
+      <ThumbTools title="場所の絞り込み" label="絞り込み">
+        <div className="menu-list">
+          {[{ value: "all", label: "すべて" }, ...placeStatuses].map(
+            (entry) => (
+              <button
+                key={entry.value}
+                aria-pressed={filter === entry.value}
+                onClick={() => setFilter(entry.value)}
+              >
+                {entry.label}
+                {filter === entry.value && <CircleCheck size={18} />}
+              </button>
+            ),
+          )}
+        </div>
+      </ThumbTools>
       <div className="page-toolbar">
         <div>
           <h2>行きたい場所</h2>
@@ -559,6 +615,37 @@ export function PackingScreen() {
         setFilter("all");
       }}
     >
+      <ThumbTools title="準備の表示" label="表示">
+        <div className="form">
+          <div className="segmented">
+            {(["task", "packing"] as const).map((value) => (
+              <button
+                key={value}
+                aria-pressed={tab === value}
+                className={tab === value ? "selected" : ""}
+                onClick={() => {
+                  setTab(value);
+                  setFilter("all");
+                }}
+              >
+                {value === "task" ? "やること" : "持ち物"}
+              </button>
+            ))}
+          </div>
+          <Field label="担当者">
+            <select
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+            >
+              {options.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </ThumbTools>
       <div className="page-toolbar">
         <div>
           <h2>準備</h2>
@@ -707,6 +794,16 @@ export function NotesScreen() {
     );
   return (
     <div className="page notes-page">
+      <ThumbTools title="メモを検索" label="検索">
+        <Field label="検索キーワード">
+          <Input
+            placeholder="メモを検索"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </Field>
+        <p className="muted">{notes.length}件のメモ</p>
+      </ThumbTools>
       <div className="page-toolbar">
         <div>
           <h2>メモ</h2>
