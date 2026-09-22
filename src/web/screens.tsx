@@ -1,3 +1,4 @@
+import { dismissModal } from "./motion";
 import { Button } from "./obsidian/button";
 import { Input } from "./obsidian/input";
 import { Textarea } from "./obsidian/textarea";
@@ -834,8 +835,10 @@ function NoteEditor({
           variant="ghost"
           className="text-button"
           onClick={() => {
-            flush();
-            onClose();
+            dismissModal(() => {
+              flush();
+              onClose();
+            });
           }}
         >
           完了
@@ -873,9 +876,11 @@ function NoteEditor({
               aria-label="メモを削除"
               onClick={() => {
                 if (confirm("このメモを削除しますか？")) {
-                  dirty.current = false;
-                  deleteNote(initial.id);
-                  onClose();
+                  dismissModal(() => {
+                    dirty.current = false;
+                    deleteNote(initial.id);
+                    onClose();
+                  });
                 }
               }}
             >

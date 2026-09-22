@@ -122,8 +122,10 @@ export function Modal({
   const [closing, setClosing] = useState(false);
   const origin = useRef<HTMLElement | null>(null);
   const animation = useRef<Animation | null>(null);
+  const backdropAnimation = useRef<Animation | undefined>(undefined);
   const closeCallback = useRef(onClose);
   closeCallback.current = onClose;
+  const pendingClose = useRef<(() => void) | null>(null);
   const close = () => setClosing(true);
   useLayoutEffect(() => {
     const dialog = ref.current!;
@@ -134,9 +136,23 @@ export function Modal({
     dialog.showModal();
     const enter = animateDialog(dialog, origin.current);
     animation.current = enter;
-    void enter?.finished.then(() => enter.cancel()).catch(() => undefined);
+    backdropAnimation.current = dialog
+      .getAnimations?.({ subtree: true })
+      .find(
+        (entry) =>
+          "animationName" in entry && entry.animationName === "backdrop-enter",
+      );
+    // Do not cancel the finished entrance: its exact geometry is needed to reverse.
+    void enter?.finished.catch(() => undefined);
+    const requestClose = (event: Event) => {
+      pendingClose.current ??= (event as CustomEvent<() => void>).detail;
+      setClosing(true);
+    };
+    dialog.addEventListener("tabi:modal-close", requestClose);
     return () => {
+      dialog.removeEventListener("tabi:modal-close", requestClose);
       animation.current?.cancel();
+      backdropAnimation.current?.cancel();
       dialog.close();
       document.body.style.overflow = previous;
       if (focus?.isConnected) focus.focus({ preventScroll: true });
@@ -144,24 +160,28 @@ export function Modal({
   }, []);
   useEffect(() => {
     if (!closing) return;
-    const current = getComputedStyle(ref.current!);
-    const frame = {
-      clipPath: current.clipPath,
-      transform: current.transform,
-      opacity: current.opacity,
-    };
-    animation.current?.cancel();
-    const exit = animateDialog(ref.current!, origin.current, true, frame);
-    animation.current = exit;
+    const exit = animation.current;
+    if (exit && !reduceMotion()) {
+      exit.playbackRate = -1.15;
+      exit.play();
+      const backdrop = backdropAnimation.current;
+      if (backdrop) {
+        backdrop.playbackRate = -1.15;
+        backdrop.play();
+        void backdrop.finished.catch(() => undefined);
+      }
+    }
     let cancelled = false;
     const finish = () => {
       if (!cancelled) {
         cancelled = true;
-        closeCallback.current();
+        (pendingClose.current ?? closeCallback.current)();
       }
     };
-    if (exit) void exit.finished.then(finish).catch(() => undefined);
-    const timer = setTimeout(finish, reduceMotion() ? 0 : 220);
+    if (exit && !reduceMotion())
+      void exit.finished.then(finish).catch(() => undefined);
+    // Safety timeout must never truncate the normal reverse animation.
+    const timer = setTimeout(finish, exit && !reduceMotion() ? 600 : 0);
     return () => {
       cancelled = true;
       clearTimeout(timer);
@@ -181,7 +201,7 @@ export function Modal({
         if (event.target === ref.current) close();
       }}
     >
-      <div className="modal-inner">
+      <div className="modal-inner" inert={closing}>
         <header className="modal-header">
           <Button
             variant="ghost"

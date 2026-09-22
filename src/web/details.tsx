@@ -1,3 +1,4 @@
+import { dismissModal } from "./motion";
 import { Button } from "./obsidian/button";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
@@ -402,8 +403,10 @@ export function BookingDetail({
             onClick={() =>
               void run(() => {
                 if (confirm("この予約を削除しますか？")) {
-                  travel.deleteBooking(id);
-                  onClose();
+                  dismissModal(() => {
+                    travel.deleteBooking(id);
+                    onClose();
+                  });
                 }
               })
             }
@@ -488,8 +491,10 @@ export function ItemDetail({
             onClick={() =>
               void run(() => {
                 if (confirm("この予定を削除しますか？")) {
-                  travel.deleteItem(id);
-                  onClose();
+                  dismissModal(() => {
+                    travel.deleteItem(id);
+                    onClose();
+                  });
                 }
               })
             }
@@ -596,10 +601,12 @@ export function PlaceDetail({
               variant="ghost"
               className="primary"
               onClick={() => {
-                navigate(
-                  `/trips/${travel.selectedTrip!.id}/itinerary?day=${linked.day}&item=${linked.id}`,
-                );
-                onClose();
+                dismissModal(() => {
+                  onClose();
+                  navigate(
+                    `/trips/${travel.selectedTrip!.id}/itinerary?day=${linked.day}&item=${linked.id}`,
+                  );
+                });
               }}
             >
               しおりを見る
@@ -632,8 +639,10 @@ export function PlaceDetail({
             onClick={() =>
               void run(() => {
                 if (confirm("この場所を削除しますか？")) {
-                  travel.deletePlace(id);
-                  onClose();
+                  dismissModal(() => {
+                    travel.deletePlace(id);
+                    onClose();
+                  });
                 }
               })
             }

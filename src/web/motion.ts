@@ -19,11 +19,11 @@ export function motionOrigin() {
     : null;
 }
 
+// Keep one timeline alive for the lifetime of the dialog. Reversing it also
+// handles dismissal halfway through opening, without sampling `clip-path:none`.
 export function animateDialog(
   dialog: HTMLDialogElement,
   origin: HTMLElement | null,
-  closing = false,
-  current?: Keyframe,
 ) {
   if (reduceMotion() || !dialog.animate) return null;
   const bounds = dialog.getBoundingClientRect();
@@ -35,10 +35,9 @@ export function animateDialog(
   };
   let folded: Keyframe = {
     clipPath: "inset(0px 0px 0px 0px round 22px)",
-    transform: "translateY(24px)",
+    transform: "translateY(48px)",
     opacity: 0,
   };
-  // Reveal the surface from the tapped card without scaling or blurring its text.
   if (
     source &&
     source.width > 100 &&
@@ -55,20 +54,41 @@ export function animateDialog(
     folded = {
       clipPath: `inset(${top}px ${right}px ${bottom}px ${left}px round 16px)`,
       transform: "translateY(0px)",
-      opacity: 0.55,
+      opacity: 0,
     };
   }
-  return dialog.animate(closing ? [current ?? full, folded] : [folded, full], {
-    duration: closing ? 180 : 280,
-    easing: motionEase,
+  return dialog.animate([folded, full], {
+    duration: 320,
+    easing: "cubic-bezier(.32, 0, .2, 1)",
     fill: "both",
   });
+}
+
+// Save/Done actions use the same exit path as Escape, backdrop and close button.
+// Capture a particular dialog before awaiting a save; never close a newer dialog.
+export function dismissModal(
+  afterClose: () => void,
+  dialog?: HTMLDialogElement | null,
+) {
+  const target =
+    dialog === undefined
+      ? Array.from(
+          document.querySelectorAll<HTMLDialogElement>("dialog.modal[open]"),
+        ).at(-1)
+      : dialog;
+  if (!target?.isConnected) {
+    afterClose();
+    return;
+  }
+  target.dispatchEvent(
+    new CustomEvent("tabi:modal-close", { detail: afterClose }),
+  );
 }
 
 const tabOrder = ["itinerary", "places", "packing", "bookings", "notes"];
 
 // Use native snapshots for both sides of a route transition; older browsers
-// keep immediate React Router navigation and the short CSS entry motion.
+// keep immediate React Router navigation. Only the content is snapshotted.
 export function useMotionNavigation() {
   const navigate = useNavigate();
   const navigateRef = useRef(navigate);

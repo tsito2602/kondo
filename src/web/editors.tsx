@@ -1,7 +1,8 @@
+import { dismissModal } from "./motion";
 import { Button } from "./obsidian/button";
 import { Input } from "./obsidian/input";
 import { Textarea } from "./obsidian/textarea";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import { Trash2, Plus } from "lucide-react";
 import { findAirports } from "@/data/airports";
 import { findMatchingItineraryItem } from "@/data/booking-match";
@@ -56,12 +57,13 @@ function useSubmit(
   const { busy, run } = useAction();
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    const dialog = (event.currentTarget as HTMLFormElement).closest("dialog");
     const message = validate();
     setError(message);
     if (!message)
       void run(async () => {
         await save();
-        close();
+        dismissModal(close, dialog);
       });
   };
   return { error, busy, submit };
@@ -92,6 +94,7 @@ export function TripEditor({
   onCreated?: (id: string) => void;
 }) {
   const travel = useTravel();
+  const createdId = useRef<string | null>(null);
   const [draft, setDraft] = useState({
     name: trip?.name ?? "",
     destination: trip?.destination ?? "",
@@ -103,13 +106,16 @@ export function TripEditor({
   const { error, busy, submit } = useSubmit(
     () => {
       if (trip) travel.updateTrip(trip.id, draft);
-      else onCreated?.(travel.createTrip(draft));
+      else createdId.current = travel.createTrip(draft);
     },
     () =>
       !draft.name.trim()
         ? "旅行名を入力してください"
         : dateError(draft.startsOn, draft.endsOn),
-    onClose,
+    () => {
+      onClose();
+      if (createdId.current) onCreated?.(createdId.current);
+    },
   );
   return (
     <Modal title={trip ? "旅行を編集" : "新しい旅行"} onClose={onClose} full>

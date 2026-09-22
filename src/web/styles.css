@@ -207,7 +207,6 @@ strong {
   margin: 0 auto;
   padding: 32px 28px
     calc(48px + var(--nav-height) + env(safe-area-inset-bottom));
-  animation: page-enter 240ms var(--ease-flow);
 }
 [data-slot="button"] {
   height: auto;
@@ -1306,10 +1305,7 @@ progress::-moz-progress-bar {
   background: #101c2a3d;
   -webkit-backdrop-filter: blur(8px) saturate(0.85);
   backdrop-filter: blur(8px) saturate(0.85);
-  animation: backdrop-enter 220ms var(--ease-flow);
-}
-.modal.closing::backdrop {
-  animation: backdrop-enter 180ms reverse forwards;
+  animation: backdrop-enter 320ms cubic-bezier(0.32, 0, 0.2, 1) both;
 }
 .modal-inner {
   display: flex;
@@ -1732,16 +1728,6 @@ input::-webkit-date-and-time-value {
     transform: rotate(360deg);
   }
 }
-@keyframes page-enter {
-  from {
-    opacity: 0;
-    transform: translateX(calc(12px * var(--route-direction))) translateY(3px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 @keyframes backdrop-enter {
   from {
     opacity: 0;
@@ -1781,21 +1767,7 @@ input::-webkit-date-and-time-value {
 .modal-header {
   box-shadow: 0 1px 0 var(--surface-glow);
 }
-.modal:not(.closing) .modal-body > * {
-  animation: detail-reveal 260ms var(--ease-flow) both;
-}
-@keyframes detail-reveal {
-  from {
-    opacity: 0.25;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 .trip-tabs::before {
-  view-transition-name: tab-marker;
   content: "";
   position: absolute;
   z-index: -1;
@@ -1849,7 +1821,7 @@ input::-webkit-date-and-time-value {
 }
 @keyframes panel-enter {
   from {
-    opacity: 0.2;
+    opacity: 0.75;
     transform: translateX(var(--panel-shift));
   }
   to {
@@ -1857,49 +1829,48 @@ input::-webkit-date-and-time-value {
     transform: translateX(0);
   }
 }
+/* Keep chrome live: capturing the entire page freezes the tab indicator and
+   needlessly composites the header/backdrop on iOS. One content transition only. */
+:root {
+  view-transition-name: none;
+}
 #main-content {
   view-transition-name: route-content;
+  background: var(--canvas);
 }
-.trip-header {
-  view-transition-name: trip-chrome;
-}
-::view-transition-group(*) {
-  animation-duration: 260ms;
+::view-transition-group(route-content) {
+  animation-duration: 240ms;
   animation-timing-function: var(--ease-flow);
 }
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
+::view-transition-image-pair(route-content) {
+  isolation: isolate;
 }
 ::view-transition-old(route-content) {
-  animation: route-out 180ms var(--ease-flow) both;
+  animation: route-out 240ms var(--ease-flow) both;
+  mix-blend-mode: normal;
 }
 ::view-transition-new(route-content) {
-  animation: route-in 260ms var(--ease-flow) both;
+  animation: route-in 240ms var(--ease-flow) both;
+  mix-blend-mode: normal;
 }
 ::view-transition {
   pointer-events: none;
 }
-:root:active-view-transition .trip-tabs::before {
-  transition: none;
-}
-:root:active-view-transition .page {
-  animation: none;
-}
+/* The outgoing surface stays opaque beneath the incoming one. There is never
+   a frame with both surfaces faded down, nor a second entry animation afterward. */
 @keyframes route-out {
   to {
-    opacity: 0;
-    transform: translateX(calc(-18px * var(--route-direction))) scale(0.99);
+    transform: translateX(calc(-12px * var(--route-direction)));
   }
 }
 @keyframes route-in {
   from {
     opacity: 0;
-    transform: translateX(calc(22px * var(--route-direction))) scale(0.99);
+    transform: translateX(calc(16px * var(--route-direction)));
   }
   to {
     opacity: 1;
-    transform: translateX(0) scale(1);
+    transform: translateX(0);
   }
 }
 @media (prefers-reduced-transparency: reduce) {

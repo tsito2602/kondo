@@ -39,7 +39,7 @@
     "test:connections": "node scripts/test-flight-connections.mjs",
     "test:sync": "node scripts/test-travel-sync.mjs",
     "test:pwa": "node scripts/test-pwa-api.mjs && node scripts/test-service-worker.mjs && node scripts/test-icon-check.mjs",
-    "test:web": "node scripts/test-web.mjs",
+    "test:web": "node scripts/test-web.mjs && node scripts/test-motion.mjs",
     "build:web": "vite build && node scripts/build-pwa.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "icons:export": "node scripts/export-brand.mjs",

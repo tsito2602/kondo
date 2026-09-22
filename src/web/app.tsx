@@ -1,4 +1,8 @@
-import { captureMotionOrigin, useMotionNavigation } from "./motion";
+import {
+  captureMotionOrigin,
+  dismissModal,
+  useMotionNavigation,
+} from "./motion";
 import type { CSSProperties } from "react";
 import { Button } from "./obsidian/button";
 import { Input } from "./obsidian/input";
@@ -188,8 +192,8 @@ function TravelApp() {
   const travel = useTravel();
   const auth = useAuth();
   const location = useLocation();
-  useEffect(() => {
-    window.scrollTo({ top: 0 });
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
   }, [location.pathname]);
   if (!travel.ready) return <Loading />;
   return (
@@ -418,8 +422,10 @@ function Home() {
                   }
                   if (!token) throw new Error("招待リンクを入力してください");
                   const id = await travel.acceptInvite(token);
-                  setInvite("");
-                  navigate(`/trips/${id}/itinerary`);
+                  dismissModal(() => {
+                    setInvite("");
+                    navigate(`/trips/${id}/itinerary`);
+                  });
                 });
               }}
             >
@@ -552,8 +558,10 @@ function TripLayout() {
           <div className="menu-list">
             <button
               onClick={() => {
-                setMenu(false);
-                navigate(`/trips/${trip.id}/members`);
+                dismissModal(() => {
+                  setMenu(false);
+                  navigate(`/trips/${trip.id}/members`);
+                });
               }}
             >
               <Users />
@@ -562,8 +570,10 @@ function TripLayout() {
             {travel.canEdit && (
               <button
                 onClick={() => {
-                  setMenu(false);
-                  setEditing(true);
+                  dismissModal(() => {
+                    setMenu(false);
+                    setEditing(true);
+                  });
                 }}
               >
                 <Pencil />
