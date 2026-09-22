@@ -17,7 +17,14 @@ type DockEntry = {
   mode: "browse" | "detail" | "edit";
   target?: () => HTMLElement | null;
   disabled?: boolean;
+  navigation?: DockNavigation;
 };
+type DockNavigation = {
+  back: () => void;
+  action: ReactNode;
+  beforeNavigate: (navigate: () => void) => void;
+};
+export const DockNavigationContext = createContext<DockNavigation | null>(null);
 type Entry = {
   value: DockEntry | ReactNode;
   order: number;
@@ -76,6 +83,13 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
   const ordered = [...entries.values()].sort((a, b) => a.order - b.order);
   const active = ordered.filter((entry) => entry.scope === "dock").at(-1)
     ?.value as DockEntry | undefined;
+  const browse = ordered
+    .filter(
+      (entry) =>
+        entry.scope === "dock" && (entry.value as DockEntry).mode === "browse",
+    )
+    .at(-1)?.value as DockEntry | undefined;
+  const visible = active?.navigation && browse ? browse : active;
   const actions = useMemo(
     () =>
       [...entries.values()]
@@ -138,17 +152,19 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
       <Actions.Provider value={actions}>
         {children}
         {createPortal(
-          <div
-            ref={surface}
-            className="thumb-dock"
-            data-mode={active?.mode ?? "browse"}
-            inert={active?.disabled}
-          >
-            <div className="thumb-dock-material" aria-hidden="true" />
-            <div className="thumb-dock-content" key={active?.mode}>
-              {active?.content}
+          <DockNavigationContext.Provider value={active?.navigation ?? null}>
+            <div
+              ref={surface}
+              className="thumb-dock"
+              data-mode={visible?.mode ?? "browse"}
+              inert={active?.disabled}
+            >
+              <div className="thumb-dock-material" aria-hidden="true" />
+              <div className="thumb-dock-content" key={visible?.mode}>
+                {visible?.content}
+              </div>
             </div>
-          </div>,
+          </DockNavigationContext.Provider>,
           host,
         )}
       </Actions.Provider>

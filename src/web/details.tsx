@@ -210,6 +210,7 @@ export function BookingDetail({
   return (
     <Modal
       title="予約詳細"
+      preserveNavigation
       onClose={onClose}
       full
       action={
@@ -439,6 +440,7 @@ export function ItemDetail({
   return (
     <Modal
       title="予定詳細"
+      preserveNavigation
       onClose={onClose}
       full
       action={
@@ -532,6 +534,7 @@ export function PlaceDetail({
   return (
     <Modal
       title="場所の詳細"
+      preserveNavigation
       onClose={onClose}
       full
       action={

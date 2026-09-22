@@ -27,7 +27,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal } from './src/web/motion';",
+      "export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -49,6 +49,7 @@ const {
   SafariTabs,
   SaveButton,
   dismissModal,
+  useMotionNavigation,
   ThumbDockProvider,
   ThumbDock,
   ThumbAction,
@@ -293,11 +294,34 @@ test("one dock follows dialog focus scopes, restores the parent, and submits the
   assert.equal(document.querySelector(".thumb-dock-host"), null);
 });
 
-test("compact icons expand without navigating, retain their DOM, and collapse after selection or dismissal", async () => {
+function pointer(target, type, x = 0) {
+  const event = new dom.window.Event(type, { bubbles: true });
+  Object.assign(event, {
+    button: 0,
+    isPrimary: true,
+    pointerType: "touch",
+    clientX: x,
+    clientY: 0,
+  });
+  target.dispatchEvent(event);
+}
+
+test("compact tabs navigate with one tap; holding reveals names without navigating on release", async () => {
   const root = createRoot(document.getElementById("root"));
   const h = React.createElement;
   let menus = 0;
+  let transitions = 0;
+  document.startViewTransition = (update) => {
+    transitions++;
+    update();
+    return {
+      ready: Promise.resolve(),
+      finished: Promise.resolve(),
+      skipTransition() {},
+    };
+  };
   function Harness() {
+    useMotionNavigation();
     return h(
       React.Fragment,
       null,
@@ -315,42 +339,56 @@ test("compact icons expand without navigating, retain their DOM, and collapse af
         ),
       ),
     );
-    const trigger = document.querySelector(".safari-expand");
     const nav = document.querySelector(".safari-tabs");
+    const dock = document.querySelector(".safari-dock");
     const icons = [...nav.querySelectorAll("svg")];
+    const places = nav.querySelector('a[href$="/places"]');
+    const notes = nav.querySelector('a[href$="/notes"]');
     assert.equal(icons.length, 5);
-    assert.equal(trigger.getAttribute("aria-expanded"), "false");
-    assert.ok(nav.hasAttribute("inert"));
-    assert.equal(nav.querySelectorAll('a[tabindex="-1"]').length, 5);
-    assert.equal(
-      document.querySelector(".safari-dock").querySelectorAll(".thumb-add")
-        .length,
-      0,
-    );
-    await act(async () => trigger.click());
-    assert.equal(
-      document.querySelector("output").textContent,
-      "/trips/demo/itinerary",
-    );
-    assert.equal(trigger.getAttribute("aria-expanded"), "true");
     assert.equal(nav.hasAttribute("inert"), false);
-    assert.equal(
-      document.activeElement,
-      nav.querySelector('a[aria-current="page"]'),
-    );
-    assert.equal(document.querySelectorAll(".safari-side[inert]").length, 2);
-    assert.deepEqual([...nav.querySelectorAll("svg")], icons);
-    await act(async () => nav.querySelector('a[href$="/places"]').click());
+    assert.equal(nav.querySelectorAll('a[tabindex="-1"]').length, 0);
+    await act(async () => places.click());
     assert.equal(
       document.querySelector("output").textContent,
       "/trips/demo/places",
     );
-    assert.equal(trigger.getAttribute("aria-expanded"), "false");
-    assert.match(trigger.getAttribute("aria-label"), /行きたい場所/);
+    assert.equal(dock.dataset.expanded, "false");
+    await act(async () => pointer(notes, "pointerdown"));
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 450)));
+    assert.equal(dock.dataset.expanded, "true");
+    assert.equal(document.querySelectorAll(".safari-side[inert]").length, 2);
+    await act(async () => {
+      pointer(notes, "pointerup");
+      notes.click();
+    });
+    assert.equal(
+      document.querySelector("output").textContent,
+      "/trips/demo/places",
+      "release after a hold must not select a tab",
+    );
+    assert.equal(dock.dataset.expanded, "true");
+    assert.equal(
+      transitions,
+      1,
+      "holding must bypass native route transitions",
+    );
+    await act(async () => notes.click());
+    assert.equal(
+      document.querySelector("output").textContent,
+      "/trips/demo/notes",
+    );
+    assert.equal(dock.dataset.expanded, "false");
     assert.deepEqual([...nav.querySelectorAll("svg")], icons);
-    assert.equal(document.activeElement, trigger);
     for (const dismiss of ["outside", "escape"]) {
-      await act(async () => trigger.click());
+      await act(async () =>
+        notes.dispatchEvent(
+          new dom.window.KeyboardEvent("keydown", {
+            key: "ArrowUp",
+            bubbles: true,
+          }),
+        ),
+      );
+      assert.equal(dock.dataset.expanded, "true");
       await act(async () => {
         if (dismiss === "outside")
           document.querySelector(".safari-dismiss").click();
@@ -362,20 +400,114 @@ test("compact icons expand without navigating, retain their DOM, and collapse af
             }),
           );
       });
-      assert.equal(trigger.getAttribute("aria-expanded"), "false");
-      assert.equal(
-        document.querySelector("output").textContent,
-        "/trips/demo/places",
-      );
-      assert.equal(document.querySelectorAll(".safari-side[inert]").length, 0);
+      assert.equal(dock.dataset.expanded, "false");
     }
+    await act(async () => {
+      pointer(notes, "pointerdown");
+      pointer(notes, "pointermove", 20);
+    });
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 450)));
+    assert.equal(dock.dataset.expanded, "false", "dragging cancels a hold");
     await act(async () =>
-      document
-        .querySelector('.safari-side-button[aria-label="旅行メニュー"]')
-        .click(),
+      document.querySelector('[aria-label="旅行メニュー"]').click(),
     );
     assert.equal(menus, 1);
   } finally {
     await act(async () => root.unmount());
+    delete document.startViewTransition;
+  }
+});
+
+test("details retain the same five tab nodes and close before one-tap navigation, including the current tab", async () => {
+  let surface;
+  HTMLElement.prototype.animate = () => (surface = timeline());
+  document.startViewTransition = () => {
+    throw new Error("detail must close before route snapshots");
+  };
+  const h = React.createElement;
+  const root = createRoot(document.getElementById("root"));
+  let openDetail;
+  let edits = 0;
+  function Harness() {
+    useMotionNavigation();
+    const [open, setOpen] = React.useState(false);
+    openDetail = () => setOpen(true);
+    return h(
+      ThumbDockProvider,
+      null,
+      h("output", null, useLocation().pathname),
+      h(
+        ThumbDock,
+        { mode: "browse" },
+        h(SafariTabs, { tripId: "demo", onMenu: () => {} }),
+      ),
+      open &&
+        h(
+          Modal,
+          {
+            title: "予約詳細",
+            preserveNavigation: true,
+            onClose: () => setOpen(false),
+            action: h("button", { onClick: () => edits++ }, "編集"),
+          },
+          "詳細本文",
+        ),
+    );
+  }
+  try {
+    await act(async () =>
+      root.render(
+        h(
+          MemoryRouter,
+          { initialEntries: ["/trips/demo/bookings"] },
+          h(Harness),
+        ),
+      ),
+    );
+    const nav = document.querySelector(".safari-tabs");
+    const icons = [...nav.querySelectorAll("svg")];
+    const host = document.querySelector(".thumb-dock-host");
+    for (const destination of ["bookings", "places"]) {
+      await act(async () => openDetail());
+      const dialog = document.querySelector("dialog");
+      assert.equal(host.parentElement, dialog);
+      assert.equal(dialog.querySelector(".safari-tabs"), nav);
+      assert.deepEqual([...nav.querySelectorAll("svg")], icons);
+      assert.equal(host.querySelector(".thumb-dock").dataset.mode, "browse");
+      assert.ok(host.querySelector('[aria-label="詳細を閉じて戻る"]'));
+      await act(async () =>
+        host.querySelector(".safari-detail-action button").click(),
+      );
+      await act(async () =>
+        nav.querySelector(`a[href$="/${destination}"]`).click(),
+      );
+      assert.ok(
+        dialog.isConnected,
+        "close animation gets to finish before routing",
+      );
+      await act(async () => surface.finish());
+      assert.equal(document.querySelector("dialog"), null);
+      assert.equal(
+        document.querySelector("output").textContent,
+        `/trips/demo/${destination}`,
+      );
+      assert.equal(host.parentElement, document.body);
+      assert.equal(host.querySelector(".safari-tabs"), nav);
+      assert.deepEqual([...nav.querySelectorAll("svg")], icons);
+    }
+    assert.equal(edits, 2);
+    await act(async () => openDetail());
+    await act(async () =>
+      host.querySelector('[aria-label="詳細を閉じて戻る"]').click(),
+    );
+    await act(async () => surface.finish());
+    assert.equal(document.querySelector("dialog"), null);
+    assert.equal(
+      document.querySelector("output").textContent,
+      "/trips/demo/places",
+    );
+  } finally {
+    await act(async () => root.unmount());
+    delete document.startViewTransition;
   }
 });

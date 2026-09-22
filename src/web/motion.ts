@@ -108,6 +108,8 @@ export function useMotionNavigation() {
           : null;
       if (
         !link ||
+        link.hasAttribute("data-dock-managed") ||
+        link.closest('[data-dock-hold="true"]') ||
         event.defaultPrevented ||
         event.button !== 0 ||
         event.metaKey ||

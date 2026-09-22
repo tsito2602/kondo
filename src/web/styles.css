@@ -2488,6 +2488,8 @@ input::-webkit-date-and-time-value {
     animation: none;
   }
   .safari-dock {
+    --safari-side-size: 52px;
+    --safari-center-inset: 60px;
     --safari-ease: cubic-bezier(0.22, 0.82, 0.24, 1);
     position: relative;
     height: 64px;
@@ -2506,9 +2508,9 @@ input::-webkit-date-and-time-value {
       0 6px 24px #10203022;
   }
   .safari-circle {
-    top: 6px;
-    width: 52px;
-    height: 52px;
+    top: calc((64px - var(--safari-side-size)) / 2);
+    width: var(--safari-side-size);
+    height: var(--safari-side-size);
     border-radius: 50%;
     transition:
       opacity 160ms 100ms,
@@ -2524,10 +2526,10 @@ input::-webkit-date-and-time-value {
     overflow: hidden;
     border-radius: 50%;
     position: absolute;
-    top: 6px;
+    top: calc((64px - var(--safari-side-size)) / 2);
     z-index: 3;
-    width: 52px;
-    height: 52px;
+    width: var(--safari-side-size);
+    height: var(--safari-side-size);
     transition:
       transform 420ms var(--safari-ease),
       opacity 180ms ease;
@@ -2539,8 +2541,8 @@ input::-webkit-date-and-time-value {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 52px;
-    height: 52px;
+    width: var(--safari-side-size);
+    height: var(--safari-side-size);
     padding: 0;
     border-radius: 50%;
     pointer-events: auto;
@@ -2548,10 +2550,10 @@ input::-webkit-date-and-time-value {
   .safari-center {
     position: absolute;
     z-index: 2;
-    left: 60px;
-    right: 60px;
-    top: 6px;
-    height: 52px;
+    left: var(--safari-center-inset);
+    right: var(--safari-center-inset);
+    top: calc((64px - var(--safari-side-size)) / 2);
+    height: var(--safari-side-size);
     transition:
       left 480ms var(--safari-ease),
       right 480ms var(--safari-ease),
@@ -2579,17 +2581,20 @@ input::-webkit-date-and-time-value {
     pointer-events: none;
   }
   .safari-bridge.safari-left {
-    left: 43px;
+    left: calc(var(--safari-center-inset) - 17px);
   }
   .safari-bridge.safari-right {
-    right: 43px;
+    right: calc(var(--safari-center-inset) - 17px);
   }
   .safari-tabs {
     position: relative;
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     height: 100%;
-    padding: 0 4px;
+    padding: 0;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
   .safari-tabs a {
     position: relative;
@@ -2600,7 +2605,7 @@ input::-webkit-date-and-time-value {
     min-width: 0;
     border-radius: 24px;
     color: var(--muted);
-    pointer-events: none;
+    pointer-events: auto;
   }
   .safari-tabs a::before {
     content: "";
@@ -2640,14 +2645,11 @@ input::-webkit-date-and-time-value {
       opacity 130ms,
       transform 260ms var(--safari-ease);
   }
-  .safari-expand {
-    position: absolute;
-    inset: 0;
+  .safari-detail-action > button {
     width: 100%;
     height: 100%;
-    border-radius: 28px;
-    background: transparent;
-    pointer-events: auto;
+    padding: 0;
+    border-radius: 50%;
   }
   .safari-dismiss {
     position: fixed;
@@ -2693,10 +2695,6 @@ input::-webkit-date-and-time-value {
     top: 9px;
     height: 46px;
     animation: safari-neck 480ms both;
-  }
-  .safari-dock[data-expanded="true"] .safari-expand {
-    visibility: hidden;
-    pointer-events: none;
   }
   .safari-dock[data-expanded="true"] .safari-tabs a {
     pointer-events: auto;
@@ -2752,6 +2750,29 @@ input::-webkit-date-and-time-value {
   .safari-dock *,
   .safari-dock *::before {
     transition: none !important;
+  }
+}
+
+@media (max-width: 379px) {
+  .safari-dock {
+    --safari-side-size: 44px;
+    --safari-center-inset: 52px;
+  }
+}
+@media (max-width: 359px) {
+  .thumb-dock-host {
+    left: max(6px, env(safe-area-inset-left));
+    right: max(6px, env(safe-area-inset-right));
+  }
+  .safari-dock {
+    --safari-center-inset: 44px;
+  }
+  .safari-circle {
+    transform: scale(0.91);
+  }
+  .safari-material {
+    left: 2px;
+    right: 2px;
   }
 }
 

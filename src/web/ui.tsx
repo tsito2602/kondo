@@ -10,7 +10,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { animateDialog, motionOrigin, reduceMotion } from "./motion";
+import {
+  animateDialog,
+  dismissModal,
+  motionOrigin,
+  reduceMotion,
+} from "./motion";
 import {
   X,
   Plus,
@@ -123,11 +128,13 @@ export function Modal({
   onClose,
   full = false,
   action,
+  preserveNavigation = false,
 }: PropsWithChildren<{
   title: string;
   onClose: () => void;
   full?: boolean;
   action?: ReactNode;
+  preserveNavigation?: boolean;
 }>) {
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
@@ -261,6 +268,19 @@ export function Modal({
           mode={saveAction ? "edit" : "detail"}
           target={() => ref.current}
           disabled={closing}
+          navigation={
+            preserveNavigation && !saveAction
+              ? {
+                  back: close,
+                  action,
+                  beforeNavigate: (navigate) =>
+                    dismissModal(() => {
+                      closeCallback.current();
+                      navigate();
+                    }, ref.current),
+                }
+              : undefined
+          }
         >
           <button className="thumb-control" onClick={close}>
             <ArrowLeft size={20} />
