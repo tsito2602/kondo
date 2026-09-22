@@ -33,6 +33,7 @@
   --shadow: 0 2px 5px #1c283009, 0 10px 28px #1c283006;
   --trip-header-height: 132px;
   --nav-height: 0px;
+  --app-edge-clearance: 0px;
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif;
   font-synthesis: none;
@@ -66,6 +67,26 @@ body {
 }
 #root {
   min-height: 100dvh;
+  padding-top: var(--app-edge-clearance);
+}
+/* Installed iOS web apps can paint a system blur beyond the status bar.
+   Keep that edge empty; CSS cannot disable the native compositing effect.
+   Safari tabs, Android and desktop retain their normal spacing. */
+@supports (-webkit-touch-callout: none) {
+  @media (display-mode: standalone) {
+    :root {
+      --app-edge-clearance: 24px;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0 0 auto;
+      height: var(--app-edge-clearance);
+      background: var(--paper);
+      pointer-events: none;
+      z-index: 30;
+    }
+  }
 }
 button,
 input,
@@ -589,7 +610,7 @@ strong {
 }
 .trip-header {
   position: sticky;
-  top: 0;
+  top: var(--app-edge-clearance);
   z-index: 20;
   padding-top: env(safe-area-inset-top);
   background: var(--paper);
@@ -672,7 +693,7 @@ strong {
 }
 .date-strip {
   position: sticky;
-  top: var(--trip-header-height);
+  top: calc(var(--trip-header-height) + var(--app-edge-clearance));
   z-index: 19;
   background: var(--paper);
   border-bottom: 1px solid var(--line);
@@ -712,7 +733,9 @@ strong {
   padding-bottom: calc(112px + var(--nav-height) + env(safe-area-inset-bottom));
 }
 .day-section {
-  scroll-margin-top: calc(var(--trip-header-height) + 80px);
+  scroll-margin-top: calc(
+    var(--trip-header-height) + var(--app-edge-clearance) + 80px
+  );
   margin-bottom: 28px;
 }
 .day-heading {
@@ -1970,28 +1993,31 @@ input::-webkit-date-and-time-value {
       calc(100dvh - var(--modal-height, 100dvh) - var(--modal-top, 0px))
     );
     width: 100%;
-    max-height: var(--modal-height, 100dvh);
+    max-height: calc(var(--modal-height, 100dvh) - var(--app-edge-clearance));
     margin: 0;
     border-radius: 18px 18px 0 0;
     border: 0;
   }
   .modal-inner {
-    max-height: var(--modal-height, 100dvh);
+    max-height: calc(var(--modal-height, 100dvh) - var(--app-edge-clearance));
   }
   .modal-body {
     padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
   }
   .modal.full {
-    top: var(--modal-top, 0px);
+    top: calc(var(--modal-top, 0px) + var(--app-edge-clearance));
     width: 100%;
-    height: var(--modal-height, 100dvh);
-    max-height: var(--modal-height, 100dvh);
+    height: calc(var(--modal-height, 100dvh) - var(--app-edge-clearance));
+    max-height: calc(var(--modal-height, 100dvh) - var(--app-edge-clearance));
     margin: 0;
     border-radius: 0;
   }
+  .modal.full::backdrop {
+    background: var(--paper);
+  }
   .modal.full .modal-inner {
-    height: var(--modal-height, 100dvh);
-    max-height: var(--modal-height, 100dvh);
+    height: calc(var(--modal-height, 100dvh) - var(--app-edge-clearance));
+    max-height: calc(var(--modal-height, 100dvh) - var(--app-edge-clearance));
   }
   .modal.full .modal-header {
     padding-top: calc(8px + env(safe-area-inset-top));

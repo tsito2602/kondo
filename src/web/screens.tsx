@@ -172,22 +172,40 @@ export function ItineraryScreen() {
     }
   }, [params]);
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (changes) => {
-        const entry = changes
-          .filter((entry) => entry.isIntersecting)
-          .sort(
-            (a, b) => a.boundingClientRect.top - b.boundingClientRect.top,
-          )[0];
-        if (entry) setSelectedDay(entry.target.id.replace("day-", ""));
-      },
-      { rootMargin: "-210px 0px -55% 0px", threshold: 0 },
-    );
-    days.forEach((day) => {
-      const node = document.getElementById(`day-${day}`);
-      if (node) observer.observe(node);
-    });
-    return () => observer.disconnect();
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const sections = days.flatMap((day) => {
+        const node = document.getElementById(`day-${day}`);
+        return node ? [{ day, bounds: node.getBoundingClientRect() }] : [];
+      });
+      if (!sections.length || !sections.some(({ bounds }) => bounds.height))
+        return;
+      const boundary =
+        (document.querySelector(".date-strip")?.getBoundingClientRect()
+          .bottom ?? 0) + 24;
+      const atBottom =
+        window.scrollY > 0 &&
+        Math.ceil(window.scrollY + window.innerHeight) >=
+          document.documentElement.scrollHeight - 2;
+      // The final day may be too short to reach the sticky date strip.
+      const active = atBottom
+        ? sections.at(-1)
+        : (sections.filter(({ bounds }) => bounds.top <= boundary).at(-1) ??
+          sections[0]);
+      if (active) setSelectedDay(active.day);
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    schedule();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
   }, [days]);
   useEffect(() => {
     const tab = document.getElementById(`date-tab-${selectedDay}`);
