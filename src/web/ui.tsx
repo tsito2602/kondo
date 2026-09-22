@@ -341,26 +341,14 @@ export function AddButton({
   floating?: boolean;
 }) {
   return (
-    <>
-      <ThumbAction>
-        <button
-          className="thumb-control thumb-add"
-          onClick={onClick}
-          aria-label={label}
-        >
-          <Plus size={18} />
-          <span>{label.replace(/を追加$/, "")}</span>
-        </button>
-      </ThumbAction>
-      <Button
-        className={floating ? "floating-add" : "primary add-action"}
-        onClick={onClick}
-        aria-label={label}
-      >
-        <Plus />
-        <span>{label}</span>
-      </Button>
-    </>
+    <Button
+      className={floating ? "floating-add" : "primary add-action"}
+      onClick={onClick}
+      aria-label={label}
+    >
+      <Plus />
+      <span>{label}</span>
+    </Button>
   );
 }
 export function ErrorText({ message }: { message: string }) {

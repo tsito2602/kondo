@@ -2279,7 +2279,7 @@ input::-webkit-date-and-time-value {
 }
 @media (max-width: 759px) {
   :root:has(.thumb-dock-host:not([hidden])) {
-    --nav-height: 136px;
+    --nav-height: 88px;
   }
   :root:has(.thumb-dock-host:not([hidden]))::view-transition {
     clip-path: inset(
@@ -2344,13 +2344,6 @@ input::-webkit-date-and-time-value {
     min-height: 48px;
     border-radius: 23px;
   }
-  .thumb-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 4px;
-    padding: 0 2px 5px;
-  }
   .thumb-action {
     display: contents;
   }
@@ -2370,53 +2363,8 @@ input::-webkit-date-and-time-value {
   .thumb-control:active {
     transform: scale(0.96);
   }
-  .thumb-add {
-    background: var(--brand);
-    color: var(--paper);
-  }
-  .thumb-tabs {
-    position: relative;
-    isolation: isolate;
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-  }
-  .thumb-tabs::before {
-    content: "";
-    position: absolute;
-    inset: 0 auto 0 0;
-    z-index: -1;
-    width: 20%;
-    border-radius: 21px;
-    background: color-mix(in srgb, var(--brand) 12%, transparent);
-    transform: translateX(calc(max(0, var(--active-tab)) * 100%));
-    transition: transform 420ms cubic-bezier(0.22, 0.8, 0.28, 1);
-  }
-  .thumb-tabs:has(a[aria-current="page"])::before {
-    opacity: 1;
-  }
-  .thumb-tabs:not(:has(a[aria-current="page"]))::before {
-    opacity: 0;
-  }
-  .thumb-tabs a {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    min-height: 53px;
-    font-size: 10px;
-    color: var(--muted);
-    border-radius: 21px;
-    white-space: nowrap;
-  }
-  .thumb-tabs a.active {
-    color: var(--brand);
-    font-weight: 650;
-  }
   :root:has(.thumb-dock-host) .trip-tabs,
   :root:has(.thumb-dock-host) .trip-heading > .icon-button,
-  :root:has(.thumb-dock-host) .page-toolbar .add-action,
-  :root:has(.thumb-dock-host) .floating-add,
   :root:has(.thumb-dock-host) .home-header .icon-button,
   :root:has(.thumb-dock-host) .home-toolbar > button,
   :root:has(.thumb-dock-host) .simple-header > .icon-button {
@@ -2506,5 +2454,315 @@ input::-webkit-date-and-time-value {
   }
   :root:has(.thumb-dock-host) .modal .form {
     scroll-margin-bottom: 96px;
+  }
+}
+
+/* Compact navigation: five persistent icons between two separate round controls. */
+.thumb-page-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.thumb-page-tools:empty {
+  display: none;
+}
+.thumb-page-tools .thumb-control {
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--soft);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (max-width: 759px) {
+  .thumb-dock[data-mode="browse"] {
+    pointer-events: none;
+  }
+  .thumb-dock[data-mode="browse"] > .thumb-dock-material {
+    visibility: hidden;
+  }
+  .thumb-dock[data-mode="browse"] > .thumb-dock-content {
+    padding: 0;
+    animation: none;
+  }
+  .safari-dock {
+    --safari-ease: cubic-bezier(0.22, 0.82, 0.24, 1);
+    position: relative;
+    height: 64px;
+    isolation: isolate;
+  }
+  .safari-circle,
+  .safari-material {
+    position: absolute;
+    pointer-events: none;
+    background: color-mix(in srgb, var(--paper) 82%, transparent);
+    -webkit-backdrop-filter: blur(24px) saturate(1.18);
+    backdrop-filter: blur(24px) saturate(1.18);
+    box-shadow:
+      inset 0 1px 1px var(--surface-glow),
+      inset 0 -1px 1px #0000000a,
+      0 6px 24px #10203022;
+  }
+  .safari-circle {
+    top: 6px;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    transition:
+      opacity 160ms 100ms,
+      transform 440ms var(--safari-ease);
+  }
+  .safari-left {
+    left: 0;
+  }
+  .safari-right {
+    right: 0;
+  }
+  .safari-side {
+    overflow: hidden;
+    border-radius: 50%;
+    position: absolute;
+    top: 6px;
+    z-index: 3;
+    width: 52px;
+    height: 52px;
+    transition:
+      transform 420ms var(--safari-ease),
+      opacity 180ms ease;
+  }
+  .safari-side-button {
+    transition:
+      transform 420ms var(--safari-ease),
+      opacity 180ms ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    padding: 0;
+    border-radius: 50%;
+    pointer-events: auto;
+  }
+  .safari-center {
+    position: absolute;
+    z-index: 2;
+    left: 60px;
+    right: 60px;
+    top: 6px;
+    height: 52px;
+    transition:
+      left 480ms var(--safari-ease),
+      right 480ms var(--safari-ease),
+      top 480ms var(--safari-ease),
+      height 480ms var(--safari-ease);
+  }
+  .safari-material {
+    inset: 0;
+    border-radius: 28px;
+    transition: border-radius 480ms var(--safari-ease);
+  }
+  /* The narrow neck fills as the central material reaches each round surface. */
+  .safari-bridge {
+    position: absolute;
+    top: 23px;
+    width: 28px;
+    height: 18px;
+    opacity: 0;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--paper) 80%, transparent);
+    transition:
+      opacity 90ms,
+      height 240ms var(--safari-ease),
+      top 240ms var(--safari-ease);
+    pointer-events: none;
+  }
+  .safari-bridge.safari-left {
+    left: 43px;
+  }
+  .safari-bridge.safari-right {
+    right: 43px;
+  }
+  .safari-tabs {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    height: 100%;
+    padding: 0 4px;
+  }
+  .safari-tabs a {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-width: 0;
+    border-radius: 24px;
+    color: var(--muted);
+    pointer-events: none;
+  }
+  .safari-tabs a::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 30px;
+    height: 34px;
+    border-radius: 18px;
+    transform: translate(-50%, -50%);
+    background: transparent;
+    transition:
+      width 480ms var(--safari-ease),
+      height 480ms var(--safari-ease),
+      background-color 160ms;
+  }
+  .safari-tabs a.active {
+    color: var(--brand);
+  }
+  .safari-tabs a.active::before {
+    background: color-mix(in srgb, var(--brand) 13%, transparent);
+  }
+  .safari-tabs svg {
+    position: relative;
+    flex-shrink: 0;
+    transition: transform 480ms var(--safari-ease);
+  }
+  .safari-tabs a span {
+    position: absolute;
+    bottom: 8px;
+    font-size: clamp(9px, 2.6vw, 10px);
+    line-height: 14px;
+    white-space: nowrap;
+    opacity: 0;
+    transform: translateY(4px);
+    transition:
+      opacity 130ms,
+      transform 260ms var(--safari-ease);
+  }
+  .safari-expand {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 28px;
+    background: transparent;
+    pointer-events: auto;
+  }
+  .safari-dismiss {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    width: 100vw;
+    height: 100dvh;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    pointer-events: auto;
+  }
+  .safari-dock[data-expanded="true"] .safari-center {
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 64px;
+  }
+  .safari-dock[data-expanded="true"] .safari-material {
+    border-radius: 30px;
+  }
+  .safari-dock[data-expanded="true"]
+    .safari-side.safari-left
+    .safari-side-button {
+    transform: translateX(-56px);
+    opacity: 0;
+  }
+  .safari-dock[data-expanded="true"]
+    .safari-side.safari-right
+    .safari-side-button {
+    transform: translateX(56px);
+    opacity: 0;
+  }
+  .safari-dock[data-expanded="true"] .safari-side-button {
+    pointer-events: none;
+  }
+  .safari-dock[data-expanded="true"] .safari-circle {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  .safari-dock[data-expanded="true"] .safari-bridge {
+    top: 9px;
+    height: 46px;
+    animation: safari-neck 480ms both;
+  }
+  .safari-dock[data-expanded="true"] .safari-expand {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .safari-dock[data-expanded="true"] .safari-tabs a {
+    pointer-events: auto;
+    min-height: 44px;
+  }
+  .safari-dock[data-expanded="true"] .safari-tabs a::before {
+    width: calc(100% - 4px);
+    height: 56px;
+  }
+  .safari-dock[data-expanded="true"] .safari-tabs svg {
+    transform: translateY(-9px);
+  }
+  .safari-dock[data-expanded="true"] .safari-tabs a span {
+    opacity: 1;
+    transform: translateY(0);
+    transition-delay: 100ms;
+  }
+  :root:has(.thumb-dock-host) .page-toolbar .add-action,
+  :root:has(.thumb-dock-host) .floating-add {
+    position: fixed;
+    right: max(18px, env(safe-area-inset-right));
+    bottom: calc(104px + env(safe-area-inset-bottom));
+    z-index: 24;
+    width: 52px;
+    height: 52px;
+    min-height: 52px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 5px 20px #10203022;
+  }
+  :root:has(.thumb-dock-host) .page-toolbar .add-action span,
+  :root:has(.thumb-dock-host) .floating-add span {
+    display: none;
+  }
+  :root:has(.thumb-dock-host) .page,
+  :root:has(.thumb-dock-host) .timeline {
+    padding-bottom: calc(174px + env(safe-area-inset-bottom));
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .safari-circle,
+  .safari-material,
+  .safari-bridge {
+    background: var(--paper);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .safari-dock *,
+  .safari-dock *::before {
+    transition: none !important;
+  }
+}
+
+@keyframes safari-neck {
+  0%,
+  75%,
+  100% {
+    opacity: 0;
+  }
+  18%,
+  40% {
+    opacity: 1;
   }
 }

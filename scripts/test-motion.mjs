@@ -5,6 +5,7 @@ import { build } from "esbuild";
 import { JSDOM } from "jsdom";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
+import { MemoryRouter, useLocation } from "react-router";
 
 const dom = new JSDOM('<div id="root"></div>', { url: "https://tabi.test/" });
 Object.assign(globalThis, {
@@ -26,7 +27,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal } from './src/web/motion';",
+      "export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -45,6 +46,7 @@ new Function("require", "module", "exports", outputFiles[0].text)(
 );
 const {
   Modal,
+  SafariTabs,
   SaveButton,
   dismissModal,
   ThumbDockProvider,
@@ -289,4 +291,91 @@ test("one dock follows dialog focus scopes, restores the parent, and submits the
     reduced = false;
   }
   assert.equal(document.querySelector(".thumb-dock-host"), null);
+});
+
+test("compact icons expand without navigating, retain their DOM, and collapse after selection or dismissal", async () => {
+  const root = createRoot(document.getElementById("root"));
+  const h = React.createElement;
+  let menus = 0;
+  function Harness() {
+    return h(
+      React.Fragment,
+      null,
+      h("output", null, useLocation().pathname),
+      h(SafariTabs, { tripId: "demo", onMenu: () => menus++ }),
+    );
+  }
+  try {
+    await act(async () =>
+      root.render(
+        h(
+          MemoryRouter,
+          { initialEntries: ["/trips/demo/itinerary"] },
+          h(Harness),
+        ),
+      ),
+    );
+    const trigger = document.querySelector(".safari-expand");
+    const nav = document.querySelector(".safari-tabs");
+    const icons = [...nav.querySelectorAll("svg")];
+    assert.equal(icons.length, 5);
+    assert.equal(trigger.getAttribute("aria-expanded"), "false");
+    assert.ok(nav.hasAttribute("inert"));
+    assert.equal(nav.querySelectorAll('a[tabindex="-1"]').length, 5);
+    assert.equal(
+      document.querySelector(".safari-dock").querySelectorAll(".thumb-add")
+        .length,
+      0,
+    );
+    await act(async () => trigger.click());
+    assert.equal(
+      document.querySelector("output").textContent,
+      "/trips/demo/itinerary",
+    );
+    assert.equal(trigger.getAttribute("aria-expanded"), "true");
+    assert.equal(nav.hasAttribute("inert"), false);
+    assert.equal(
+      document.activeElement,
+      nav.querySelector('a[aria-current="page"]'),
+    );
+    assert.equal(document.querySelectorAll(".safari-side[inert]").length, 2);
+    assert.deepEqual([...nav.querySelectorAll("svg")], icons);
+    await act(async () => nav.querySelector('a[href$="/places"]').click());
+    assert.equal(
+      document.querySelector("output").textContent,
+      "/trips/demo/places",
+    );
+    assert.equal(trigger.getAttribute("aria-expanded"), "false");
+    assert.match(trigger.getAttribute("aria-label"), /行きたい場所/);
+    assert.deepEqual([...nav.querySelectorAll("svg")], icons);
+    assert.equal(document.activeElement, trigger);
+    for (const dismiss of ["outside", "escape"]) {
+      await act(async () => trigger.click());
+      await act(async () => {
+        if (dismiss === "outside")
+          document.querySelector(".safari-dismiss").click();
+        else
+          window.dispatchEvent(
+            new dom.window.KeyboardEvent("keydown", {
+              key: "Escape",
+              cancelable: true,
+            }),
+          );
+      });
+      assert.equal(trigger.getAttribute("aria-expanded"), "false");
+      assert.equal(
+        document.querySelector("output").textContent,
+        "/trips/demo/places",
+      );
+      assert.equal(document.querySelectorAll(".safari-side[inert]").length, 0);
+    }
+    await act(async () =>
+      document
+        .querySelector('.safari-side-button[aria-label="旅行メニュー"]')
+        .click(),
+    );
+    assert.equal(menus, 1);
+  } finally {
+    await act(async () => root.unmount());
+  }
 });
