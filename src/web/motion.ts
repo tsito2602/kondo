@@ -75,6 +75,7 @@ export function useMotionNavigation() {
   navigateRef.current = navigate;
   useEffect(() => {
     let active: ViewTransition | undefined;
+    const interrupt = () => active?.skipTransition();
     const click = (event: MouseEvent) => {
       const link =
         event.target instanceof Element
@@ -116,8 +117,12 @@ export function useMotionNavigation() {
       void active.ready.catch(() => undefined);
       void active.finished.catch(() => undefined);
     };
+    document.addEventListener("pointerdown", interrupt, true);
+    document.addEventListener("keydown", interrupt, true);
     document.addEventListener("click", click, true);
     return () => {
+      document.removeEventListener("pointerdown", interrupt, true);
+      document.removeEventListener("keydown", interrupt, true);
       document.removeEventListener("click", click, true);
       active?.skipTransition();
     };
