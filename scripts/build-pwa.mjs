@@ -13,8 +13,7 @@ async function walk(dir) {
   return (await Promise.all(entries.map((entry) => entry.isDirectory() ? walk(path.join(dir, entry.name)) : path.join(dir, entry.name)))).flat();
 }
 const exportedFiles = await walk(root);
-// Expo replaces custom rel=icon links with favicon.ico during export.
-// Restore Web Clip and ICO/PNG/theme-aware SVG candidates on every exported page.
+// Apply the same icon set to every generated HTML page.
 const iconLinks = '<link rel="apple-touch-icon" href="/icons/apple-touch-icon-transparent.png"/><link rel="icon" href="/icons/favicon.ico" sizes="any"/><link rel="icon" href="/icons/favicon-32x32.png" type="image/png" sizes="32x32"/><link rel="icon" href="/icons/favicon-16x16.png" type="image/png" sizes="16x16"/><link rel="icon" href="/icons/icon.svg" type="image/svg+xml" sizes="any"/>';
 for (const file of exportedFiles.filter((file) => file.endsWith('.html'))) {
   const html = await readFile(file, 'utf8');

@@ -57,8 +57,7 @@ export function configuration(target, env, template, checkOnly = false) {
   config.vars = { ...config.vars, GOOGLE_CLIENT_IDS: audiences.join(','), ALLOWED_ORIGINS: origin };
   if (/__[A-Z0-9_]+__/.test(JSON.stringify(config))) throw new Error('Unresolved Wrangler template placeholder');
   const childEnv = { ...env, ...publicEnv, GOOGLE_CLIENT_IDS: audiences.join(','), ALLOWED_ORIGINS: origin, CI: 'true', EXPO_NO_DOTENV: '1' };
-  // React's tests need the development implementation. Expo export controls its
-  // own production bundling; do not let a dashboard NODE_ENV break npm run check.
+  // React tests need development React; Vite build selects production itself.
   delete childEnv.NODE_ENV;
   return { ...expected, target, origin, account, databaseId, commit, config, env: childEnv, checkOnly };
 }

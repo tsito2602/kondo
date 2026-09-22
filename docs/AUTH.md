@@ -1,30 +1,11 @@
-# Google OAuth
+# Googleログイン
 
-## 方針
+Web/PWAはGoogle Identity Servicesの公式ボタンを表示し、popupのcallbackで受け取ったID tokenを`POST /v1/auth/google`へ送ります。既存のWeb OAuth Client IDとJavaScript生成元を利用できます。Expo AuthSessionとネイティブ用のOAuth起動処理は使用しません。
 
-`tabi`はExpo AuthSessionでGoogle OpenID Connectを開始し、iOS・Android・Webでそれぞれ専用のOAuth Client IDを使う。
+Workerは従来と同じGoogle JWKSによる署名・issuer・audience・有効期限・verified emailを確認します。Googleの`sub`をユーザーIDとし、D1へSHA-256ハッシュを保存する256 bitランダムセッションを発行します。Google Client Secret・refresh tokenは不要です。
 
-Googleから受け取ったID tokenはCloudflare Workerへ送り、次をすべて検証する。
+ブラウザのセッション保存キー`tabi.session`を維持し、旧sessionStorageからlocalStorageへも引き継ぎます。期限付きの`tabi.offline-user`はオフライン閲覧のみに使い、サーバーは毎回認証・旅行ごとの権限を検証します。ネットワーク障害ではログアウトせず、401/403では認証を解除します。
 
-1. Google JWKSによる署名
-2. issuerが`https://accounts.google.com`または`accounts.google.com`
-3. audienceが許可したClient ID
-4. expiryが現在時刻より後
-5. emailが検証済み
+Google CloudのWeb OAuthクライアントには本番・stagingそれぞれのJavaScript生成元を登録します。GISのpopup方式では旧`/oauth`リダイレクトページを使用しません。既存のリダイレクトURIを削除する必要はありません。
 
-アプリ内の利用者IDには変更されにくいGoogleの`sub`を使い、メールアドレスは表示と招待照合にだけ使う。
-
-検証成功後はWorkerが256 bitのランダムなアプリ用セッションを発行し、D1にはSHA-256 hashだけを保存する。iOS・AndroidではSecureStore、Webではブラウザを閉じるまでのsessionStorageへ保存する。Google Client Secretやrefresh tokenをアプリbundleへ含めない。
-
-## 招待
-
-招待URLを開いた利用者はGoogleログイン後にtokenを引き継ぐ。Workerは招待tokenを一度だけ消費し、認証済みのGoogle `sub`を旅行メンバーへ追加する。
-
-認証と認可を分け、ログイン済みでも旅行メンバーでない利用者にはデータを返さない。
-
-## Google Cloudで用意するもの
-
-- iOS OAuth client: bundle ID `com.tsito2602.tabi`
-- Android OAuth client: package `com.tsito2602.tabi` と署名証明書SHA-1
-- Web OAuth client: Cloudflareの本番・staging URL
-
+招待URLの`invite`パラメーターはログイン中も保持され、参加ボタンで明示的に受諾します。招待は1回限り、7日間有効です。

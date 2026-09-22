@@ -1,6 +1,4 @@
-import * as Crypto from 'expo-crypto';
 import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, AppState, Platform } from 'react-native';
 
 import { useAuth } from '@/auth/auth-provider';
 
@@ -126,8 +124,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
               // Discard only a permanently rejected link, then reload the server's
               // choices. Network/auth failures keep their queued mutation for retry.
               const message = cause instanceof Error ? cause.message : '便を選び直してください';
-              if (Platform.OS === 'web') globalThis.alert(`乗り継ぎを保存できませんでした\n${message}`);
-              else Alert.alert('乗り継ぎを保存できませんでした', message);
+              globalThis.alert?.(`乗り継ぎを保存できませんでした\n${message}`);
             }
             commit((current) => ({ ...current, pending: current.pending.filter((item) => item.id !== mutation.id) }));
           }
@@ -196,16 +193,15 @@ export function TravelProvider({ children }: PropsWithChildren) {
       setReady(true);
       void sync();
     }).catch(() => { if (active) { setError('端末の保存データを開けませんでした'); setReady(true); } });
-    const appState = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void sync();
-    });
+    const onVisible = () => { if (globalThis.document?.visibilityState === 'visible') void sync(); };
+    globalThis.document?.addEventListener('visibilitychange', onVisible);
     const onOnline = () => void sync();
-    if (Platform.OS === 'web') globalThis.addEventListener?.('online', onOnline);
+    globalThis.addEventListener?.('online', onOnline);
     const timer = setInterval(() => void sync(), 30_000);
     return () => {
       active = false;
-      appState.remove();
-      if (Platform.OS === 'web') globalThis.removeEventListener?.('online', onOnline);
+      globalThis.document?.removeEventListener('visibilitychange', onVisible);
+      globalThis.removeEventListener?.('online', onOnline);
       clearInterval(timer);
     };
   }, [sync, isDemo, user?.id]);
@@ -214,7 +210,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     if (isDemo) return;
     commit((current) => ({
       ...current,
-      pending: [...current.pending, { ...mutation, id: Crypto.randomUUID() }],
+      pending: [...current.pending, { ...mutation, id: crypto.randomUUID() }],
     }));
     queueMicrotask(() => void sync());
   }, [commit, sync, isDemo]);
@@ -224,7 +220,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
   }, [commit]);
 
   const createTrip = useCallback((input: TripInput) => {
-    const id = Crypto.randomUUID();
+    const id = crypto.randomUUID();
     const trip: Trip = { id, ...input, role: 'owner', memberCount: 1 };
     commit((current) => ({
       ...current,
@@ -285,7 +281,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     const tripId = cacheRef.current.selectedTripId;
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
-    const id = Crypto.randomUUID();
+    const id = crypto.randomUUID();
     commit((current) => ({ ...current, placesByTrip: { ...current.placesByTrip, [tripId]: [...(current.placesByTrip[tripId] ?? []), { id, ...input }] } }));
     enqueue({ method: 'POST', path: `/v1/trips/${tripId}/places`, body: { id, ...input } });
     return id;
@@ -309,7 +305,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     const tripId = cacheRef.current.selectedTripId;
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
-    const id = Crypto.randomUUID();
+    const id = crypto.randomUUID();
     const item: ItineraryItem = { id, ...input };
     commit((current) => ({ ...current, itemsByTrip: { ...current.itemsByTrip, [tripId]: [...(current.itemsByTrip[tripId] ?? []), item] } }));
     enqueue({ method: 'POST', path: `/v1/trips/${tripId}/items`, body: { id, ...input } });
@@ -336,7 +332,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     const tripId = cacheRef.current.selectedTripId;
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
-    const id = Crypto.randomUUID();
+    const id = crypto.randomUUID();
     const booking: Booking = { id, ...input };
     commit((current) => ({
       ...current,
@@ -390,7 +386,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
     if (isDemo) {
-      const document: BookingDocument = { id: Crypto.randomUUID(), bookingId, filename: input.filename, contentType: input.contentType, size: input.size, createdAt: Date.now() };
+      const document: BookingDocument = { id: crypto.randomUUID(), bookingId, filename: input.filename, contentType: input.contentType, size: input.size, createdAt: Date.now() };
       await saveDemoDocument(document.id, input.bytes);
       commit((current) => ({ ...current, documentsByBooking: { ...current.documentsByBooking, [bookingId]: [...(current.documentsByBooking[bookingId] ?? []), document] } }));
       return document;
@@ -485,7 +481,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     const tripId = cacheRef.current.selectedTripId;
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
-    const id = Crypto.randomUUID();
+    const id = crypto.randomUUID();
     const item: PackingItem = { id, ...input };
     commit((current) => ({
       ...current,
@@ -527,7 +523,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     const tripId = cacheRef.current.selectedTripId;
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
-    const id = Crypto.randomUUID();
+    const id = crypto.randomUUID();
     const task: TravelTask = { id, ...input };
     commit((current) => ({
       ...current,
