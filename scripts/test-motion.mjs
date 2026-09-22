@@ -15,6 +15,9 @@ Object.assign(globalThis, {
   Element: dom.window.Element,
   CustomEvent: dom.window.CustomEvent,
   IS_REACT_ACT_ENVIRONMENT: true,
+  requestAnimationFrame: (callback) =>
+    setTimeout(() => callback(performance.now()), 16),
+  cancelAnimationFrame: clearTimeout,
 });
 let reduced = false;
 globalThis.matchMedia = () => ({ matches: reduced });
@@ -294,16 +297,39 @@ test("one dock follows dialog focus scopes, restores the parent, and submits the
   assert.equal(document.querySelector(".thumb-dock-host"), null);
 });
 
-function pointer(target, type, x = 0) {
+function pointer(target, type, x = 0, y = 0, extra = {}) {
   const event = new dom.window.Event(type, { bubbles: true });
   Object.assign(event, {
     button: 0,
     isPrimary: true,
     pointerType: "touch",
+    pointerId: 1,
     clientX: x,
-    clientY: 0,
+    clientY: y,
+    ...extra,
   });
   target.dispatchEvent(event);
+}
+
+function layoutTabs(nav, width = () => 360) {
+  [...nav.querySelectorAll("a")].forEach((link, index) => {
+    link.getBoundingClientRect = () => ({
+      left: (index * width()) / 5,
+      right: ((index + 1) * width()) / 5,
+      top: 100,
+      bottom: 164,
+      width: width() / 5,
+      height: 64,
+    });
+  });
+  let captured;
+  nav.setPointerCapture = (id) => {
+    captured = id;
+  };
+  nav.hasPointerCapture = (id) => captured === id;
+  nav.releasePointerCapture = (id) => {
+    if (captured === id) captured = undefined;
+  };
 }
 
 test("compact tabs navigate with one tap; holding reveals names without navigating on release", async () => {
@@ -340,6 +366,7 @@ test("compact tabs navigate with one tap; holding reveals names without navigati
       ),
     );
     const nav = document.querySelector(".safari-tabs");
+    layoutTabs(nav);
     const dock = document.querySelector(".safari-dock");
     const icons = [...nav.querySelectorAll("svg")];
     const places = nav.querySelector('a[href$="/places"]');
@@ -353,12 +380,12 @@ test("compact tabs navigate with one tap; holding reveals names without navigati
       "/trips/demo/places",
     );
     assert.equal(dock.dataset.expanded, "false");
-    await act(async () => pointer(notes, "pointerdown"));
+    await act(async () => pointer(notes, "pointerdown", 324, 130));
     await act(async () => new Promise((resolve) => setTimeout(resolve, 450)));
     assert.equal(dock.dataset.expanded, "true");
     assert.equal(document.querySelectorAll(".safari-side[inert]").length, 2);
     await act(async () => {
-      pointer(notes, "pointerup");
+      pointer(nav, "pointerup", 324, 130);
       notes.click();
     });
     assert.equal(
@@ -403,7 +430,7 @@ test("compact tabs navigate with one tap; holding reveals names without navigati
       assert.equal(dock.dataset.expanded, "false");
     }
     await act(async () => {
-      pointer(notes, "pointerdown");
+      pointer(notes, "pointerdown", 324, 130);
       pointer(notes, "pointermove", 20);
     });
     await act(async () => new Promise((resolve) => setTimeout(resolve, 450)));
@@ -467,7 +494,7 @@ test("details retain the same five tab nodes and close before one-tap navigation
     const nav = document.querySelector(".safari-tabs");
     const icons = [...nav.querySelectorAll("svg")];
     const host = document.querySelector(".thumb-dock-host");
-    for (const destination of ["bookings", "places"]) {
+    for (const destination of ["bookings", "places", "notes"]) {
       await act(async () => openDetail());
       const dialog = document.querySelector("dialog");
       assert.equal(host.parentElement, dialog);
@@ -478,9 +505,23 @@ test("details retain the same five tab nodes and close before one-tap navigation
       await act(async () =>
         host.querySelector(".safari-detail-action button").click(),
       );
-      await act(async () =>
-        nav.querySelector(`a[href$="/${destination}"]`).click(),
-      );
+      if (destination === "notes") {
+        layoutTabs(nav);
+        const origin = nav.querySelector('a[href$="/places"]');
+        await act(async () => pointer(origin, "pointerdown", 108, 130));
+        await act(
+          async () => new Promise((resolve) => setTimeout(resolve, 450)),
+        );
+        await act(async () => pointer(nav, "pointermove", 324, 130));
+        await act(async () => {
+          pointer(nav, "pointerup", 324, 130);
+          origin.click();
+        });
+      } else {
+        await act(async () =>
+          nav.querySelector(`a[href$="/${destination}"]`).click(),
+        );
+      }
       assert.ok(
         dialog.isConnected,
         "close animation gets to finish before routing",
@@ -495,7 +536,7 @@ test("details retain the same five tab nodes and close before one-tap navigation
       assert.equal(host.querySelector(".safari-tabs"), nav);
       assert.deepEqual([...nav.querySelectorAll("svg")], icons);
     }
-    assert.equal(edits, 2);
+    assert.equal(edits, 3);
     await act(async () => openDetail());
     await act(async () =>
       host.querySelector('[aria-label="詳細を閉じて戻る"]').click(),
@@ -504,7 +545,140 @@ test("details retain the same five tab nodes and close before one-tap navigation
     assert.equal(document.querySelector("dialog"), null);
     assert.equal(
       document.querySelector("output").textContent,
+      "/trips/demo/notes",
+    );
+  } finally {
+    await act(async () => root.unmount());
+    delete document.startViewTransition;
+  }
+});
+
+test("hold and drag previews live tab bounds, commits once on release, and cancels outside or on interruption", async () => {
+  const root = createRoot(document.getElementById("root"));
+  const h = React.createElement;
+  let transitions = 0;
+  document.startViewTransition = (update) => {
+    transitions++;
+    update();
+    return {
+      ready: Promise.resolve(),
+      finished: Promise.resolve(),
+      skipTransition() {},
+    };
+  };
+  function Harness() {
+    useMotionNavigation();
+    return h(
+      React.Fragment,
+      null,
+      h("output", null, useLocation().pathname),
+      h(SafariTabs, { tripId: "demo", onMenu() {} }),
+    );
+  }
+  try {
+    await act(async () =>
+      root.render(
+        h(
+          MemoryRouter,
+          { initialEntries: ["/trips/demo/itinerary"] },
+          h(Harness),
+        ),
+      ),
+    );
+    const nav = document.querySelector(".safari-tabs");
+    const links = [...nav.querySelectorAll("a")];
+    const dock = document.querySelector(".safari-dock");
+    let width = 360;
+    layoutTabs(nav, () => width);
+    const hold = async () => {
+      await act(async () => pointer(links[0], "pointerdown", 36, 130));
+      await act(async () => new Promise((resolve) => setTimeout(resolve, 450)));
+      assert.equal(dock.dataset.expanded, "true");
+      assert.equal(nav.hasPointerCapture(1), true);
+    };
+    await hold();
+    await act(async () => pointer(links[0], "lostpointercapture", 36, 130));
+    assert.equal(
+      dock.dataset.expanded,
+      "true",
+      "transferring implicit touch capture from link to nav is not cancellation",
+    );
+    await act(async () => pointer(nav, "pointermove", 225, 130));
+    assert.equal(links[3].dataset.preview, "true");
+    assert.equal(
+      document.querySelector("output").textContent,
+      "/trips/demo/itinerary",
+    );
+    width = 420;
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 25)));
+    assert.equal(
+      links[2].dataset.preview,
+      "true",
+      "preview follows expanding hit regions even with a stationary finger",
+    );
+    await act(async () =>
+      pointer(nav, "pointermove", 378, 130, { pointerId: 2, isPrimary: false }),
+    );
+    assert.equal(
+      links[2].dataset.preview,
+      "true",
+      "another finger cannot change this gesture",
+    );
+    await act(async () => {
+      pointer(nav, "pointerup", 225, 130);
+      links[0].click(); // Compatibility click may still target the initial link.
+    });
+    assert.equal(
+      document.querySelector("output").textContent,
+      "/trips/demo/packing",
+    );
+    assert.equal(transitions, 1, "release must navigate exactly once");
+    assert.equal(nav.hasPointerCapture(1), false);
+    assert.equal(dock.dataset.expanded, "false");
+    for (const reason of [
+      "outside",
+      "pointercancel",
+      "lostpointercapture",
+      "escape",
+    ]) {
+      await hold();
+      await act(async () => pointer(nav, "pointermove", 378, 130));
+      assert.equal(links[4].dataset.preview, "true");
+      await act(async () => {
+        if (reason === "outside") {
+          pointer(nav, "pointermove", 378, 70);
+          pointer(nav, "pointerup", 378, 70);
+        } else if (reason === "escape") {
+          window.dispatchEvent(
+            new dom.window.KeyboardEvent("keydown", {
+              key: "Escape",
+              cancelable: true,
+            }),
+          );
+          pointer(nav, "pointerup", 378, 130);
+        } else {
+          pointer(nav, reason, 378, 130);
+        }
+        links[0].click();
+      });
+      assert.equal(
+        document.querySelector("output").textContent,
+        "/trips/demo/packing",
+        reason,
+      );
+      assert.equal(dock.dataset.expanded, "false", reason);
+      assert.equal(nav.hasPointerCapture(1), false);
+    }
+    assert.equal(transitions, 1);
+    await act(async () => {
+      pointer(links[1], "pointerdown", 126, 130);
+      pointer(links[1], "pointerup", 126, 130);
+      links[1].click();
+    });
+    assert.equal(
+      document.querySelector("output").textContent,
       "/trips/demo/places",
+      "a fresh tap still navigates immediately",
     );
   } finally {
     await act(async () => root.unmount());

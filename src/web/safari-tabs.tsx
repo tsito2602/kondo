@@ -5,6 +5,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+import { flushSync } from "react-dom";
 import { Link, NavLink, useLocation, useNavigate } from "react-router";
 import {
   ArrowLeft,
@@ -16,6 +17,7 @@ import {
   Ticket,
 } from "lucide-react";
 
+import { reduceMotion } from "./motion";
 import { DockNavigationContext } from "./thumb-dock";
 
 export const tripTabs = [
@@ -26,7 +28,7 @@ export const tripTabs = [
   { path: "notes", label: "メモ", icon: NotebookPen },
 ];
 
-/** Tap any icon directly; holding reveals names without changing pages. */
+/** Tap directly, or hold then scrub across the expanded tabs and release. */
 export function SafariTabs({
   tripId,
   onMenu,
@@ -41,26 +43,93 @@ export function SafariTabs({
   const holdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
-  const pointer = useRef<{ x: number; y: number } | null>(null);
-  const held = useRef(false);
+  const pointer = useRef<{
+    id: number;
+    x: number;
+    y: number;
+    startX: number;
+    startY: number;
+    held: boolean;
+    dragged: boolean;
+  } | null>(null);
+  const suppressClick = useRef(false);
   const [holding, setHolding] = useState(false);
-  const cancelHold = () => {
-    clearTimeout(holdTimer.current);
-    pointer.current = null;
-  };
+  const [preview, setPreview] = useState(-1);
+  const frame = useRef<number | undefined>(undefined);
+  const transition = useRef<ViewTransition | undefined>(undefined);
   const nav = useRef<HTMLElement>(null);
   const restoreFocus = useRef(false);
-  useEffect(() => () => clearTimeout(holdTimer.current), []);
   const active = tripTabs.findIndex((tab) =>
     location.pathname.endsWith(`/${tab.path}`),
   );
+  const stopGesture = () => {
+    clearTimeout(holdTimer.current);
+    if (frame.current !== undefined) cancelAnimationFrame(frame.current);
+    const id = pointer.current?.id;
+    pointer.current = null;
+    setPreview(-1);
+    if (id !== undefined && nav.current?.hasPointerCapture?.(id))
+      nav.current.releasePointerCapture(id);
+  };
+  const blockReleaseClick = () => {
+    suppressClick.current = true;
+    setHolding(true);
+    // The document's capture listener runs before React's click handlers.
+    // Set this immediately, including when release and click share a frame.
+    if (nav.current) nav.current.dataset.dockHold = "true";
+  };
+  const hitTab = (x: number, y: number) =>
+    [
+      ...(nav.current?.querySelectorAll<HTMLAnchorElement>("a") ?? []),
+    ].findIndex((link) => {
+      const rect = link.getBoundingClientRect();
+      return (
+        rect.width > 0 &&
+        x >= rect.left &&
+        x < rect.right &&
+        y >= rect.top &&
+        y <= rect.bottom
+      );
+    });
+  const followPointer = () => {
+    const gesture = pointer.current;
+    if (!gesture?.held) return;
+    if (gesture.dragged) setPreview(hitTab(gesture.x, gesture.y));
+    // Tabs move while the material expands; hit-test their live positions.
+    frame.current = requestAnimationFrame(followPointer);
+  };
   const collapse = () => {
-    cancelHold();
-    held.current = false;
-    setHolding(false);
+    stopGesture();
     restoreFocus.current = true;
     setExpanded(false);
   };
+  const selectTab = (index: number) => {
+    const to = `/trips/${tripId}/${tripTabs[index].path}`;
+    if (controls) {
+      controls.beforeNavigate(() => navigate(to));
+    } else if (document.startViewTransition && !reduceMotion()) {
+      document.documentElement.style.setProperty(
+        "--route-direction",
+        String(index < active ? -1 : 1),
+      );
+      transition.current?.skipTransition();
+      transition.current = document.startViewTransition(() =>
+        flushSync(() => navigate(to)),
+      );
+      void transition.current.ready.catch(() => undefined);
+      void transition.current.finished.catch(() => undefined);
+    } else {
+      navigate(to);
+    }
+  };
+  useEffect(
+    () => () => {
+      clearTimeout(holdTimer.current);
+      if (frame.current !== undefined) cancelAnimationFrame(frame.current);
+      transition.current?.skipTransition();
+    },
+    [],
+  );
   useEffect(() => {
     if (!expanded) {
       if (restoreFocus.current)
@@ -147,36 +216,96 @@ export function SafariTabs({
             className="safari-tabs"
             aria-label="旅行のページ"
             data-dock-hold={holding}
+            data-scrubbing={preview >= 0}
             onPointerDown={(event) => {
-              cancelHold();
-              held.current = false;
+              if (event.button !== 0 || !event.isPrimary) return;
+              transition.current?.skipTransition();
+              stopGesture();
+              suppressClick.current = false;
               setHolding(false);
-              if (expanded || event.button !== 0 || !event.isPrimary) return;
-              pointer.current = { x: event.clientX, y: event.clientY };
+              event.currentTarget.dataset.dockHold = "false";
+              if (expanded) return;
+              pointer.current = {
+                id: event.pointerId,
+                x: event.clientX,
+                y: event.clientY,
+                startX: event.clientX,
+                startY: event.clientY,
+                held: false,
+                dragged: false,
+              };
               holdTimer.current = setTimeout(() => {
-                held.current = true;
-                setHolding(true);
+                const gesture = pointer.current;
+                if (!gesture) return;
+                gesture.held = true;
+                gesture.startX = gesture.x;
+                gesture.startY = gesture.y;
+                blockReleaseClick();
                 setExpanded(true);
+                nav.current?.setPointerCapture?.(gesture.id);
+                followPointer();
               }, 420);
             }}
             onPointerMove={(event) => {
-              if (
-                pointer.current &&
-                Math.hypot(
-                  event.clientX - pointer.current.x,
-                  event.clientY - pointer.current.y,
-                ) > 10
-              )
-                cancelHold();
+              const gesture = pointer.current;
+              if (!gesture || gesture.id !== event.pointerId) return;
+              gesture.x = event.clientX;
+              gesture.y = event.clientY;
+              const distance = Math.hypot(
+                gesture.x - gesture.startX,
+                gesture.y - gesture.startY,
+              );
+              if (gesture.held) {
+                gesture.dragged ||= distance > 8;
+                if (gesture.dragged) setPreview(hitTab(gesture.x, gesture.y));
+              } else if (distance > 10) {
+                blockReleaseClick();
+                stopGesture();
+              }
             }}
-            onPointerUp={cancelHold}
-            onPointerCancel={() => {
-              cancelHold();
-              held.current = false;
+            onPointerUp={(event) => {
+              const gesture = pointer.current;
+              if (!gesture || gesture.id !== event.pointerId) return;
+              if (!gesture.held) {
+                stopGesture();
+                return;
+              }
+              event.preventDefault();
+              blockReleaseClick();
+              const selected = hitTab(event.clientX, event.clientY);
+              const dragged = gesture.dragged;
+              stopGesture();
+              if (dragged || selected < 0) collapse();
+              if (dragged && selected >= 0) selectTab(selected);
+            }}
+            onPointerCancel={(event) => {
+              if (pointer.current?.id !== event.pointerId) return;
+              blockReleaseClick();
+              collapse();
+            }}
+            onLostPointerCapture={(event) => {
+              // Touch starts with implicit capture on the pressed link. Its
+              // capture loss when ownership moves to this nav is expected.
+              if (event.target !== event.currentTarget) return;
+              if (pointer.current?.id !== event.pointerId) return;
+              blockReleaseClick();
+              collapse();
+            }}
+            onClickCapture={(event) => {
+              if (!suppressClick.current) return;
+              event.preventDefault();
+              event.stopPropagation();
+              suppressClick.current = false;
               setHolding(false);
+              event.currentTarget.dataset.dockHold = "false";
             }}
             onContextMenu={(event) => event.preventDefault()}
             onKeyDown={(event) => {
+              if (!pointer.current) {
+                suppressClick.current = false;
+                setHolding(false);
+                event.currentTarget.dataset.dockHold = "false";
+              }
               if (event.key === "ArrowUp") {
                 event.preventDefault();
                 setExpanded(true);
@@ -184,20 +313,16 @@ export function SafariTabs({
             }}
             style={{ "--active-tab": active } as CSSProperties}
           >
-            {tripTabs.map((tab) => (
+            {tripTabs.map((tab, index) => (
               <NavLink
                 key={tab.path}
                 to={`/trips/${tripId}/${tab.path}`}
                 aria-label={tab.label}
+                data-preview={preview === index}
+                draggable={false}
                 aria-keyshortcuts="ArrowUp"
                 data-dock-managed={controls ? "" : undefined}
                 onClick={(event) => {
-                  if (held.current) {
-                    event.preventDefault();
-                    held.current = false;
-                    setHolding(false);
-                    return;
-                  }
                   if (
                     event.button !== 0 ||
                     event.metaKey ||
@@ -209,9 +334,7 @@ export function SafariTabs({
                   collapse();
                   if (controls) {
                     event.preventDefault();
-                    controls.beforeNavigate(() =>
-                      navigate(`/trips/${tripId}/${tab.path}`),
-                    );
+                    selectTab(index);
                   }
                 }}
               >

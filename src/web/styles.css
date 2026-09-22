@@ -2592,7 +2592,7 @@ input::-webkit-date-and-time-value {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     height: 100%;
     padding: 0;
-    touch-action: manipulation;
+    touch-action: none;
     user-select: none;
     -webkit-touch-callout: none;
   }
@@ -2627,6 +2627,18 @@ input::-webkit-date-and-time-value {
   }
   .safari-tabs a.active::before {
     background: color-mix(in srgb, var(--brand) 13%, transparent);
+  }
+  .safari-tabs[data-scrubbing="true"] a.active {
+    color: var(--muted);
+  }
+  .safari-tabs[data-scrubbing="true"] a.active::before {
+    background: transparent;
+  }
+  .safari-tabs[data-scrubbing="true"] a[data-preview="true"] {
+    color: var(--brand);
+  }
+  .safari-tabs[data-scrubbing="true"] a[data-preview="true"]::before {
+    background: color-mix(in srgb, var(--brand) 20%, transparent);
   }
   .safari-tabs svg {
     position: relative;
