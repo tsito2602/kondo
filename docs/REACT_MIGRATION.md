@@ -31,4 +31,4 @@ stagingでGoogleログイン、既存のPWAからの更新、iPhone/Androidの�
 
 ### iPhoneの上端表示
 
-ホーム画面起動のiOS WebKitだけに24pxの無地領域を確保し、OS側で上端に重なる効果からヘッダー操作を離す。通常ページ・stickyヘッダー・日付ナビ・全画面dialogに同じ`--app-edge-clearance`を適用し、dialogは高さも縮めて下端を維持する。Safariタブ・Android・PCには追加余白を適用しない。OSのブラーを無効にするAPIではなく回避策であり、効果と必要な余白はiPhone実機で未確認。
+`viewport-fit=contain`と不透明な標準ステータスバー設定を使用し、ブラウザ側にノッチ・Dynamic Islandを避けた表示領域の確保を任せる。24px固定の回避用余白・上端オーバーレイは撤去。各ヘッダーの`safe-area-inset-top`も撤去し、サンプルバナーとヘッダーの間に端末用余白を二重加算しない。全画面dialogはその表示領域内のvisualViewportの高さと位置に合わせる。iPhoneのホーム画面起動・縦横回転・キーボード表示は実機確認が必要。
