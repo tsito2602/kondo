@@ -113,6 +113,7 @@ export function useMotionNavigation() {
       active = document.startViewTransition(() => {
         flushSync(() => navigateRef.current(url.pathname + url.search));
       });
+      void active.ready.catch(() => undefined);
       void active.finished.catch(() => undefined);
     };
     document.addEventListener("click", click, true);
