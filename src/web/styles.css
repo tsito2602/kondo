@@ -119,6 +119,13 @@ select {
   outline: 2px solid var(--brand);
   outline-offset: 3px;
 }
+/* Safari can retain focus-visible after dialog autofocus or touch navigation.
+   Keep DOM focus, but only show action focus rings during keyboard interaction. */
+:root[data-input-modality="pointer"]
+  :is(button, a, [role="button"], [role="tab"]):focus {
+  outline: none;
+  box-shadow: none;
+}
 h1,
 h2,
 h3,
@@ -1765,7 +1772,7 @@ input::-webkit-date-and-time-value {
 }
 @media (max-width: 759px) {
   :root:has(.trip-tabs) {
-    --nav-height: 66px;
+    --nav-height: 84px;
   }
   .page {
     padding: 24px 16px
@@ -1839,10 +1846,10 @@ input::-webkit-date-and-time-value {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 0;
-    padding: 5px max(4px, env(safe-area-inset-right))
-      calc(5px + env(safe-area-inset-bottom))
-      max(4px, env(safe-area-inset-left));
-    min-height: calc(66px + env(safe-area-inset-bottom));
+    padding: 8px max(8px, env(safe-area-inset-right))
+      calc(20px + env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
+    min-height: calc(var(--nav-height) + env(safe-area-inset-bottom));
     background: var(--paper);
     border-top: 1px solid var(--line);
   }

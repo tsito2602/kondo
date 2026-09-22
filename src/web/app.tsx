@@ -67,6 +67,30 @@ import {
 export function App() {
   const auth = useAuth();
   useEffect(() => {
+    const root = document.documentElement;
+    const pointer = () => {
+      root.dataset.inputModality = "pointer";
+    };
+    const keyboard = (event: KeyboardEvent) => {
+      if (
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !["Shift", "Control", "Alt", "Meta"].includes(event.key)
+      ) {
+        root.dataset.inputModality = "keyboard";
+      }
+    };
+    pointer();
+    document.addEventListener("pointerdown", pointer, true);
+    document.addEventListener("keydown", keyboard, true);
+    return () => {
+      document.removeEventListener("pointerdown", pointer, true);
+      document.removeEventListener("keydown", keyboard, true);
+      delete root.dataset.inputModality;
+    };
+  }, []);
+  useEffect(() => {
     if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
     void navigator.serviceWorker
       .register("/sw.js", { updateViaCache: "none" })
