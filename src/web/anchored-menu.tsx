@@ -83,10 +83,15 @@ export function AnchoredMenu({
     position();
     node.showModal();
     const bounds = body.current!.getBoundingClientRect();
+    const panelRadius =
+      window
+        .getComputedStyle(document.documentElement)
+        .getPropertyValue("--radius-panel")
+        .trim() || "28px";
     const expanded = {
       width: `${bounds.width}px`,
       height: `${bounds.height}px`,
-      borderRadius: "26px",
+      borderRadius: panelRadius,
       backgroundColor: window
         .getComputedStyle(document.documentElement)
         .getPropertyValue("--menu-glass")
@@ -111,7 +116,11 @@ export function AnchoredMenu({
             offset: 0,
           },
           { opacity: 0, offset: 0.25 },
-          { opacity: 1, clipPath: "inset(0px round 26px)", offset: 1 },
+          {
+            opacity: 1,
+            clipPath: `inset(0px round ${panelRadius})`,
+            offset: 1,
+          },
         ],
         timing,
       );

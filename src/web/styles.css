@@ -37,7 +37,9 @@
   --field-tint: #ffffff66;
   --content-card: #f3f3f3;
   --panel-card-tint: #ffffff8f;
+  --radius-panel: 28px;
   --radius-card: 22px;
+  --radius-control: 999px;
   --radius-field: 16px;
   --dock-glass: #ffffff52;
   --dock-bottom-gap: 32px;
@@ -163,7 +165,7 @@ select {
   max-width: 100%;
 }
 :focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius-field);
   outline: 2px solid var(--brand);
   outline-offset: 3px;
 }
@@ -2687,7 +2689,7 @@ input::-webkit-date-and-time-value {
     background: var(--panel-tint);
     -webkit-backdrop-filter: blur(32px) saturate(1.05);
     backdrop-filter: blur(32px) saturate(1.05);
-    border-radius: 28px;
+    border-radius: var(--radius-panel);
     overflow-y: auto;
     overscroll-behavior: contain;
     scroll-padding-bottom: 24px;
@@ -3245,7 +3247,7 @@ input::-webkit-date-and-time-value {
   place-items: center;
   position: relative;
   z-index: 1;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: transparent;
 }
 .calendar-grid button span {
@@ -3270,7 +3272,7 @@ input::-webkit-date-and-time-value {
 .calendar-grid button:focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: -2px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
 }
 .calendar-highlights {
   position: absolute;
@@ -3391,7 +3393,7 @@ input::-webkit-date-and-time-value {
     background: var(--panel-tint);
     -webkit-backdrop-filter: blur(32px);
     backdrop-filter: blur(32px);
-    border-radius: 28px;
+    border-radius: var(--radius-panel);
   }
 }
 .task-list {
@@ -3624,11 +3626,18 @@ input::-webkit-date-and-time-value {
 .settings-card,
 .check-list,
 [data-slot="card"],
+.timeline-entry,
 .timeline-entry:not(.transport-entry) > div,
+.note-checklist,
+.task-row,
+.calendar-time,
+.toast,
 .detail-grid,
 .cover-upload {
   border-radius: var(--radius-card);
 }
+[data-slot="input"]:not([type="checkbox"]):not([type="radio"]),
+[data-slot="textarea"]:not(.note-editor),
 .field input:not([type="checkbox"]):not([type="radio"]),
 .field select,
 .field textarea,
@@ -3640,12 +3649,45 @@ input::-webkit-date-and-time-value {
 .notice,
 .document-row,
 .day-empty,
+.menu-list > button,
+.appearance-control button,
+.task-toggle,
+.thumb-date-grid button,
+.reference-link,
+.copy-code,
 .cover-upload img {
   border-radius: var(--radius-field);
 }
 .search,
-.badge {
-  border-radius: 999px;
+.badge,
+.booking-kind,
+.connection-strip,
+.place-icon,
+.primary,
+.secondary,
+.subtle,
+.text-button,
+.icon-button,
+.floating-add,
+.add-action,
+.task-edit,
+.trip-tabs a,
+.trip-tabs::before,
+.segmented,
+.segmented button,
+[data-slot="button"],
+[data-slot="tabs-list"],
+[data-slot="tabs-trigger"] {
+  border-radius: var(--radius-control);
+}
+.appearance-control {
+  border-radius: var(--radius-card);
+}
+.appearance-control button {
+  border-radius: var(--radius-field);
+}
+.login-art {
+  border-radius: var(--radius-panel);
 }
 .badge {
   padding-inline: 10px;
