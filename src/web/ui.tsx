@@ -141,6 +141,7 @@ export function Modal({
   dockActions?: { primary?: ReactNode; actions?: ReactNode };
 }>) {
   const ref = useRef<HTMLDialogElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   const id = useId();
   const [closing, setClosing] = useState(false);
   const [saveAction, setSaveAction] = useState<{
@@ -161,7 +162,10 @@ export function Modal({
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     origin.current = motionOrigin();
+    const opener = origin.current ?? focus;
     dialog.showModal();
+    // Start on the title: opening a screen must not activate an input/keyboard.
+    heading.current?.focus({ preventScroll: true });
     const enter = animateDialog(dialog, origin.current);
     animation.current = enter;
     backdropAnimation.current = dialog
@@ -183,7 +187,24 @@ export function Modal({
       backdropAnimation.current?.cancel();
       dialog.close();
       document.body.style.overflow = previous;
-      if (focus?.isConnected) focus.focus({ preventScroll: true });
+      if (document.documentElement.dataset.inputModality === "pointer") {
+        // Native dialog.close() may restore a stale tab panel on touch Safari.
+        // Clear that restoration without stealing focus from a newer dialog.
+        const restored = document.activeElement;
+        if (
+          restored instanceof HTMLElement &&
+          (restored === focus ||
+            restored === opener ||
+            dialog.contains(restored))
+        )
+          restored.blur();
+      } else if (
+        opener?.isConnected &&
+        !dialog.contains(opener) &&
+        !opener.closest("[inert], [hidden], dialog:not([open])")
+      ) {
+        opener.focus({ preventScroll: true });
+      }
     };
   }, []);
   useEffect(() => {
@@ -262,7 +283,9 @@ export function Modal({
             >
               <X />
             </Button>
-            <h2 id={id}>{title}</h2>
+            <h2 ref={heading} id={id} tabIndex={-1} autoFocus>
+              {title}
+            </h2>
             {action ?? <span className="icon-spacer" />}
           </header>
           <div className="modal-body">{children}</div>

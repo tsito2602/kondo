@@ -5,7 +5,6 @@ import { build } from "esbuild";
 import sharp from "sharp";
 import { JSDOM } from "jsdom";
 import React, { act } from "react";
-import { createRoot } from "react-dom/client";
 import { MemoryRouter, useLocation } from "react-router";
 
 const dom = new JSDOM('<div id="root"></div>', { url: "https://tabi.test/" });
@@ -20,6 +19,8 @@ Object.assign(globalThis, {
     setTimeout(() => callback(performance.now()), 16),
   cancelAnimationFrame: clearTimeout,
 });
+// Load the DOM renderer after jsdom so React detects native input events.
+const { createRoot } = await import("react-dom/client");
 let reduced = false;
 globalThis.matchMedia = () => ({ matches: reduced });
 dom.window.HTMLDialogElement.prototype.showModal = function () {
@@ -167,6 +168,87 @@ test("dialog reverses its retained timeline and backdrop before dismissing, incl
     } finally {
       await act(async () => root.unmount());
     }
+  }
+});
+
+test("forms open without activating inputs and only keyboard dismissal restores the opener", async () => {
+  const nativeShow = dom.window.HTMLDialogElement.prototype.showModal;
+  const nativeClose = dom.window.HTMLDialogElement.prototype.close;
+  const previousFocus = new WeakMap();
+  dom.window.HTMLDialogElement.prototype.showModal = function () {
+    previousFocus.set(this, document.activeElement);
+    this.open = true;
+    (
+      this.querySelector("[autofocus]") ?? this.querySelector("input, button")
+    )?.focus();
+  };
+  dom.window.HTMLDialogElement.prototype.close = function () {
+    this.open = false;
+    previousFocus.get(this)?.focus();
+  };
+  try {
+    for (const modality of ["pointer", "keyboard"]) {
+      document.documentElement.dataset.inputModality = modality;
+      const opener = document.createElement("button");
+      opener.textContent = "やることを編集";
+      document.body.append(opener);
+      opener.focus();
+      const root = createRoot(document.getElementById("root"));
+      try {
+        await act(async () =>
+          root.render(
+            React.createElement(
+              Modal,
+              { title: "やることを編集", onClose: () => {} },
+              React.createElement("input", { "aria-label": "やること" }),
+            ),
+          ),
+        );
+        const dialog = document.querySelector("dialog");
+        assert.equal(document.activeElement, dialog.querySelector("h2"));
+        const input = dialog.querySelector("input");
+        input.focus();
+        assert.equal(
+          document.activeElement,
+          input,
+          "explicit input focus still works",
+        );
+        await act(async () => root.unmount());
+        assert.equal(
+          document.activeElement,
+          modality === "keyboard" ? opener : document.body,
+        );
+      } finally {
+        opener.remove();
+      }
+    }
+    // On touch Safari, the active element can still be the preparation tab panel.
+    document.documentElement.dataset.inputModality = "pointer";
+    const panel = document.createElement("div");
+    panel.tabIndex = 0;
+    panel.setAttribute("role", "tabpanel");
+    document.body.append(panel);
+    panel.focus();
+    const root = createRoot(document.getElementById("root"));
+    await act(async () =>
+      root.render(
+        React.createElement(Modal, {
+          title: "やることを編集",
+          onClose: () => {},
+        }),
+      ),
+    );
+    await act(async () => root.unmount());
+    assert.equal(
+      document.activeElement,
+      document.body,
+      "no stale panel focus after returning",
+    );
+    panel.remove();
+  } finally {
+    delete document.documentElement.dataset.inputModality;
+    dom.window.HTMLDialogElement.prototype.showModal = nativeShow;
+    dom.window.HTMLDialogElement.prototype.close = nativeClose;
   }
 });
 

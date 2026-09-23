@@ -463,7 +463,6 @@ function Home() {
               <p>共有された旅のしおりに参加します。</p>
               <Field label="招待リンク">
                 <Input
-                  autoFocus
                   required
                   value={invite.trimStart()}
                   onChange={(event) => setInvite(event.target.value || " ")}

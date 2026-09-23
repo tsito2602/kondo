@@ -366,12 +366,24 @@ test("legacy account cache and pending changes survive React migration; real for
     await tick(200);
     await click(byText("nav a", "準備"));
     await click(document.querySelector('[aria-label="やることを追加"]'));
+    assert.equal(document.activeElement, document.querySelector("dialog h2"));
+    assert.equal(document.querySelector("dialog input[autofocus]"), null);
     await fill("やること", "チケットを予約");
     await submit();
     assert.equal(
       db.prepare("SELECT COUNT(*) AS n FROM travel_tasks").get().n,
       1,
     );
+    const preparationPanel = document.querySelector('[role="tabpanel"]');
+    preparationPanel.focus();
+    await click(
+      byText(".check-content strong", "チケットを予約")?.closest("button"),
+    );
+    assert.equal(document.activeElement, document.querySelector("dialog h2"));
+    await click(document.querySelector('.context-back [aria-label="戻る"]'));
+    await tick(30);
+    assert.equal(document.querySelector("dialog"), null);
+    assert.notEqual(document.activeElement, preparationPanel);
     await click(document.querySelector('[role="tab"][aria-label="持ち物"]'));
     await click(document.querySelector('[aria-label="持ち物を追加"]'));
     await fill("持ち物", "充電器");
@@ -382,6 +394,7 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await click(byText("nav a", "メモ"));
     await click(document.querySelector('[aria-label="メモを書く"]'));
+    assert.equal(document.activeElement, document.querySelector("dialog h2"));
     const textarea = document.querySelector('[aria-label="メモ本文"]');
     await act(async () => {
       Object.getOwnPropertyDescriptor(

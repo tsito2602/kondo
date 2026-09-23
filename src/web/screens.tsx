@@ -1037,7 +1037,6 @@ function NoteEditor({
       )}
       <Textarea
         ref={input}
-        autoFocus={canEdit}
         readOnly={!canEdit}
         className="note-editor"
         maxLength={50000}

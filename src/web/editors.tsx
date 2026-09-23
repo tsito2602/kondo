@@ -165,7 +165,6 @@ export function TripEditor({
         </div>
         <Field label="旅行名">
           <Input
-            autoFocus
             required
             maxLength={120}
             placeholder="ヨーロッパ旅行"
@@ -308,7 +307,6 @@ export function ItemEditor({
         </Field>
         <Field label="タイトル">
           <Input
-            autoFocus
             required
             maxLength={160}
             value={draft.title}
@@ -753,7 +751,6 @@ export function PlaceEditor({
       <form className="form" onSubmit={submit}>
         <Field label="場所の名前">
           <Input
-            autoFocus
             required
             maxLength={160}
             value={draft.title}
@@ -973,7 +970,6 @@ export function PreparationEditor({
       <form className="form" onSubmit={submit}>
         <Field label={task ? "やること" : "持ち物"}>
           <Input
-            autoFocus
             required
             maxLength={task ? 160 : 120}
             value={name}
