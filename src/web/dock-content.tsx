@@ -52,8 +52,8 @@ export class DockContent extends Component<Props> {
     );
     node.inert = true;
     this.entrance = node.animate([{ opacity: 0 }, { opacity: 1 }], {
-      delay: 300,
-      duration: 280,
+      delay: 180,
+      duration: 240,
       easing: "cubic-bezier(0.22, 1, 0.36, 1)",
       fill: "backwards",
     });

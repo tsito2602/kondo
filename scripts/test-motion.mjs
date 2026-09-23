@@ -31,7 +31,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { DockContent } from './src/web/dock-content'; export { dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { DockContent } from './src/web/dock-content'; export { dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -54,6 +54,7 @@ const {
   AnchoredMenu,
   SafariTabs,
   dockOutline,
+  dockContour,
   dockField,
   dockFieldPath,
   dockSlots,
@@ -1128,7 +1129,7 @@ test("all dock layouts morph through a shared contour with real necks and clean 
       assert.equal(split(x, 32), 255);
     // Fixed nearby islands actually pull together through a concave bridge,
     // then separate again, even when the surrounding layout is already split.
-    const neck = await raster(layouts[1], layouts[3], 0.5);
+    const neck = await raster(layouts[1], layouts[3], 0.2);
     assert.equal(neck(69, 32), 255);
     assert.equal(neck(69, 8), 0, "the bridge must have a visible waist");
   }
@@ -1247,12 +1248,11 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
     ]);
     assert.equal(
       border.getAttribute("d"),
-      dockFieldPath(
+      dockContour(
         w + 24,
-        dockField(
-          w + 24,
-          settings.map((island) => ({ ...island, left: island.left + 12 })),
-        ),
+        settings.map((island) => ({ ...island, left: island.left + 12 })),
+        0,
+        [],
         44,
       ),
     );
@@ -1273,12 +1273,11 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
     const expanded = border.getAttribute("d");
     assert.notEqual(
       expanded,
-      dockFieldPath(
+      dockContour(
         w + 24,
-        dockField(
-          w + 24,
-          settings.map((island) => ({ ...island, left: island.left + 12 })),
-        ),
+        settings.map((island) => ({ ...island, left: island.left + 12 })),
+        0,
+        [],
         44,
       ),
     );
@@ -1396,4 +1395,96 @@ test("dock labels fade out before replacement appears, with inert snapshots and 
     if (original) HTMLElement.prototype.animate = original;
     else delete HTMLElement.prototype.animate;
   }
+});
+
+test("edit/delete stretches left into save without shrinking, rebounding, or moving back", () => {
+  for (const w of [308, 366, 420]) {
+    const back = { left: 0, width: 64, radius: 32 };
+    const actions = { left: w - 128, width: 128, radius: 32 };
+    const save = { left: 74, width: w - 74, radius: 32 };
+    const detail = dockSlots(w, [back, null, actions]);
+    const edit = dockSlots(w, [back, save, null]);
+    for (const [from, to, grows] of [
+      [detail, edit, true],
+      [edit, detail, false],
+    ]) {
+      let previous = grows ? actions.width : save.width;
+      for (let frame = 1; frame <= 120; frame++) {
+        const shape = morphDock(from, to, 0, frame / 120);
+        const visible = shape.islands.filter((island) => island.width > 0);
+        assert.equal(visible.length, 2, "no new droplet is created");
+        assert.deepEqual(visible[0], back);
+        const right = visible[1];
+        assert.ok(
+          Math.abs(right.left + right.width - w) < 0.001,
+          "right edge stays anchored",
+        );
+        assert.equal(right.radius, 32, "height remains 64px throughout");
+        assert.ok(
+          grows ? right.width >= previous : right.width <= previous,
+          "motion never reverses",
+        );
+        assert.equal(shape.tension, 0, "back remains separate");
+        previous = right.width;
+        const d = dockContour(w, shape.islands);
+        assert.equal((d.match(/M /g) ?? []).length, 2);
+        assert.ok(
+          d.length < 500,
+          "simple resizing uses short exact arcs instead of hundreds of samples",
+        );
+      }
+    }
+    const interrupted = morphDock(detail, edit, 0, 0.35);
+    const reverse = morphDock(
+      interrupted.islands,
+      detail,
+      interrupted.tension,
+      0,
+    );
+    assert.equal(
+      dockContour(w, reverse.islands),
+      dockContour(w, interrupted.islands),
+    );
+  }
+});
+
+test("exact dock capsules retain transparent gaps, round edges, and pressed geometry", async () => {
+  const w = 366;
+  const islands = dockSlots(w, [
+    { left: 0, width: 64, radius: 32 },
+    { left: 74, width: w - 74, radius: 32 },
+    null,
+  ]);
+  const d = dockContour(
+    w + 24,
+    islands.map((island) => ({ ...island, left: island.left + 12 })),
+    0,
+    [
+      { x: 1, y: 1 },
+      { x: 1.06, y: 1.1 },
+    ],
+    44,
+  );
+  const { data, info } = await sharp(
+    Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="390" height="88"><path d="${d}" fill="white"/></svg>`,
+    ),
+  )
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const pixel = (x, y) => data[(y * info.width + x) * 4 + 3];
+  assert.equal(pixel(44, 13), 255);
+  assert.equal(pixel(12, 12), 0, "circular back corner is transparent");
+  assert.equal(pixel(76, 44), 0, "controls do not share an internal fill");
+  assert.equal(
+    pixel(230, 9),
+    255,
+    "pressed save grows above its normal top edge",
+  );
+  assert.equal(
+    (dockContour(w, joinedDock(w)).match(/M /g) ?? []).length,
+    1,
+    "joined tabs have one contour without internal borders",
+  );
 });

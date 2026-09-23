@@ -11,7 +11,7 @@ import { animateDockPress } from "./dock-surface";
 
 export type DockIsland = { left: number; width: number; radius: number };
 const samples = 320;
-const ease = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
+const ease = (t: number) => 1 - (1 - t) ** 3;
 
 /** Three overlapping lobes make one capsule, with no internal seams. */
 export function joinedDock(width: number, radius = 32): DockIsland[] {
@@ -41,6 +41,29 @@ export function dockSlots(
   });
 }
 
+/** Preserve visible surfaces by position when a control changes its role. */
+export function matchDockIslands(from: DockIsland[], to: DockIsland[]) {
+  const visible = (islands: DockIsland[]) =>
+    islands
+      .map((island, index) => ({ island, index }))
+      .filter(({ island }) => island.width > 0 && island.radius > 0)
+      .sort((a, b) => a.island.left - b.island.left);
+  const a = visible(from),
+    b = visible(to);
+  if (a.length !== b.length || a.length > 2) return from;
+  const matched = from.slice();
+  b.forEach(({ index }, i) => {
+    matched[index] = a[i].island;
+  });
+  const absent = from.filter(
+    (island) => island.width === 0 || island.radius === 0,
+  );
+  to.forEach((island, i) => {
+    if (island.width === 0 || island.radius === 0) matched[i] = absent.shift()!;
+  });
+  return matched;
+}
+
 export function morphDock(
   from: DockIsland[],
   to: DockIsland[],
@@ -49,25 +72,22 @@ export function morphDock(
 ) {
   if (t >= 1) return { islands: to, tension: 0 };
   if (t <= 0) return { islands: from, tension };
-  // Stretch slowly against a persistent bridge, then release quickly. The
-  // final damped squeeze is horizontal so every surface keeps the same height.
-  const release = Math.max(0, Math.min(1, (t - 0.52) / 0.22));
-  const p = t < 0.52 ? 0.68 * ease(t / 0.52) : 0.68 + 0.32 * ease(release);
-  const settle = Math.max(0, (t - 0.66) / 0.34);
-  const recoil =
-    0.065 * Math.sin(settle * Math.PI * 2) ** 2 * (1 - settle) ** 2;
-  const stick = ease(Math.min(1, t / 0.24)) * (1 - ease(release));
+  from = matchDockIslands(from, to);
+  const visibleCount = (islands: DockIsland[]) =>
+    islands.filter((island) => island.width > 0 && island.radius > 0).length;
+  const simpleResize =
+    visibleCount(from) === visibleCount(to) && visibleCount(to) <= 2;
+  // One monotonic curve: no mid-flight stop, restart or settling oscillation.
+  const p = ease(t);
   return {
-    islands: from.map((island, i) => {
-      const width = island.width + (to[i].width - island.width) * p;
-      const squeeze = width * recoil;
-      return {
-        left: island.left + (to[i].left - island.left) * p + squeeze / 2,
-        width: width - squeeze,
-        radius: island.radius + (to[i].radius - island.radius) * p,
-      };
-    }),
-    tension: tension * (1 - p) + 2200 * stick,
+    islands: from.map((island, i) => ({
+      left: island.left + (to[i].left - island.left) * p,
+      width: island.width + (to[i].width - island.width) * p,
+      radius: island.radius + (to[i].radius - island.radius) * p,
+    })),
+    tension:
+      tension * (1 - p) +
+      (simpleResize ? 0 : 1800 * Math.sin(Math.PI * p) ** 2),
   };
 }
 
@@ -143,6 +163,67 @@ export function dockFieldPath(width: number, field: number[], center = 32) {
   return contours.join(" ");
 }
 
+type DockScale = { x: number; y: number };
+
+/** Exact arcs for simple capsules; sample a field only during an actual neck. */
+export function dockContour(
+  width: number,
+  islands: DockIsland[],
+  tension = 0,
+  scales: DockScale[] = [],
+  center = 32,
+) {
+  if (tension > 0)
+    return dockFieldPath(
+      width,
+      dockField(width, islands, tension, scales),
+      center,
+    );
+  const capsules = islands
+    .flatMap((island, i) => {
+      if (island.width <= 0 || island.radius <= 0) return [];
+      const { x, y } = scales[i] ?? { x: 1, y: 1 };
+      const r = Math.min(island.radius, island.width / 2);
+      return [
+        {
+          left: island.left + (island.width * (1 - x)) / 2,
+          right: island.left + (island.width * (1 + x)) / 2,
+          rx: r * x,
+          ry: r * y,
+        },
+      ];
+    })
+    .sort((a, b) => a.left - b.left);
+  const merged: typeof capsules = [];
+  for (const capsule of capsules) {
+    const previous = merged.at(-1);
+    if (previous && capsule.left < previous.right) {
+      if (
+        Math.abs(capsule.rx - previous.rx) < 0.001 &&
+        Math.abs(capsule.ry - previous.ry) < 0.001 &&
+        capsule.left + capsule.rx <= previous.right - previous.rx + 0.001
+      ) {
+        previous.right = Math.max(previous.right, capsule.right);
+        continue;
+      }
+      return dockFieldPath(
+        width,
+        dockField(width, islands, tension, scales),
+        center,
+      );
+    }
+    merged.push({ ...capsule });
+  }
+  const n = (value: number) => Number(value.toFixed(3));
+  return merged
+    .map(({ left, right, rx, ry }) => {
+      const top = center - ry,
+        bottom = center + ry;
+      return `M ${n(left + rx)} ${n(top)} H ${n(right - rx)} A ${n(rx)} ${n(ry)} 0 0 1 ${n(right)} ${n(center)} A ${n(rx)} ${n(ry)} 0 0 1 ${n(right - rx)} ${n(bottom)} H ${n(left + rx)} A ${n(rx)} ${n(ry)} 0 0 1 ${n(left)} ${n(center)} A ${n(rx)} ${n(ry)} 0 0 1 ${n(left + rx)} ${n(top)} Z`;
+    })
+    .join(" ");
+}
+
 export type FluidDockHandle = { measure: () => void };
 
 /** Lives in the provider, so routes and nested dialogs never replace the glass. */
@@ -162,7 +243,27 @@ export function FluidDockSurface({
   const target = useRef("");
   const width = useRef(0);
   const frame = useRef(0);
-  const pressFrame = useRef(0);
+  const morph = useRef<{
+    from: DockIsland[];
+    to: DockIsland[];
+    tension: number;
+    start: number;
+  } | null>(null);
+  const presses = useRef(
+    new Map<
+      HTMLElement,
+      {
+        from: DockScale;
+        to: DockScale;
+        start: number;
+        duration: number;
+        animation?: Animation;
+      }
+    >(),
+  );
+  const lastPath = useRef("");
+  const lastAccentPath = useRef("");
+  const accentIndex = useRef(1);
   const controls = useRef<(HTMLElement | null)[]>([]);
   const id = useId();
   const paint = () => {
@@ -172,25 +273,67 @@ export function FluidDockSurface({
       ...island,
       left: island.left + 12,
     }));
-    const scales = controls.current.map((element) => {
-      const matrix =
-        element &&
-        window.getComputedStyle(element).transform.match(/^matrix\(([^)]+)\)$/);
-      const values = matrix?.[1].split(",").map(Number);
-      return { x: values?.[0] || 1, y: values?.[3] || 1 };
-    });
-    const d = dockFieldPath(
+    const scales = controls.current.map((element) =>
+      pressScale(element, performance.now()),
+    );
+    const d = dockContour(w, islands, shape.current.tension, scales, 44);
+    if (d !== lastPath.current) {
+      glass.current.style.clipPath = `path("${d}")`;
+      outline.current!.setAttribute("d", d);
+      shadow.current!.setAttribute("d", d);
+      lastPath.current = d;
+    }
+    const a = dockContour(
       w,
-      dockField(w, islands, shape.current.tension, scales),
+      [islands[accentIndex.current]],
+      0,
+      [scales[accentIndex.current]],
       44,
     );
-    glass.current.style.clipPath = `path("${d}")`;
-    if (accent.current)
-      accent.current.style.clipPath = `path("${dockFieldPath(w, dockField(w, [islands[1]], 0, [scales[1] ?? { x: 1, y: 1 }]), 44)}")`;
-    outline.current!.setAttribute("d", d);
-    shadow.current!.setAttribute("d", d);
-    svg.current!.setAttribute("viewBox", `0 0 ${w} 88`);
+    if (accent.current && a !== lastAccentPath.current) {
+      accent.current.style.clipPath = `path("${a}")`;
+      lastAccentPath.current = a;
+    }
   };
+  const pressScale = (element: HTMLElement | null, now: number): DockScale => {
+    const track = element && presses.current.get(element);
+    if (!track) return { x: 1, y: 1 };
+    const t = Math.min(1, Math.max(0, (now - track.start) / track.duration));
+    // WAAPI already knows the eased progress; this does not flush style/layout.
+    const p =
+      t >= 1
+        ? 1
+        : (track.animation?.effect?.getComputedTiming().progress ?? ease(t));
+    return {
+      x: track.from.x + (track.to.x - track.from.x) * p,
+      y: track.from.y + (track.to.y - track.from.y) * p,
+    };
+  };
+  const tick = (now: number) => {
+    frame.current = 0;
+    if (morph.current) {
+      const m = morph.current;
+      const t = Math.min(1, Math.max(0, (now - m.start) / 600));
+      shape.current = morphDock(m.from, m.to, m.tension, t);
+      if (t >= 1) morph.current = null;
+    }
+    let pressing = false;
+    for (const [element, track] of presses.current) {
+      if (!element.isConnected) {
+        presses.current.delete(element);
+        continue;
+      }
+      if (now - track.start < track.duration) pressing = true;
+      else if (track.to.x === 1 && track.to.y === 1)
+        presses.current.delete(element);
+    }
+    paint();
+    if (morph.current || pressing) frame.current = requestAnimationFrame(tick);
+  };
+  const schedule = () => {
+    if (!frame.current) frame.current = requestAnimationFrame(tick);
+  };
+
   const measure = () => {
     const node = root.current;
     if (!node) return;
@@ -255,25 +398,36 @@ export function FluidDockSurface({
       return;
     }
     target.current = key;
-    cancelAnimationFrame(frame.current);
     const from = shape.current;
+    accentIndex.current =
+      controls.current[1] || !from
+        ? 1
+        : Math.max(
+            0,
+            matchDockIslands(from.islands, islands).indexOf(
+              from.islands[accentIndex.current],
+            ),
+          );
     const resized = width.current !== w;
     width.current = w;
+    svg.current!.setAttribute("viewBox", `0 0 ${w + 24} 88`);
     if (!from || resized || reduceMotion()) {
+      morph.current = null;
+      cancelAnimationFrame(frame.current);
+      frame.current = 0;
       shape.current = { islands, tension: 0 };
       paint();
       return;
     }
     // Interrupted transitions start at the exact rendered geometry, not a layout
     // endpoint. Both the glass mask and its border use that same contour.
-    const start = performance.now();
-    const tick = (now: number) => {
-      const t = Math.min(1, Math.max(0, (now - start) / 820));
-      shape.current = morphDock(from.islands, islands, from.tension, t);
-      paint();
-      if (t < 1) frame.current = requestAnimationFrame(tick);
+    morph.current = {
+      from: from.islands,
+      to: islands,
+      tension: from.tension,
+      start: performance.now(),
     };
-    frame.current = requestAnimationFrame(tick);
+    schedule();
   };
   useEffect(() => {
     const node = root.current;
@@ -292,15 +446,29 @@ export function FluidDockSurface({
           () => {},
         );
       }
+      const style = window.getComputedStyle(element);
+      const matrix = style.transform
+        .match(/^matrix\(([^)]+)\)$/)?.[1]
+        .split(",")
+        .map(Number);
+      const from = matrix
+        ? { x: matrix[0], y: matrix[3] }
+        : pressScale(element, performance.now());
+      const x = down
+        ? parseFloat(style.getPropertyValue("--safari-press-scale")) || 1.06
+        : 1;
       element.dataset.pressed = String(down);
-      cancelAnimationFrame(pressFrame.current);
-      const start = performance.now();
-      const tick = () => {
-        paint();
-        if (!reduceMotion() && performance.now() - start < 920)
-          pressFrame.current = requestAnimationFrame(tick);
-      };
-      tick();
+      if (reduceMotion()) presses.current.delete(element);
+      else
+        presses.current.set(element, {
+          from,
+          to: { x, y: down ? 1.1 : 1 },
+          start: performance.now(),
+          duration: down ? 320 : 900,
+          animation: motion,
+        });
+      paint();
+      if (!reduceMotion()) schedule();
     };
     const release = () => {
       if (pressed) feedback(pressed, false);
@@ -340,7 +508,7 @@ export function FluidDockSurface({
       window.removeEventListener("pointercancel", up);
       window.removeEventListener("blur", release);
       animations.forEach((animation) => animation.cancel());
-      cancelAnimationFrame(pressFrame.current);
+      presses.current.clear();
     };
   }, []);
   useImperativeHandle(ref, () => ({ measure }));
