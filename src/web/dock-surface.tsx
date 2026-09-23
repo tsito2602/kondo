@@ -221,6 +221,7 @@ export function DockSurface({ split }: { split: boolean }) {
           fill="none"
           stroke={`url(#${id})`}
           strokeWidth="1"
+          vectorEffect="non-scaling-stroke"
         />
       </svg>
     </div>

@@ -31,7 +31,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { dockOutline } from './src/web/dock-surface'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline } from './src/web/dock-surface'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -52,6 +52,7 @@ const {
   Modal,
   SafariTabs,
   dockOutline,
+  dockKeyboardInset,
   SaveButton,
   dismissModal,
   useMotionNavigation,
@@ -762,4 +763,54 @@ test("dock contour pinches continuously and separates into three surfaces at mob
       "upper contour forms a visible concave neck",
     );
   }
+});
+
+test("dock ignores top-edge rubber banding and only lifts for a focused software keyboard", () => {
+  const input = document.createElement("input");
+  const viewport = { height: 800, offsetTop: 0, scale: 1 };
+  for (const offsetTop of [-240, -120, -20, 0, 80]) {
+    assert.equal(
+      dockKeyboardInset(800, { ...viewport, offsetTop }, document.body),
+      0,
+    );
+    assert.equal(dockKeyboardInset(800, { ...viewport, offsetTop }, input), 0);
+  }
+  assert.equal(
+    dockKeyboardInset(800, { ...viewport, height: 740 }, input),
+    0,
+    "browser chrome does not open a keyboard",
+  );
+  assert.equal(
+    dockKeyboardInset(800, { ...viewport, height: 480 }, document.body),
+    0,
+    "no focused editor means no keyboard lift",
+  );
+  assert.equal(
+    dockKeyboardInset(800, { ...viewport, height: 480 }, input),
+    320,
+  );
+  assert.equal(
+    dockKeyboardInset(800, { ...viewport, height: 480, offsetTop: 50 }, input),
+    270,
+  );
+  assert.equal(
+    dockKeyboardInset(800, { ...viewport, height: 480, offsetTop: -30 }, input),
+    320,
+    "negative overscroll never adds extra lift",
+  );
+  assert.equal(
+    dockKeyboardInset(800, { ...viewport, height: 400, scale: 2 }, input),
+    0,
+    "pinch zoom is not a keyboard",
+  );
+  input.readOnly = true;
+  assert.equal(dockKeyboardInset(800, { ...viewport, height: 480 }, input), 0);
+  input.readOnly = false;
+  input.type = "checkbox";
+  assert.equal(
+    dockKeyboardInset(800, { ...viewport, height: 480 }, input),
+    0,
+    "checkbox focus does not require a keyboard",
+  );
+  assert.equal(dockKeyboardInset(800, null, input), 0);
 });

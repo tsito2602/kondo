@@ -50,6 +50,7 @@ import type { TripMember } from "@/data/types";
 import { formatDate, localDate } from "@/utils/dates";
 import { TripEditor } from "./editors";
 import { SafariTabs, tripTabs } from "./safari-tabs";
+import { dockKeyboardInset } from "./viewport";
 import { ThumbDock, ThumbDockProvider, ThumbActions } from "./thumb-dock";
 import {
   BookingsScreen,
@@ -121,17 +122,25 @@ export function App() {
       );
       document.documentElement.style.setProperty(
         "--modal-top",
-        `${viewport?.offsetTop ?? 0}px`,
+        `${Math.max(0, viewport?.offsetTop ?? 0)}px`,
+      );
+      document.documentElement.style.setProperty(
+        "--dock-keyboard-inset",
+        `${dockKeyboardInset(window.innerHeight, viewport, document.activeElement)}px`,
       );
     };
     update();
     viewport?.addEventListener("resize", update);
     viewport?.addEventListener("scroll", update);
     window.addEventListener("resize", update);
+    document.addEventListener("focusin", update);
+    document.addEventListener("focusout", update);
     return () => {
       viewport?.removeEventListener("resize", update);
       viewport?.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
+      document.removeEventListener("focusin", update);
+      document.removeEventListener("focusout", update);
     };
   }, []);
   if (auth.loading) return <Loading />;
