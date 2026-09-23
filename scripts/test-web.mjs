@@ -701,3 +701,117 @@ test("all-day hotel checkout remains visible in itinerary without an end time", 
     ],
   );
 });
+
+test("booking clocks keep local time prominent and normalize seasonal offsets to UTC without duplicate Japan time", async () => {
+  const { BookingSchedule } = await bundle(
+    "export { BookingSchedule } from './src/web/booking-schedule';",
+  );
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const booking = {
+    kind: "flight",
+    day: "2026-09-28",
+    time: "22:20",
+    endDay: "2026-09-29",
+    endTime: "05:30",
+    originCode: "NRT",
+    destinationCode: "DXB",
+  };
+  const render = (patch = {}) =>
+    new JSDOM(
+      renderToStaticMarkup(
+        React.createElement(BookingSchedule, {
+          booking: { ...booking, ...patch },
+        }),
+      ),
+    ).window.document;
+  const doc = render();
+  assert.deepEqual(
+    [...doc.querySelectorAll("h3")].map((n) => n.textContent),
+    ["出発", "到着"],
+  );
+  assert.deepEqual(
+    [...doc.querySelectorAll("time")].map((n) => n.textContent),
+    ["22:20", "05:30"],
+  );
+  assert.deepEqual(
+    [...doc.querySelectorAll(".booking-time-zone")].map((n) => n.textContent),
+    ["現地時刻 · UTC+9", "現地時刻 · UTC+4"],
+  );
+  assert.equal(doc.querySelectorAll(".booking-time-japan").length, 1);
+  assert.match(
+    doc.querySelector(".booking-time-japan").textContent,
+    /9\/29 10:30/,
+  );
+  assert.ok(!doc.body.textContent.includes("GMT"));
+  assert.match(
+    render({ destinationCode: "VIE", endDay: "2026-07-01" }).body.textContent,
+    /UTC\+2/,
+  );
+  assert.match(
+    render({ destinationCode: "VIE", endDay: "2026-11-22" }).body.textContent,
+    /UTC\+1/,
+  );
+  assert.match(
+    render({ destinationCode: "LHR", endDay: "2026-11-22" }).body.textContent,
+    /UTC\+0/,
+  );
+  const unknown = render({ destinationCode: "XXX" });
+  assert.match(unknown.body.textContent, /時差未確認/);
+  assert.equal(unknown.querySelectorAll(".booking-time-japan").length, 0);
+  const missing = render({ endTime: "" });
+  assert.match(missing.body.textContent, /時刻未設定/);
+  assert.equal(missing.querySelectorAll("time").length, 1);
+  assert.equal(missing.querySelectorAll(".booking-time-japan").length, 0);
+});
+
+test("booking details use kind-specific labels and keep single-date reservations to one column", async () => {
+  const { BookingSchedule } = await bundle(
+    "export { BookingSchedule } from './src/web/booking-schedule';",
+  );
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const render = (kind, patch = {}) =>
+    new JSDOM(
+      renderToStaticMarkup(
+        React.createElement(BookingSchedule, {
+          booking: {
+            kind,
+            day: "2026-11-22",
+            time: "15:00",
+            endDay: "2026-11-22",
+            endTime: "15:00",
+            ...patch,
+          },
+        }),
+      ),
+    ).window.document;
+  for (const [kind, labels] of [
+    ["hotel", ["チェックイン", "チェックアウト"]],
+    ["train", ["出発", "到着"]],
+    ["car", ["受取", "返却"]],
+    ["restaurant", ["予約"]],
+    ["ticket", ["入場"]],
+    ["other", ["開始"]],
+  ]) {
+    const doc = render(kind);
+    assert.deepEqual(
+      [...doc.querySelectorAll("h3")].map((n) => n.textContent),
+      labels,
+    );
+    assert.equal(
+      doc.querySelectorAll(".booking-time-zone").length,
+      0,
+      "no airport timezone is inferred for other reservation kinds",
+    );
+  }
+  assert.equal(
+    render("restaurant", { endTime: "17:00" }).querySelectorAll("section")
+      .length,
+    2,
+    "a meaningful existing end time is preserved",
+  );
+  assert.equal(
+    render("ticket", { endDay: "2026-11-23" }).querySelectorAll("section")
+      .length,
+    2,
+  );
+});

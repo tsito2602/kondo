@@ -1,3 +1,4 @@
+import { BookingSchedule } from "./booking-schedule";
 import { dismissModal } from "./motion";
 import { Button } from "./obsidian/button";
 import { useEffect, useState } from "react";
@@ -18,7 +19,6 @@ import {
   findFlightConnections,
   flightConnectionCandidates,
   formatConnectionDuration,
-  localDateTimeToEpoch,
 } from "@/data/flight-connections";
 import {
   mapUrl,
@@ -55,7 +55,9 @@ export function BookingRoute({ booking }: { booking: Booking }) {
     <div className="booking-route">
       <div>
         <strong className={booking.originCode ? "route-code" : "route-label"}>
-          {booking.originCode || booking.origin || "出発"}
+          {booking.originCode ||
+            booking.origin ||
+            (booking.kind === "car" ? "受取" : "出発")}
         </strong>
         <span>{start?.name ?? booking.origin}</span>
       </div>
@@ -64,52 +66,12 @@ export function BookingRoute({ booking }: { booking: Booking }) {
         <strong
           className={booking.destinationCode ? "route-code" : "route-label"}
         >
-          {booking.destinationCode || booking.destination || "到着"}
+          {booking.destinationCode ||
+            booking.destination ||
+            (booking.kind === "car" ? "返却" : "到着")}
         </strong>
         <span>{end?.name ?? booking.destination}</span>
       </div>
-    </div>
-  );
-}
-function FlightTime({
-  day,
-  time,
-  code,
-}: {
-  day: string;
-  time: string;
-  code: string;
-}) {
-  const zone = findAirportByCode(code)?.timeZone;
-  const epoch = zone ? localDateTimeToEpoch(day, time, zone) : null;
-  const zoneName =
-    epoch !== null && zone
-      ? new Intl.DateTimeFormat("en", {
-          timeZone: zone,
-          timeZoneName: "shortOffset",
-        })
-          .formatToParts(epoch)
-          .find((part) => part.type === "timeZoneName")?.value
-      : "";
-  return (
-    <div>
-      <strong>
-        {formatDate(day)} {time}
-      </strong>
-      <p className="muted">現地時刻 {zoneName}</p>
-      {epoch !== null && (
-        <small>
-          日本時間{" "}
-          {new Intl.DateTimeFormat("ja-JP", {
-            timeZone: "Asia/Tokyo",
-            month: "numeric",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          }).format(epoch)}{" "}
-          JST
-        </small>
-      )}
     </div>
   );
 }
@@ -236,40 +198,7 @@ export function BookingDetail({
           {["flight", "train", "car"].includes(booking.kind) && (
             <BookingRoute booking={booking} />
           )}
-          <div className="detail-grid">
-            <section>
-              <h3>
-                {booking.kind === "hotel" ? "チェックイン" : "開始・出発"}
-              </h3>
-              {booking.kind === "flight" ? (
-                <FlightTime
-                  day={booking.day}
-                  time={booking.time}
-                  code={booking.originCode}
-                />
-              ) : (
-                <p>
-                  {formatDate(booking.day)} {booking.time}
-                </p>
-              )}
-            </section>
-            <section>
-              <h3>
-                {booking.kind === "hotel" ? "チェックアウト" : "終了・到着"}
-              </h3>
-              {booking.kind === "flight" ? (
-                <FlightTime
-                  day={booking.endDay || booking.day}
-                  time={booking.endTime}
-                  code={booking.destinationCode}
-                />
-              ) : (
-                <p>
-                  {formatDate(booking.endDay || booking.day)} {booking.endTime}
-                </p>
-              )}
-            </section>
-          </div>
+          <BookingSchedule booking={booking} />
           {bookingDurationLabel(booking) && (
             <p className="badge">{bookingDurationLabel(booking)}</p>
           )}

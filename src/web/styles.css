@@ -3663,3 +3663,56 @@ input::-webkit-date-and-time-value {
     --panel-card-tint: var(--soft);
   }
 }
+
+/* Put the local clock first; dates and conversions are supporting information. */
+.booking-schedule {
+  gap: 20px;
+}
+.booking-schedule.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+.booking-schedule > section {
+  min-width: 0;
+}
+.detail-stack .booking-schedule h3 {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.booking-time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+}
+.booking-time-date {
+  font-size: 13px;
+  font-weight: 500;
+}
+.booking-time-clock {
+  font-size: clamp(30px, 8vw, 38px);
+  font-weight: 650;
+  line-height: 1.12;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+}
+.booking-time-missing {
+  padding-block: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.booking-time-zone,
+.booking-time-japan {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.booking-time-zone {
+  margin-top: 4px;
+}
+.booking-time-japan {
+  display: flex;
+  flex-direction: column;
+  margin-top: 9px;
+}

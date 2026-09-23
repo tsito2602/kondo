@@ -575,8 +575,22 @@ export function BookingEditor({
         {route && (
           <>
             <div className="form-grid">
-              {field("origin", "出発地・受取場所")}
-              {field("destination", "到着地・返却場所")}
+              {field(
+                "origin",
+                draft.kind === "car"
+                  ? "受取場所"
+                  : draft.kind === "train"
+                    ? "出発駅"
+                    : "出発地",
+              )}
+              {field(
+                "destination",
+                draft.kind === "car"
+                  ? "返却場所"
+                  : draft.kind === "train"
+                    ? "到着駅"
+                    : "到着地",
+              )}
             </div>
             {draft.kind === "flight" && (
               <div className="form-grid">
