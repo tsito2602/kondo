@@ -10,6 +10,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
+import { menuDepth } from "./menu-depth";
 import {
   animateDialog,
   dismissModal,
@@ -150,6 +152,7 @@ export function Modal({
   } | null>(null);
   const origin = useRef<HTMLElement | null>(null);
   const animation = useRef<Animation | null>(null);
+  const depth = useRef<ReturnType<typeof menuDepth> | null>(null);
   const backdropAnimation = useRef<Animation | undefined>(undefined);
   const closeCallback = useRef(onClose);
   closeCallback.current = onClose;
@@ -168,6 +171,15 @@ export function Modal({
     heading.current?.focus({ preventScroll: true });
     const enter = animateDialog(dialog, origin.current);
     animation.current = enter;
+    depth.current = menuDepth(
+      reduceMotion(),
+      {
+        duration: 320,
+        easing: "cubic-bezier(.32, 0, .2, 1)",
+        fill: "both",
+      },
+      dialog,
+    );
     backdropAnimation.current = dialog
       .getAnimations?.({ subtree: true })
       .find(
@@ -183,6 +195,8 @@ export function Modal({
     dialog.addEventListener("tabi:modal-close", requestClose);
     return () => {
       dialog.removeEventListener("tabi:modal-close", requestClose);
+      depth.current?.cancel();
+      depth.current = null;
       animation.current?.cancel();
       backdropAnimation.current?.cancel();
       dialog.close();
@@ -213,8 +227,10 @@ export function Modal({
     if (exit && !reduceMotion()) {
       exit.playbackRate = -1.15;
       exit.play();
+      depth.current?.reverse(exit.currentTime, -1.15);
       const backdrop = backdropAnimation.current;
       if (backdrop) {
+        backdrop.currentTime = exit.currentTime;
         backdrop.playbackRate = -1.15;
         backdrop.play();
         void backdrop.finished.catch(() => undefined);
@@ -237,7 +253,7 @@ export function Modal({
       exit?.cancel();
     };
   }, [closing]);
-  return (
+  return createPortal(
     <dialog
       ref={ref}
       aria-labelledby={id}
@@ -344,7 +360,8 @@ export function Modal({
           )}
         </ThumbDock>
       </ThumbFormContext.Provider>
-    </dialog>
+    </dialog>,
+    document.body,
   );
 }
 export function Field({

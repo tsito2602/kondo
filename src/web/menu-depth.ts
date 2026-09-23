@@ -1,16 +1,32 @@
 /** Recede the live page around the viewport, without moving fixed controls or scroll. */
-export function menuDepth(reduced: boolean, timing: KeyframeAnimationOptions) {
-  const layers = Array.from(
-    document.querySelectorAll<HTMLElement>(
-      "#root > header, #root > .demo-banner, #main-content, body > .thumb-dock-host .thumb-dock",
-    ),
-  );
+export function menuDepth(
+  reduced: boolean,
+  timing: KeyframeAnimationOptions,
+  foreground?: HTMLDialogElement,
+) {
+  const previousPanel = foreground
+    ? Array.from(
+        document.querySelectorAll<HTMLDialogElement>("dialog.modal[open]"),
+      )
+        .filter((dialog) => dialog !== foreground)
+        .at(-1)
+        ?.querySelector<HTMLElement>(".modal-inner")
+    : null;
+  const layers = previousPanel
+    ? [previousPanel]
+    : Array.from(
+        document.querySelectorAll<HTMLElement>(
+          foreground
+            ? "#root > header, #root > .demo-banner, #main-content"
+            : "#root > header, #root > .demo-banner, #main-content, body > .thumb-dock-host .thumb-dock",
+        ),
+      );
   const restore: (() => void)[] = [];
   const animations: Animation[] = [];
   const main = document.getElementById("main-content");
   // A transformed ancestor becomes the containing block of fixed descendants.
   // Preserve their screen coordinates before scaling the reading layer.
-  if (main) {
+  if (main && layers.includes(main)) {
     const bounds = main.getBoundingClientRect();
     const fixed = Array.from(
       main.querySelectorAll<HTMLElement>(
@@ -65,10 +81,10 @@ export function menuDepth(reduced: boolean, timing: KeyframeAnimationOptions) {
     }
   }
   return {
-    reverse(time: CSSNumberish | null) {
+    reverse(time: CSSNumberish | null, rate = -1) {
       for (const motion of animations) {
         motion.currentTime = time;
-        motion.playbackRate = -1;
+        motion.playbackRate = rate;
         motion.play();
       }
     },

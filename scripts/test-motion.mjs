@@ -309,8 +309,9 @@ test("route layers cover short pages, clip header and dock, and leave no opaque 
 
 test("dialog reverses its retained timeline and backdrop before dismissing, including interrupted opening and Save", async () => {
   for (const trigger of ["close", "early-close", "save", "escape"]) {
-    let surface, backdrop;
+    let surface, backdrop, background;
     HTMLElement.prototype.animate = function () {
+      if (this.id === "main-content") return (background = timeline());
       surface = timeline();
       return surface;
     };
@@ -326,21 +327,31 @@ test("dialog reverses its retained timeline and backdrop before dismissing, incl
         dismissed++;
         setOpen(false);
       };
-      return open
-        ? React.createElement(
-            Modal,
-            { title: "詳細", onClose: close },
-            React.createElement(
-              "button",
-              { onClick: () => dismissModal(close) },
-              "保存",
-            ),
-          )
-        : null;
+      return React.createElement(
+        React.Fragment,
+        null,
+        React.createElement("main", { id: "main-content" }),
+        open
+          ? React.createElement(
+              Modal,
+              { title: "詳細", onClose: close },
+              React.createElement(
+                "button",
+                { onClick: () => dismissModal(close) },
+                "保存",
+              ),
+            )
+          : null,
+      );
     }
     try {
       await act(async () => root.render(React.createElement(Harness)));
       const dialog = document.querySelector("dialog");
+      assert.equal(
+        dialog.parentElement,
+        document.body,
+        "foreground stays outside the blurred root",
+      );
       surface.currentTime = trigger === "early-close" ? 80 : 320;
       backdrop.currentTime = surface.currentTime;
       if (trigger !== "early-close") await act(async () => surface.finish());
@@ -359,6 +370,8 @@ test("dialog reverses its retained timeline and backdrop before dismissing, incl
         else dialog.querySelector('[aria-label="閉じる"]').click();
       });
       assert.equal(surface.playbackRate, -1.15);
+      assert.equal(background.playbackRate, -1.15);
+      assert.equal(background.currentTime, surface.currentTime);
       assert.equal(backdrop.playbackRate, -1.15);
       assert.equal(
         surface.currentTime,
@@ -372,6 +385,7 @@ test("dialog reverses its retained timeline and backdrop before dismissing, incl
       assert.equal(document.querySelector("dialog"), null);
       assert.equal(document.body.style.overflow, "");
       assert.equal(surface.cancelled, true);
+      assert.equal(background.cancelled, true);
     } finally {
       await act(async () => root.unmount());
     }
@@ -2060,5 +2074,42 @@ test("menu depth keeps scrolled fixed controls in place and reverses from an int
     assert.equal(add.getAttribute("style"), originalStyle);
   } finally {
     main.remove();
+  }
+});
+
+test("a foreground panel leaves the dock sharp and a nested panel only recedes its parent", () => {
+  const main = document.createElement("main");
+  main.id = "main-content";
+  document.getElementById("root").append(main);
+  const dockHost = document.createElement("div");
+  dockHost.className = "thumb-dock-host";
+  dockHost.innerHTML = '<div class="thumb-dock"></div>';
+  const first = document.createElement("dialog");
+  first.className = "modal";
+  first.open = true;
+  first.innerHTML = '<div class="modal-inner"></div>';
+  document.body.append(dockHost, first);
+  const animated = [];
+  HTMLElement.prototype.animate = function () {
+    animated.push(this);
+    return timeline();
+  };
+  try {
+    const outer = menuDepth(false, { duration: 320 }, first);
+    assert.deepEqual(animated, [main]);
+    const second = document.createElement("dialog");
+    second.className = "modal";
+    second.open = true;
+    document.body.append(second);
+    animated.length = 0;
+    const inner = menuDepth(false, { duration: 320 }, second);
+    assert.deepEqual(animated, [first.querySelector(".modal-inner")]);
+    inner.cancel();
+    second.remove();
+    outer.cancel();
+  } finally {
+    main.remove();
+    first.remove();
+    dockHost.remove();
   }
 });

@@ -34,7 +34,7 @@ export function animateDialog(
   const bounds = panel.getBoundingClientRect();
   const source = origin?.isConnected ? origin.getBoundingClientRect() : null;
   const full = {
-    clipPath: "inset(0px 0px 0px 0px round 0px)",
+    clipPath: `inset(0px 0px 0px 0px round ${window.getComputedStyle(panel).borderRadius || "0px"})`,
     transform: "translateY(0px)",
     opacity: 1,
   };
