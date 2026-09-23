@@ -25,3 +25,17 @@ export function mapUrl(location: string, title = ''): string | null {
   const query = text || title.trim();
   return query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : null;
 }
+
+/** Only a saved Google Maps link enables the card's direct map action. */
+export function registeredGoogleMapsUrl(location: string): string | null {
+  const href = referenceUrl(location);
+  if (!href) return null;
+  const url = new URL(href);
+  const host = url.hostname.toLowerCase();
+  const googleDomain = 'google\\.(?:com|[a-z]{2}|com\\.[a-z]{2}|co\\.[a-z]{2})';
+  const isMaps = host === 'maps.app.goo.gl' ||
+    (host === 'goo.gl' && /^\/maps(?:\/|$)/.test(url.pathname)) ||
+    new RegExp(`^maps\\.${googleDomain}$`).test(host) ||
+    (new RegExp(`^(?:www\\.)?${googleDomain}$`).test(host) && /^\/maps(?:\/|$)/.test(url.pathname));
+  return isMaps ? href : null;
+}

@@ -2716,6 +2716,60 @@ test("place cards separate detail and scheduling actions, and link scheduled vis
       "read-only visitors cannot schedule",
     );
     assert.ok(document.querySelector(".place-card-main"));
+    for (const [status, icon] of [
+      ["want", "heart"],
+      ["planned", "calendar-check"],
+      ["visited", "circle-check"],
+      ["skipped", "circle-pause"],
+    ]) {
+      await act(async () => render({ place: { ...place, status } }));
+      assert.ok(document.querySelector(`.place-status-label .lucide-${icon}`));
+    }
+    for (const location of [
+      "https://maps.app.goo.gl/demo",
+      "https://goo.gl/maps/demo",
+      "https://www.google.com/maps/search/?api=1&query=Vienna",
+      "https://maps.google.co.jp/?q=Vienna",
+    ]) {
+      await act(async () => render({ place: { ...place, location } }));
+      const map = document.querySelector(".place-card-map");
+      assert.equal(map.getAttribute("href"), location);
+      assert.equal(map.getAttribute("target"), "_blank");
+      assert.equal(
+        map.nextElementSibling.tagName,
+        "BUTTON",
+        "map precedes scheduling action",
+      );
+      await act(async () =>
+        render({
+          place: { ...place, location },
+          linked: { id: "item", day: "2026-11-22", time: "16:00" },
+          onSchedule: undefined,
+        }),
+      );
+      assert.match(
+        document.querySelector(".place-card-map").nextElementSibling
+          .textContent,
+        /しおりを見る/,
+      );
+      await act(async () =>
+        render({ place: { ...place, location }, onSchedule: undefined }),
+      );
+      assert.ok(
+        document.querySelector(".place-card-map"),
+        "viewers can open maps",
+      );
+    }
+    for (const location of [
+      "",
+      "旧市街",
+      "https://museum.example/",
+      "https://google.com.evil.example/maps",
+      "javascript:alert(1)",
+    ]) {
+      await act(async () => render({ place: { ...place, location } }));
+      assert.equal(document.querySelector(".place-card-map"), null);
+    }
   } finally {
     await act(async () => root.unmount());
   }

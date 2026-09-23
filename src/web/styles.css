@@ -4013,3 +4013,45 @@ input::-webkit-date-and-time-value {
 [data-press-card][data-press-active="true"] {
   transform: scale(1.04);
 }
+
+.place-status-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.place-status-label svg {
+  flex-shrink: 0;
+}
+.place-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+.place-card-actions .place-card-action {
+  padding-inline: 8px;
+}
+.preparation-tabs {
+  background: #fff;
+  border: 1px solid #0000000d;
+  box-shadow: 0 2px 8px #0000000a;
+  border-radius: 999px;
+}
+.preparation-tabs button {
+  color: #666;
+  border-radius: 999px;
+}
+.preparation-tabs[data-active-tab]::before,
+.preparation-tabs .selected {
+  background: #171717;
+}
+.preparation-tabs [data-state="active"],
+.preparation-tabs .selected {
+  color: #fff;
+}
+.preparation-tabs .tab-count {
+  color: inherit;
+  opacity: 0.75;
+}

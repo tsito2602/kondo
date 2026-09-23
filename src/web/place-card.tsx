@@ -1,12 +1,14 @@
+import { PlaceStatusLabel } from "./place-status";
 import {
   BookOpen,
   CalendarDays,
   ChevronRight,
   MapPin,
+  Map,
   Plus,
 } from "lucide-react";
 import { Link } from "react-router";
-import { placeStatuses, reservationStatuses } from "@/data/places";
+import { registeredGoogleMapsUrl, reservationStatuses } from "@/data/places";
 import type { ItineraryItem, Place } from "@/data/types";
 import { formatDate } from "@/utils/dates";
 
@@ -23,6 +25,7 @@ export function PlaceCard({
   onOpen: () => void;
   onSchedule?: () => void;
 }) {
+  const mapsHref = registeredGoogleMapsUrl(place.location || "");
   const address =
     place.location && !/^https?:\/\//i.test(place.location)
       ? place.location
@@ -36,7 +39,7 @@ export function PlaceCard({
       >
         <span className="place-card-heading">
           <span className={`badge status-${place.status}`}>
-            {placeStatuses.find((entry) => entry.value === place.status)?.label}
+            <PlaceStatusLabel status={place.status} />
           </span>
           <ChevronRight size={18} aria-hidden="true" />
         </span>
@@ -63,22 +66,36 @@ export function PlaceCard({
             )?.label
           }
         </span>
-        {linked ? (
-          <Link
-            className="place-card-action"
-            to={`/trips/${tripId}/itinerary?day=${linked.day}&item=${linked.id}`}
-          >
-            <BookOpen size={15} />
-            しおりを見る
-          </Link>
-        ) : (
-          onSchedule && (
-            <button className="place-card-action" onClick={onSchedule}>
-              <Plus size={15} />
-              しおりへ追加
-            </button>
-          )
-        )}
+        <div className="place-card-actions">
+          {mapsHref && (
+            <a
+              className="place-card-action place-card-map"
+              href={mapsHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${place.title}の地図を開く`}
+            >
+              <Map size={15} aria-hidden="true" />
+              地図を開く
+            </a>
+          )}
+          {linked ? (
+            <Link
+              className="place-card-action"
+              to={`/trips/${tripId}/itinerary?day=${linked.day}&item=${linked.id}`}
+            >
+              <BookOpen size={15} />
+              しおりを見る
+            </Link>
+          ) : (
+            onSchedule && (
+              <button className="place-card-action" onClick={onSchedule}>
+                <Plus size={15} />
+                しおりへ追加
+              </button>
+            )
+          )}
+        </div>
       </div>
     </article>
   );

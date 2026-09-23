@@ -1,3 +1,4 @@
+import { PlaceStatusLabel } from "./place-status";
 import { BookingSchedule, ItemSchedule } from "./booking-schedule";
 import { dismissModal } from "./motion";
 import { Button } from "./obsidian/button";
@@ -24,12 +25,7 @@ import {
   flightConnectionCandidates,
   formatConnectionDuration,
 } from "@/data/flight-connections";
-import {
-  mapUrl,
-  placeStatuses,
-  reservationStatuses,
-  referenceUrl,
-} from "@/data/places";
+import { mapUrl, reservationStatuses, referenceUrl } from "@/data/places";
 import {
   itemDetails,
   itemCategory,
@@ -600,10 +596,7 @@ export function PlaceDetail({
           <header className="detail-hero">
             <div className="detail-tags">
               <span className={`badge status-${place.status}`}>
-                {
-                  placeStatuses.find((entry) => entry.value === place.status)
-                    ?.label
-                }
+                <PlaceStatusLabel status={place.status} />
               </span>
               <span className="badge">
                 {

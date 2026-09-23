@@ -1,3 +1,4 @@
+import { PlaceStatusLabel } from "./place-status";
 import { DayStrip } from "./day-strip";
 import { PlaceCard } from "./place-card";
 import { TaskList } from "./task-list";
@@ -441,7 +442,9 @@ export function PlacesScreen() {
                 aria-pressed={filter === entry.value}
                 onClick={() => setFilter(entry.value)}
               >
-                {entry.label}
+                <PlaceStatusLabel
+                  status={entry.value as Place["status"] | "all"}
+                />
                 {filter === entry.value && <CircleCheck size={18} />}
               </button>
             ),
@@ -465,7 +468,7 @@ export function PlacesScreen() {
             aria-pressed={filter === entry.value}
             onClick={() => setFilter(entry.value)}
           >
-            {entry.label}
+            <PlaceStatusLabel status={entry.value as Place["status"] | "all"} />
           </button>
         ))}
       </div>
@@ -542,7 +545,7 @@ export function PackingScreen() {
     >
       <ThumbTools title="準備の表示" label="表示">
         <div className="form">
-          <div className="segmented">
+          <div className="segmented preparation-tabs">
             {(["task", "packing"] as const).map((value) => (
               <button
                 key={value}
@@ -583,7 +586,7 @@ export function PackingScreen() {
         )}
       </div>
       <TabsList
-        className="segmented"
+        className="segmented preparation-tabs"
         data-active-tab={tab}
         aria-label="旅の準備"
       >
