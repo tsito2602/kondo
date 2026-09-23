@@ -4097,3 +4097,12 @@ input::-webkit-date-and-time-value {
   color: inherit;
   opacity: 0.75;
 }
+
+.members-page {
+  display: grid;
+  gap: 18px;
+}
+.members-page > .section-heading,
+.members-page > .settings-card {
+  margin: 0;
+}
