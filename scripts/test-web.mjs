@@ -388,7 +388,7 @@ test("legacy account cache and pending changes survive React migration; real for
       root.render(
         React.createElement(
           MemoryRouter,
-          { initialEntries: [`/trips/${trip.id}/itinerary`] },
+          { initialEntries: [`/trips/${trip.id}/members`] },
           React.createElement(
             ThemeProvider,
             null,
@@ -402,6 +402,17 @@ test("legacy account cache and pending changes survive React migration; real for
       ),
     );
     await tick(80);
+    assert.equal(
+      document.querySelector("dialog h2").textContent,
+      "メンバー管理",
+    );
+    assert.ok(
+      document.querySelector("dialog.full .members-page"),
+      "direct member URL opens a floating panel above the itinerary",
+    );
+    await click(document.querySelector('.context-back [aria-label="戻る"]'));
+    await tick(30);
+    assert.equal(document.querySelector("dialog[open]"), null);
     assert.match(document.body.textContent, /圏外で追加した予定/);
     assert.equal(
       db.prepare("SELECT COUNT(*) AS n FROM itinerary_items").get().n,
@@ -413,10 +424,7 @@ test("legacy account cache and pending changes survive React migration; real for
     const emptyDay = document.querySelector("#day-2026-11-24 .timeline-empty");
     assert.ok(emptyDay && !emptyDay.disabled);
     await click(emptyDay);
-    assert.match(
-      field("開始").textContent,
-      /2026年11月24日/,
-    );
+    assert.match(field("開始").textContent, /2026年11月24日/);
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
     await click(document.querySelector('[aria-label="予定を追加"]'));
@@ -666,6 +674,36 @@ test("legacy account cache and pending changes survive React migration; real for
     await tick(30);
     assert.equal(document.querySelector("#main-content"), settingsBackground);
     assert.ok(document.querySelector(".trip-title"));
+    const membersBackground = document.querySelector("#main-content");
+    await click(
+      document.querySelector('.trip-heading [aria-label="旅行メニュー"]'),
+    );
+    await click(byText(".trip-menu-popover button", "メンバー管理"));
+    await tick(30);
+    assert.equal(
+      document.querySelector("#main-content"),
+      membersBackground,
+      "opening members preserves the current page",
+    );
+    assert.equal(
+      document.querySelector("dialog h2").textContent,
+      "メンバー管理",
+    );
+    assert.ok(document.querySelector("dialog.full .members-page"));
+    assert.ok(byText("dialog button", "招待リンクを作成"));
+    assert.equal(
+      document.querySelector(".thumb-dock-host").parentElement,
+      document.querySelector("dialog"),
+    );
+    await click(document.querySelector('.context-back [aria-label="戻る"]'));
+    await tick(30);
+    assert.equal(document.querySelector("dialog[open]"), null);
+    assert.equal(
+      document.querySelector("#main-content"),
+      membersBackground,
+      "closing members restores the same page",
+    );
+
     await click(
       document.querySelector('.trip-heading [aria-label="旅行一覧へ戻る"]'),
     );

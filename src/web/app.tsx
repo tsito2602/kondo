@@ -210,10 +210,21 @@ function TravelApp() {
   const travel = useTravel();
   const auth = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const settingsOpen = location.pathname === "/settings";
+  const membersTripId = location.pathname.match(
+    /^\/trips\/([^/]+)\/members$/,
+  )?.[1];
   const background = (location.state as { background?: Location } | null)
     ?.background;
-  const routeLocation = settingsOpen ? (background ?? "/") : location;
+  const membersFallback = membersTripId
+    ? `/trips/${membersTripId}/itinerary`
+    : "/";
+  const routeLocation = settingsOpen
+    ? (background ?? "/")
+    : membersTripId
+      ? (background ?? membersFallback)
+      : location;
   const routePath =
     typeof routeLocation === "string" ? routeLocation : routeLocation.pathname;
   useLayoutEffect(() => {
@@ -240,7 +251,6 @@ function TravelApp() {
           <Route path="places" element={<PlacesScreen />} />
           <Route path="packing" element={<PackingScreen />} />
           <Route path="notes" element={<NotesScreen />} />
-          <Route path="members" element={<MembersScreen />} />
         </Route>
         <Route
           path="*"
@@ -255,6 +265,15 @@ function TravelApp() {
         />
       </Routes>
       {settingsOpen && <SettingsScreen />}
+      {membersTripId && travel.selectedTrip?.id === membersTripId && (
+        <MembersScreen
+          onClose={() =>
+            background
+              ? navigate(-1)
+              : navigate(membersFallback, { replace: true })
+          }
+        />
+      )}
     </>
   );
 }
@@ -625,7 +644,9 @@ function TripLayout() {
               <button
                 onClick={() => {
                   closeMenu(() => {
-                    navigate(`/trips/${trip.id}/members`);
+                    navigate(`/trips/${trip.id}/members`, {
+                      state: { background: location },
+                    });
                   });
                 }}
               >
@@ -707,7 +728,7 @@ function TripLayout() {
     </>
   );
 }
-function MembersScreen() {
+function MembersScreen({ onClose }: { onClose: () => void }) {
   const travel = useTravel();
   const auth = useAuth();
   const notify = useToast();
@@ -726,132 +747,137 @@ function MembersScreen() {
     await travel.sync();
   };
   return (
-    <div className="page">
-      <div className="section-heading">
-        <h2>一緒に旅する人</h2>
-        <span>{travel.members.length}人</span>
-      </div>
-      <div className="check-list">
-        {travel.members.map((member) => (
-          <div className="member-row" key={member.id}>
-            {member.avatarUrl ? (
-              <img
-                className="avatar"
-                src={member.avatarUrl}
-                alt=""
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <span className="avatar">
-                {(member.name || member.email).slice(0, 1)}
-              </span>
-            )}
-            <div className="grow">
-              <strong>{member.name || member.email}</strong>
-              <small>{member.email}</small>
+    <Modal title="メンバー管理" full dockActions={{}} onClose={onClose}>
+      <div className="settings-page members-page">
+        <div className="section-heading">
+          <h2>一緒に旅する人</h2>
+          <span>{travel.members.length}人</span>
+        </div>
+        <div className="check-list">
+          {travel.members.map((member) => (
+            <div className="member-row" key={member.id}>
+              {member.avatarUrl ? (
+                <img
+                  className="avatar"
+                  src={member.avatarUrl}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <span className="avatar">
+                  {(member.name || member.email).slice(0, 1)}
+                </span>
+              )}
+              <div className="grow">
+                <strong>{member.name || member.email}</strong>
+                <small>{member.email}</small>
+              </div>
+              {owner && member.role !== "owner" ? (
+                <>
+                  <select
+                    aria-label={`${member.name || member.email}の権限`}
+                    disabled={busy}
+                    value={member.role}
+                    onChange={(event) =>
+                      void run(() =>
+                        change(
+                          member,
+                          event.target.value as "editor" | "viewer",
+                        ),
+                      )
+                    }
+                  >
+                    <option value="editor">編集可</option>
+                    <option value="viewer">閲覧のみ</option>
+                  </select>
+                  <Button
+                    variant="ghost"
+                    className="icon-button danger"
+                    disabled={busy}
+                    aria-label="メンバーを削除"
+                    onClick={() => {
+                      if (confirm("このメンバーを旅行から削除しますか？"))
+                        void run(() => change(member));
+                    }}
+                  >
+                    <Trash2 />
+                  </Button>
+                </>
+              ) : (
+                <span className="badge">
+                  {member.role === "owner"
+                    ? "オーナー"
+                    : member.role === "editor"
+                      ? "編集可"
+                      : "閲覧のみ"}
+                </span>
+              )}
             </div>
-            {owner && member.role !== "owner" ? (
-              <>
-                <select
-                  aria-label={`${member.name || member.email}の権限`}
-                  disabled={busy}
-                  value={member.role}
-                  onChange={(event) =>
-                    void run(() =>
-                      change(member, event.target.value as "editor" | "viewer"),
-                    )
-                  }
-                >
-                  <option value="editor">編集可</option>
-                  <option value="viewer">閲覧のみ</option>
-                </select>
+          ))}
+        </div>
+        {owner && (
+          <Card className="settings-card">
+            <h3>旅のしおりを共有</h3>
+            <p>招待リンクは1回限り、7日間有効です。</p>
+            <Button
+              variant="ghost"
+              className="primary"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  setInvite(await travel.createInvite());
+                })
+              }
+            >
+              招待リンクを作成
+            </Button>
+            {invite && (
+              <div className="form">
+                <Field label="招待リンク">
+                  <Input
+                    readOnly
+                    value={invite}
+                    onFocus={(event) => event.target.select()}
+                  />
+                </Field>
                 <Button
                   variant="ghost"
-                  className="icon-button danger"
-                  disabled={busy}
-                  aria-label="メンバーを削除"
-                  onClick={() => {
-                    if (confirm("このメンバーを旅行から削除しますか？"))
-                      void run(() => change(member));
-                  }}
+                  className="secondary"
+                  onClick={() =>
+                    void run(async () => {
+                      await copyText(invite);
+                      notify("招待リンクをコピーしました");
+                    })
+                  }
                 >
-                  <Trash2 />
+                  <Copy />
+                  リンクをコピー
                 </Button>
-              </>
-            ) : (
-              <span className="badge">
-                {member.role === "owner"
-                  ? "オーナー"
-                  : member.role === "editor"
-                    ? "編集可"
-                    : "閲覧のみ"}
-              </span>
+              </div>
             )}
-          </div>
-        ))}
+            <Button
+              variant="ghost"
+              className="subtle danger"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  if (confirm("発行済みの招待リンクを無効にしますか？")) {
+                    await auth.request(
+                      `/v1/trips/${travel.selectedTrip!.id}/invites`,
+                      { method: "DELETE" },
+                    );
+                    setInvite("");
+                    notify("招待リンクを無効にしました");
+                  }
+                })
+              }
+            >
+              発行済みの招待を無効にする
+            </Button>
+          </Card>
+        )}
       </div>
-      {owner && (
-        <Card className="settings-card">
-          <h3>旅のしおりを共有</h3>
-          <p>招待リンクは1回限り、7日間有効です。</p>
-          <Button
-            variant="ghost"
-            className="primary"
-            disabled={busy}
-            onClick={() =>
-              void run(async () => {
-                setInvite(await travel.createInvite());
-              })
-            }
-          >
-            招待リンクを作成
-          </Button>
-          {invite && (
-            <div className="form">
-              <Field label="招待リンク">
-                <Input
-                  readOnly
-                  value={invite}
-                  onFocus={(event) => event.target.select()}
-                />
-              </Field>
-              <Button
-                variant="ghost"
-                className="secondary"
-                onClick={() =>
-                  void run(async () => {
-                    await copyText(invite);
-                    notify("招待リンクをコピーしました");
-                  })
-                }
-              >
-                <Copy />
-                リンクをコピー
-              </Button>
-            </div>
-          )}
-          <Button
-            variant="ghost"
-            className="subtle danger"
-            disabled={busy}
-            onClick={() =>
-              void run(async () => {
-                if (confirm("発行済みの招待リンクを無効にしますか？")) {
-                  await auth.request(
-                    `/v1/trips/${travel.selectedTrip!.id}/invites`,
-                    { method: "DELETE" },
-                  );
-                  setInvite("");
-                  notify("招待リンクを無効にしました");
-                }
-              })
-            }
-          >
-            発行済みの招待を無効にする
-          </Button>
-        </Card>
-      )}
-    </div>
+    </Modal>
   );
 }
 function SettingsScreen() {
