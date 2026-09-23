@@ -5,7 +5,7 @@ import { build } from "esbuild";
 import sharp from "sharp";
 import { JSDOM } from "jsdom";
 import React, { act } from "react";
-import { MemoryRouter, useLocation } from "react-router";
+import { MemoryRouter, useLocation, useNavigate } from "react-router";
 
 const dom = new JSDOM('<div id="root"></div>', { url: "https://tabi.test/" });
 Object.assign(globalThis, {
@@ -32,7 +32,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -51,6 +51,7 @@ new Function("require", "module", "exports", outputFiles[0].text)(
 );
 const {
   Modal,
+  AppRouter,
   useItineraryScroll,
   startRouteTransition,
   DockContent,
@@ -110,7 +111,14 @@ test("date clicks retain the target through intermediate days, retargeting and s
   const originalScroll = HTMLElement.prototype.scrollIntoView;
   HTMLElement.prototype.getBoundingClientRect = function () {
     const index = days.indexOf(this.id.replace("day-", ""));
-    return { top: (index - visible) * 500, bottom: 0, height: 500, width: 400, left: 0, right: 400 };
+    return {
+      top: (index - visible) * 500,
+      bottom: 0,
+      height: 500,
+      width: 400,
+      left: 0,
+      right: 400,
+    };
   };
   const targets = [];
   HTMLElement.prototype.scrollIntoView = function (options) {
@@ -118,10 +126,22 @@ test("date clicks retain the target through intermediate days, retargeting and s
   };
   function Harness() {
     const { selectedDay, selectDay } = useItineraryScroll(days, days[0]);
-    return React.createElement("div", null,
+    return React.createElement(
+      "div",
+      null,
       React.createElement("output", null, selectedDay),
-      ...days.map((day) => React.createElement("section", { id: `day-${day}`, key: day },
-        React.createElement("button", { onClick: () => selectDay(day, "smooth") }, day))));
+      ...days.map((day) =>
+        React.createElement(
+          "section",
+          { id: `day-${day}`, key: day },
+          React.createElement(
+            "button",
+            { onClick: () => selectDay(day, "smooth") },
+            day,
+          ),
+        ),
+      ),
+    );
   }
   const selected = () => document.querySelector("output").textContent;
   const scroll = async (index) => {
@@ -133,30 +153,57 @@ test("date clicks retain the target through intermediate days, retargeting and s
   };
   try {
     await act(async () => root.render(React.createElement(Harness)));
-    await act(async () => document.querySelectorAll("section button")[2].click());
+    await act(async () =>
+      document.querySelectorAll("section button")[2].click(),
+    );
     await scroll(0);
     assert.equal(selected(), days[2]);
     await scroll(1);
     assert.equal(selected(), days[2], "do not flash the intermediate date");
-    await act(async () => document.querySelectorAll("section button")[0].click());
+    await act(async () =>
+      document.querySelectorAll("section button")[0].click(),
+    );
     window.dispatchEvent(new dom.window.Event("scrollend"));
     await scroll(1);
-    assert.equal(selected(), days[0], "old completion must not unlock a new target");
+    assert.equal(
+      selected(),
+      days[0],
+      "old completion must not unlock a new target",
+    );
     await scroll(0);
     await act(async () => new Promise((resolve) => setTimeout(resolve, 200)));
     await scroll(1);
-    assert.equal(selected(), days[1], "manual scrolling follows sections after settling");
-    await act(async () => document.querySelectorAll("section button")[2].click());
+    assert.equal(
+      selected(),
+      days[1],
+      "manual scrolling follows sections after settling",
+    );
+    await act(async () =>
+      document.querySelectorAll("section button")[2].click(),
+    );
     await scroll(1);
     await act(async () => new Promise((resolve) => setTimeout(resolve, 200)));
-    assert.equal(selected(), days[2], "a short final day retains explicit selection");
-    await act(async () => document.querySelectorAll("section button")[0].click());
+    assert.equal(
+      selected(),
+      days[2],
+      "a short final day retains explicit selection",
+    );
+    await act(async () =>
+      document.querySelectorAll("section button")[0].click(),
+    );
     await act(async () => {
       window.dispatchEvent(new dom.window.Event("wheel"));
       await new Promise((resolve) => setTimeout(resolve, 25));
     });
-    assert.equal(selected(), days[1], "user input releases the automatic-scroll lock");
-    assert.deepEqual(targets.map(([id]) => id), [days[2], days[0], days[2], days[0]].map((day) => `day-${day}`));
+    assert.equal(
+      selected(),
+      days[1],
+      "user input releases the automatic-scroll lock",
+    );
+    assert.deepEqual(
+      targets.map(([id]) => id),
+      [days[2], days[0], days[2], days[0]].map((day) => `day-${day}`),
+    );
   } finally {
     await act(async () => root.unmount());
     HTMLElement.prototype.getBoundingClientRect = originalBounds;
@@ -164,33 +211,66 @@ test("date clicks retain the target through intermediate days, retargeting and s
   }
 });
 
-test("route snapshots preserve the outgoing scrolled geometry separately from the incoming page", async () => {
-  const main = document.createElement("main");
-  main.id = "main-content";
-  document.body.append(main);
-  let bounds = { top: -1200, left: 0, width: 390, height: 3000 };
-  main.getBoundingClientRect = () => bounds;
+test("real router commits the new page inside the snapshot update, retaining the old scroll position", async () => {
+  const root = createRoot(document.getElementById("root"));
+  const originalBounds = HTMLElement.prototype.getBoundingClientRect;
+  HTMLElement.prototype.getBoundingClientRect = function () {
+    return this.textContent === "/bookings"
+      ? { top: 72, left: 0, width: 390, height: 500 }
+      : { top: -1200, left: 0, width: 390, height: 3000 };
+  };
   const nativeStart = document.startViewTransition;
   let captureNew;
   document.startViewTransition = (update) => {
     captureNew = update;
-    return { ready: Promise.resolve(), finished: Promise.resolve(), skipTransition() {} };
+    return {
+      ready: Promise.resolve(),
+      finished: Promise.resolve(),
+      skipTransition() {},
+    };
   };
+  let go;
+  function Page() {
+    const location = useLocation();
+    const navigate = useNavigate();
+    go = () => startRouteTransition(() => navigate("/bookings"));
+    return React.createElement(
+      "main",
+      { id: "main-content" },
+      location.pathname,
+    );
+  }
   try {
-    startRouteTransition(() => {
-      bounds = { top: 72, left: 0, width: 390, height: 500 };
-    });
+    await act(async () =>
+      root.render(
+        React.createElement(AppRouter, null, React.createElement(Page)),
+      ),
+    );
+    await act(async () => go());
     const style = document.documentElement.style;
     assert.equal(style.getPropertyValue("--route-old-top"), "-1200px");
-    assert.equal(bounds.top, -1200, "do not reset before the outgoing snapshot");
-    captureNew();
+    assert.notEqual(
+      document.querySelector("main").textContent,
+      "/bookings",
+      "old page remains until snapshot callback",
+    );
+    await act(async () => {
+      captureNew();
+      assert.equal(
+        document.querySelector("main").textContent,
+        "/bookings",
+        "route must commit before capture returns",
+      );
+      assert.equal(style.getPropertyValue("--route-new-top"), "72px");
+      assert.equal(style.getPropertyValue("--route-new-height"), "500px");
+    });
     assert.equal(style.getPropertyValue("--route-old-top"), "-1200px");
     assert.equal(style.getPropertyValue("--route-old-height"), "3000px");
-    assert.equal(style.getPropertyValue("--route-new-top"), "72px");
-    assert.equal(style.getPropertyValue("--route-new-height"), "500px");
   } finally {
+    await act(async () => root.unmount());
     document.startViewTransition = nativeStart;
-    main.remove();
+    HTMLElement.prototype.getBoundingClientRect = originalBounds;
+    window.history.replaceState(null, "", "/");
   }
 });
 
