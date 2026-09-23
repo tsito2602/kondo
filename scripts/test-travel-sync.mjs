@@ -30,6 +30,9 @@ test('shared packing has one record, appears under its carrier and shared filter
     assert.equal(items.filter((item) => matchesPreparationFilter(item, { kind: 'shared' })).length, 1);
     assert.equal(items.filter((item) => matchesPreparationFilter(item, { kind: 'assignee', value: 'member:one' })).length, 1);
     assert.equal(matchesPreparationFilter({}, { kind: 'assignee', value: '' }), true, 'legacy packing is unassigned');
+    assert.equal(matchesPreparationFilter({}, { kind: 'shared' }), true, 'legacy packing without a carrier appears under shared');
+    assert.equal(matchesPreparationFilter({ assignee: '', shared: false }, { kind: 'shared' }), true);
+    assert.equal(matchesPreparationFilter({ assignee: 'member:two', shared: false }, { kind: 'shared' }), false);
     assert.equal(matchesPreparationFilter({ assignee: 'member:two' }, { kind: 'assignee', value: 'member:one' }), false);
     f.api.updatePackingItem(id, { ...input, packed: true });
     assert.equal(f.render().packingItems.find((item) => item.id === id).packed, true);
@@ -38,7 +41,9 @@ test('shared packing has one record, appears under its carrier and shared filter
     assert.equal(options.find((option) => option.key === 'member:one').label, '新しい名前');
     assert.ok(options.some((option) => option.key === 'member:two'), 'departed or not-yet-loaded members remain selectable');
     assert.ok(options.some((option) => option.key === '旧担当'), 'legacy task names remain selectable');
+    assert.equal(options.some((option) => option.key === 'unassigned'), false, 'packing has only shared, not unassigned');
     assert.equal(preparationFilterOptions([], [], false).some((option) => option.key === 'shared'), false);
+    assert.equal(preparationFilterOptions([], [], false).find((option) => option.key === 'unassigned').label, '未指定', 'tasks keep unassigned');
   } finally { f.close(); }
 });
 const tick = () => new Promise((resolve) => setImmediate(resolve));

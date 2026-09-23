@@ -337,6 +337,76 @@ const editAndReturn = async (label, value) => {
   }
 };
 
+test("attachment preview uses a fullscreen dialog with close and download controls", async () => {
+  const { DocumentPreview, ThumbDockProvider } = await bundle(
+    "export { DocumentPreview } from './src/web/document-preview'; export { ThumbDockProvider } from './src/web/thumb-dock';",
+  );
+  const preview = (props) =>
+    React.createElement(
+      ThumbDockProvider,
+      null,
+      React.createElement(DocumentPreview, props),
+    );
+  const root = createRoot(document.getElementById("root"));
+  let closed = 0;
+  const file = {
+    id: "document",
+    filename: "reservation.pdf",
+    contentType: "application/pdf",
+    size: 100,
+  };
+  try {
+    await act(async () =>
+      root.render(
+        preview({
+          url: "blob:https://tabi.test/document",
+          file,
+          onClose: () => closed++,
+        }),
+      ),
+    );
+    const dialog = document.querySelector("dialog.fullscreen[open]");
+    assert.ok(dialog);
+    assert.ok(dialog.querySelector(".thumb-dock-host"));
+    assert.equal(
+      dialog.querySelector(".context-back button").getAttribute("aria-label"),
+      "閉じる",
+    );
+    assert.equal(dialog.querySelector(".context-back button").textContent, "");
+    assert.equal(
+      dialog.querySelector(".context-primary a").textContent,
+      "端末に保存",
+    );
+    assert.equal(
+      dialog.querySelector("iframe").getAttribute("title"),
+      file.filename,
+    );
+    assert.equal(
+      dialog.querySelector("a[download]").getAttribute("download"),
+      file.filename,
+    );
+    await act(async () =>
+      root.render(
+        preview({
+          url: "blob:https://tabi.test/photo",
+          file: { ...file, filename: "ticket.png", contentType: "image/png" },
+          onClose: () => closed++,
+        }),
+      ),
+    );
+    assert.equal(dialog.querySelector("iframe"), null);
+    assert.equal(
+      dialog.querySelector(".document-preview img").alt,
+      "ticket.png",
+    );
+    await click(dialog.querySelector('.context-back [aria-label="閉じる"]'));
+    await tick(30);
+    assert.equal(closed, 1);
+  } finally {
+    await act(async () => root.unmount());
+  }
+});
+
 test("legacy account cache and pending changes survive React migration; real forms sync through Hono", async () => {
   const db = new DatabaseSync(":memory:");
   db.exec("PRAGMA foreign_keys=ON");
@@ -345,6 +415,10 @@ test("legacy account cache and pending changes survive React migration; real for
     "owner",
     "test@example.test",
     "テスト",
+  );
+  db.prepare("INSERT INTO user_profiles(user_id,avatar_url) VALUES (?,?)").run(
+    "owner",
+    "https://example.test/avatar.png",
   );
   db.prepare(
     "INSERT INTO sessions(token_hash,user_id,expires_at,created_at) VALUES (?,?,unixepoch()+1000,unixepoch())",
@@ -509,10 +583,27 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(document.querySelector('[aria-label="予約を追加"]'));
     await fill("種類", "hotel");
     await fill("予約名", "テストホテル");
+    const hotelUrl =
+      "https://links.h6.hilton.com/f/a/" +
+      "long-link-".repeat(30) +
+      "?reservation=private";
+    await fill("予約内容", hotelUrl);
+    await fill("住所・Google MapsのURL", hotelUrl);
     await fill("宿泊期間", { start: trip.startsOn, end: "2026-11-25" });
     await submit();
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings").get().n, 1);
     await click(document.querySelector(".booking-ticket"));
+    const hotelLink = document.querySelector("dialog .reference-link");
+    assert.equal(hotelLink.href, hotelUrl);
+    assert.match(hotelLink.textContent, /サイトを開く/);
+    assert.equal(
+      hotelLink.querySelector("small").textContent,
+      "links.h6.hilton.com",
+    );
+    assert.doesNotMatch(
+      document.querySelector("dialog").textContent,
+      /long-link-|reservation=private|Google Mapsで開く/,
+    );
     assert.equal(document.querySelector(".thumb-dock-host .safari-tabs"), null);
     assert.equal(
       document.querySelectorAll(".context-actions button").length,
@@ -552,6 +643,20 @@ test("legacy account cache and pending changes survive React migration; real for
     await submit();
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM places").get().n, 1);
     await click([...document.querySelectorAll(".place-card-main")][0]);
+    const placeMapLink = [
+      ...document.querySelectorAll("dialog .reference-link"),
+    ].find((link) => link.textContent.includes("Google Mapsで開く"));
+    assert.equal(placeMapLink.querySelector("small").textContent, "google.com");
+    assert.equal(
+      placeMapLink.href.startsWith("https://www.google.com/maps/"),
+      true,
+    );
+    assert.equal(
+      document.querySelector(
+        'dialog a[href="https://example.com/museum"] small',
+      ).textContent,
+      "example.com",
+    );
     assert.ok(
       document.querySelector('.context-actions [aria-label="場所を削除"]'),
     );
@@ -612,6 +717,10 @@ test("legacy account cache and pending changes survive React migration; real for
     await tick(200);
     await click(byText("nav a", "準備"));
     await click(document.querySelector('[aria-label="やることを追加"]'));
+    assert.equal(
+      field("担当").querySelector('option[value=""]').textContent,
+      "未指定",
+    );
     assert.equal(document.activeElement, document.querySelector("dialog h2"));
     assert.equal(document.querySelector("dialog input[autofocus]"), null);
     assert.equal(
@@ -631,6 +740,7 @@ test("legacy account cache and pending changes survive React migration; real for
       1,
     );
     const preparationPanel = document.querySelector('[role="tabpanel"]');
+    assert.match(document.querySelector(".task-list").textContent, /未指定/);
     preparationPanel.focus();
     await click(
       document.querySelector('[aria-label="チケットを予約の詳細を編集"]'),
@@ -655,7 +765,33 @@ test("legacy account cache and pending changes survive React migration; real for
       /正しい期限/,
     );
     await fill("期限", "2026-11-20");
+    await fill("担当", "member:owner");
     await submit();
+    assert.equal(
+      document
+        .querySelector(".task-list .assignee-avatar")
+        .getAttribute("aria-label"),
+      "テスト",
+    );
+    assert.doesNotMatch(
+      document.querySelector(".task-list .preparation-meta").textContent,
+      /テスト|未指定/,
+    );
+    const avatarImage = document.querySelector(
+      ".task-list .assignee-avatar img",
+    );
+    assert.equal(avatarImage.src, "https://example.test/avatar.png");
+    await act(async () =>
+      avatarImage.dispatchEvent(new dom.window.Event("error")),
+    );
+    assert.equal(
+      document.querySelector(".task-list .assignee-avatar img"),
+      null,
+    );
+    assert.equal(
+      document.querySelector(".task-list .assignee-avatar").textContent,
+      "テ",
+    );
     assert.equal(
       db.prepare("SELECT due_on FROM travel_tasks").get().due_on,
       "2026-11-20",
@@ -718,9 +854,29 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.equal(document.querySelector("dialog"), null);
     await click(document.querySelector('[role="tab"][aria-label="持ち物"]'));
+    assert.doesNotMatch(
+      document.querySelector(".filter-strip").textContent,
+      /未指定/,
+    );
     await click(document.querySelector('[aria-label="持ち物を追加"]'));
+    assert.equal(
+      field("担当").querySelector('option[value=""]').textContent,
+      "共用",
+    );
     await fill("持ち物", "充電器");
     await submit();
+    assert.match(
+      document.querySelector(".task-list .preparation-meta").textContent,
+      /共用/,
+    );
+    assert.doesNotMatch(
+      document.querySelector(".task-list .preparation-meta").textContent,
+      /未指定/,
+    );
+    assert.equal(
+      db.prepare("SELECT shared FROM packing_details").get().shared,
+      1,
+    );
     assert.equal(
       db.prepare("SELECT COUNT(*) AS n FROM packing_items").get().n,
       1,

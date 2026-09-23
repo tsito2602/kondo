@@ -1,4 +1,5 @@
 import { PlaceStatusLabel } from "./place-status";
+import { DocumentPreview } from "./document-preview";
 import { BookingSchedule, ItemSchedule } from "./booking-schedule";
 import { dismissModal } from "./motion";
 import { Button } from "./obsidian/button";
@@ -45,7 +46,15 @@ import {
   PlaceEditor,
   bookingKinds,
 } from "./editors";
-import { Modal, Field, MapLink, copyText, useAction, useToast } from "./ui";
+import {
+  Modal,
+  Field,
+  MapLink,
+  ExternalLink,
+  copyText,
+  useAction,
+  useToast,
+} from "./ui";
 
 export function BookingRoute({ booking }: { booking: Booking }) {
   const start = findAirportByCode(booking.originCode);
@@ -197,9 +206,15 @@ export function BookingDetail({
               }
             </span>
             <h1>{booking.title}</h1>
-            {booking.detail && (
-              <p className="detail-subtitle">{booking.detail}</p>
-            )}
+            {booking.detail &&
+              (referenceUrl(booking.detail) ? (
+                booking.detail !== booking.location &&
+                !(booking.kind === "hotel" && !booking.location) && (
+                  <ExternalLink url={booking.detail} label="関連サイトを開く" />
+                )
+              ) : (
+                <p className="detail-subtitle">{booking.detail}</p>
+              ))}
           </header>
           <div className="detail-primary">
             {["flight", "train", "car"].includes(booking.kind) && (
@@ -220,7 +235,9 @@ export function BookingDetail({
                 <MapPin size={16} />
                 場所
               </h3>
-              <p>{booking.location || booking.detail}</p>
+              {!referenceUrl(booking.location || booking.detail) && (
+                <p>{booking.location || booking.detail}</p>
+              )}
               <MapLink url={mapUrl(booking.location || booking.detail)} />
             </section>
           )}
@@ -365,30 +382,7 @@ export function BookingDetail({
         <BookingEditor booking={booking} onClose={() => setEditing(false)} />
       )}
       {preview && (
-        <Modal
-          title={preview.file.filename}
-          onClose={() => setPreview(null)}
-          full
-        >
-          <div className="document-preview">
-            {preview.file.contentType === "application/pdf" ? (
-              <iframe title={preview.file.filename} src={preview.url} />
-            ) : ["image/heic", "image/heif"].includes(
-                preview.file.contentType,
-              ) ? (
-              <p>この画像は端末に保存して開けます。</p>
-            ) : (
-              <img alt={preview.file.filename} src={preview.url} />
-            )}
-            <a
-              className="secondary"
-              href={preview.url}
-              download={preview.file.filename}
-            >
-              端末に保存
-            </a>
-          </div>
-        </Modal>
+        <DocumentPreview {...preview} onClose={() => setPreview(null)} />
       )}
     </>
   );
@@ -486,7 +480,7 @@ export function ItemDetail({
                 <MapPin size={16} />
                 場所
               </h3>
-              <p>{details.location}</p>
+              {!referenceUrl(details.location) && <p>{details.location}</p>}
               <MapLink url={mapUrl(details.location)} />
             </section>
           )}
@@ -662,19 +656,11 @@ export function PlaceDetail({
                 const url = referenceUrl(link.url);
                 return (
                   url && (
-                    <a
+                    <ExternalLink
                       key={index}
-                      className="reference-link"
-                      href={url}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <span>
-                        <strong>{link.label || new URL(url).hostname}</strong>
-                        {link.label && <small>{new URL(url).hostname}</small>}
-                      </span>
-                      <ChevronRight size={16} />
-                    </a>
+                      url={url}
+                      label={link.label || "サイトを開く"}
+                    />
                   )
                 );
               })}

@@ -5,7 +5,7 @@ export type PreparationFilter = { kind: 'all' } | { kind: 'shared' } | { kind: '
 export type PreparationEntry = { assignee?: string; shared?: boolean };
 
 export const matchesPreparationFilter = (item: PreparationEntry, filter: PreparationFilter) =>
-  filter.kind === 'all' || (filter.kind === 'shared' ? item.shared === true : (item.assignee ?? '') === filter.value);
+  filter.kind === 'all' || (filter.kind === 'shared' ? item.shared === true || !item.assignee : (item.assignee ?? '') === filter.value);
 
 export function preparationFilterOptions(members: TripMember[], items: PreparationEntry[], includeShared: boolean) {
   const assignees = [...new Set([...members.map((member) => memberAssignee(member.id)), ...items.map((item) => item.assignee ?? '').filter(Boolean)])];
@@ -13,6 +13,6 @@ export function preparationFilterOptions(members: TripMember[], items: Preparati
     { key: 'all', label: 'すべて', filter: { kind: 'all' } as PreparationFilter },
     ...assignees.map((value) => ({ key: value, label: assigneeName(value, members), filter: { kind: 'assignee', value } as PreparationFilter })),
     ...(includeShared ? [{ key: 'shared', label: '共用', filter: { kind: 'shared' } as PreparationFilter }] : []),
-    { key: 'unassigned', label: '未指定', filter: { kind: 'assignee', value: '' } as PreparationFilter },
+    ...(!includeShared ? [{ key: 'unassigned', label: '未指定', filter: { kind: 'assignee', value: '' } as PreparationFilter }] : []),
   ];
 }
