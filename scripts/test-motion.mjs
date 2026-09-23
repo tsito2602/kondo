@@ -1253,6 +1253,16 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
     await act(async () => setMode("tabs"));
     assert.equal(border.getAttribute("d"), initial);
     assert.equal(pending.size, 0, "reduced motion settles immediately");
+    reduced = false;
+    await act(async () =>
+      document.querySelector(".safari-dock").setAttribute("data-wide", "false"),
+    );
+    advance(820);
+    assert.notEqual(
+      border.getAttribute("d"),
+      initial,
+      "hold expansion is observed without a registry update",
+    );
     assert.equal(document.querySelectorAll(".safari-glass").length, 1);
     assert.equal(document.querySelector(".thumb-dock-material"), material);
   } finally {

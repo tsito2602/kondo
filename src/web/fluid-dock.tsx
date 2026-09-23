@@ -1,7 +1,7 @@
 import {
   useId,
   useImperativeHandle,
-  useLayoutEffect,
+  useEffect,
   useRef,
   type Ref,
   type RefObject,
@@ -221,7 +221,7 @@ export function FluidDockSurface({
     frame.current = requestAnimationFrame(tick);
   };
   useImperativeHandle(ref, () => ({ measure }));
-  useLayoutEffect(() => {
+  useEffect(() => {
     const observer =
       typeof ResizeObserver === "undefined"
         ? null
