@@ -840,7 +840,7 @@ test("journeys join endpoints without moving intervening events; stays do not in
   );
   assert.match(stay, /連泊/);
   assert.match(stay, /15:00〜/);
-  assert.match(stay, /11:00まで/);
+  assert.match(stay, /〜11:00/);
   const untimed = renderToStaticMarkup(
     React.createElement(StayCards, {
       bookings: [{ ...hotel, time: "", endTime: "" }],
@@ -990,5 +990,49 @@ test("booking details use kind-specific labels and keep single-date reservations
     render("ticket", { endDay: "2026-11-23" }).querySelectorAll("section")
       .length,
     2,
+  );
+});
+
+test("ticket summaries preserve overnight and cross-year dates, hotel bounds and unknown times", async () => {
+  const { BookingTicketDates } = await bundle(
+    "export { BookingTicketDates } from './src/web/ticket-content';",
+  );
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const render = (patch = {}) =>
+    new JSDOM(
+      renderToStaticMarkup(
+        React.createElement(BookingTicketDates, {
+          booking: {
+            kind: "flight",
+            day: "2026-12-31",
+            time: "22:00",
+            endDay: "2027-01-01",
+            endTime: "05:00",
+            ...patch,
+          },
+        }),
+      ),
+    ).window.document;
+  assert.match(render().body.textContent, /2026\/12\/31/);
+  assert.match(render().body.textContent, /2027\/1\/1/);
+  assert.match(render().body.textContent, /各空港の現地時刻/);
+  const hotel = render({ kind: "hotel", time: "15:00", endTime: "11:00" });
+  assert.deepEqual(
+    [...hotel.querySelectorAll("dd strong")].map((n) => n.textContent),
+    ["15:00〜", "〜11:00"],
+  );
+  const incomplete = render({ endDay: "", endTime: "" });
+  assert.match(incomplete.body.textContent, /到着日付未定時刻未定/);
+  const sameDay = render({ endDay: "", endTime: "23:00" });
+  assert.equal(sameDay.querySelectorAll("dd span")[1].textContent, "12/31");
+  const restaurant = render({
+    kind: "restaurant",
+    endDay: "2026-12-31",
+    endTime: "22:00",
+  });
+  assert.equal(
+    restaurant.querySelectorAll("dt").length,
+    1,
+    "identical end points are not repeated for single-time bookings",
   );
 });

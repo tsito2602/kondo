@@ -162,7 +162,7 @@ export function StayCards({
                 <span>チェックアウト</span>
                 <strong>{shortDate(booking.endDay)}</strong>
                 <span>
-                  {booking.endTime ? `${booking.endTime}まで` : "時刻未定"}
+                  {booking.endTime ? `〜${booking.endTime}` : "時刻未定"}
                 </span>
               </div>
             </div>

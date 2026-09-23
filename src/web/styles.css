@@ -493,18 +493,50 @@ strong {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
 }
-.trip-ticket {
+.trip-ticket,
+.booking-ticket {
+  --ticket-stub-width: 96px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 84px;
-  min-height: 198px;
-  border-radius: 16px;
+  grid-template-columns: minmax(0, 1fr) var(--ticket-stub-width);
+  border-radius: 12px;
   overflow: hidden;
   background: var(--paper);
-  box-shadow: var(--shadow);
+  box-shadow: inset 0 0 0 1px var(--line);
   transition:
-    transform 180ms,
+    transform 180ms var(--ease-flow),
     box-shadow 180ms;
   isolation: isolate;
+  -webkit-mask-image:
+    radial-gradient(
+      circle at calc(100% - var(--ticket-stub-width)) 0,
+      transparent 12px,
+      #000 12.5px
+    ),
+    radial-gradient(
+      circle at calc(100% - var(--ticket-stub-width)) 100%,
+      transparent 12px,
+      #000 12.5px
+    );
+  mask-image:
+    radial-gradient(
+      circle at calc(100% - var(--ticket-stub-width)) 0,
+      transparent 12px,
+      #000 12.5px
+    ),
+    radial-gradient(
+      circle at calc(100% - var(--ticket-stub-width)) 100%,
+      transparent 12px,
+      #000 12.5px
+    );
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+.trip-ticket {
+  min-height: 218px;
+}
+.trip-ticket:focus-visible,
+.booking-ticket:focus-visible {
+  outline-offset: -4px;
 }
 .trip-photo {
   background: #262626;
@@ -539,6 +571,37 @@ strong {
   font-size: 10px;
   color: #ffffffd9;
   overflow-wrap: anywhere;
+  margin-bottom: 18px;
+}
+.trip-ticket-label,
+.ticket-category {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.trip-ticket-label {
+  color: #ffffffd9;
+}
+.trip-ticket-label svg,
+.ticket-category svg,
+.trip-destination svg {
+  flex-shrink: 0;
+}
+.ticket-category {
+  color: var(--muted);
+}
+.trip-ticket-period {
+  margin-top: auto;
+}
+.trip-ticket-period > span {
+  font-size: 10px;
+  color: #ffffffbd;
+}
+.ticket-range-end {
+  display: inline-block;
+  margin-left: 5px;
 }
 .trip-destination svg {
   width: 13px;
@@ -551,7 +614,7 @@ strong {
   overflow: hidden;
   font-size: 20px;
   line-height: 1.45;
-  margin: 9px 0 18px;
+  margin: 10px 0 8px;
   overflow-wrap: anywhere;
 }
 .trip-photo-content p {
@@ -568,8 +631,8 @@ strong {
   justify-content: center;
   align-items: center;
   gap: 12px;
-  border-left: 1px dashed var(--line);
-  padding: 18px 8px;
+  border-left: 1px dashed color-mix(in srgb, var(--ink) 32%, transparent);
+  padding: 22px 10px;
   color: var(--muted);
   position: relative;
   min-width: 0;
@@ -599,35 +662,15 @@ strong {
   width: 14px;
   height: 14px;
 }
-.trip-stub::before,
-.trip-stub::after,
-.ticket-stub::before,
-.ticket-stub::after {
-  content: "";
-  width: 14px;
-  height: 14px;
-  position: absolute;
-  left: -7px;
-  border-radius: 50%;
-  background: var(--canvas);
-  z-index: 1;
-}
-.trip-stub::before,
-.ticket-stub::before {
-  top: -7px;
-}
-.trip-stub::after,
-.ticket-stub::after {
-  bottom: -7px;
-}
 .ticket-open {
-  width: 32px;
-  height: 32px;
-  background: var(--soft);
+  min-height: 32px;
   color: var(--brand);
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
   margin-top: auto;
 }
 .trip-stub .ticket-open svg {
@@ -928,9 +971,9 @@ strong {
 }
 .timeline-entry {
   display: grid;
-  grid-template-columns: var(--timeline-time-width) var(
-      --timeline-marker-width
-    ) minmax(0, 1fr);
+  grid-template-columns:
+    var(--timeline-time-width) var(--timeline-marker-width)
+    minmax(0, 1fr);
   gap: var(--timeline-column-gap);
   width: 100%;
   text-align: left;
@@ -1172,16 +1215,7 @@ strong {
   gap: 16px;
 }
 .booking-ticket {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 100px;
   text-align: left;
-  background: var(--paper);
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow: var(--shadow);
-  transition:
-    transform 180ms,
-    box-shadow 180ms;
 }
 .ticket-main {
   padding: 20px 24px;
@@ -1195,6 +1229,7 @@ strong {
   margin-top: 10px;
   font-size: 16px;
   overflow-wrap: anywhere;
+  margin-bottom: 6px;
 }
 .ticket-main p {
   font-size: 12px;
@@ -1222,6 +1257,60 @@ strong {
 .ticket-stub {
   justify-content: flex-start;
   padding-top: 23px;
+}
+.ticket-stub-icon {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.ticket-reference {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  text-align: center;
+}
+.ticket-reference > span {
+  font-size: 9px;
+  color: var(--muted);
+}
+.ticket-reference strong {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.ticket-schedule {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.ticket-schedule dl {
+  display: grid;
+  gap: 9px;
+}
+.ticket-schedule dl > div {
+  display: grid;
+  gap: 2px;
+}
+.ticket-schedule dt,
+.ticket-time-note {
+  color: var(--muted);
+  font-size: 10px;
+}
+.ticket-schedule dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.ticket-schedule dd strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+.ticket-time-note {
+  display: block;
+  margin-top: 8px;
 }
 .ticket-stub > strong {
   font-size: 19px;
@@ -2049,8 +2138,6 @@ input::-webkit-date-and-time-value {
 }
 
 /* Content is a solid reading layer. Only raised, temporary panels transmit light. */
-.trip-ticket,
-.booking-ticket,
 .place-card,
 .note-card,
 .settings-card {
@@ -2064,8 +2151,7 @@ input::-webkit-date-and-time-value {
 }
 .trip-stub,
 .ticket-stub {
-  background:
-    linear-gradient(150deg, var(--surface-glow), transparent 70%), var(--soft);
+  background: var(--soft);
 }
 .modal:not(.full) {
   background: var(--panel-tint);
@@ -2232,7 +2318,9 @@ input::-webkit-date-and-time-value {
   .trip-ticket:hover,
   .booking-ticket:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 18px #1c283013;
+    box-shadow:
+      inset 0 0 0 1px var(--line),
+      0 5px 18px #1c283013;
   }
   .timeline-entry:hover > div,
   .place-card:hover,
@@ -2274,8 +2362,11 @@ input::-webkit-date-and-time-value {
     gap: 14px;
   }
   .trip-ticket {
-    min-height: 186px;
-    grid-template-columns: minmax(0, 1fr) 76px;
+    min-height: 206px;
+  }
+  .trip-ticket,
+  .booking-ticket {
+    --ticket-stub-width: 80px;
   }
   .trip-photo-content {
     padding: 18px;
@@ -2394,9 +2485,6 @@ input::-webkit-date-and-time-value {
     padding: 10px 12px;
     font-size: 12px;
     gap: 5px;
-  }
-  .booking-ticket {
-    grid-template-columns: minmax(0, 1fr) 76px;
   }
   .ticket-main {
     padding: 17px 16px;
@@ -2536,8 +2624,9 @@ input::-webkit-date-and-time-value {
   .trip-photo-content h2 {
     font-size: 17px;
   }
-  .trip-ticket {
-    grid-template-columns: minmax(0, 1fr) 68px;
+  .trip-ticket,
+  .booking-ticket {
+    --ticket-stub-width: 72px;
   }
   .page-toolbar > div {
     gap: 6px;
@@ -3701,7 +3790,6 @@ input::-webkit-date-and-time-value {
   color: var(--ink);
 }
 .timeline-entry:not(.transport-entry) > div,
-.booking-ticket,
 .place-card,
 .note-card {
   background: var(--content-card);
@@ -3759,8 +3847,6 @@ input::-webkit-date-and-time-value {
   min-width: 80px;
   padding-inline: 16px;
 }
-.trip-ticket,
-.booking-ticket,
 .place-card,
 .note-card,
 .settings-card,

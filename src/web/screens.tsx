@@ -1,5 +1,6 @@
 import { PlaceStatusLabel } from "./place-status";
 import { DayStrip } from "./day-strip";
+import { BookingTicketDates } from "./ticket-content";
 import {
   dayTimeline,
   isJourney,
@@ -416,48 +417,64 @@ export function BookingsScreen() {
               (a, b) =>
                 a.day.localeCompare(b.day) || a.time.localeCompare(b.time),
             )
-            .map((booking) => (
-              <button
-                className="booking-ticket"
-                data-press-card
-                key={booking.id}
-                onClick={() => setId(booking.id)}
-              >
-                <div className="ticket-main">
-                  <div className="row between">
-                    <Badge variant="secondary" className="booking-kind">
-                      {
-                        bookingKinds.find(
-                          (entry) => entry.value === booking.kind,
-                        )?.label
-                      }
-                    </Badge>
-                    <span className="muted">{formatDate(booking.day)}</span>
+            .map((booking) => {
+              const BookingIcon = bookingIcons[booking.kind];
+              return (
+                <button
+                  className="booking-ticket"
+                  data-press-card
+                  key={booking.id}
+                  onClick={() => setId(booking.id)}
+                >
+                  <div className="ticket-main">
+                    <div className="ticket-category">
+                      <BookingIcon size={14} aria-hidden="true" />
+                      <span>
+                        {
+                          bookingKinds.find(
+                            (entry) => entry.value === booking.kind,
+                          )?.label
+                        }
+                      </span>
+                    </div>
+                    <h2>{booking.title}</h2>
+                    {booking.detail && (
+                      <p className="clamp">{booking.detail}</p>
+                    )}
+                    {["flight", "train", "car"].includes(booking.kind) ? (
+                      <BookingRoute booking={booking} />
+                    ) : (
+                      booking.location && (
+                        <p className="muted clamp ticket-location">
+                          <MapPin size={12} />
+                          {booking.location}
+                        </p>
+                      )
+                    )}
+                    <BookingTicketDates booking={booking} />
                   </div>
-                  <h2>{booking.title}</h2>
-                  {booking.detail && <p className="clamp">{booking.detail}</p>}
-                  {["flight", "train", "car"].includes(booking.kind) ? (
-                    <BookingRoute booking={booking} />
-                  ) : (
-                    booking.location && (
-                      <p className="muted clamp ticket-location">
-                        <MapPin size={12} />
-                        {booking.location}
-                      </p>
-                    )
-                  )}
-                </div>
-                <div className="ticket-stub">
-                  <strong>{booking.time || "時刻未定"}</strong>
-                  <span className="confirmation-code">
-                    {booking.confirmationCode}
-                  </span>
-                  <span className="ticket-open">
-                    <ChevronRight size={18} />
-                  </span>
-                </div>
-              </button>
-            ))}
+                  <div className="ticket-stub">
+                    <BookingIcon
+                      className="ticket-stub-icon"
+                      size={22}
+                      aria-hidden="true"
+                    />
+                    {booking.confirmationCode && (
+                      <div className="ticket-reference">
+                        <span>予約番号</span>
+                        <strong className="confirmation-code">
+                          {booking.confirmationCode}
+                        </strong>
+                      </div>
+                    )}
+                    <span className="ticket-open">
+                      詳細
+                      <ChevronRight size={18} />
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
         </div>
       )}
       {adding && <BookingEditor onClose={() => setAdding(false)} />}

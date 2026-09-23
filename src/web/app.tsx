@@ -1,5 +1,6 @@
 import { startTripTransition } from "./trip-transition";
 import { TripCover } from "./trip-cover";
+import { ticketDate } from "./ticket-content";
 import {
   captureMotionOrigin,
   dismissModal,
@@ -420,23 +421,26 @@ function Home() {
                       <div className="trip-photo">
                         <TripCover id={trip.id} src={trip.coverImage ?? ""} />
                         <div className="trip-photo-content">
+                          <span className="trip-ticket-label">
+                            <BookOpen size={13} aria-hidden="true" />
+                            旅のしおり
+                          </span>
+                          <h2>{trip.name}</h2>
                           {trip.destination && (
                             <span className="trip-destination">
                               <MapPin size={13} />
                               {trip.destination}
                             </span>
                           )}
-                          <h2>{trip.name}</h2>
-                          <p>
-                            {trip.startsOn.slice(0, 4)}
-                            <br />
-                            {trip.startsOn.slice(5).replace("-", ".")} —{" "}
-                            {(trip.endsOn.slice(0, 4) ===
-                            trip.startsOn.slice(0, 4)
-                              ? trip.endsOn.slice(5)
-                              : trip.endsOn
-                            ).replaceAll("-", ".")}
-                          </p>
+                          <div className="trip-ticket-period">
+                            <span>旅行期間</span>
+                            <p>
+                              {ticketDate(trip.startsOn)}
+                              <span className="ticket-range-end">
+                                〜 {ticketDate(trip.endsOn, trip.startsOn)}
+                              </span>
+                            </p>
+                          </div>
                         </div>
                       </div>
                       <div className="trip-stub">
@@ -453,6 +457,7 @@ function Home() {
                           {trip.memberCount}人
                         </span>
                         <span className="ticket-open" aria-label="しおりを開く">
+                          しおり
                           <ChevronRight size={20} />
                         </span>
                       </div>
