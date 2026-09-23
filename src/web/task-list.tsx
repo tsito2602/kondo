@@ -1,8 +1,8 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Check, SquarePen } from "lucide-react";
 import { reduceMotion } from "./motion";
 
-type TaskRow = { id: string; title: string; meta: string; done: boolean };
+type TaskRow = { id: string; title: string; meta: ReactNode; done: boolean };
 /** Inspired by Rare UI's check → strike → reorder interaction; uses our own data and motion. */
 export function TaskList({
   items,

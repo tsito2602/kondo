@@ -3658,6 +3658,32 @@ input::-webkit-date-and-time-value {
   font-size: 11px;
   color: var(--muted);
 }
+.preparation-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 24px;
+}
+.assignee-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--soft);
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1;
+}
+.assignee-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .task-row.is-done .task-check {
   background: var(--brand);
   border-color: var(--brand);
@@ -4069,12 +4095,18 @@ input::-webkit-date-and-time-value {
   width: 100%;
   font-size: 12px;
 }
-.detail-section .reference-link {
+.reference-link {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   min-height: 52px;
+}
+.reference-link > span {
+  min-width: 0;
+}
+.reference-link > svg {
+  flex: none;
 }
 .reference-link strong,
 .reference-link small {
@@ -4088,6 +4120,9 @@ input::-webkit-date-and-time-value {
   font-size: 11px;
   color: var(--muted);
   margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .reference-link:last-child {
   border: 0;
@@ -4312,4 +4347,133 @@ input::-webkit-date-and-time-value {
 }
 .keyboard-dismiss-icon svg:last-child {
   margin-top: -3px;
+}
+
+/* Attachments fill the viewport while retaining the shared bottom controls. */
+:root .modal.full.fullscreen {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  max-height: 100dvh;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--paper);
+  overflow: hidden;
+}
+:root .modal.full.fullscreen .modal-inner {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  border-radius: 0;
+  background: var(--paper);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  overflow: hidden;
+}
+:root .modal.full.fullscreen .modal-header {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: calc(8px + env(safe-area-inset-top))
+    max(12px, env(safe-area-inset-right)) 8px
+    max(12px, env(safe-area-inset-left));
+  background: var(--paper);
+}
+:root .modal.full.fullscreen .modal-header > .icon-button,
+:root .modal.full.fullscreen .modal-header > .icon-spacer {
+  display: none;
+}
+:root .modal.full.fullscreen .modal-header h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root .modal.full.fullscreen .modal-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 0 env(safe-area-inset-right)
+    calc(
+      var(--dock-height) + var(--dock-bottom-gap) + 12px +
+        env(safe-area-inset-bottom)
+    )
+    env(safe-area-inset-left);
+  overflow: hidden;
+}
+.fullscreen .document-preview {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  gap: 0;
+}
+.fullscreen .document-preview iframe,
+.fullscreen .document-preview img {
+  display: block;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+}
+.fullscreen .document-preview p {
+  margin: auto;
+  padding: 24px;
+}
+@media (min-width: 760px) {
+  .fullscreen .thumb-dock-host:not([hidden]) {
+    display: flex;
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: var(--dock-bottom-gap);
+    justify-content: center;
+    pointer-events: none;
+  }
+  .fullscreen .thumb-dock {
+    width: min(100%, var(--dock-max-width));
+  }
+  .fullscreen .thumb-dock-material {
+    display: none;
+  }
+  .fullscreen .context-dock {
+    display: flex;
+    gap: 10px;
+    height: var(--dock-height);
+  }
+  .fullscreen .context-island {
+    pointer-events: auto;
+    border-radius: 999px;
+    background: var(--soft);
+    box-shadow: var(--shadow);
+  }
+  .fullscreen .context-back button {
+    display: grid;
+    place-items: center;
+    width: var(--dock-height);
+    height: var(--dock-height);
+    border-radius: 50%;
+  }
+  .fullscreen .context-primary {
+    flex: 1;
+    background: var(--brand);
+    color: var(--dock-on-accent);
+  }
+  .fullscreen .context-primary a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 100%;
+    border-radius: 999px;
+    font-size: 14px;
+  }
 }

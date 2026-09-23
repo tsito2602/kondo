@@ -918,7 +918,7 @@ export function PreparationEditor({
           category,
           quantity,
           assignee,
-          shared,
+          shared: !assignee || shared,
           packed: item && "packed" in item ? item.packed : false,
         };
         if (item) travel.updatePackingItem(item.id, input);
@@ -974,7 +974,7 @@ export function PreparationEditor({
             value={assignee}
             onChange={(event) => setAssignee(event.target.value)}
           >
-            <option value="">未指定</option>
+            <option value="">{task ? "未指定" : "共用"}</option>
             {travel.members.map((member) => (
               <option key={member.id} value={memberAssignee(member.id)}>
                 {member.name || member.email}
@@ -1030,14 +1030,16 @@ export function PreparationEditor({
                 />
               </Field>
             </div>
-            <label className="check-line">
-              <input
-                type="checkbox"
-                checked={shared}
-                onChange={(event) => setShared(event.target.checked)}
-              />
-              みんなで使う共用品
-            </label>
+            {assignee && (
+              <label className="check-line">
+                <input
+                  type="checkbox"
+                  checked={shared}
+                  onChange={(event) => setShared(event.target.checked)}
+                />
+                みんなで使う共用品
+              </label>
+            )}
           </>
         )}
         <ErrorText message={error} />

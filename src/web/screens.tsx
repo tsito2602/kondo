@@ -62,7 +62,7 @@ import {
   matchesPreparationFilter,
   preparationFilterOptions,
 } from "@/data/preparation-filter";
-import { assigneeName } from "@/data/assignee";
+import { AssigneeAvatar } from "./assignee-avatar";
 import type {
   Booking,
   Place,
@@ -681,7 +681,14 @@ export function PackingScreen() {
               aria-pressed={filter === option.key}
               onClick={() => setFilter(option.key)}
             >
-              {option.label}
+              {option.filter.kind === "assignee" && option.filter.value ? (
+                <AssigneeAvatar
+                  value={option.filter.value}
+                  members={travel.members}
+                />
+              ) : (
+                option.label
+              )}
             </button>
           ))}
         </div>
@@ -698,7 +705,28 @@ export function PackingScreen() {
               id: item.id,
               title: "title" in item ? item.title : item.name,
               done: complete(item),
-              meta: `${"quantity" in item ? `${item.category} · ${item.quantity}個${item.shared ? " · 共用" : ""}` : item.dueOn ? `${formatDate(item.dueOn)}まで` : "期限なし"} · ${assigneeName(item.assignee ?? "", travel.members)}`,
+              meta: (
+                <span className="preparation-meta">
+                  <span>
+                    {"quantity" in item
+                      ? `${item.category} · ${item.quantity}個`
+                      : item.dueOn
+                        ? `${formatDate(item.dueOn)}まで`
+                        : "期限なし"}
+                  </span>
+                  {"quantity" in item && (item.shared || !item.assignee) && (
+                    <span>共用</span>
+                  )}
+                  {item.assignee ? (
+                    <AssigneeAvatar
+                      value={item.assignee}
+                      members={travel.members}
+                    />
+                  ) : !("quantity" in item) ? (
+                    <span>未指定</span>
+                  ) : null}
+                </span>
+              ),
             }))}
             onToggle={(id, checked) => {
               const item = items.find((item) => item.id === id)!;

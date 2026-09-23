@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { referenceUrl, registeredGoogleMapsUrl } from "@/data/places";
 import { menuDepth } from "./menu-depth";
 import {
   animateDialog,
@@ -27,6 +28,7 @@ import {
   Keyboard,
   ChevronDown,
   SlidersHorizontal,
+  ExternalLink as ExternalLinkIcon,
 } from "lucide-react";
 import {
   ThumbDock,
@@ -203,6 +205,7 @@ export function Modal({
   children,
   onClose,
   full = false,
+  fullscreen = false,
   action,
   preserveNavigation = false,
   dockActions,
@@ -210,6 +213,7 @@ export function Modal({
   title: string;
   onClose: () => void;
   full?: boolean;
+  fullscreen?: boolean;
   action?: ReactNode;
   preserveNavigation?: boolean;
   dockActions?: { primary?: ReactNode; actions?: ReactNode };
@@ -329,7 +333,7 @@ export function Modal({
     <dialog
       ref={ref}
       aria-labelledby={id}
-      className={`modal ${full ? "full" : ""} ${closing ? "closing" : ""}`}
+      className={`modal ${full || fullscreen ? "full" : ""} ${fullscreen ? "fullscreen" : ""} ${closing ? "closing" : ""}`}
       onCancel={(event) => {
         event.preventDefault();
         close();
@@ -345,7 +349,7 @@ export function Modal({
             onPointerDown={(event) => {
               if (
                 event.pointerType === "touch" &&
-                !(event.target as Element).closest("button")
+                !(event.target as Element).closest("button, a")
               ) {
                 swipeStart.current = event.clientY;
                 event.currentTarget.setPointerCapture(event.pointerId);
@@ -399,7 +403,15 @@ export function Modal({
         >
           {saveAction || dockActions ? (
             <ContextDock
-              back={<FormBackButton onBack={close} />}
+              back={
+                fullscreen ? (
+                  <button aria-label="閉じる" onClick={close}>
+                    <X size={22} />
+                  </button>
+                ) : (
+                  <FormBackButton onBack={close} />
+                )
+              }
               primary={
                 saveAction ? (
                   <Button
@@ -526,11 +538,34 @@ export function SaveButton({ busy = false }: { busy?: boolean }) {
     </Button>
   );
 }
+export function ExternalLink({
+  url,
+  label = "サイトを開く",
+}: {
+  url: string;
+  label?: string;
+}) {
+  const href = referenceUrl(url);
+  if (!href) return null;
+  const host = new URL(href).hostname.replace(/^www\./, "");
+  return (
+    <a className="reference-link" href={href} target="_blank" rel="noreferrer">
+      <span>
+        <strong>{label}</strong>
+        <small>{host}</small>
+      </span>
+      <ExternalLinkIcon size={16} aria-hidden="true" />
+    </a>
+  );
+}
 export function MapLink({ url }: { url: string | null }) {
   return url ? (
-    <a className="text-link" href={url} target="_blank" rel="noreferrer">
-      Google Mapsで開く
-    </a>
+    <ExternalLink
+      url={url}
+      label={
+        registeredGoogleMapsUrl(url) ? "Google Mapsで開く" : "サイトを開く"
+      }
+    />
   ) : null;
 }
 export async function copyText(value: string) {
