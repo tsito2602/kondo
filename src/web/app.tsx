@@ -377,6 +377,7 @@ function Home() {
                   {group.trips.map((trip) => (
                     <Link
                       className="trip-ticket"
+                      data-press-card
                       data-trip-surface={trip.id}
                       data-motion-managed
                       onClick={(event) => {

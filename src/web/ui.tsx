@@ -152,7 +152,7 @@ export function Modal({
     busy: boolean;
   } | null>(null);
   const origin = useRef<HTMLElement | null>(null);
-  const animation = useRef<ReturnType<typeof animateDialog>>(null);
+  const animation = useRef<Animation | null>(null);
   const depth = useRef<ReturnType<typeof menuDepth> | null>(null);
   const backdropAnimation = useRef<Animation | undefined>(undefined);
   const closeCallback = useRef(onClose);

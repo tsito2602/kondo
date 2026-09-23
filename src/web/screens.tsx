@@ -238,7 +238,7 @@ export function ItineraryScreen() {
                 }
                 onClick={() => setAdding(day)}
               >
-                <div data-card-origin>
+                <div data-press-card>
                   <p>まだ予定はありません</p>
                   {travel.canEdit && (
                     <span className="empty-add">
@@ -287,7 +287,7 @@ export function ItineraryScreen() {
                           <span />
                         )}
                       </span>
-                      <div data-card-origin>
+                      <div data-press-card>
                         <small>
                           {entry.item
                             ? transport
@@ -375,6 +375,7 @@ export function BookingsScreen() {
             .map((booking) => (
               <button
                 className="booking-ticket"
+                data-press-card
                 key={booking.id}
                 onClick={() => setId(booking.id)}
               >
@@ -736,6 +737,7 @@ export function NotesScreen() {
           {notes.map((note) => (
             <button
               className="note-card"
+              data-press-card
               key={note.id}
               onClick={() => setNote(note)}
             >

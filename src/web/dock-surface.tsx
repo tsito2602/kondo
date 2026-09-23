@@ -10,12 +10,14 @@ export function animateDockPress(
   const style = window.getComputedStyle(element);
   const from = style.transform || "none";
   const scale = style.getPropertyValue("--safari-press-scale").trim() || "1.06";
+  const scaleY =
+    style.getPropertyValue("--safari-press-scale-y").trim() || "1.1";
   previous?.cancel();
   if (reduceMotion() || !element.animate) return undefined;
   return element.animate(
     [
       { transform: from },
-      { transform: pressed ? `scale(${scale}, 1.1)` : "scale(1)" },
+      { transform: pressed ? `scale(${scale}, ${scaleY})` : "scale(1)" },
     ],
     {
       duration: pressed ? 320 : 900,

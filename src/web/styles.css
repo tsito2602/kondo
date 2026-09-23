@@ -4004,14 +4004,12 @@ input::-webkit-date-and-time-value {
   font-size: 12px;
   font-weight: 600;
 }
-.modal-origin-card {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 4;
-  display: block;
-  min-height: 0;
-  padding: 0;
-  margin: 0;
-  pointer-events: none;
+/* Card contact uses the dock timing with uniform scaling to preserve text. */
+[data-press-card] {
+  --safari-press-scale: 1.04;
+  --safari-press-scale-y: 1.04;
+  transform-origin: center;
+}
+[data-press-card][data-press-active="true"] {
+  transform: scale(1.04);
 }

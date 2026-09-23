@@ -5,7 +5,14 @@ import { reduceMotion } from "./motion";
 export function installPressFeedback() {
   const animations = new Map<HTMLElement, Animation>();
   let active:
-    { element: HTMLElement; pointerId?: number; key?: string } | undefined;
+    | {
+        element: HTMLElement;
+        pointerId?: number;
+        key?: string;
+        x?: number;
+        y?: number;
+      }
+    | undefined;
   const animate = (element: HTMLElement, pressed: boolean) => {
     const animation = animateDockPress(
       element,
@@ -28,18 +35,26 @@ export function installPressFeedback() {
     delete element.dataset.pressActive;
   };
   const target = (event: Event) => {
-    const element =
-      event.target instanceof Element
-        ? event.target.closest<HTMLElement>(
-            ".icon-button, .floating-add, .add-action",
-          )
-        : null;
-    return element &&
-      !element.closest(
+    if (!(event.target instanceof Element)) return null;
+    const control = event.target.closest<HTMLElement>(
+      "button, a, [role=button]",
+    );
+    if (
+      !control ||
+      control.closest(
         '.thumb-dock, .trip-menu-toggle, [inert], :disabled, [aria-disabled="true"]',
       )
-      ? element
-      : null;
+    )
+      return null;
+    // A place has separate detail/add controls but one shared card surface.
+    // Timeline time/marker columns stay still while their visual card responds.
+    return (
+      control.closest<HTMLElement>("[data-press-card]") ??
+      control.querySelector<HTMLElement>("[data-press-card]") ??
+      (control.matches(".icon-button, .floating-add, .add-action")
+        ? control
+        : null)
+    );
   };
   const press = (element: HTMLElement) => {
     release();
@@ -53,7 +68,22 @@ export function installPressFeedback() {
     const element = target(event);
     if (!element) return;
     press(element);
-    active = { element, pointerId: event.pointerId };
+    active = {
+      element,
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+    };
+  };
+  const move = (event: PointerEvent) => {
+    if (
+      active?.pointerId === event.pointerId &&
+      Math.hypot(
+        event.clientX - (active.x ?? event.clientX),
+        event.clientY - (active.y ?? event.clientY),
+      ) > 10
+    )
+      release();
   };
   const up = (event: PointerEvent) => {
     if (active?.pointerId === event.pointerId) release();
@@ -93,6 +123,7 @@ export function installPressFeedback() {
   };
   document.addEventListener("pointerdown", down, true);
   document.addEventListener("pointerup", up, true);
+  document.addEventListener("pointermove", move, true);
   document.addEventListener("pointercancel", up, true);
   document.addEventListener("pointerout", out, true);
   document.addEventListener("keydown", keydown, true);
@@ -102,6 +133,7 @@ export function installPressFeedback() {
   return () => {
     document.removeEventListener("pointerdown", down, true);
     document.removeEventListener("pointerup", up, true);
+    document.removeEventListener("pointermove", move, true);
     document.removeEventListener("pointercancel", up, true);
     document.removeEventListener("pointerout", out, true);
     document.removeEventListener("keydown", keydown, true);

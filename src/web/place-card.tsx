@@ -28,7 +28,7 @@ export function PlaceCard({
       ? place.location
       : "";
   return (
-    <article className="place-card">
+    <article className="place-card" data-press-card>
       <button
         className="place-card-main"
         aria-label={`${place.title}の詳細`}

@@ -34,7 +34,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { PlaceCard } from './src/web/place-card'; export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { animateDialog, dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { PlaceCard } from './src/web/place-card'; export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -79,7 +79,6 @@ const {
   animateDockPress,
   dockKeyboardInset,
   SaveButton,
-  animateDialog,
   dismissModal,
   useMotionNavigation,
   ThumbDockProvider,
@@ -2722,82 +2721,80 @@ test("place cards separate detail and scheduling actions, and link scheduled vis
   }
 });
 
-test("itinerary panels grow from the card column and reverse every layer without a jump", () => {
-  const originalAnimate = HTMLElement.prototype.animate;
-  const originalMedia = globalThis.matchMedia;
-  globalThis.matchMedia = (query) => ({ matches: query.includes("max-width") });
-  const origin = document.createElement("button");
-  origin.className = "timeline-entry";
-  origin.innerHTML =
-    '<time>16:00</time><span></span><div data-card-origin style="border-radius:22px"><h3>散歩</h3></div>';
-  const card = origin.querySelector("div");
-  const dialog = document.createElement("dialog");
-  dialog.innerHTML =
-    '<div class="modal-inner" style="position:relative;border-radius:28px"><header class="modal-header">予定詳細</header><div class="modal-body">本文</div></div><nav>戻る</nav>';
-  document.body.append(origin, dialog);
-  const panel = dialog.querySelector(".modal-inner");
-  panel.getBoundingClientRect = () => ({
-    left: 12,
-    top: 20,
-    width: 351,
-    height: 540,
-  });
-  card.getBoundingClientRect = () => ({
-    left: 78,
-    top: 220,
-    width: 280,
-    height: 92,
-    bottom: 312,
-  });
+test("card contact scales the whole surface, keeps actions independent and releases on scrolling", async () => {
+  const host = document.createElement("div");
+  host.innerHTML =
+    '<button class="timeline-entry"><time>10:00</time><div data-press-card><h3>予定</h3></div></button><button class="timeline-empty"><div data-press-card>追加</div></button><article class="place-card" data-press-card><button class="place-card-main">場所詳細</button><button class="place-card-action">しおりへ</button><button disabled>無効</button></article><button class="booking-ticket" data-press-card>予約</button><button class="note-card" data-press-card>メモ</button><a href="#trip" class="trip-ticket" data-press-card>旅行</a><button class="timeline-empty" disabled><div data-press-card>閲覧のみ</div></button>';
+  document.body.append(host);
   const calls = [];
-  HTMLElement.prototype.animate = function (frames) {
-    const animation = timeline();
-    calls.push({ element: this, frames, animation });
-    return animation;
-  };
+  for (const surface of host.querySelectorAll("[data-press-card]")) {
+    surface.style.setProperty("--safari-press-scale", "1.04");
+    surface.style.setProperty("--safari-press-scale-y", "1.04");
+    surface.animate = (frames, options) => {
+      const animation = timeline();
+      calls.push({ surface, frames, options, animation });
+      return animation;
+    };
+  }
+  const cleanup = installPressFeedback();
   try {
-    const motion = animateDialog(dialog, origin);
-    assert.equal(calls[0].element, panel);
-    assert.equal(calls[0].frames[0].transform, "translate(66px, 200px)");
-    assert.equal(
-      calls[0].frames[0].clipPath,
-      "inset(0px 71px 448px 0px round 22px)",
-    );
-    assert.equal(
-      calls[0].frames[0].opacity,
-      1,
-      "card material never fades away",
-    );
-    assert.equal(
-      card.style.visibility,
-      "hidden",
-      "avoid a duplicate receding card",
-    );
-    assert.equal(panel.querySelector(".modal-origin-card").textContent, "散歩");
-    assert.ok(calls.every(({ element }) => element.tagName !== "NAV"));
-    calls[0].animation.currentTime = 110;
-    panel.scrollTop = 150;
-    motion.playbackRate = -1.15;
-    motion.play();
-    for (const { animation } of calls) {
-      assert.equal(animation.currentTime, 110);
-      assert.equal(animation.playbackRate, -1.15);
+    const controls = [...host.querySelectorAll("button:not(:disabled), a")];
+    for (const control of controls) {
+      pointer(control, "pointerdown", 20, 20);
+      const { surface, frames, animation } = calls.at(-1);
+      assert.equal(surface.dataset.pressActive, "true");
+      assert.equal(frames[1].transform, "scale(1.04, 1.04)");
+      assert.equal(
+        surface,
+        control.closest("[data-press-card]") ??
+          control.querySelector("[data-press-card]"),
+      );
+      animation.finish();
+      await Promise.resolve();
+      assert.equal(
+        surface.dataset.pressActive,
+        "true",
+        "hold persists after animation completes",
+      );
+      pointer(control, "pointermove", 22, 23);
+      assert.equal(
+        surface.dataset.pressActive,
+        "true",
+        "small touch movement keeps contact",
+      );
+      pointer(control, "pointermove", 20, 45);
+      assert.equal(
+        surface.dataset.pressActive,
+        undefined,
+        "scroll releases without blocking the gesture",
+      );
+      assert.equal(calls.at(-1).options.duration, 900);
     }
-    assert.equal(panel.querySelector(".modal-origin-card").style.top, "150px");
-    motion.cancel();
-    assert.equal(card.style.visibility, "");
-    assert.equal(panel.querySelector(".modal-origin-card"), null);
-    assert.ok(calls.every(({ animation }) => animation.cancelled));
-    globalThis.matchMedia = () => ({ matches: true });
-    assert.equal(
-      animateDialog(dialog, origin),
-      null,
-      "reduced motion skips expansion",
+    const detail = host.querySelector(".place-card-main");
+    const add = host.querySelector(".place-card-action");
+    let details = 0,
+      additions = 0;
+    detail.onclick = () => details++;
+    add.onclick = () => additions++;
+    pointer(add, "pointerdown");
+    pointer(document, "pointerup");
+    add.click();
+    assert.equal(details, 0);
+    assert.equal(additions, 1);
+    detail.dispatchEvent(
+      new dom.window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
     );
+    assert.equal(detail.parentElement.dataset.pressActive, "true");
+    detail.dispatchEvent(
+      new dom.window.KeyboardEvent("keyup", { key: "Enter", bubbles: true }),
+    );
+    assert.equal(detail.parentElement.dataset.pressActive, undefined);
+    const count = calls.length;
+    for (const disabled of host.querySelectorAll(":disabled"))
+      pointer(disabled, "pointerdown");
+    assert.equal(calls.length, count, "disabled card actions never animate");
   } finally {
-    HTMLElement.prototype.animate = originalAnimate;
-    globalThis.matchMedia = originalMedia;
-    origin.remove();
-    dialog.remove();
+    cleanup();
+    host.remove();
   }
 });
