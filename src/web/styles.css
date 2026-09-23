@@ -33,7 +33,7 @@
   --shadow: 0 1px 2px #182a3806, 0 6px 20px #182a3808;
   --surface-glow: #ffffffbd;
   --panel-tint: #ffffffed;
-  --dock-glass: color-mix(in srgb, var(--paper) 30%, transparent);
+  --dock-glass: color-mix(in srgb, var(--paper) 18%, transparent);
   --dock-bottom-gap: 24px;
   --dock-height: 56px;
   --dock-on-accent: #fff;
@@ -66,7 +66,7 @@
   --shadow: 0 1px 2px #0003, 0 8px 24px #0002;
   --surface-glow: #ffffff0e;
   --panel-tint: #1b1e21f5;
-  --dock-glass: color-mix(in srgb, var(--paper) 36%, transparent);
+  --dock-glass: color-mix(in srgb, var(--paper) 24%, transparent);
   --dock-border: #ffffff18;
   --dock-border-top: #ffffff26;
   --dock-border-bottom: #ffffff10;
@@ -619,6 +619,13 @@ strong {
   text-decoration: underline;
   min-height: 36px;
   padding: 0 8px;
+}
+.home-header,
+.simple-header,
+.modal-header {
+  background: var(--dock-glass);
+  -webkit-backdrop-filter: blur(24px) saturate(1.18);
+  backdrop-filter: blur(24px) saturate(1.18);
 }
 .trip-header {
   position: sticky;
@@ -1371,12 +1378,17 @@ progress::-moz-progress-bar {
   backdrop-filter: blur(8px) saturate(0.85);
   animation: backdrop-enter 320ms cubic-bezier(0.32, 0, 0.2, 1) both;
 }
+/* Scroll the reading layer beneath its sticky glass header. */
 .modal-inner {
-  display: flex;
-  flex-direction: column;
   max-height: 90dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-top: 80px;
 }
 .modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   padding: 12px;
   display: flex;
   align-items: center;
@@ -1384,7 +1396,8 @@ progress::-moz-progress-bar {
   gap: 8px;
   border-bottom: 1px solid var(--line);
   flex-shrink: 0;
-  background: var(--paper);
+  background: var(--dock-glass);
+  border-bottom-color: var(--dock-border);
 }
 .modal-header h2:focus {
   outline: none;
@@ -1395,8 +1408,6 @@ progress::-moz-progress-bar {
 }
 .modal-body {
   padding: 28px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
   min-height: 0;
 }
 .modal.full {
@@ -1603,7 +1614,7 @@ input::-webkit-date-and-time-value {
   margin: auto;
   padding: 16px 20px 16px;
   border-bottom: 1px solid var(--line);
-  background: var(--canvas);
+  background: var(--dock-glass);
 }
 .simple-header h1 {
   font-size: 20px;
@@ -1828,11 +1839,8 @@ input::-webkit-date-and-time-value {
   border-color: color-mix(in srgb, var(--line) 75%, transparent);
   border-radius: 24px;
 }
-.modal:not(.full) .modal-header {
-  background: transparent;
-}
 .modal-header {
-  box-shadow: 0 1px 0 var(--surface-glow);
+  box-shadow: 0 1px 0 var(--dock-border-bottom);
 }
 .trip-tabs::before {
   content: "";
@@ -2382,9 +2390,9 @@ input::-webkit-date-and-time-value {
       to bottom,
       color-mix(in srgb, var(--dock-fade-color) 0%, transparent) 0%,
       color-mix(in srgb, var(--dock-fade-color) 5%, transparent) 22%,
-      color-mix(in srgb, var(--dock-fade-color) 28%, transparent) 50%,
-      color-mix(in srgb, var(--dock-fade-color) 72%, transparent) 78%,
-      var(--dock-fade-color) 100%
+      color-mix(in srgb, var(--dock-fade-color) 14%, transparent) 50%,
+      color-mix(in srgb, var(--dock-fade-color) 36%, transparent) 78%,
+      color-mix(in srgb, var(--dock-fade-color) 60%, transparent) 100%
     );
     pointer-events: none;
   }
@@ -2551,7 +2559,8 @@ input::-webkit-date-and-time-value {
     max-height: 100%;
     background: var(--paper);
     border-radius: 28px 28px 0 0;
-    overflow: hidden;
+    overflow-y: auto;
+    scroll-padding-bottom: 96px;
     box-shadow: inset 0 1px 0 var(--surface-glow);
   }
   :root:has(.thumb-dock-host) .modal.full .modal-inner {
@@ -2560,7 +2569,6 @@ input::-webkit-date-and-time-value {
   }
   :root:has(.thumb-dock-host) .modal .modal-body {
     padding-bottom: calc(96px + env(safe-area-inset-bottom));
-    scroll-padding-bottom: 96px;
   }
   :root:has(.thumb-dock-host) .modal-header > button,
   :root:has(.thumb-dock-host) .modal-header > .icon-spacer,
@@ -2689,7 +2697,7 @@ input::-webkit-date-and-time-value {
   .fluid-dock-accent {
     position: absolute;
     inset: 0;
-    background: var(--brand);
+    background: color-mix(in srgb, var(--brand) 90%, transparent);
     opacity: 0;
   }
   .safari-left {
@@ -2893,9 +2901,15 @@ input::-webkit-date-and-time-value {
   }
 }
 @media (prefers-reduced-transparency: reduce) {
+  .fluid-dock-accent {
+    background: var(--brand);
+  }
   .safari-glass,
   .trip-menu-popover,
   .trip-header,
+  .home-header,
+  .simple-header,
+  .modal-header,
   .date-strip {
     background: var(--paper);
     backdrop-filter: none;
