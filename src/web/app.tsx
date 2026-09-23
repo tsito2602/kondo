@@ -51,6 +51,7 @@ import { formatDate, localDate } from "@/utils/dates";
 import { TripEditor } from "./editors";
 import { SafariTabs, tripTabs } from "./safari-tabs";
 import { AnchoredMenu } from "./anchored-menu";
+import { installPressFeedback } from "./press-feedback";
 import { dockKeyboardInset } from "./viewport";
 import {
   ThumbDock,
@@ -78,6 +79,7 @@ import {
 
 export function App() {
   const auth = useAuth();
+  useEffect(installPressFeedback, []);
   useEffect(() => {
     const root = document.documentElement;
     const pointer = () => {

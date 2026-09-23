@@ -14,6 +14,7 @@ Object.assign(globalThis, {
   document: dom.window.document,
   HTMLElement: dom.window.HTMLElement,
   Element: dom.window.Element,
+  Node: dom.window.Node,
   CustomEvent: dom.window.CustomEvent,
   IS_REACT_ACT_ENVIRONMENT: true,
   requestAnimationFrame: (callback) =>
@@ -33,7 +34,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -52,6 +53,7 @@ new Function("require", "module", "exports", outputFiles[0].text)(
 );
 const {
   Modal,
+  installPressFeedback,
   AppRouter,
   useItineraryScroll,
   startRouteTransition,
@@ -1210,6 +1212,72 @@ test("contact previews immediately and a short scrub commits once without waitin
   } finally {
     await act(async () => root.unmount());
     delete document.startViewTransition;
+  }
+});
+
+test("standalone controls share dock press timing, release on cancellation, and preserve native activation", () => {
+  const host = document.createElement("div");
+  host.innerHTML =
+    '<a class="icon-button" href="#back"><span>戻る</span></a><button class="icon-button">メニュー</button><button class="primary add-action">追加</button><button class="floating-add">予定追加</button><button class="icon-button" disabled>無効</button><div class="thumb-dock"><button class="icon-button">既存ナビ</button></div>';
+  document.body.append(host);
+  const calls = [];
+  for (const element of host.querySelectorAll("a, button")) {
+    element.style.setProperty("--safari-press-scale", "1.1");
+    element.animate = (frames, options) => {
+      const animation = timeline();
+      calls.push({ element, frames, options, animation });
+      return animation;
+    };
+  }
+  const cleanup = installPressFeedback();
+  try {
+    for (const element of [...host.querySelectorAll("a, button")].slice(0, 4)) {
+      pointer(element.firstElementChild ?? element, "pointerdown");
+      assert.equal(element.dataset.pressActive, "true");
+      assert.equal(calls.at(-1).options.duration, 320);
+      assert.equal(calls.at(-1).frames[1].transform, "scale(1.1, 1.1)");
+      pointer(document, "pointerup");
+      assert.equal(element.dataset.pressActive, undefined);
+      assert.equal(calls.at(-1).options.duration, 900);
+    }
+    const menu = host.querySelector("button");
+    pointer(menu, "pointerdown");
+    pointer(menu, "pointercancel");
+    assert.equal(menu.dataset.pressActive, undefined);
+    pointer(menu, "pointerdown");
+    pointer(menu, "pointerout", 0, 0, { relatedTarget: document.body });
+    assert.equal(menu.dataset.pressActive, undefined);
+    menu.dispatchEvent(
+      new dom.window.KeyboardEvent("keydown", { key: " ", bubbles: true }),
+    );
+    assert.equal(menu.dataset.pressActive, "true");
+    menu.dispatchEvent(
+      new dom.window.KeyboardEvent("keyup", { key: " ", bubbles: true }),
+    );
+    assert.equal(menu.dataset.pressActive, undefined);
+    let activated = 0;
+    menu.onclick = () => activated++;
+    menu.click();
+    assert.equal(activated, 1);
+    const count = calls.length;
+    pointer(host.querySelector(":disabled"), "pointerdown");
+    pointer(host.querySelector(".thumb-dock button"), "pointerdown");
+    reduced = true;
+    pointer(menu, "pointerdown");
+    assert.equal(
+      calls.length,
+      count,
+      "disabled, existing dock and reduced motion stay untouched",
+    );
+    reduced = false;
+    pointer(menu, "pointerdown");
+    cleanup();
+    assert.equal(menu.dataset.pressActive, undefined);
+    assert.equal(calls.at(-1).animation.cancelled, true);
+  } finally {
+    reduced = false;
+    cleanup();
+    host.remove();
   }
 });
 

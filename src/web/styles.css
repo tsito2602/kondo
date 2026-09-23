@@ -267,9 +267,8 @@ strong {
 .subtle {
   color: var(--muted);
 }
-.primary:active,
-.secondary:active,
-.icon-button:active {
+.primary:active:not(.add-action),
+.secondary:active:not(.icon-button) {
   transform: scale(0.97);
 }
 .text-button {
@@ -426,8 +425,15 @@ strong {
   box-shadow: 0 4px 16px #172d4430;
   transition: transform 150ms;
 }
-.floating-add:active {
-  transform: scale(0.97);
+.icon-button,
+.floating-add,
+.add-action {
+  --safari-press-scale: 1.1;
+  transform-origin: center;
+  transition: background 150ms;
+}
+:is(.icon-button, .floating-add, .add-action)[data-press-active="true"] {
+  transform: scale(1.1);
 }
 .logo {
   width: 84px;
