@@ -1,6 +1,6 @@
 import { PlaceStatusLabel } from "./place-status";
 import { DayStrip } from "./day-strip";
-import { BookingTicketDates } from "./ticket-content";
+import { ticketDate } from "./ticket-content";
 import {
   dayTimeline,
   isJourney,
@@ -39,7 +39,6 @@ import {
   Car,
   Utensils,
   Ticket,
-  ChevronRight,
   CalendarDays,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./obsidian/tabs";
@@ -80,12 +79,7 @@ import {
   PreparationEditor,
   bookingKinds,
 } from "./editors";
-import {
-  BookingDetail,
-  BookingRoute,
-  ItemDetail,
-  PlaceDetail,
-} from "./details";
+import { BookingDetail, ItemDetail, PlaceDetail } from "./details";
 
 export type Entry = {
   key: string;
@@ -438,39 +432,33 @@ export function BookingsScreen() {
                       </span>
                     </div>
                     <h2>{booking.title}</h2>
-                    {booking.detail && (
-                      <p className="clamp">{booking.detail}</p>
-                    )}
-                    {["flight", "train", "car"].includes(booking.kind) ? (
-                      <BookingRoute booking={booking} />
-                    ) : (
-                      booking.location && (
-                        <p className="muted clamp ticket-location">
-                          <MapPin size={12} />
-                          {booking.location}
+                    {["flight", "train", "car"].includes(booking.kind) &&
+                      (booking.originCode ||
+                        booking.origin ||
+                        booking.destinationCode ||
+                        booking.destination) && (
+                        <p className="ticket-route-summary">
+                          {booking.originCode || booking.origin || "未定"} →{" "}
+                          {booking.destinationCode ||
+                            booking.destination ||
+                            "未定"}
                         </p>
-                      )
-                    )}
-                    <BookingTicketDates booking={booking} />
+                      )}
+                    <p className="ticket-date-summary">
+                      {ticketDate(booking.day)}
+                      {booking.kind === "hotel" &&
+                      booking.endDay &&
+                      booking.endDay !== booking.day
+                        ? ` 〜 ${ticketDate(booking.endDay, booking.day)}`
+                        : ""}
+                    </p>
                   </div>
                   <div className="ticket-stub">
-                    <BookingIcon
-                      className="ticket-stub-icon"
-                      size={22}
-                      aria-hidden="true"
-                    />
-                    {booking.confirmationCode && (
-                      <div className="ticket-reference">
-                        <span>予約番号</span>
-                        <strong className="confirmation-code">
-                          {booking.confirmationCode}
-                        </strong>
-                      </div>
-                    )}
-                    <span className="ticket-open">
-                      詳細
-                      <ChevronRight size={18} />
-                    </span>
+                    <strong>
+                      {booking.time
+                        ? `${booking.time}${booking.kind === "hotel" ? "〜" : ""}`
+                        : "未定"}
+                    </strong>
                   </div>
                 </button>
               );

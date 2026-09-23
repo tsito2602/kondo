@@ -421,10 +421,6 @@ function Home() {
                       <div className="trip-photo">
                         <TripCover id={trip.id} src={trip.coverImage ?? ""} />
                         <div className="trip-photo-content">
-                          <span className="trip-ticket-label">
-                            <BookOpen size={13} aria-hidden="true" />
-                            旅のしおり
-                          </span>
                           <h2>{trip.name}</h2>
                           {trip.destination && (
                             <span className="trip-destination">
@@ -433,7 +429,6 @@ function Home() {
                             </span>
                           )}
                           <div className="trip-ticket-period">
-                            <span>旅行期間</span>
                             <p>
                               {ticketDate(trip.startsOn)}
                               <span className="ticket-range-end">
@@ -455,10 +450,6 @@ function Home() {
                         <span>
                           <Users size={14} />
                           {trip.memberCount}人
-                        </span>
-                        <span className="ticket-open" aria-label="しおりを開く">
-                          しおり
-                          <ChevronRight size={20} />
                         </span>
                       </div>
                     </Link>
@@ -996,6 +987,8 @@ function SettingsScreen() {
 type InstallEvent = Event & { prompt: () => Promise<void> };
 function PwaControls() {
   const { pendingCount } = useTravel();
+  const [checking, setChecking] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState("");
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
   const [installEvent, setInstallEvent] = useState<InstallEvent | null>(null);
   const [standalone] = useState(
@@ -1047,8 +1040,9 @@ function PwaControls() {
       <Button
         variant="ghost"
         className="secondary"
-        disabled={pendingCount > 0}
-        onClick={() => {
+        disabled={pendingCount > 0 || checking}
+        onClick={async () => {
+          setUpdateStatus("");
           if (waiting) {
             navigator.serviceWorker.addEventListener(
               "controllerchange",
@@ -1056,22 +1050,41 @@ function PwaControls() {
               { once: true },
             );
             waiting.postMessage({ type: "ACTIVATE_UPDATE" });
-          } else if ("serviceWorker" in navigator)
-            void navigator.serviceWorker
-              .getRegistration()
-              .then(async (registration) => {
-                await registration?.update();
-                if (registration?.waiting) setWaiting(registration.waiting);
-                else
-                  notify(
-                    "更新を確認しました。準備ができると更新ボタンが表示されます",
-                  );
-              })
-              .catch(() => notify("更新を確認できませんでした"));
+          } else {
+            setChecking(true);
+            try {
+              const registration =
+                "serviceWorker" in navigator
+                  ? await navigator.serviceWorker.getRegistration()
+                  : undefined;
+              if (!registration) throw new Error("Service worker unavailable");
+              await registration.update();
+              if (registration.waiting) setWaiting(registration.waiting);
+              else
+                setUpdateStatus(
+                  "更新を確認しました。準備ができると更新ボタンが表示されます",
+                );
+            } catch {
+              setUpdateStatus("更新を確認できませんでした");
+            } finally {
+              setChecking(false);
+            }
+          }
         }}
       >
-        {waiting ? "新しいバージョンに更新" : "更新を確認"}
+        {checking
+          ? "確認中…"
+          : waiting
+            ? "新しいバージョンに更新"
+            : "更新を確認"}
       </Button>
+      <p
+        className="pwa-update-status muted small"
+        role="status"
+        aria-live="polite"
+      >
+        {waiting ? "" : updateStatus}
+      </p>
       {pendingCount > 0 && (
         <p className="muted">未同期の変更を送信してから更新できます。</p>
       )}

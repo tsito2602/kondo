@@ -670,6 +670,40 @@ test("legacy account cache and pending changes survive React migration; real for
     const settingsBackground = document.querySelector("#main-content");
     assert.equal(document.querySelector("dialog h2").textContent, "設定");
     assert.ok(document.querySelector("dialog.full .settings-page"));
+    let updateFails = false;
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: {
+        getRegistration: async () => ({
+          waiting: null,
+          update: async () => {
+            if (updateFails) throw new Error("offline");
+          },
+        }),
+      },
+    });
+    await click(byText("dialog button", "更新を確認"));
+    const updateStatus = document.querySelector(".pwa-update-status");
+    assert.match(updateStatus.textContent, /更新を確認しました/);
+    assert.equal(
+      updateStatus.previousElementSibling,
+      byText("dialog button", "更新を確認"),
+      "confirmation stays in document flow below its button",
+    );
+    assert.ok(
+      !document
+        .querySelector(".toast")
+        .textContent.includes("更新を確認しました"),
+    );
+    updateFails = true;
+    await click(byText("dialog button", "更新を確認"));
+    assert.match(updateStatus.textContent, /更新を確認できませんでした/);
+    assert.equal(
+      byText("dialog button", "更新を確認").disabled,
+      false,
+      "failed checks can be retried",
+    );
+    delete navigator.serviceWorker;
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
     assert.equal(document.querySelector("#main-content"), settingsBackground);
@@ -990,49 +1024,5 @@ test("booking details use kind-specific labels and keep single-date reservations
     render("ticket", { endDay: "2026-11-23" }).querySelectorAll("section")
       .length,
     2,
-  );
-});
-
-test("ticket summaries preserve overnight and cross-year dates, hotel bounds and unknown times", async () => {
-  const { BookingTicketDates } = await bundle(
-    "export { BookingTicketDates } from './src/web/ticket-content';",
-  );
-  const { renderToStaticMarkup } = await import("react-dom/server");
-  const render = (patch = {}) =>
-    new JSDOM(
-      renderToStaticMarkup(
-        React.createElement(BookingTicketDates, {
-          booking: {
-            kind: "flight",
-            day: "2026-12-31",
-            time: "22:00",
-            endDay: "2027-01-01",
-            endTime: "05:00",
-            ...patch,
-          },
-        }),
-      ),
-    ).window.document;
-  assert.match(render().body.textContent, /2026\/12\/31/);
-  assert.match(render().body.textContent, /2027\/1\/1/);
-  assert.match(render().body.textContent, /各空港の現地時刻/);
-  const hotel = render({ kind: "hotel", time: "15:00", endTime: "11:00" });
-  assert.deepEqual(
-    [...hotel.querySelectorAll("dd strong")].map((n) => n.textContent),
-    ["15:00〜", "〜11:00"],
-  );
-  const incomplete = render({ endDay: "", endTime: "" });
-  assert.match(incomplete.body.textContent, /到着日付未定時刻未定/);
-  const sameDay = render({ endDay: "", endTime: "23:00" });
-  assert.equal(sameDay.querySelectorAll("dd span")[1].textContent, "12/31");
-  const restaurant = render({
-    kind: "restaurant",
-    endDay: "2026-12-31",
-    endTime: "22:00",
-  });
-  assert.equal(
-    restaurant.querySelectorAll("dt").length,
-    1,
-    "identical end points are not repeated for single-time bookings",
   );
 });
