@@ -92,6 +92,31 @@ export function dismissModal(
 
 const tabOrder = ["itinerary", "places", "packing", "bookings", "notes"];
 
+// Pin each snapshot to its own viewport coordinates. The browser's default
+// group animation otherwise interpolates a scrolled, tall page into the next
+// page's top/height, visibly pulling the outgoing content back to the top.
+export function startRouteTransition(update: () => void) {
+  const capture = (side: "old" | "new") => {
+    const bounds = document
+      .getElementById("main-content")
+      ?.getBoundingClientRect();
+    for (const property of ["top", "left", "width", "height"] as const) {
+      document.documentElement.style.setProperty(
+        `--route-${side}-${property}`,
+        `${bounds?.[property] ?? 0}px`,
+      );
+    }
+  };
+  capture("old");
+  const transition = document.startViewTransition(() => {
+    flushSync(update);
+    capture("new");
+  });
+  void transition.ready.catch(() => undefined);
+  void transition.finished.catch(() => undefined);
+  return transition;
+}
+
 // Use native snapshots for both sides of a route transition; older browsers
 // keep immediate React Router navigation. Only the content is snapshotted.
 export function useMotionNavigation() {
@@ -138,11 +163,9 @@ export function useMotionNavigation() {
       if (!document.startViewTransition || reduceMotion()) return;
       event.preventDefault();
       active?.skipTransition();
-      active = document.startViewTransition(() => {
-        flushSync(() => navigateRef.current(url.pathname + url.search));
-      });
-      void active.ready.catch(() => undefined);
-      void active.finished.catch(() => undefined);
+      active = startRouteTransition(() =>
+        navigateRef.current(url.pathname + url.search),
+      );
     };
     document.addEventListener("pointerdown", interrupt, true);
     document.addEventListener("keydown", interrupt, true);

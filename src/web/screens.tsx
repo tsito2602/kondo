@@ -1,3 +1,4 @@
+import { useItineraryScroll } from "./itinerary-scroll";
 import { dismissModal } from "./motion";
 import { ThumbAction } from "./thumb-dock";
 import { Button } from "./obsidian/button";
@@ -139,9 +140,6 @@ export function timelineEntries(
 export function ItineraryScreen() {
   const travel = useTravel();
   const [params] = useSearchParams();
-  const [selectedDay, setSelectedDay] = useState(
-    params.get("day") ?? travel.selectedTrip!.startsOn,
-  );
   const [adding, setAdding] = useState(false);
   const [datePicker, setDatePicker] = useState(false);
   const [detail, setDetail] = useState<{
@@ -163,55 +161,16 @@ export function ItineraryScreen() {
       values.add(day);
     return [...values].sort();
   }, [entries, travel.selectedTrip]);
+  const { selectedDay, selectDay } = useItineraryScroll(
+    days,
+    params.get("day") ?? travel.selectedTrip!.startsOn,
+  );
   useEffect(() => {
     const day = params.get("day");
-    if (day) {
-      setSelectedDay(day);
-      setTimeout(
-        () =>
-          document
-            .getElementById(`day-${day}`)
-            ?.scrollIntoView({ block: "start" }),
-        50,
-      );
-    }
-  }, [params]);
-  useEffect(() => {
-    let frame = 0;
-    const update = () => {
-      frame = 0;
-      const sections = days.flatMap((day) => {
-        const node = document.getElementById(`day-${day}`);
-        return node ? [{ day, bounds: node.getBoundingClientRect() }] : [];
-      });
-      if (!sections.length || !sections.some(({ bounds }) => bounds.height))
-        return;
-      const boundary =
-        (document.querySelector(".date-strip")?.getBoundingClientRect()
-          .bottom ?? 0) + 24;
-      const atBottom =
-        window.scrollY > 0 &&
-        Math.ceil(window.scrollY + window.innerHeight) >=
-          document.documentElement.scrollHeight - 2;
-      // The final day may be too short to reach the sticky date strip.
-      const active = atBottom
-        ? sections.at(-1)
-        : (sections.filter(({ bounds }) => bounds.top <= boundary).at(-1) ??
-          sections[0]);
-      if (active) setSelectedDay(active.day);
-    };
-    const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(update);
-    };
-    schedule();
-    window.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", schedule);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", schedule);
-      window.removeEventListener("resize", schedule);
-    };
-  }, [days]);
+    if (!day) return;
+    const timer = setTimeout(() => selectDay(day, "instant"), 50);
+    return () => clearTimeout(timer);
+  }, [params, selectDay]);
   useEffect(() => {
     const tab = document.getElementById(`date-tab-${selectedDay}`);
     const strip = tab?.parentElement;
@@ -252,13 +211,7 @@ export function ItineraryScreen() {
                 onClick={() =>
                   dismissModal(() => {
                     setDatePicker(false);
-                    setSelectedDay(day);
-                    requestAnimationFrame(() =>
-                      document.getElementById(`day-${day}`)?.scrollIntoView({
-                        block: "start",
-                        behavior: "instant",
-                      }),
-                    );
+                    requestAnimationFrame(() => selectDay(day, "instant"));
                   })
                 }
               >
@@ -276,13 +229,12 @@ export function ItineraryScreen() {
             key={day}
             aria-current={selectedDay === day ? "date" : undefined}
             onClick={() => {
-              setSelectedDay(day);
-              document.getElementById(`day-${day}`)?.scrollIntoView({
-                behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+              selectDay(
+                day,
+                matchMedia("(prefers-reduced-motion: reduce)").matches
                   ? "instant"
                   : "smooth",
-                block: "start",
-              });
+              );
             }}
           >
             <small>DAY {index + 1}</small>

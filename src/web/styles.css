@@ -1914,17 +1914,31 @@ input::-webkit-date-and-time-value {
   background: var(--canvas);
 }
 ::view-transition-group(route-content) {
-  animation-duration: 240ms;
-  animation-timing-function: var(--ease-flow);
+  animation: none;
+  transform: none;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 ::view-transition-image-pair(route-content) {
   isolation: isolate;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 ::view-transition-old(route-content) {
+  top: var(--route-old-top);
+  left: var(--route-old-left);
+  width: var(--route-old-width);
+  height: var(--route-old-height);
   animation: route-out 240ms var(--ease-flow) both;
   mix-blend-mode: normal;
 }
 ::view-transition-new(route-content) {
+  top: var(--route-new-top);
+  left: var(--route-new-left);
+  width: var(--route-new-width);
+  height: var(--route-new-height);
   animation: route-in 240ms var(--ease-flow) both;
   mix-blend-mode: normal;
 }

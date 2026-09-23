@@ -6,7 +6,6 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { flushSync } from "react-dom";
 import { NavLink, useLocation, useNavigate } from "react-router";
 import {
   ArrowLeft,
@@ -18,7 +17,7 @@ import {
   Ticket,
 } from "lucide-react";
 
-import { reduceMotion } from "./motion";
+import { reduceMotion, startRouteTransition } from "./motion";
 import { animateDockPress, DockSurface } from "./dock-surface";
 import { DockNavigationContext, SharedDockSurfaceContext } from "./thumb-dock";
 
@@ -130,17 +129,16 @@ export function SafariTabs({
     const to = `/trips/${tripId}/${tripTabs[index].path}`;
     if (controls) {
       controls.beforeNavigate(() => navigate(to));
-    } else if (document.startViewTransition && !reduceMotion()) {
+    } else if (
+      typeof document.startViewTransition === "function" &&
+      !reduceMotion()
+    ) {
       document.documentElement.style.setProperty(
         "--route-direction",
         String(index < active ? -1 : 1),
       );
       transition.current?.skipTransition();
-      transition.current = document.startViewTransition(() =>
-        flushSync(() => navigate(to)),
-      );
-      void transition.current.ready.catch(() => undefined);
-      void transition.current.finished.catch(() => undefined);
+      transition.current = startRouteTransition(() => navigate(to));
     } else {
       navigate(to);
     }

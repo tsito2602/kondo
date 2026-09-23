@@ -32,7 +32,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -51,6 +51,8 @@ new Function("require", "module", "exports", outputFiles[0].text)(
 );
 const {
   Modal,
+  useItineraryScroll,
+  startRouteTransition,
   DockContent,
   AnchoredMenu,
   SafariTabs,
@@ -99,6 +101,98 @@ function timeline() {
   };
   return entry;
 }
+
+test("date clicks retain the target through intermediate days, retargeting and short final days", async () => {
+  const root = createRoot(document.getElementById("root"));
+  const days = ["2026-11-22", "2026-11-23", "2026-11-24"];
+  let visible = 0;
+  const originalBounds = HTMLElement.prototype.getBoundingClientRect;
+  const originalScroll = HTMLElement.prototype.scrollIntoView;
+  HTMLElement.prototype.getBoundingClientRect = function () {
+    const index = days.indexOf(this.id.replace("day-", ""));
+    return { top: (index - visible) * 500, bottom: 0, height: 500, width: 400, left: 0, right: 400 };
+  };
+  const targets = [];
+  HTMLElement.prototype.scrollIntoView = function (options) {
+    targets.push([this.id, options.behavior]);
+  };
+  function Harness() {
+    const { selectedDay, selectDay } = useItineraryScroll(days, days[0]);
+    return React.createElement("div", null,
+      React.createElement("output", null, selectedDay),
+      ...days.map((day) => React.createElement("section", { id: `day-${day}`, key: day },
+        React.createElement("button", { onClick: () => selectDay(day, "smooth") }, day))));
+  }
+  const selected = () => document.querySelector("output").textContent;
+  const scroll = async (index) => {
+    visible = index;
+    await act(async () => {
+      window.dispatchEvent(new dom.window.Event("scroll"));
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    });
+  };
+  try {
+    await act(async () => root.render(React.createElement(Harness)));
+    await act(async () => document.querySelectorAll("section button")[2].click());
+    await scroll(0);
+    assert.equal(selected(), days[2]);
+    await scroll(1);
+    assert.equal(selected(), days[2], "do not flash the intermediate date");
+    await act(async () => document.querySelectorAll("section button")[0].click());
+    window.dispatchEvent(new dom.window.Event("scrollend"));
+    await scroll(1);
+    assert.equal(selected(), days[0], "old completion must not unlock a new target");
+    await scroll(0);
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 200)));
+    await scroll(1);
+    assert.equal(selected(), days[1], "manual scrolling follows sections after settling");
+    await act(async () => document.querySelectorAll("section button")[2].click());
+    await scroll(1);
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 200)));
+    assert.equal(selected(), days[2], "a short final day retains explicit selection");
+    await act(async () => document.querySelectorAll("section button")[0].click());
+    await act(async () => {
+      window.dispatchEvent(new dom.window.Event("wheel"));
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    });
+    assert.equal(selected(), days[1], "user input releases the automatic-scroll lock");
+    assert.deepEqual(targets.map(([id]) => id), [days[2], days[0], days[2], days[0]].map((day) => `day-${day}`));
+  } finally {
+    await act(async () => root.unmount());
+    HTMLElement.prototype.getBoundingClientRect = originalBounds;
+    HTMLElement.prototype.scrollIntoView = originalScroll;
+  }
+});
+
+test("route snapshots preserve the outgoing scrolled geometry separately from the incoming page", async () => {
+  const main = document.createElement("main");
+  main.id = "main-content";
+  document.body.append(main);
+  let bounds = { top: -1200, left: 0, width: 390, height: 3000 };
+  main.getBoundingClientRect = () => bounds;
+  const nativeStart = document.startViewTransition;
+  let captureNew;
+  document.startViewTransition = (update) => {
+    captureNew = update;
+    return { ready: Promise.resolve(), finished: Promise.resolve(), skipTransition() {} };
+  };
+  try {
+    startRouteTransition(() => {
+      bounds = { top: 72, left: 0, width: 390, height: 500 };
+    });
+    const style = document.documentElement.style;
+    assert.equal(style.getPropertyValue("--route-old-top"), "-1200px");
+    assert.equal(bounds.top, -1200, "do not reset before the outgoing snapshot");
+    captureNew();
+    assert.equal(style.getPropertyValue("--route-old-top"), "-1200px");
+    assert.equal(style.getPropertyValue("--route-old-height"), "3000px");
+    assert.equal(style.getPropertyValue("--route-new-top"), "72px");
+    assert.equal(style.getPropertyValue("--route-new-height"), "500px");
+  } finally {
+    document.startViewTransition = nativeStart;
+    main.remove();
+  }
+});
 
 test("dialog reverses its retained timeline and backdrop before dismissing, including interrupted opening and Save", async () => {
   for (const trigger of ["close", "early-close", "save", "escape"]) {
