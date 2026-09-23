@@ -36,6 +36,9 @@
   --panel-header-tint: #ffffffe0;
   --field-tint: #ffffff66;
   --content-card: #f3f3f3;
+  --panel-card-tint: #ffffff8f;
+  --radius-card: 22px;
+  --radius-field: 16px;
   --dock-glass: #ffffff52;
   --dock-bottom-gap: 32px;
   --control-size: 44px;
@@ -75,6 +78,7 @@
   --panel-header-tint: #202020e0;
   --field-tint: #ffffff08;
   --content-card: #1c1c1c;
+  --panel-card-tint: #ffffff0f;
   --dock-glass: #18181859;
   --menu-glass: #242424a3;
   --dock-border: #ffffff18;
@@ -3105,7 +3109,7 @@ input::-webkit-date-and-time-value {
 ::view-transition-group(trip-surface) {
   z-index: 0;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: var(--radius-card);
 }
 ::view-transition-group(trip-cover) {
   z-index: 1;
@@ -3602,5 +3606,60 @@ input::-webkit-date-and-time-value {
     --field-tint: var(--paper);
     --panel-header-tint: var(--paper);
     --menu-glass: var(--paper);
+  }
+}
+
+/* Roomier date capsules and a shared radius scale for the surrounding surfaces. */
+.date-strip {
+  gap: 12px;
+}
+.date-strip button {
+  min-width: 80px;
+  padding-inline: 16px;
+}
+.trip-ticket,
+.booking-ticket,
+.place-card,
+.note-card,
+.settings-card,
+.check-list,
+[data-slot="card"],
+.timeline-entry:not(.transport-entry) > div,
+.detail-grid,
+.cover-upload {
+  border-radius: var(--radius-card);
+}
+.field input:not([type="checkbox"]):not([type="radio"]),
+.field select,
+.field textarea,
+.member-row select,
+.date-trigger,
+.calendar-summary button,
+.calendar-month select,
+.calendar-time input,
+.notice,
+.document-row,
+.day-empty,
+.cover-upload img {
+  border-radius: var(--radius-field);
+}
+.search,
+.badge {
+  border-radius: 999px;
+}
+.badge {
+  padding-inline: 10px;
+}
+.modal .detail-grid,
+.modal .calendar-summary button,
+.modal .cover-upload,
+.modal .check-list,
+.modal [data-slot="card"] {
+  background: var(--panel-card-tint);
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  :root[data-theme="dark"] {
+    --panel-card-tint: var(--soft);
   }
 }
