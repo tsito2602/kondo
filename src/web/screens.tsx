@@ -1,4 +1,19 @@
-import { dismissModal } from "./motion";
+import { PlaceStatusLabel } from "./place-status";
+import { DayStrip } from "./day-strip";
+import { ticketDate } from "./ticket-content";
+import {
+  dayTimeline,
+  isJourney,
+  JourneyPair,
+  StayCards,
+} from "./itinerary-bookings";
+import { PlaceCard } from "./place-card";
+import { TaskList } from "./task-list";
+import { CalendarPanel } from "./date-picker";
+import { TripCover } from "./trip-cover";
+import { useItineraryScroll } from "./itinerary-scroll";
+import { dismissModal, reduceMotion } from "./motion";
+import { ThumbAction } from "./thumb-dock";
 import { Button } from "./obsidian/button";
 import { Input } from "./obsidian/input";
 import { Textarea } from "./obsidian/textarea";
@@ -6,8 +21,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import {
   BookOpen,
+  Plus,
+  Check,
   MapPin,
   Plane,
+  PlaneLanding,
+  PlaneTakeoff,
   Pin,
   Search,
   Trash2,
@@ -20,7 +39,7 @@ import {
   Car,
   Utensils,
   Ticket,
-  ChevronRight,
+  CalendarDays,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./obsidian/tabs";
 import { Badge } from "./obsidian/badge";
@@ -38,7 +57,7 @@ import {
   findFlightConnections,
   formatConnectionDuration,
 } from "@/data/flight-connections";
-import { placeStatuses, reservationStatuses } from "@/data/places";
+import { placeStatuses } from "@/data/places";
 import {
   matchesPreparationFilter,
   preparationFilterOptions,
@@ -46,12 +65,13 @@ import {
 import { assigneeName } from "@/data/assignee";
 import type {
   Booking,
+  Place,
   ItineraryItem,
   PackingItem,
   TravelTask,
   TravelNote,
 } from "@/data/types";
-import { AddButton, Empty, Modal, useAction } from "./ui";
+import { AddButton, Empty, Modal, ThumbTools, Field, useAction } from "./ui";
 import {
   BookingEditor,
   ItemEditor,
@@ -59,14 +79,9 @@ import {
   PreparationEditor,
   bookingKinds,
 } from "./editors";
-import {
-  BookingDetail,
-  BookingRoute,
-  ItemDetail,
-  PlaceDetail,
-} from "./details";
+import { BookingDetail, ItemDetail, PlaceDetail } from "./details";
 
-type Entry = {
+export type Entry = {
   key: string;
   day: string;
   time: string;
@@ -74,6 +89,7 @@ type Entry = {
   item?: ItineraryItem;
   booking?: Booking;
   stage?: string;
+  endpoint?: "start" | "end";
 };
 const stages = {
   flight: ["出発", "到着"],
@@ -114,20 +130,22 @@ export function timelineEntries(
           title: booking.title,
           booking,
           stage: stages[booking.kind][0],
+          endpoint: "start",
         },
       ];
       if (
-        booking.endDay &&
-        (booking.endDay !== booking.day ||
+        (booking.endDay || booking.endTime) &&
+        ((booking.endDay && booking.endDay !== booking.day) ||
           (booking.endTime && booking.endTime !== booking.time))
       )
         entries.push({
           key: `booking-${booking.id}-end`,
-          day: booking.endDay,
+          day: booking.endDay || booking.day,
           time: booking.endTime,
           title: booking.title,
           booking,
           stage: stages[booking.kind][1],
+          endpoint: "end",
         });
       return entries;
     }),
@@ -136,10 +154,8 @@ export function timelineEntries(
 export function ItineraryScreen() {
   const travel = useTravel();
   const [params] = useSearchParams();
-  const [selectedDay, setSelectedDay] = useState(
-    params.get("day") ?? travel.selectedTrip!.startsOn,
-  );
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<string | null>(null);
+  const [datePicker, setDatePicker] = useState(false);
   const [detail, setDetail] = useState<{
     type: "item" | "booking";
     id: string;
@@ -150,6 +166,15 @@ export function ItineraryScreen() {
   );
   const days = useMemo(() => {
     const values = new Set(entries.map((entry) => entry.day));
+    for (const booking of travel.bookings) {
+      if (booking.kind !== "hotel") continue;
+      for (
+        let day = booking.day, count = 0;
+        day <= booking.endDay && count < 1096;
+        day = addDays(day, 1), count++
+      )
+        values.add(day);
+    }
     const trip = travel.selectedTrip!;
     for (
       let day = trip.startsOn, count = 0;
@@ -158,121 +183,113 @@ export function ItineraryScreen() {
     )
       values.add(day);
     return [...values].sort();
-  }, [entries, travel.selectedTrip]);
+  }, [entries, travel.selectedTrip, travel.bookings]);
+  const { selectedDay, selectDay } = useItineraryScroll(
+    days,
+    params.get("day") ?? travel.selectedTrip!.startsOn,
+  );
   useEffect(() => {
     const day = params.get("day");
-    if (day) {
-      setSelectedDay(day);
-      setTimeout(
-        () =>
-          document
-            .getElementById(`day-${day}`)
-            ?.scrollIntoView({ block: "start" }),
-        50,
-      );
-    }
-  }, [params]);
-  useEffect(() => {
-    let frame = 0;
-    const update = () => {
-      frame = 0;
-      const sections = days.flatMap((day) => {
-        const node = document.getElementById(`day-${day}`);
-        return node ? [{ day, bounds: node.getBoundingClientRect() }] : [];
-      });
-      if (!sections.length || !sections.some(({ bounds }) => bounds.height))
-        return;
-      const boundary =
-        (document.querySelector(".date-strip")?.getBoundingClientRect()
-          .bottom ?? 0) + 24;
-      const atBottom =
-        window.scrollY > 0 &&
-        Math.ceil(window.scrollY + window.innerHeight) >=
-          document.documentElement.scrollHeight - 2;
-      // The final day may be too short to reach the sticky date strip.
-      const active = atBottom
-        ? sections.at(-1)
-        : (sections.filter(({ bounds }) => bounds.top <= boundary).at(-1) ??
-          sections[0]);
-      if (active) setSelectedDay(active.day);
-    };
-    const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(update);
-    };
-    schedule();
-    window.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", schedule);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", schedule);
-      window.removeEventListener("resize", schedule);
-    };
-  }, [days]);
-  useEffect(() => {
-    const tab = document.getElementById(`date-tab-${selectedDay}`);
-    const strip = tab?.parentElement;
-    if (!tab || !strip) return;
-    const bounds = tab.getBoundingClientRect();
-    const container = strip.getBoundingClientRect();
-    if (bounds.left < container.left || bounds.right > container.right) {
-      strip.scrollTo({
-        left:
-          strip.scrollLeft +
-          bounds.left -
-          container.left -
-          (strip.clientWidth - bounds.width) / 2,
-        behavior: "instant",
-      });
-    }
-  }, [selectedDay]);
+    if (!day) return;
+    const timer = setTimeout(() => selectDay(day, "instant"), 50);
+    return () => clearTimeout(timer);
+  }, [params, selectDay]);
   const connections = findFlightConnections(travel.bookings);
   return (
     <>
-      <nav className="date-strip" aria-label="旅の日付">
-        {days.map((day, index) => (
-          <button
-            id={`date-tab-${day}`}
-            key={day}
-            aria-current={selectedDay === day ? "date" : undefined}
-            onClick={() => {
-              setSelectedDay(day);
-              document.getElementById(`day-${day}`)?.scrollIntoView({
-                behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
-                  ? "instant"
-                  : "smooth",
-                block: "start",
-              });
-            }}
-          >
-            <small>DAY {index + 1}</small>
-            <span>{day.slice(5).replace("-", "/")}</span>
-          </button>
-        ))}
-      </nav>
+      <ThumbAction>
+        <button
+          className="thumb-control"
+          onClick={() => setDatePicker(true)}
+          aria-label="日付を選ぶ"
+        >
+          <CalendarDays size={18} />
+          {selectedDay.slice(5).replace("-", "/")}
+        </button>
+      </ThumbAction>
+      {datePicker && (
+        <CalendarPanel
+          label="日付を選ぶ"
+          required
+          value={selectedDay}
+          allowedDates={days}
+          min={days[0]}
+          max={days.at(-1)}
+          onChange={(day) =>
+            requestAnimationFrame(() =>
+              selectDay(day, reduceMotion() ? "instant" : "smooth"),
+            )
+          }
+          onClose={() => setDatePicker(false)}
+        />
+      )}
+      {travel.selectedTrip!.coverImage && (
+        <section className="itinerary-cover" aria-label="旅行のカバー">
+          <TripCover
+            id={travel.selectedTrip!.id}
+            src={travel.selectedTrip!.coverImage}
+          />
+          <div className="itinerary-cover-caption">
+            <span>{travel.selectedTrip!.destination}</span>
+            <h2>{travel.selectedTrip!.name}</h2>
+          </div>
+        </section>
+      )}
+      <DayStrip days={days} selectedDay={selectedDay} onSelect={selectDay} />
       <div className="page timeline">
-        {days.map((day, index) => (
-          <section className="day-section" id={`day-${day}`} key={day}>
-            <div className="day-heading">
-              <span className="eyebrow">
-                DAY {String(index + 1).padStart(2, "0")}
-              </span>
-              <h2>{formatDate(day)}</h2>
-            </div>
-            {!entries.some((entry) => entry.day === day) && (
-              <p className="day-empty">まだ予定はありません</p>
-            )}
-            {entries
-              .filter((entry) => entry.day === day)
-              .map((entry) => {
+        {days.map((day, index) => {
+          const dayEntries = dayTimeline(entries, day);
+          return (
+            <section className="day-section" id={`day-${day}`} key={day}>
+              <div className="day-heading">
+                <span className="eyebrow">
+                  DAY {String(index + 1).padStart(2, "0")}
+                </span>
+                <h2>{formatDate(day)}</h2>
+              </div>
+              <StayCards
+                bookings={travel.bookings}
+                day={day}
+                onOpen={(id) => setDetail({ type: "booking", id })}
+              />
+              {!dayEntries.length && (
+                <button
+                  className="timeline-entry timeline-empty"
+                  disabled={!travel.canEdit}
+                  aria-label={
+                    travel.canEdit
+                      ? `${formatDate(day)}に予定を追加`
+                      : undefined
+                  }
+                  onClick={() => setAdding(day)}
+                >
+                  <div data-press-card>
+                    <p>まだ予定はありません</p>
+                    {travel.canEdit && (
+                      <span className="empty-add">
+                        <Plus size={16} />
+                        予定を追加
+                      </span>
+                    )}
+                  </div>
+                </button>
+              )}
+              {dayEntries.map((entry) => {
                 const BookingIcon = entry.booking
-                  ? bookingIcons[entry.booking.kind]
+                  ? entry.booking.kind === "flight"
+                    ? entry.endpoint === "end"
+                      ? PlaneLanding
+                      : PlaneTakeoff
+                    : entry.booking.kind === "train" && entry.endpoint === "end"
+                      ? MapPin
+                      : bookingIcons[entry.booking.kind]
                   : BookOpen;
                 const transport =
                   entry.item &&
                   itemDetails(entry.item).category === "transport";
                 const connection =
                   entry.booking &&
-                  entry.stage === "到着" &&
+                  (entry.stage === "到着" || entry.joinedArrival) &&
                   connections.find(
                     (connection) =>
                       connection.arrivalBookingId === entry.booking!.id,
@@ -281,7 +298,7 @@ export function ItineraryScreen() {
                   <div key={entry.key}>
                     <button
                       id={entry.item ? `item-${entry.item.id}` : undefined}
-                      className={`timeline-entry ${transport ? "transport-entry" : ""} ${params.get("item") === entry.item?.id ? "highlight" : ""}`}
+                      className={`timeline-entry ${transport ? "transport-entry" : ""} ${isJourney(entry.booking) ? "journey-entry" : ""} ${params.get("item") === entry.item?.id ? "highlight" : ""}`}
                       onClick={() =>
                         setDetail({
                           type: entry.item ? "item" : "booking",
@@ -299,25 +316,34 @@ export function ItineraryScreen() {
                           <span />
                         )}
                       </span>
-                      <div>
+                      <div data-press-card>
                         <small>
                           {entry.item
                             ? transport
                               ? `${transportLabel(itemDetails(entry.item))} ${durationLabel(durationMinutes(entry.item.day, entry.item.time, itemDetails(entry.item)))}`
                               : itemCategory(entry.item).label
-                            : entry.stage}
+                            : isJourney(entry.booking)
+                              ? `${entry.booking!.kind === "flight" ? "フライト" : "鉄道"}${entry.endpoint === "end" ? " · 到着" : ""}`
+                              : entry.stage}
                         </small>
                         <h3>{entry.title}</h3>
-                        {entry.booking && (
-                          <p className="muted">
-                            {entry.booking.originCode || entry.booking.origin}
-                            {entry.booking.destinationCode ||
-                            entry.booking.destination
-                              ? " → "
-                              : ""}
-                            {entry.booking.destinationCode ||
-                              entry.booking.destination}
-                          </p>
+                        {entry.booking && isJourney(entry.booking) ? (
+                          <JourneyPair
+                            booking={entry.booking}
+                            arrival={entry.endpoint === "end"}
+                          />
+                        ) : (
+                          entry.booking && (
+                            <p className="muted">
+                              {entry.booking.originCode || entry.booking.origin}
+                              {entry.booking.destinationCode ||
+                              entry.booking.destination
+                                ? " → "
+                                : ""}
+                              {entry.booking.destinationCode ||
+                                entry.booking.destination}
+                            </p>
+                          )
                         )}
                       </div>
                     </button>
@@ -336,19 +362,18 @@ export function ItineraryScreen() {
                   </div>
                 );
               })}
-          </section>
-        ))}
+            </section>
+          );
+        })}
       </div>
       {travel.canEdit && (
         <AddButton
           floating
           label="予定を追加"
-          onClick={() => setAdding(true)}
+          onClick={() => setAdding(selectedDay)}
         />
       )}
-      {adding && (
-        <ItemEditor day={selectedDay} onClose={() => setAdding(false)} />
-      )}
+      {adding && <ItemEditor day={adding} onClose={() => setAdding(null)} />}
       {detail?.type === "item" && (
         <ItemDetail id={detail.id} onClose={() => setDetail(null)} />
       )}
@@ -386,47 +411,64 @@ export function BookingsScreen() {
               (a, b) =>
                 a.day.localeCompare(b.day) || a.time.localeCompare(b.time),
             )
-            .map((booking) => (
-              <button
-                className="booking-ticket"
-                key={booking.id}
-                onClick={() => setId(booking.id)}
-              >
-                <div className="ticket-main">
-                  <div className="row between">
-                    <Badge variant="secondary" className="booking-kind">
-                      {
-                        bookingKinds.find(
-                          (entry) => entry.value === booking.kind,
-                        )?.label
-                      }
-                    </Badge>
-                    <span className="muted">{formatDate(booking.day)}</span>
+            .map((booking) => {
+              const BookingIcon = bookingIcons[booking.kind];
+              return (
+                <button
+                  className="booking-ticket"
+                  data-press-card
+                  key={booking.id}
+                  onClick={() => setId(booking.id)}
+                >
+                  <div className="ticket-main">
+                    <div className="ticket-category">
+                      <span>
+                        {
+                          bookingKinds.find(
+                            (entry) => entry.value === booking.kind,
+                          )?.label
+                        }
+                      </span>
+                    </div>
+                    <h2>{booking.title}</h2>
+                    {["flight", "train", "car"].includes(booking.kind) &&
+                      (booking.originCode ||
+                        booking.origin ||
+                        booking.destinationCode ||
+                        booking.destination) && (
+                        <p className="ticket-route-summary">
+                          {booking.originCode || booking.origin || "未定"} →{" "}
+                          {booking.destinationCode ||
+                            booking.destination ||
+                            "未定"}
+                        </p>
+                      )}
+                    <p className="ticket-date-summary">
+                      <span>
+                        {ticketDate(booking.day)}
+                        {booking.kind === "hotel" &&
+                        booking.endDay &&
+                        booking.endDay !== booking.day
+                          ? ` 〜 ${ticketDate(booking.endDay, booking.day)}`
+                          : ""}
+                      </span>
+                      <span className="ticket-start-time">
+                        {booking.time
+                          ? `${booking.time}${booking.kind === "hotel" ? "〜" : ""}`
+                          : "時刻未定"}
+                      </span>
+                    </p>
                   </div>
-                  <h2>{booking.title}</h2>
-                  {booking.detail && <p className="clamp">{booking.detail}</p>}
-                  {["flight", "train", "car"].includes(booking.kind) ? (
-                    <BookingRoute booking={booking} />
-                  ) : (
-                    booking.location && (
-                      <p className="muted clamp ticket-location">
-                        <MapPin size={12} />
-                        {booking.location}
-                      </p>
-                    )
-                  )}
-                </div>
-                <div className="ticket-stub">
-                  <strong>{booking.time || "時刻未定"}</strong>
-                  <span className="confirmation-code">
-                    {booking.confirmationCode}
-                  </span>
-                  <span className="ticket-open">
-                    <ChevronRight size={18} />
-                  </span>
-                </div>
-              </button>
-            ))}
+                  <div className="ticket-stub">
+                    <BookingIcon
+                      size={24}
+                      strokeWidth={1.5}
+                      aria-hidden="true"
+                    />
+                  </div>
+                </button>
+              );
+            })}
         </div>
       )}
       {adding && <BookingEditor onClose={() => setAdding(false)} />}
@@ -438,12 +480,31 @@ export function PlacesScreen() {
   const travel = useTravel();
   const [id, setId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [scheduling, setScheduling] = useState<Place | null>(null);
   const [filter, setFilter] = useState("all");
   const places = travel.places.filter(
     (place) => filter === "all" || place.status === filter,
   );
   return (
     <div className="page places-page">
+      <ThumbTools title="場所の絞り込み" label="絞り込み">
+        <div className="menu-list">
+          {[{ value: "all", label: "すべて" }, ...placeStatuses].map(
+            (entry) => (
+              <button
+                key={entry.value}
+                aria-pressed={filter === entry.value}
+                onClick={() => setFilter(entry.value)}
+              >
+                <PlaceStatusLabel
+                  status={entry.value as Place["status"] | "all"}
+                />
+                {filter === entry.value && <CircleCheck size={18} />}
+              </button>
+            ),
+          )}
+        </div>
+      </ThumbTools>
       <div className="page-toolbar">
         <div>
           <h2>行きたい場所</h2>
@@ -461,7 +522,7 @@ export function PlacesScreen() {
             aria-pressed={filter === entry.value}
             onClick={() => setFilter(entry.value)}
           >
-            {entry.label}
+            <PlaceStatusLabel status={entry.value as Place["status"] | "all"} />
           </button>
         ))}
       </div>
@@ -482,46 +543,23 @@ export function PlacesScreen() {
       ) : (
         <div className="place-grid">
           {places.map((place) => (
-            <button
-              className="place-card"
+            <PlaceCard
               key={place.id}
-              onClick={() => setId(place.id)}
-            >
-              <div className="place-top">
-                <span className={`place-icon status-${place.status}`}>
-                  {place.status === "visited" ? <CircleCheck /> : <MapPin />}
-                </span>
-                <Badge
-                  variant="secondary"
-                  className={`badge status-${place.status}`}
-                >
-                  {
-                    placeStatuses.find((entry) => entry.value === place.status)
-                      ?.label
-                  }
-                </Badge>
-              </div>
-              <h2>{place.title}</h2>
-              <p className="clamp muted">{place.note || place.location}</p>
-              <div className="row between">
-                <small>
-                  {
-                    reservationStatuses.find(
-                      (entry) => entry.value === place.reservationStatus,
-                    )?.label
-                  }
-                </small>
-                <span className="text-link">
-                  {travel.items.some(
-                    (item) => item.id === place.itineraryItemId,
-                  )
-                    ? "しおりを見る"
-                    : "しおりへ"}
-                </span>
-              </div>
-            </button>
+              place={place}
+              linked={travel.items.find(
+                (item) => item.id === place.itineraryItemId,
+              )}
+              tripId={travel.selectedTrip!.id}
+              onOpen={() => setId(place.id)}
+              onSchedule={
+                travel.canEdit ? () => setScheduling(place) : undefined
+              }
+            />
           ))}
         </div>
+      )}
+      {scheduling && (
+        <ItemEditor place={scheduling} onClose={() => setScheduling(null)} />
       )}
       {adding && <PlaceEditor onClose={() => setAdding(false)} />}
       {id && <PlaceDetail id={id} onClose={() => setId(null)} />}
@@ -559,6 +597,37 @@ export function PackingScreen() {
         setFilter("all");
       }}
     >
+      <ThumbTools title="準備の表示" label="表示">
+        <div className="form">
+          <div className="segmented preparation-tabs">
+            {(["task", "packing"] as const).map((value) => (
+              <button
+                key={value}
+                aria-pressed={tab === value}
+                className={tab === value ? "selected" : ""}
+                onClick={() => {
+                  setTab(value);
+                  setFilter("all");
+                }}
+              >
+                {value === "task" ? "やること" : "持ち物"}
+              </button>
+            ))}
+          </div>
+          <Field label="担当者">
+            <select
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+            >
+              {options.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </ThumbTools>
       <div className="page-toolbar">
         <div>
           <h2>準備</h2>
@@ -571,7 +640,7 @@ export function PackingScreen() {
         )}
       </div>
       <TabsList
-        className="segmented"
+        className="segmented preparation-tabs"
         data-active-tab={tab}
         aria-label="旅の準備"
       >
@@ -622,67 +691,30 @@ export function PackingScreen() {
             <p>{tab === "task" ? "やること" : "持ち物"}を追加しましょう。</p>
           </Empty>
         ) : (
-          <div className="check-list">
-            {items.map((item) => (
-              <div
-                className={`check-row ${complete(item) ? "completed" : ""}`}
-                key={item.id}
-              >
-                <input
-                  type="checkbox"
-                  disabled={!travel.canEdit}
-                  checked={complete(item)}
-                  aria-label={`${"title" in item ? item.title : item.name}を${complete(item) ? "未完了" : "完了"}にする`}
-                  onChange={(event) =>
-                    void run(() =>
-                      "done" in item
-                        ? travel.updateTask(item.id, {
-                            ...item,
-                            done: event.target.checked,
-                          })
-                        : travel.updatePackingItem(item.id, {
-                            ...item,
-                            packed: event.target.checked,
-                          }),
-                    )
-                  }
-                />
-                <button
-                  className="check-content"
-                  onClick={() =>
-                    travel.canEdit && setEditing({ item, type: tab })
-                  }
-                >
-                  <strong>{"title" in item ? item.title : item.name}</strong>
-                  <span>
-                    {"quantity" in item
-                      ? `${item.category} · ${item.quantity}個${item.shared ? " · 共用" : ""}`
-                      : item.dueOn
-                        ? `${formatDate(item.dueOn)}まで`
-                        : "期限なし"}{" "}
-                    · {assigneeName(item.assignee ?? "", travel.members)}
-                  </span>
-                </button>
-                {travel.canEdit && (
-                  <Button
-                    variant="ghost"
-                    className="icon-button danger"
-                    aria-label={`${"title" in item ? item.title : item.name}を削除`}
-                    onClick={() =>
-                      void run(() => {
-                        if (confirm("削除しますか？")) {
-                          if ("done" in item) travel.deleteTask(item.id);
-                          else travel.deletePackingItem(item.id);
-                        }
-                      })
-                    }
-                  >
-                    <Trash2 size={16} />
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
+          <TaskList
+            key={tab + filter}
+            canEdit={travel.canEdit}
+            items={items.map((item) => ({
+              id: item.id,
+              title: "title" in item ? item.title : item.name,
+              done: complete(item),
+              meta: `${"quantity" in item ? `${item.category} · ${item.quantity}個${item.shared ? " · 共用" : ""}` : item.dueOn ? `${formatDate(item.dueOn)}まで` : "期限なし"} · ${assigneeName(item.assignee ?? "", travel.members)}`,
+            }))}
+            onToggle={(id, checked) => {
+              const item = items.find((item) => item.id === id)!;
+              void run(() =>
+                "done" in item
+                  ? travel.updateTask(id, { ...item, done: checked })
+                  : travel.updatePackingItem(id, { ...item, packed: checked }),
+              );
+            }}
+            onEdit={(id) =>
+              setEditing({
+                item: items.find((item) => item.id === id),
+                type: tab,
+              })
+            }
+          />
         )}
         {editing && (
           <PreparationEditor
@@ -707,6 +739,16 @@ export function NotesScreen() {
     );
   return (
     <div className="page notes-page">
+      <ThumbTools title="メモを検索" label="検索">
+        <Field label="検索キーワード">
+          <Input
+            placeholder="メモを検索"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </Field>
+        <p className="muted">{notes.length}件のメモ</p>
+      </ThumbTools>
       <div className="page-toolbar">
         <div>
           <h2>メモ</h2>
@@ -752,6 +794,7 @@ export function NotesScreen() {
           {notes.map((note) => (
             <button
               className="note-card"
+              data-press-card
               key={note.id}
               onClick={() => setNote(note)}
             >
@@ -825,6 +868,21 @@ function NoteEditor({
   return (
     <Modal
       title="メモ"
+      dockActions={{
+        primary: canEdit && (
+          <button
+            onClick={() =>
+              dismissModal(() => {
+                flush();
+                onClose();
+              })
+            }
+          >
+            <Check size={18} aria-hidden="true" />
+            保存する
+          </button>
+        ),
+      }}
       onClose={() => {
         flush();
         onClose();
@@ -924,7 +982,6 @@ function NoteEditor({
       )}
       <Textarea
         ref={input}
-        autoFocus={canEdit}
         readOnly={!canEdit}
         className="note-editor"
         maxLength={50000}

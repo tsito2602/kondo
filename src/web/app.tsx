@@ -1,3 +1,6 @@
+import { startTripTransition } from "./trip-transition";
+import { TripCover } from "./trip-cover";
+import { ticketDate } from "./ticket-content";
 import {
   captureMotionOrigin,
   dismissModal,
@@ -21,14 +24,17 @@ import {
   Route,
   Routes,
   useLocation,
+  type Location,
   useNavigate,
   useParams,
   useSearchParams,
 } from "react-router";
 import {
   ArrowLeft,
+  Monitor,
+  Sun,
+  Moon,
   Settings,
-  MoreHorizontal,
   Users,
   Download,
   Pencil,
@@ -41,9 +47,6 @@ import {
   BookOpen,
   Plus,
   MapPin,
-  ListChecks,
-  Ticket,
-  NotebookPen,
   Check,
 } from "lucide-react";
 import { Card } from "./obsidian/card";
@@ -52,6 +55,11 @@ import { TravelProvider, useTravel } from "@/data/travel-provider";
 import type { TripMember } from "@/data/types";
 import { formatDate, localDate } from "@/utils/dates";
 import { TripEditor } from "./editors";
+import { SafariTabs, tripTabs } from "./safari-tabs";
+import { AnchoredMenu } from "./anchored-menu";
+import { installPressFeedback } from "./press-feedback";
+import { dockKeyboardInset, revealModalField } from "./viewport";
+import { ThumbDock, ThumbDockProvider, ContextDock } from "./thumb-dock";
 import {
   BookingsScreen,
   ItineraryScreen,
@@ -72,6 +80,7 @@ import {
 
 export function App() {
   const auth = useAuth();
+  useEffect(installPressFeedback, []);
   useEffect(() => {
     const root = document.documentElement;
     const pointer = () => {
@@ -115,6 +124,7 @@ export function App() {
   }, []);
   useEffect(() => {
     const viewport = window.visualViewport;
+    let revealFrame = 0;
     const update = () => {
       document.documentElement.style.setProperty(
         "--modal-height",
@@ -122,24 +132,42 @@ export function App() {
       );
       document.documentElement.style.setProperty(
         "--modal-top",
-        `${viewport?.offsetTop ?? 0}px`,
+        `${Math.max(0, viewport?.offsetTop ?? 0)}px`,
       );
+      document.documentElement.style.setProperty(
+        "--dock-keyboard-inset",
+        `${dockKeyboardInset(window.innerHeight, viewport, document.activeElement)}px`,
+      );
+      // Safari's native focus scroll runs before our panel has shrunk. Measure
+      // after the viewport styles apply, including keyboard animation/panning.
+      cancelAnimationFrame(revealFrame);
+      revealFrame = requestAnimationFrame(() => {
+        if (!viewport || Math.abs(viewport.scale - 1) <= 0.01)
+          revealModalField(document.activeElement);
+      });
     };
     update();
     viewport?.addEventListener("resize", update);
     viewport?.addEventListener("scroll", update);
     window.addEventListener("resize", update);
+    document.addEventListener("focusin", update);
+    document.addEventListener("focusout", update);
     return () => {
+      cancelAnimationFrame(revealFrame);
       viewport?.removeEventListener("resize", update);
       viewport?.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
+      document.removeEventListener("focusin", update);
+      document.removeEventListener("focusout", update);
     };
   }, []);
   if (auth.loading) return <Loading />;
   if (!auth.user) return <Login />;
   return (
     <TravelProvider key={auth.isDemo ? "demo" : auth.user.id}>
-      <TravelApp />
+      <ThumbDockProvider>
+        <TravelApp />
+      </ThumbDockProvider>
     </TravelProvider>
   );
 }
@@ -192,9 +220,26 @@ function TravelApp() {
   const travel = useTravel();
   const auth = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+  const settingsOpen = location.pathname === "/settings";
+  const membersTripId = location.pathname.match(
+    /^\/trips\/([^/]+)\/members$/,
+  )?.[1];
+  const background = (location.state as { background?: Location } | null)
+    ?.background;
+  const membersFallback = membersTripId
+    ? `/trips/${membersTripId}/itinerary`
+    : "/";
+  const routeLocation = settingsOpen
+    ? (background ?? "/")
+    : membersTripId
+      ? (background ?? membersFallback)
+      : location;
+  const routePath =
+    typeof routeLocation === "string" ? routeLocation : routeLocation.pathname;
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
-  }, [location.pathname]);
+  }, [routePath]);
   if (!travel.ready) return <Loading />;
   return (
     <>
@@ -207,9 +252,8 @@ function TravelApp() {
           <button onClick={auth.exitDemo}>終了</button>
         </div>
       )}
-      <Routes>
+      <Routes location={routeLocation}>
         <Route path="/" element={<Home />} />
-        <Route path="/settings" element={<SettingsScreen />} />
         <Route path="/trips/:tripId" element={<TripLayout />}>
           <Route index element={<Navigate to="itinerary" replace />} />
           <Route path="itinerary" element={<ItineraryScreen />} />
@@ -217,7 +261,6 @@ function TravelApp() {
           <Route path="places" element={<PlacesScreen />} />
           <Route path="packing" element={<PackingScreen />} />
           <Route path="notes" element={<NotesScreen />} />
-          <Route path="members" element={<MembersScreen />} />
         </Route>
         <Route
           path="*"
@@ -231,6 +274,16 @@ function TravelApp() {
           }
         />
       </Routes>
+      {settingsOpen && <SettingsScreen />}
+      {membersTripId && travel.selectedTrip?.id === membersTripId && (
+        <MembersScreen
+          onClose={() =>
+            background
+              ? navigate(-1)
+              : navigate(membersFallback, { replace: true })
+          }
+        />
+      )}
     </>
   );
 }
@@ -277,6 +330,7 @@ function SyncStatus() {
 function Home() {
   const travel = useTravel();
   const navigate = useNavigate();
+  const location = useLocation();
   const [editing, setEditing] = useState(false);
   const [params, setParams] = useSearchParams();
   const [invite, setInvite] = useState(params.get("invite") ?? "");
@@ -286,18 +340,36 @@ function Home() {
   const past = travel.trips.filter((trip) => trip.endsOn < today);
   return (
     <>
-      <header className="home-header">
-        <Logo />
-        <div className="row">
-          <SyncStatus />
-          <Link className="icon-button" aria-label="設定" to="/settings">
-            <Settings />
-          </Link>
-        </div>
-      </header>
+      <ThumbDock mode="context">
+        <ContextDock
+          primary={
+            <button onClick={() => setEditing(true)}>
+              <Plus size={18} aria-hidden="true" />
+              旅行を作成
+            </button>
+          }
+          actions={
+            <Link
+              to="/settings"
+              state={{ background: location }}
+              aria-label="設定"
+            >
+              <Settings size={22} />
+            </Link>
+          }
+        />
+      </ThumbDock>
       <main id="main-content" className="page home-page">
         <div className="home-toolbar">
           <h1>旅行</h1>
+          <Link
+            className="icon-button home-settings"
+            to="/settings"
+            state={{ background: location }}
+            aria-label="設定"
+          >
+            <Settings />
+          </Link>
           <Button
             variant="ghost"
             className="primary"
@@ -334,35 +406,45 @@ function Home() {
                   {group.trips.map((trip) => (
                     <Link
                       className="trip-ticket"
+                      data-press-card
+                      data-trip-surface={trip.id}
+                      data-motion-managed
+                      onClick={(event) => {
+                        if (
+                          event.button !== 0 ||
+                          event.metaKey ||
+                          event.ctrlKey ||
+                          event.shiftKey ||
+                          event.altKey
+                        )
+                          return;
+                        event.preventDefault();
+                        startTripTransition(() => {
+                          travel.selectTrip(trip.id);
+                          navigate(`/trips/${trip.id}/itinerary`);
+                        }, trip.id);
+                      }}
                       key={trip.id}
                       to={`/trips/${trip.id}/itinerary`}
                     >
-                      <div
-                        className="trip-photo"
-                        style={
-                          trip.coverImage
-                            ? { backgroundImage: `url(${trip.coverImage})` }
-                            : undefined
-                        }
-                      >
+                      <div className="trip-photo">
+                        <TripCover id={trip.id} src={trip.coverImage ?? ""} />
                         <div className="trip-photo-content">
+                          <h2>{trip.name}</h2>
                           {trip.destination && (
                             <span className="trip-destination">
                               <MapPin size={13} />
                               {trip.destination}
                             </span>
                           )}
-                          <h2>{trip.name}</h2>
-                          <p>
-                            {trip.startsOn.slice(0, 4)}
-                            <br />
-                            {trip.startsOn.slice(5).replace("-", ".")} —{" "}
-                            {(trip.endsOn.slice(0, 4) ===
-                            trip.startsOn.slice(0, 4)
-                              ? trip.endsOn.slice(5)
-                              : trip.endsOn
-                            ).replaceAll("-", ".")}
-                          </p>
+                          <div className="trip-ticket-period">
+                            <p>
+                              {ticketDate(trip.startsOn)}
+                              <span className="ticket-range-end">
+                                〜 {ticketDate(trip.endsOn, trip.startsOn)}
+                              </span>
+                            </p>
+                          </div>
                         </div>
                       </div>
                       <div className="trip-stub">
@@ -377,9 +459,6 @@ function Home() {
                         <span>
                           <Users size={14} />
                           {trip.memberCount}人
-                        </span>
-                        <span className="ticket-open" aria-label="しおりを開く">
-                          <ChevronRight size={20} />
                         </span>
                       </div>
                     </Link>
@@ -432,7 +511,6 @@ function Home() {
               <p>共有された旅のしおりに参加します。</p>
               <Field label="招待リンク">
                 <Input
-                  autoFocus
                   required
                   value={invite.trimStart()}
                   onChange={(event) => setInvite(event.target.value || " ")}
@@ -453,13 +531,6 @@ function Home() {
     </>
   );
 }
-const tripTabs = [
-  { path: "itinerary", label: "しおり", icon: BookOpen },
-  { path: "places", label: "行きたい場所", icon: MapPin },
-  { path: "packing", label: "準備", icon: ListChecks },
-  { path: "bookings", label: "予約", icon: Ticket },
-  { path: "notes", label: "メモ", icon: NotebookPen },
-];
 function TripLayout() {
   const { tripId } = useParams();
   const travel = useTravel();
@@ -467,6 +538,7 @@ function TripLayout() {
   const notify = useToast();
   const location = useLocation();
   const [menu, setMenu] = useState(false);
+  const menuTrigger = useRef<HTMLDivElement>(null);
   const [editing, setEditing] = useState(false);
   const [progress, setProgress] = useState("");
   const { busy, run } = useAction();
@@ -506,24 +578,33 @@ function TripLayout() {
     <>
       <header className="trip-header" ref={ref}>
         <div className="trip-heading">
-          <Link className="icon-button" to="/" aria-label="旅行一覧へ戻る">
+          <Link
+            className="icon-button"
+            to="/"
+            aria-label="旅行一覧へ戻る"
+            data-motion-managed
+            onClick={(event) => {
+              if (
+                event.button !== 0 ||
+                event.metaKey ||
+                event.ctrlKey ||
+                event.shiftKey ||
+                event.altKey
+              )
+                return;
+              event.preventDefault();
+              startTripTransition(() => navigate("/"), trip.id, true);
+            }}
+          >
             <ArrowLeft />
           </Link>
-          <div className="grow">
+          <div className="trip-title">
             <h1>{trip.name}</h1>
             <p>
               {formatDate(trip.startsOn)} — {formatDate(trip.endsOn)}
             </p>
           </div>
-          <SyncStatus />
-          <Button
-            variant="ghost"
-            className="icon-button"
-            aria-label="旅行メニュー"
-            onClick={() => setMenu(true)}
-          >
-            <MoreHorizontal />
-          </Button>
+          <div ref={menuTrigger} className="trip-menu-anchor" />
         </div>
         {trip.role === "viewer" && (
           <div className="viewer-status">閲覧のみ</div>
@@ -550,81 +631,109 @@ function TripLayout() {
           ))}
         </nav>
       </header>
-      <main id="main-content" key={trip.id}>
+      <main id="main-content" key={trip.id} data-trip-surface={trip.id}>
         <Outlet />
       </main>
-      {menu && (
-        <Modal title="旅行メニュー" onClose={() => setMenu(false)}>
-          <div className="menu-list">
-            <button
-              onClick={() => {
-                dismissModal(() => {
-                  setMenu(false);
-                  navigate(`/trips/${trip.id}/members`);
-                });
-              }}
-            >
-              <Users />
-              メンバー管理
-            </button>
-            {travel.canEdit && (
+      <ThumbDock mode="browse">
+        <SafariTabs tripId={trip.id} onMenu={() => setMenu(true)} />
+      </ThumbDock>
+      <AnchoredMenu
+        anchor={menuTrigger}
+        open={menu}
+        onOpen={() => setMenu(true)}
+        onClose={() => setMenu(false)}
+      >
+        {(closeMenu) => (
+          <>
+            <div className="menu-list">
               <button
                 onClick={() => {
-                  dismissModal(() => {
-                    setMenu(false);
-                    setEditing(true);
+                  closeMenu(() => {
+                    navigate(`/trips/${trip.id}/members`, {
+                      state: { background: location },
+                    });
                   });
                 }}
               >
-                <Pencil />
-                旅行を編集
+                <Users />
+                メンバー管理
               </button>
-            )}
-            <button
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  const count = await travel.saveTripOffline((done, total) =>
-                    setProgress(`${done} / ${total}件の書類を保存中`),
-                  );
-                  setProgress("");
-                  notify(`旅行と${count}件の書類をオフライン保存しました`);
-                })
-              }
-            >
-              <Download />
-              オフライン保存
-            </button>
-            {progress && <p role="status">{progress}</p>}
-            {trip.role === "owner" && (
+              {travel.canEdit && (
+                <button
+                  onClick={() => {
+                    closeMenu(() => {
+                      setEditing(true);
+                    });
+                  }}
+                >
+                  <Pencil />
+                  旅行を編集
+                </button>
+              )}
               <button
                 disabled={busy}
-                className="danger"
                 onClick={() =>
                   void run(async () => {
-                    if (
-                      confirm(
-                        `「${trip.name}」と旅行内のすべてのデータを削除しますか？この操作は取り消せません。`,
-                      )
-                    ) {
-                      await travel.deleteTrip(trip.id);
-                      navigate("/");
-                    }
+                    const count = await travel.saveTripOffline((done, total) =>
+                      setProgress(`${done} / ${total}件の書類を保存中`),
+                    );
+                    setProgress("");
+                    notify(`旅行と${count}件の書類をオフライン保存しました`);
                   })
                 }
               >
-                <Trash2 />
-                旅行を削除
+                <Download />
+                オフライン保存
               </button>
-            )}
-          </div>
-        </Modal>
-      )}
+              {progress && <p role="status">{progress}</p>}
+              <button
+                onClick={() =>
+                  closeMenu(() =>
+                    navigate("/settings", {
+                      state: {
+                        returnTo: location.pathname,
+                        background: location,
+                      },
+                    }),
+                  )
+                }
+              >
+                <Settings />
+                設定
+              </button>
+              {trip.role === "owner" && (
+                <button
+                  disabled={busy}
+                  className="danger"
+                  onClick={() =>
+                    void run(async () => {
+                      if (
+                        confirm(
+                          `「${trip.name}」と旅行内のすべてのデータを削除しますか？この操作は取り消せません。`,
+                        )
+                      ) {
+                        await travel.deleteTrip(trip.id);
+                        navigate("/");
+                      }
+                    })
+                  }
+                >
+                  <Trash2 />
+                  旅行を削除
+                </button>
+              )}
+            </div>
+            <div className="trip-menu-sync">
+              <SyncStatus />
+            </div>
+          </>
+        )}
+      </AnchoredMenu>
       {editing && <TripEditor trip={trip} onClose={() => setEditing(false)} />}
     </>
   );
 }
-function MembersScreen() {
+function MembersScreen({ onClose }: { onClose: () => void }) {
   const travel = useTravel();
   const auth = useAuth();
   const notify = useToast();
@@ -643,135 +752,143 @@ function MembersScreen() {
     await travel.sync();
   };
   return (
-    <div className="page">
-      <div className="section-heading">
-        <h2>一緒に旅する人</h2>
-        <span>{travel.members.length}人</span>
-      </div>
-      <div className="check-list">
-        {travel.members.map((member) => (
-          <div className="member-row" key={member.id}>
-            {member.avatarUrl ? (
-              <img
-                className="avatar"
-                src={member.avatarUrl}
-                alt=""
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <span className="avatar">
-                {(member.name || member.email).slice(0, 1)}
-              </span>
-            )}
-            <div className="grow">
-              <strong>{member.name || member.email}</strong>
-              <small>{member.email}</small>
+    <Modal title="メンバー管理" full dockActions={{}} onClose={onClose}>
+      <div className="settings-page members-page">
+        <div className="section-heading">
+          <h2>一緒に旅する人</h2>
+          <span>{travel.members.length}人</span>
+        </div>
+        <div className="check-list">
+          {travel.members.map((member) => (
+            <div className="member-row" key={member.id}>
+              {member.avatarUrl ? (
+                <img
+                  className="avatar"
+                  src={member.avatarUrl}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <span className="avatar">
+                  {(member.name || member.email).slice(0, 1)}
+                </span>
+              )}
+              <div className="grow">
+                <strong>{member.name || member.email}</strong>
+                <small>{member.email}</small>
+              </div>
+              {owner && member.role !== "owner" ? (
+                <>
+                  <select
+                    aria-label={`${member.name || member.email}の権限`}
+                    disabled={busy}
+                    value={member.role}
+                    onChange={(event) =>
+                      void run(() =>
+                        change(
+                          member,
+                          event.target.value as "editor" | "viewer",
+                        ),
+                      )
+                    }
+                  >
+                    <option value="editor">編集可</option>
+                    <option value="viewer">閲覧のみ</option>
+                  </select>
+                  <Button
+                    variant="ghost"
+                    className="icon-button danger"
+                    disabled={busy}
+                    aria-label="メンバーを削除"
+                    onClick={() => {
+                      if (confirm("このメンバーを旅行から削除しますか？"))
+                        void run(() => change(member));
+                    }}
+                  >
+                    <Trash2 />
+                  </Button>
+                </>
+              ) : (
+                <span className="badge">
+                  {member.role === "owner"
+                    ? "オーナー"
+                    : member.role === "editor"
+                      ? "編集可"
+                      : "閲覧のみ"}
+                </span>
+              )}
             </div>
-            {owner && member.role !== "owner" ? (
-              <>
-                <select
-                  aria-label={`${member.name || member.email}の権限`}
-                  disabled={busy}
-                  value={member.role}
-                  onChange={(event) =>
-                    void run(() =>
-                      change(member, event.target.value as "editor" | "viewer"),
-                    )
-                  }
-                >
-                  <option value="editor">編集可</option>
-                  <option value="viewer">閲覧のみ</option>
-                </select>
+          ))}
+        </div>
+        {owner && (
+          <Card className="settings-card">
+            <h3>旅のしおりを共有</h3>
+            <p>招待リンクは1回限り、7日間有効です。</p>
+            <Button
+              variant="ghost"
+              className="primary"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  setInvite(await travel.createInvite());
+                })
+              }
+            >
+              招待リンクを作成
+            </Button>
+            {invite && (
+              <div className="form">
+                <Field label="招待リンク">
+                  <Input
+                    readOnly
+                    value={invite}
+                    onFocus={(event) => event.target.select()}
+                  />
+                </Field>
                 <Button
                   variant="ghost"
-                  className="icon-button danger"
-                  disabled={busy}
-                  aria-label="メンバーを削除"
-                  onClick={() => {
-                    if (confirm("このメンバーを旅行から削除しますか？"))
-                      void run(() => change(member));
-                  }}
+                  className="secondary"
+                  onClick={() =>
+                    void run(async () => {
+                      await copyText(invite);
+                      notify("招待リンクをコピーしました");
+                    })
+                  }
                 >
-                  <Trash2 />
+                  <Copy />
+                  リンクをコピー
                 </Button>
-              </>
-            ) : (
-              <span className="badge">
-                {member.role === "owner"
-                  ? "オーナー"
-                  : member.role === "editor"
-                    ? "編集可"
-                    : "閲覧のみ"}
-              </span>
+              </div>
             )}
-          </div>
-        ))}
+            <Button
+              variant="ghost"
+              className="subtle danger"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  if (confirm("発行済みの招待リンクを無効にしますか？")) {
+                    await auth.request(
+                      `/v1/trips/${travel.selectedTrip!.id}/invites`,
+                      { method: "DELETE" },
+                    );
+                    setInvite("");
+                    notify("招待リンクを無効にしました");
+                  }
+                })
+              }
+            >
+              発行済みの招待を無効にする
+            </Button>
+          </Card>
+        )}
       </div>
-      {owner && (
-        <Card className="settings-card">
-          <h3>旅のしおりを共有</h3>
-          <p>招待リンクは1回限り、7日間有効です。</p>
-          <Button
-            variant="ghost"
-            className="primary"
-            disabled={busy}
-            onClick={() =>
-              void run(async () => {
-                setInvite(await travel.createInvite());
-              })
-            }
-          >
-            招待リンクを作成
-          </Button>
-          {invite && (
-            <div className="form">
-              <Field label="招待リンク">
-                <Input
-                  readOnly
-                  value={invite}
-                  onFocus={(event) => event.target.select()}
-                />
-              </Field>
-              <Button
-                variant="ghost"
-                className="secondary"
-                onClick={() =>
-                  void run(async () => {
-                    await copyText(invite);
-                    notify("招待リンクをコピーしました");
-                  })
-                }
-              >
-                <Copy />
-                リンクをコピー
-              </Button>
-            </div>
-          )}
-          <Button
-            variant="ghost"
-            className="subtle danger"
-            disabled={busy}
-            onClick={() =>
-              void run(async () => {
-                if (confirm("発行済みの招待リンクを無効にしますか？")) {
-                  await auth.request(
-                    `/v1/trips/${travel.selectedTrip!.id}/invites`,
-                    { method: "DELETE" },
-                  );
-                  setInvite("");
-                  notify("招待リンクを無効にしました");
-                }
-              })
-            }
-          >
-            発行済みの招待を無効にする
-          </Button>
-        </Card>
-      )}
-    </div>
+    </Modal>
   );
 }
 function SettingsScreen() {
+  const location = useLocation();
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo;
+  const backTo = returnTo?.startsWith("/trips/") ? returnTo : "/";
   const auth = useAuth();
   const travel = useTravel();
   const theme = useTheme();
@@ -787,14 +904,17 @@ function SettingsScreen() {
     });
   };
   return (
-    <>
-      <header className="simple-header">
-        <Link className="icon-button" to="/" aria-label="戻る">
-          <ArrowLeft />
-        </Link>
-        <h1>設定</h1>
-      </header>
-      <main id="main-content" className="page settings-page">
+    <Modal
+      title="設定"
+      full
+      dockActions={{}}
+      onClose={() => {
+        if ((location.state as { background?: Location } | null)?.background)
+          navigate(-1);
+        else navigate(backTo, { replace: true });
+      }}
+    >
+      <div className="settings-page">
         <Card className="settings-card">
           <h2>アカウント</h2>
           <div className="member-row">
@@ -824,21 +944,23 @@ function SettingsScreen() {
         </Card>
         <Card className="settings-card">
           <h2>外観</h2>
-          <div className="segmented" aria-label="表示モード">
+          <div className="segmented appearance-control" aria-label="表示モード">
             {(
               [
-                { value: "system", label: "端末に合わせる" },
-                { value: "light", label: "ライト" },
-                { value: "dark", label: "ダーク" },
+                { value: "system", label: "端末に合わせる", icon: Monitor },
+                { value: "light", label: "ライト", icon: Sun },
+                { value: "dark", label: "ダーク", icon: Moon },
               ] as const
             ).map((entry) => (
               <button
                 key={entry.value}
+                aria-label={entry.label}
                 aria-pressed={theme.preference === entry.value}
                 className={theme.preference === entry.value ? "selected" : ""}
                 onClick={() => theme.setPreference(entry.value)}
               >
-                {entry.label}
+                <entry.icon size={18} aria-hidden="true" />
+                {entry.value === "system" ? "自動" : entry.label}
               </button>
             ))}
           </div>
@@ -867,13 +989,15 @@ function SettingsScreen() {
           <LogOut />
           {auth.isDemo ? "サンプルを終了" : "ログアウト"}
         </Button>
-      </main>
-    </>
+      </div>
+    </Modal>
   );
 }
 type InstallEvent = Event & { prompt: () => Promise<void> };
 function PwaControls() {
   const { pendingCount } = useTravel();
+  const [checking, setChecking] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState("");
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
   const [installEvent, setInstallEvent] = useState<InstallEvent | null>(null);
   const [standalone] = useState(
@@ -925,8 +1049,9 @@ function PwaControls() {
       <Button
         variant="ghost"
         className="secondary"
-        disabled={pendingCount > 0}
-        onClick={() => {
+        disabled={pendingCount > 0 || checking}
+        onClick={async () => {
+          setUpdateStatus("");
           if (waiting) {
             navigator.serviceWorker.addEventListener(
               "controllerchange",
@@ -934,22 +1059,41 @@ function PwaControls() {
               { once: true },
             );
             waiting.postMessage({ type: "ACTIVATE_UPDATE" });
-          } else if ("serviceWorker" in navigator)
-            void navigator.serviceWorker
-              .getRegistration()
-              .then(async (registration) => {
-                await registration?.update();
-                if (registration?.waiting) setWaiting(registration.waiting);
-                else
-                  notify(
-                    "更新を確認しました。準備ができると更新ボタンが表示されます",
-                  );
-              })
-              .catch(() => notify("更新を確認できませんでした"));
+          } else {
+            setChecking(true);
+            try {
+              const registration =
+                "serviceWorker" in navigator
+                  ? await navigator.serviceWorker.getRegistration()
+                  : undefined;
+              if (!registration) throw new Error("Service worker unavailable");
+              await registration.update();
+              if (registration.waiting) setWaiting(registration.waiting);
+              else
+                setUpdateStatus(
+                  "更新を確認しました。準備ができると更新ボタンが表示されます",
+                );
+            } catch {
+              setUpdateStatus("更新を確認できませんでした");
+            } finally {
+              setChecking(false);
+            }
+          }
         }}
       >
-        {waiting ? "新しいバージョンに更新" : "更新を確認"}
+        {checking
+          ? "確認中…"
+          : waiting
+            ? "新しいバージョンに更新"
+            : "更新を確認"}
       </Button>
+      <p
+        className="pwa-update-status muted small"
+        role="status"
+        aria-live="polite"
+      >
+        {waiting ? "" : updateStatus}
+      </p>
       {pendingCount > 0 && (
         <p className="muted">未同期の変更を送信してから更新できます。</p>
       )}

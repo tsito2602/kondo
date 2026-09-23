@@ -1,3 +1,4 @@
+import { DatePicker } from "./date-picker";
 import { dismissModal } from "./motion";
 import { Button } from "./obsidian/button";
 import { Input } from "./obsidian/input";
@@ -165,7 +166,6 @@ export function TripEditor({
         </div>
         <Field label="旅行名">
           <Input
-            autoFocus
             required
             maxLength={120}
             placeholder="ヨーロッパ旅行"
@@ -185,29 +185,16 @@ export function TripEditor({
             }
           />
         </Field>
-        <div className="form-grid">
-          <Field label="出発日">
-            <Input
-              required
-              type="date"
-              value={draft.startsOn}
-              onChange={(event) =>
-                setDraft({ ...draft, startsOn: event.target.value })
-              }
-            />
-          </Field>
-          <Field label="帰宅日">
-            <Input
-              required
-              type="date"
-              min={draft.startsOn}
-              value={draft.endsOn}
-              onChange={(event) =>
-                setDraft({ ...draft, endsOn: event.target.value })
-              }
-            />
-          </Field>
-        </div>
+        <DatePicker
+          label="旅行期間"
+          range
+          required
+          value={draft.startsOn}
+          endValue={draft.endsOn}
+          onChange={(startsOn, endsOn) =>
+            setDraft({ ...draft, startsOn, endsOn })
+          }
+        />
         <ErrorText message={error} />
         <SaveButton busy={busy || imageBusy} />
       </form>
@@ -308,7 +295,6 @@ export function ItemEditor({
         </Field>
         <Field label="タイトル">
           <Input
-            autoFocus
             required
             maxLength={160}
             value={draft.title}
@@ -317,52 +303,26 @@ export function ItemEditor({
             }
           />
         </Field>
-        <div className="form-grid">
-          <Field label="日付">
-            <Input
-              type="date"
-              required
-              value={draft.day}
-              onChange={(event) =>
-                setDraft({ ...draft, day: event.target.value })
-              }
-            />
-          </Field>
-          <Field
-            label={details.category === "transport" ? "出発時刻" : "開始時刻"}
-          >
-            <Input
-              type="time"
-              value={draft.time}
-              onChange={(event) =>
-                setDraft({ ...draft, time: event.target.value })
-              }
-            />
-          </Field>
-        </div>
-        <div className="form-grid">
-          <Field label="終了日">
-            <Input
-              type="date"
-              min={draft.day}
-              value={details.endDay}
-              onChange={(event) =>
-                setDetails({ ...details, endDay: event.target.value })
-              }
-            />
-          </Field>
-          <Field
-            label={details.category === "transport" ? "到着時刻" : "終了時刻"}
-          >
-            <Input
-              type="time"
-              value={details.endTime}
-              onChange={(event) =>
-                setDetails({ ...details, endTime: event.target.value })
-              }
-            />
-          </Field>
-        </div>
+        <DatePicker
+          label={details.category === "transport" ? "出発" : "開始"}
+          startLabel={details.category === "transport" ? "出発" : "開始"}
+          required
+          showTime
+          value={draft.day}
+          startTime={draft.time}
+          onChange={(day, _end, time) => setDraft({ ...draft, day, time })}
+        />
+        <DatePicker
+          label={details.category === "transport" ? "到着" : "終了"}
+          startLabel={details.category === "transport" ? "到着" : "終了"}
+          showTime
+          min={draft.day}
+          value={details.endDay ?? ""}
+          startTime={details.endTime}
+          onChange={(endDay, _end, endTime) =>
+            setDetails({ ...details, endDay, endTime })
+          }
+        />
         {details.category === "transport" ? (
           <>
             <div className="form-grid">
@@ -580,6 +540,16 @@ export function BookingEditor({
     </Field>
   );
   const route = ["flight", "train", "car"].includes(draft.kind);
+  const rangeBooking = route || draft.kind === "hotel";
+  const dateLabels = {
+    flight: { label: "フライト日時", start: "出発", end: "到着" },
+    hotel: { label: "宿泊期間", start: "チェックイン", end: "チェックアウト" },
+    train: { label: "乗車日時", start: "出発", end: "到着" },
+    car: { label: "利用期間", start: "受取", end: "返却" },
+    restaurant: { label: "予約日・予約時刻", start: "予約日", end: "" },
+    ticket: { label: "利用日・利用時刻", start: "利用日", end: "" },
+    other: { label: "日付・時刻", start: "日付", end: "" },
+  }[draft.kind];
   return (
     <Modal title={booking ? "予約を編集" : "予約を追加"} onClose={onClose} full>
       <form className="form" onSubmit={submit}>
@@ -605,8 +575,22 @@ export function BookingEditor({
         {route && (
           <>
             <div className="form-grid">
-              {field("origin", "出発地・受取場所")}
-              {field("destination", "到着地・返却場所")}
+              {field(
+                "origin",
+                draft.kind === "car"
+                  ? "受取場所"
+                  : draft.kind === "train"
+                    ? "出発駅"
+                    : "出発地",
+              )}
+              {field(
+                "destination",
+                draft.kind === "car"
+                  ? "返却場所"
+                  : draft.kind === "train"
+                    ? "到着駅"
+                    : "到着地",
+              )}
             </div>
             {draft.kind === "flight" && (
               <div className="form-grid">
@@ -617,53 +601,27 @@ export function BookingEditor({
           </>
         )}
         {!route && field("location", "住所・Google MapsのURL")}
-        <div className="form-grid">
-          <Field
-            label={draft.kind === "hotel" ? "チェックイン日" : "開始日（現地）"}
-          >
-            <Input
-              required
-              type="date"
-              value={draft.day}
-              onChange={(event) =>
-                setDraft({ ...draft, day: event.target.value })
-              }
-            />
-          </Field>
-          <Field label="開始時刻（現地）">
-            <Input
-              type="time"
-              value={draft.time}
-              onChange={(event) =>
-                setDraft({ ...draft, time: event.target.value })
-              }
-            />
-          </Field>
-        </div>
-        <div className="form-grid">
-          <Field
-            label={
-              draft.kind === "hotel" ? "チェックアウト日" : "終了日（現地）"
-            }
-          >
-            <Input
-              type="date"
-              value={draft.endDay}
-              onChange={(event) =>
-                setDraft({ ...draft, endDay: event.target.value })
-              }
-            />
-          </Field>
-          <Field label="終了時刻（現地）">
-            <Input
-              type="time"
-              value={draft.endTime}
-              onChange={(event) =>
-                setDraft({ ...draft, endTime: event.target.value })
-              }
-            />
-          </Field>
-        </div>
+        <DatePicker
+          label={dateLabels.label}
+          startLabel={dateLabels.start}
+          endLabel={dateLabels.end}
+          range={rangeBooking}
+          required
+          showTime
+          value={draft.day}
+          endValue={draft.endDay}
+          startTime={draft.time}
+          endTime={draft.endTime}
+          onChange={(day, endDay, time, endTime) =>
+            setDraft({
+              ...draft,
+              day,
+              endDay,
+              time,
+              endTime: rangeBooking ? endTime : time,
+            })
+          }
+        />
         {["flight", "train"].includes(draft.kind) && (
           <Field label="所要時間（分・空欄なら自動計算）">
             <Input
@@ -750,11 +708,11 @@ export function PlaceEditor({
       onClose={onClose}
       full
     >
-      <form className="form" onSubmit={submit}>
+      <form className="form place-form" onSubmit={submit}>
         <Field label="場所の名前">
           <Input
-            autoFocus
             required
+            placeholder="お店やスポットの名前"
             maxLength={160}
             value={draft.title}
             onChange={(event) =>
@@ -802,44 +760,36 @@ export function PlaceEditor({
         <Field label="住所・Google MapsのURL">
           <Input
             maxLength={2000}
+            placeholder="住所または地図のリンクを貼り付け"
+            autoCapitalize="none"
+            autoCorrect="off"
             value={draft.location}
             onChange={(event) =>
               setDraft({ ...draft, location: event.target.value })
             }
           />
         </Field>
-        <Field label="営業時間">
-          <Input
-            maxLength={500}
-            value={draft.openingHours}
+        <Field label="メモ">
+          <Textarea
+            rows={3}
+            placeholder="気になること、食べたいものなど"
+            value={draft.note}
+            maxLength={4000}
             onChange={(event) =>
-              setDraft({ ...draft, openingHours: event.target.value })
+              setDraft({ ...draft, note: event.target.value })
             }
           />
         </Field>
-        <fieldset>
+        <fieldset className="place-links">
           <legend>参照リンク</legend>
           {draft.referenceLinks.map((link, index) => (
             <div className="link-input" key={index}>
-              <Field label="名前">
-                <Input
-                  maxLength={120}
-                  value={link.label}
-                  onChange={(event) =>
-                    setDraft({
-                      ...draft,
-                      referenceLinks: draft.referenceLinks.map((entry, i) =>
-                        i === index
-                          ? { ...entry, label: event.target.value }
-                          : entry,
-                      ),
-                    })
-                  }
-                />
-              </Field>
               <Field label="URL">
                 <Input
                   type="url"
+                  placeholder="https://"
+                  autoCapitalize="none"
+                  autoCorrect="off"
                   required
                   maxLength={2000}
                   value={link.url}
@@ -849,6 +799,23 @@ export function PlaceEditor({
                       referenceLinks: draft.referenceLinks.map((entry, i) =>
                         i === index
                           ? { ...entry, url: event.target.value }
+                          : entry,
+                      ),
+                    })
+                  }
+                />
+              </Field>
+              <Field label="名前">
+                <Input
+                  maxLength={120}
+                  placeholder="公式サイトなど（任意）"
+                  value={link.label}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      referenceLinks: draft.referenceLinks.map((entry, i) =>
+                        i === index
+                          ? { ...entry, label: event.target.value }
                           : entry,
                       ),
                     })
@@ -876,7 +843,7 @@ export function PlaceEditor({
           <Button
             variant="ghost"
             type="button"
-            className="secondary"
+            className="secondary place-link-add"
             disabled={draft.referenceLinks.length >= 20}
             onClick={() =>
               setDraft({
@@ -892,16 +859,16 @@ export function PlaceEditor({
             リンクを追加
           </Button>
         </fieldset>
-        <Field label="メモ">
-          <Textarea
-            rows={5}
-            value={draft.note}
-            maxLength={4000}
+        <Field label="営業時間">
+          <Input
+            maxLength={500}
+            value={draft.openingHours}
             onChange={(event) =>
-              setDraft({ ...draft, note: event.target.value })
+              setDraft({ ...draft, openingHours: event.target.value })
             }
           />
         </Field>
+
         <ErrorText message={error} />
         <SaveButton busy={busy} />
       </form>
@@ -924,6 +891,7 @@ export function PreparationEditor({
   );
   const [assignee, setAssignee] = useState(item?.assignee ?? "");
   const [dueOn, setDueOn] = useState(item && "dueOn" in item ? item.dueOn : "");
+  const [hasDueDate, setHasDueDate] = useState(Boolean(dueOn));
   const [category, setCategory] = useState(
     item && "category" in item ? item.category : "その他",
   );
@@ -938,7 +906,7 @@ export function PreparationEditor({
       if (task) {
         const input = {
           title: name,
-          dueOn,
+          dueOn: hasDueDate ? dueOn : "",
           assignee,
           done: item && "done" in item ? item.done : false,
         };
@@ -960,20 +928,41 @@ export function PreparationEditor({
     () =>
       !name.trim()
         ? "名前を入力してください"
-        : dueOn && !validDate(dueOn)
+        : task && hasDueDate && !validDate(dueOn)
           ? "正しい期限を入力してください"
           : "",
     onClose,
   );
+  const { run: runDelete, busy: deleting } = useAction();
+  const deleteButton = item ? (
+    <button
+      type="button"
+      className="icon-button danger"
+      aria-label={`${task ? "やること" : "持ち物"}を削除`}
+      disabled={busy || deleting}
+      onClick={() => {
+        if (!confirm(`「${name}」を削除しますか？`)) return;
+        void runDelete(() => {
+          if (task) travel.deleteTask(item.id);
+          else travel.deletePackingItem(item.id);
+          dismissModal(onClose);
+        });
+      }}
+    >
+      <Trash2 size={20} />
+    </button>
+  ) : undefined;
   return (
     <Modal
       title={`${task ? "やること" : "持ち物"}を${item ? "編集" : "追加"}`}
       onClose={onClose}
+      full={task}
+      action={deleteButton}
+      dockActions={{ actions: deleteButton }}
     >
       <form className="form" onSubmit={submit}>
         <Field label={task ? "やること" : "持ち物"}>
           <Input
-            autoFocus
             required
             maxLength={task ? 160 : 120}
             value={name}
@@ -1002,13 +991,24 @@ export function PreparationEditor({
           </select>
         </Field>
         {task ? (
-          <Field label="期限">
-            <Input
-              type="date"
-              value={dueOn}
-              onChange={(event) => setDueOn(event.target.value)}
-            />
-          </Field>
+          <>
+            <label className="check-line">
+              <input
+                type="checkbox"
+                checked={hasDueDate}
+                onChange={(event) => setHasDueDate(event.target.checked)}
+              />
+              期限を設定する
+            </label>
+            {hasDueDate && (
+              <DatePicker
+                label="期限"
+                required
+                value={dueOn}
+                onChange={(day) => setDueOn(day)}
+              />
+            )}
+          </>
         ) : (
           <>
             <div className="form-grid">

@@ -10,8 +10,32 @@ import {
   useRef,
   useState,
 } from "react";
-import { animateDialog, motionOrigin, reduceMotion } from "./motion";
-import { X, Plus, LoaderCircle } from "lucide-react";
+import { createPortal } from "react-dom";
+import { menuDepth } from "./menu-depth";
+import {
+  animateDialog,
+  dismissModal,
+  motionOrigin,
+  reduceMotion,
+} from "./motion";
+import {
+  X,
+  Check,
+  Plus,
+  LoaderCircle,
+  ArrowLeft,
+  Keyboard,
+  ChevronDown,
+  SlidersHorizontal,
+} from "lucide-react";
+import {
+  ThumbDock,
+  ContextDock,
+  ThumbAction,
+  FloatingAddAction,
+  ThumbFormContext,
+  useThumbForm,
+} from "./thumb-dock";
 import { Button } from "./obsidian/button";
 import {
   normalizeThemePreference,
@@ -34,7 +58,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
       document.documentElement.dataset.theme = theme;
       document
         .querySelector('meta[name="theme-color"]')
-        ?.setAttribute("content", theme === "dark" ? "#111315" : "#F7F7F7");
+        ?.setAttribute("content", theme === "dark" ? "#000000" : "#FFFFFF");
     };
     localStorage.setItem(THEME_KEY, preference);
     update();
@@ -105,27 +129,107 @@ export function useAction() {
   };
   return { busy, run };
 }
+/** Keep the pointer-down action stable even when the browser blurs on tap. */
+function FormBackButton({ onBack }: { onBack: () => void }) {
+  const [editor, setEditor] = useState<HTMLElement | null>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const pressedEditor = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      const focused = document.activeElement;
+      const dialog = button.current?.closest("dialog");
+      setEditor(
+        focused instanceof HTMLElement &&
+          dialog?.contains(focused) &&
+          focused.matches(
+            "input, textarea, select, [contenteditable='true']",
+          ) &&
+          !focused.matches(
+            ':disabled, [readonly], input[type="checkbox"], input[type="radio"], input[type="button"], input[type="submit"], input[type="reset"], input[type="range"], input[type="file"], input[type="color"]',
+          )
+          ? focused
+          : null,
+      );
+    };
+    const afterBlur = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(update);
+    };
+    update();
+    document.addEventListener("focusin", update);
+    document.addEventListener("focusout", afterBlur);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("focusin", update);
+      document.removeEventListener("focusout", afterBlur);
+    };
+  }, []);
+  return (
+    <button
+      ref={button}
+      type="button"
+      aria-label={editor ? "キーボードを閉じる" : "戻る"}
+      onPointerDown={(event) => {
+        pressedEditor.current = editor;
+        if (editor) event.preventDefault();
+      }}
+      onPointerCancel={() => {
+        pressedEditor.current = null;
+      }}
+      onClick={() => {
+        const target = pressedEditor.current ?? editor;
+        pressedEditor.current = null;
+        if (target) {
+          target.blur();
+          setEditor(null);
+        } else onBack();
+      }}
+    >
+      {editor ? (
+        <span className="keyboard-dismiss-icon" aria-hidden="true">
+          <Keyboard size={20} />
+          <ChevronDown size={12} />
+        </span>
+      ) : (
+        <ArrowLeft size={22} />
+      )}
+    </button>
+  );
+}
+
 export function Modal({
   title,
   children,
   onClose,
   full = false,
   action,
+  preserveNavigation = false,
+  dockActions,
 }: PropsWithChildren<{
   title: string;
   onClose: () => void;
   full?: boolean;
   action?: ReactNode;
+  preserveNavigation?: boolean;
+  dockActions?: { primary?: ReactNode; actions?: ReactNode };
 }>) {
   const ref = useRef<HTMLDialogElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   const id = useId();
   const [closing, setClosing] = useState(false);
+  const [saveAction, setSaveAction] = useState<{
+    formId: string;
+    busy: boolean;
+  } | null>(null);
   const origin = useRef<HTMLElement | null>(null);
   const animation = useRef<Animation | null>(null);
+  const depth = useRef<ReturnType<typeof menuDepth> | null>(null);
   const backdropAnimation = useRef<Animation | undefined>(undefined);
   const closeCallback = useRef(onClose);
   closeCallback.current = onClose;
   const pendingClose = useRef<(() => void) | null>(null);
+  const swipeStart = useRef<number | null>(null);
   const close = () => setClosing(true);
   useLayoutEffect(() => {
     const dialog = ref.current!;
@@ -133,9 +237,21 @@ export function Modal({
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     origin.current = motionOrigin();
+    const opener = origin.current ?? focus;
     dialog.showModal();
+    // Start on the title: opening a screen must not activate an input/keyboard.
+    heading.current?.focus({ preventScroll: true });
     const enter = animateDialog(dialog, origin.current);
     animation.current = enter;
+    depth.current = menuDepth(
+      reduceMotion(),
+      {
+        duration: 320,
+        easing: "cubic-bezier(.32, 0, .2, 1)",
+        fill: "both",
+      },
+      dialog,
+    );
     backdropAnimation.current = dialog
       .getAnimations?.({ subtree: true })
       .find(
@@ -151,11 +267,30 @@ export function Modal({
     dialog.addEventListener("tabi:modal-close", requestClose);
     return () => {
       dialog.removeEventListener("tabi:modal-close", requestClose);
+      depth.current?.cancel();
+      depth.current = null;
       animation.current?.cancel();
       backdropAnimation.current?.cancel();
       dialog.close();
       document.body.style.overflow = previous;
-      if (focus?.isConnected) focus.focus({ preventScroll: true });
+      if (document.documentElement.dataset.inputModality === "pointer") {
+        // Native dialog.close() may restore a stale tab panel on touch Safari.
+        // Clear that restoration without stealing focus from a newer dialog.
+        const restored = document.activeElement;
+        if (
+          restored instanceof HTMLElement &&
+          (restored === focus ||
+            restored === opener ||
+            dialog.contains(restored))
+        )
+          restored.blur();
+      } else if (
+        opener?.isConnected &&
+        !dialog.contains(opener) &&
+        !opener.closest("[inert], [hidden], dialog:not([open])")
+      ) {
+        opener.focus({ preventScroll: true });
+      }
     };
   }, []);
   useEffect(() => {
@@ -164,8 +299,10 @@ export function Modal({
     if (exit && !reduceMotion()) {
       exit.playbackRate = -1.15;
       exit.play();
+      depth.current?.reverse(exit.currentTime, -1.15);
       const backdrop = backdropAnimation.current;
       if (backdrop) {
+        backdrop.currentTime = exit.currentTime;
         backdrop.playbackRate = -1.15;
         backdrop.play();
         void backdrop.finished.catch(() => undefined);
@@ -188,7 +325,7 @@ export function Modal({
       exit?.cancel();
     };
   }, [closing]);
-  return (
+  return createPortal(
     <dialog
       ref={ref}
       aria-labelledby={id}
@@ -201,23 +338,98 @@ export function Modal({
         if (event.target === ref.current) close();
       }}
     >
-      <div className="modal-inner" inert={closing}>
-        <header className="modal-header">
-          <Button
-            variant="ghost"
-            className="icon-button"
-            aria-label="閉じる"
-            onClick={close}
+      <ThumbFormContext.Provider value={setSaveAction}>
+        <div className="modal-inner" inert={closing}>
+          <header
+            className="modal-header"
+            onPointerDown={(event) => {
+              if (
+                event.pointerType === "touch" &&
+                !(event.target as Element).closest("button")
+              ) {
+                swipeStart.current = event.clientY;
+                event.currentTarget.setPointerCapture(event.pointerId);
+              }
+            }}
+            onPointerUp={(event) => {
+              if (
+                swipeStart.current !== null &&
+                event.clientY - swipeStart.current > 72
+              )
+                close();
+              swipeStart.current = null;
+            }}
+            onPointerCancel={() => {
+              swipeStart.current = null;
+            }}
           >
-            <X />
-          </Button>
-          <h2 id={id}>{title}</h2>
-          {action ?? <span className="icon-spacer" />}
-        </header>
-        <div className="modal-body">{children}</div>
-        <ToastMessage />
-      </div>
-    </dialog>
+            <Button
+              variant="ghost"
+              className="icon-button"
+              aria-label="閉じる"
+              onClick={close}
+            >
+              <X />
+            </Button>
+            <h2 ref={heading} id={id} tabIndex={-1} autoFocus>
+              {title}
+            </h2>
+            {action ?? <span className="icon-spacer" />}
+          </header>
+          <div className="modal-body">{children}</div>
+          <ToastMessage />
+        </div>
+        <ThumbDock
+          mode={saveAction ? "edit" : dockActions ? "context" : "detail"}
+          target={() => ref.current}
+          disabled={closing}
+          navigation={
+            preserveNavigation && !saveAction && !dockActions
+              ? {
+                  back: close,
+                  action,
+                  beforeNavigate: (navigate) =>
+                    dismissModal(() => {
+                      closeCallback.current();
+                      navigate();
+                    }, ref.current),
+                }
+              : undefined
+          }
+        >
+          {saveAction || dockActions ? (
+            <ContextDock
+              back={<FormBackButton onBack={close} />}
+              primary={
+                saveAction ? (
+                  <Button
+                    variant="ghost"
+                    type="submit"
+                    form={saveAction.formId}
+                    disabled={saveAction.busy}
+                  >
+                    <Check size={18} aria-hidden="true" />
+                    {saveAction.busy ? "保存中…" : "保存する"}
+                  </Button>
+                ) : (
+                  dockActions?.primary
+                )
+              }
+              actions={dockActions?.actions}
+            />
+          ) : (
+            <>
+              <button className="thumb-control" onClick={close}>
+                <ArrowLeft size={20} />
+                戻る
+              </button>
+              {action}
+            </>
+          )}
+        </ThumbDock>
+      </ThumbFormContext.Provider>
+    </dialog>,
+    document.body,
   );
 }
 export function Field({
@@ -229,6 +441,32 @@ export function Field({
       <span>{label}</span>
       {children}
     </label>
+  );
+}
+export function ThumbTools({
+  title,
+  label = "表示",
+  children,
+}: PropsWithChildren<{ title: string; label?: string }>) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <ThumbAction>
+        <button
+          className="thumb-control"
+          aria-label={title}
+          onClick={() => setOpen(true)}
+        >
+          <SlidersHorizontal size={18} />
+          {label}
+        </button>
+      </ThumbAction>
+      {open && (
+        <Modal title={title} onClose={() => setOpen(false)}>
+          {children}
+        </Modal>
+      )}
+    </>
   );
 }
 export function Empty({ children }: PropsWithChildren) {
@@ -252,14 +490,17 @@ export function AddButton({
   floating?: boolean;
 }) {
   return (
-    <Button
-      className={floating ? "floating-add" : "primary add-action"}
-      onClick={onClick}
-      aria-label={label}
-    >
-      <Plus />
-      <span>{label}</span>
-    </Button>
+    <>
+      <FloatingAddAction label={label} onClick={onClick} />
+      <Button
+        className={`page-add ${floating ? "floating-add" : "primary add-action"}`}
+        onClick={onClick}
+        aria-label={label}
+      >
+        <Plus />
+        <span>{label}</span>
+      </Button>
+    </>
   );
 }
 export function ErrorText({ message }: { message: string }) {
@@ -270,8 +511,17 @@ export function ErrorText({ message }: { message: string }) {
   ) : null;
 }
 export function SaveButton({ busy = false }: { busy?: boolean }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  useThumbForm(ref, busy);
   return (
-    <Button variant="ghost" className="primary" type="submit" disabled={busy}>
+    <Button
+      ref={ref}
+      variant="ghost"
+      className="primary form-save"
+      type="submit"
+      disabled={busy}
+    >
+      <Check size={18} aria-hidden="true" />
       {busy ? "保存しています…" : "保存する"}
     </Button>
   );
