@@ -32,6 +32,17 @@ export function animateDialog(
     ? (dialog.querySelector<HTMLElement>(".modal-inner") ?? dialog)
     : dialog;
   const bounds = panel.getBoundingClientRect();
+  const card = origin?.querySelector<HTMLElement>("[data-card-origin]");
+  if (card?.isConnected && bounds.width && bounds.height) {
+    const source = card.getBoundingClientRect();
+    if (
+      source.width &&
+      source.height &&
+      source.bottom > 0 &&
+      source.top < window.innerHeight
+    )
+      return expandCard(panel, card, bounds, source);
+  }
   const source = origin?.isConnected ? origin.getBoundingClientRect() : null;
   const full = {
     clipPath: `inset(0px 0px 0px 0px round ${window.getComputedStyle(panel).borderRadius || "0px"})`,
@@ -67,6 +78,112 @@ export function animateDialog(
     easing: "cubic-bezier(.32, 0, .2, 1)",
     fill: "both",
   });
+}
+
+// Grow the card's frame, not its text. The old title crosses into the new
+// content while the surface travels, with one reversible clock for every layer.
+function expandCard(
+  panel: HTMLElement,
+  card: HTMLElement,
+  bounds: DOMRect,
+  source: DOMRect,
+) {
+  const timing = {
+    duration: 320,
+    easing: "cubic-bezier(.32, 0, .2, 1)",
+    fill: "both" as const,
+  };
+  const style = window.getComputedStyle(card);
+  const panelStyle = window.getComputedStyle(panel);
+  const position = panel.style.position;
+  if (panelStyle.position === "static") panel.style.position = "relative";
+  const snapshot = document.createElement("div");
+  snapshot.className = `${card.parentElement!.className} modal-origin-card`;
+  snapshot.setAttribute("aria-hidden", "true");
+  snapshot.inert = true;
+  snapshot.style.width = `${source.width}px`;
+  const copy = card.cloneNode(true) as HTMLElement;
+  copy.removeAttribute("data-card-origin");
+  for (const node of [copy, ...copy.querySelectorAll<HTMLElement>("[id]")])
+    node.removeAttribute("id");
+  copy.style.background = "transparent";
+  copy.style.borderColor = "transparent";
+  snapshot.appendChild(copy);
+  panel.appendChild(snapshot);
+  const visibility = card.style.visibility;
+  card.style.visibility = "hidden";
+  const surface = panel.animate(
+    [
+      {
+        transform: `translate(${source.left - bounds.left}px, ${source.top - bounds.top}px)`,
+        clipPath: `inset(0px ${bounds.width - source.width}px ${bounds.height - source.height}px 0px round ${style.borderRadius})`,
+        backgroundColor: style.backgroundColor,
+        opacity: 1,
+      },
+      {
+        transform: "translate(0px, 0px)",
+        clipPath: `inset(0px round ${panelStyle.borderRadius})`,
+        backgroundColor: panelStyle.backgroundColor,
+        opacity: 1,
+      },
+    ],
+    timing,
+  );
+  const companions = [
+    snapshot.animate(
+      [
+        { opacity: 1, offset: 0 },
+        { opacity: 0, offset: 0.45 },
+        { opacity: 0, offset: 1 },
+      ],
+      timing,
+    ),
+  ];
+  for (const content of panel.querySelectorAll<HTMLElement>(
+    ".modal-header, .modal-body",
+  )) {
+    companions.push(
+      content.animate(
+        [
+          { opacity: 0, offset: 0 },
+          { opacity: 0, offset: 0.18 },
+          { opacity: 1, offset: 1 },
+        ],
+        timing,
+      ),
+    );
+  }
+  for (const motion of companions) void motion.finished.catch(() => undefined);
+  return {
+    get finished() {
+      return surface.finished;
+    },
+    get currentTime() {
+      return surface.currentTime;
+    },
+    set playbackRate(rate: number) {
+      surface.playbackRate = rate;
+    },
+    play() {
+      // The reading panel may have scrolled since opening; keep the snapshot
+      // at its visible top so the return still meets the original card.
+      snapshot.style.top = `${panel.scrollTop}px`;
+      for (const motion of companions) {
+        motion.currentTime = surface.currentTime;
+        motion.playbackRate = surface.playbackRate;
+        motion.play();
+        void motion.finished.catch(() => undefined);
+      }
+      surface.play();
+    },
+    cancel() {
+      surface.cancel();
+      companions.forEach((motion) => motion.cancel());
+      snapshot.remove();
+      card.style.visibility = visibility;
+      panel.style.position = position;
+    },
+  };
 }
 
 // Save/Done actions use the same exit path as Escape, backdrop and close button.

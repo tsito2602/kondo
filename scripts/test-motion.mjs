@@ -34,7 +34,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { PlaceCard } from './src/web/place-card'; export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { PlaceCard } from './src/web/place-card'; export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { animateDialog, dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -79,6 +79,7 @@ const {
   animateDockPress,
   dockKeyboardInset,
   SaveButton,
+  animateDialog,
   dismissModal,
   useMotionNavigation,
   ThumbDockProvider,
@@ -2718,5 +2719,85 @@ test("place cards separate detail and scheduling actions, and link scheduled vis
     assert.ok(document.querySelector(".place-card-main"));
   } finally {
     await act(async () => root.unmount());
+  }
+});
+
+test("itinerary panels grow from the card column and reverse every layer without a jump", () => {
+  const originalAnimate = HTMLElement.prototype.animate;
+  const originalMedia = globalThis.matchMedia;
+  globalThis.matchMedia = (query) => ({ matches: query.includes("max-width") });
+  const origin = document.createElement("button");
+  origin.className = "timeline-entry";
+  origin.innerHTML =
+    '<time>16:00</time><span></span><div data-card-origin style="border-radius:22px"><h3>散歩</h3></div>';
+  const card = origin.querySelector("div");
+  const dialog = document.createElement("dialog");
+  dialog.innerHTML =
+    '<div class="modal-inner" style="position:relative;border-radius:28px"><header class="modal-header">予定詳細</header><div class="modal-body">本文</div></div><nav>戻る</nav>';
+  document.body.append(origin, dialog);
+  const panel = dialog.querySelector(".modal-inner");
+  panel.getBoundingClientRect = () => ({
+    left: 12,
+    top: 20,
+    width: 351,
+    height: 540,
+  });
+  card.getBoundingClientRect = () => ({
+    left: 78,
+    top: 220,
+    width: 280,
+    height: 92,
+    bottom: 312,
+  });
+  const calls = [];
+  HTMLElement.prototype.animate = function (frames) {
+    const animation = timeline();
+    calls.push({ element: this, frames, animation });
+    return animation;
+  };
+  try {
+    const motion = animateDialog(dialog, origin);
+    assert.equal(calls[0].element, panel);
+    assert.equal(calls[0].frames[0].transform, "translate(66px, 200px)");
+    assert.equal(
+      calls[0].frames[0].clipPath,
+      "inset(0px 71px 448px 0px round 22px)",
+    );
+    assert.equal(
+      calls[0].frames[0].opacity,
+      1,
+      "card material never fades away",
+    );
+    assert.equal(
+      card.style.visibility,
+      "hidden",
+      "avoid a duplicate receding card",
+    );
+    assert.equal(panel.querySelector(".modal-origin-card").textContent, "散歩");
+    assert.ok(calls.every(({ element }) => element.tagName !== "NAV"));
+    calls[0].animation.currentTime = 110;
+    panel.scrollTop = 150;
+    motion.playbackRate = -1.15;
+    motion.play();
+    for (const { animation } of calls) {
+      assert.equal(animation.currentTime, 110);
+      assert.equal(animation.playbackRate, -1.15);
+    }
+    assert.equal(panel.querySelector(".modal-origin-card").style.top, "150px");
+    motion.cancel();
+    assert.equal(card.style.visibility, "");
+    assert.equal(panel.querySelector(".modal-origin-card"), null);
+    assert.ok(calls.every(({ animation }) => animation.cancelled));
+    globalThis.matchMedia = () => ({ matches: true });
+    assert.equal(
+      animateDialog(dialog, origin),
+      null,
+      "reduced motion skips expansion",
+    );
+  } finally {
+    HTMLElement.prototype.animate = originalAnimate;
+    globalThis.matchMedia = originalMedia;
+    origin.remove();
+    dialog.remove();
   }
 });

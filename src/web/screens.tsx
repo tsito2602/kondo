@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import {
   BookOpen,
+  Plus,
   Check,
   MapPin,
   Plane,
@@ -146,7 +147,7 @@ export function timelineEntries(
 export function ItineraryScreen() {
   const travel = useTravel();
   const [params] = useSearchParams();
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<string | null>(null);
   const [datePicker, setDatePicker] = useState(false);
   const [detail, setDetail] = useState<{
     type: "item" | "booking";
@@ -229,7 +230,24 @@ export function ItineraryScreen() {
               <h2>{formatDate(day)}</h2>
             </div>
             {!entries.some((entry) => entry.day === day) && (
-              <p className="day-empty">まだ予定はありません</p>
+              <button
+                className="timeline-entry timeline-empty"
+                disabled={!travel.canEdit}
+                aria-label={
+                  travel.canEdit ? `${formatDate(day)}に予定を追加` : undefined
+                }
+                onClick={() => setAdding(day)}
+              >
+                <div data-card-origin>
+                  <p>まだ予定はありません</p>
+                  {travel.canEdit && (
+                    <span className="empty-add">
+                      <Plus size={16} />
+                      予定を追加
+                    </span>
+                  )}
+                </div>
+              </button>
             )}
             {entries
               .filter((entry) => entry.day === day)
@@ -269,7 +287,7 @@ export function ItineraryScreen() {
                           <span />
                         )}
                       </span>
-                      <div>
+                      <div data-card-origin>
                         <small>
                           {entry.item
                             ? transport
@@ -313,12 +331,10 @@ export function ItineraryScreen() {
         <AddButton
           floating
           label="予定を追加"
-          onClick={() => setAdding(true)}
+          onClick={() => setAdding(selectedDay)}
         />
       )}
-      {adding && (
-        <ItemEditor day={selectedDay} onClose={() => setAdding(false)} />
-      )}
+      {adding && <ItemEditor day={adding} onClose={() => setAdding(null)} />}
       {detail?.type === "item" && (
         <ItemDetail id={detail.id} onClose={() => setDetail(null)} />
       )}

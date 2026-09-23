@@ -3980,3 +3980,38 @@ input::-webkit-date-and-time-value {
     background: color-mix(in srgb, var(--ink) 4%, transparent);
   }
 }
+
+/* Empty days share the timeline's card column and provide a dated add action. */
+.timeline-empty > div {
+  grid-column: 3;
+  border-style: dashed;
+  display: grid;
+  gap: 12px;
+}
+.timeline-empty:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.timeline-empty p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.empty-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.modal-origin-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  display: block;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  pointer-events: none;
+}

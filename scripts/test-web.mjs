@@ -410,6 +410,15 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.equal((await loadTravelCache("owner")).pending.length, 0);
     assert.equal(localStorage.getItem("tabi.session"), "test-session");
     assert.equal(sessionStorage.getItem("tabi.session"), null);
+    const emptyDay = document.querySelector("#day-2026-11-24 .timeline-empty");
+    assert.ok(emptyDay && !emptyDay.disabled);
+    await click(emptyDay);
+    assert.match(
+      field("開始").textContent,
+      /2026年11月24日/,
+    );
+    await click(document.querySelector('.context-back [aria-label="戻る"]'));
+    await tick(30);
     await click(document.querySelector('[aria-label="予定を追加"]'));
     await fill("タイトル", "市内を歩く");
     await fill("開始", { time: "14:00" });
