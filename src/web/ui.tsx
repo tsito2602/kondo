@@ -18,6 +18,7 @@ import {
 } from "./motion";
 import {
   X,
+  Check,
   Plus,
   LoaderCircle,
   ArrowLeft,
@@ -300,6 +301,7 @@ export function Modal({
                     form={saveAction.formId}
                     disabled={saveAction.busy}
                   >
+                    <Check size={18} aria-hidden="true" />
                     {saveAction.busy ? "保存中…" : "保存する"}
                   </Button>
                 ) : (
@@ -408,6 +410,7 @@ export function SaveButton({ busy = false }: { busy?: boolean }) {
       type="submit"
       disabled={busy}
     >
+      <Check size={18} aria-hidden="true" />
       {busy ? "保存しています…" : "保存する"}
     </Button>
   );

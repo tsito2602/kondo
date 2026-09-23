@@ -1159,15 +1159,15 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
   const w = 366;
   function box(element) {
     const context = element.closest(".context-dock");
-    const back = context?.querySelector(".context-back") ? 64 : 0;
-    const actions = context?.querySelector(".context-actions") ? 128 : 0;
+    const back = context?.querySelector(".context-back") ? 56 : 0;
+    const actions = context?.querySelector(".context-actions") ? 112 : 0;
     if (element.classList.contains("context-back"))
       return { left: 0, width: back };
     if (element.classList.contains("context-actions"))
       return { left: w - actions, width: actions };
     if (element.classList.contains("context-primary"))
       return {
-        left: back ? 74 : 0,
+        left: back ? 66 : 0,
         width: w - back - actions - (back ? 10 : 0) - (actions ? 10 : 0),
       };
     return { left: 0, width: w };
@@ -1185,7 +1185,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
     },
   });
   HTMLElement.prototype.getBoundingClientRect = function () {
-    return { ...box(this), top: 0, bottom: 64, height: 64 };
+    return { ...box(this), top: 0, bottom: 56, height: 56 };
   };
   globalThis.requestAnimationFrame = (callback) => {
     pending.set(++sequence, callback);
@@ -1226,6 +1226,10 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
     const border = material.querySelector("path[stroke]");
     const initial = border.getAttribute("d");
     assert.ok(initial);
+    assert.equal(
+      material.querySelector("svg").getAttribute("viewBox"),
+      `0 0 ${w + 24} 80`,
+    );
     await act(async () => setMode("place"));
     assert.equal(border.getAttribute("d"), initial, "no jump on registration");
     advance(410);
@@ -1245,7 +1249,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
     assert.equal(pending.size, 1, "only the new animation remains active");
     advance(820);
     const settings = dockSlots(w, [
-      { left: 0, width: 64, radius: 32 },
+      { left: 0, width: 56, radius: 28 },
       null,
       null,
     ]);
@@ -1256,7 +1260,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
         settings.map((island) => ({ ...island, left: island.left + 12 })),
         0,
         [],
-        44,
+        40,
       ),
     );
     assert.equal(pending.size, 0);
@@ -1281,7 +1285,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
         settings.map((island) => ({ ...island, left: island.left + 12 })),
         0,
         [],
-        44,
+        40,
       ),
     );
     await act(async () => pointer(button, "pointerup"));
@@ -1501,15 +1505,15 @@ test("exact dock capsules retain transparent gaps, round edges, and pressed geom
 
 test("all colored and neutral dock layouts reshape existing surfaces without zero-size seeds", () => {
   for (const w of [308, 366, 420]) {
-    const c = (left, width) => ({ left, width, radius: 32 });
+    const c = (left, width) => ({ left, width, radius: 28 });
     const tag = (slots) =>
       dockSlots(w, slots).map((island, slot) => ({
         ...island,
         slot,
         tint: slot === 1 && slots[1] ? 1 : 0,
       }));
-    const home = tag([null, c(0, w - 74), c(w - 64, 64)]);
-    const tabs = joinedDock(w).map((island) => ({
+    const home = tag([null, c(0, w - 66), c(w - 56, 56)]);
+    const tabs = joinedDock(w, 28).map((island) => ({
       ...island,
       slot: -1,
       tint: 0,
@@ -1517,10 +1521,10 @@ test("all colored and neutral dock layouts reshape existing surfaces without zer
     const layouts = [
       home,
       tabs,
-      tag([c(0, 64), c(74, w - 212), c(w - 128, 128)]),
-      tag([c(0, 64), null, c(w - 128, 128)]),
-      tag([c(0, 64), c(74, w - 74), null]),
-      tag([c(0, 64), null, null]),
+      tag([c(0, 56), c(66, w - 188), c(w - 112, 112)]),
+      tag([c(0, 56), null, c(w - 112, 112)]),
+      tag([c(0, 56), c(66, w - 66), null]),
+      tag([c(0, 56), null, null]),
     ];
     const sameField = (a, b, label) => {
       const field = dockField(w, a),
@@ -1551,9 +1555,9 @@ test("all colored and neutral dock layouts reshape existing surfaces without zer
         for (const t of [0.001, 0.1, 0.3, 0.5, 0.75, 0.999]) {
           const shape = morphDock(from, to, 0, t, plan);
           for (const island of shape.islands) {
-            assert.equal(island.radius, 32);
+            assert.equal(island.radius, 28);
             assert.ok(
-              island.width >= 64 - 0.00001,
+              island.width >= 56 - 0.00001,
               "a surface never sprouts from a point",
             );
             assert.ok(

@@ -349,6 +349,7 @@ export function FluidDockSurface({
   const shape = useRef<{ islands: DockIsland[]; tension: number } | null>(null);
   const target = useRef("");
   const width = useRef(0);
+  const height = useRef(56);
   const frame = useRef(0);
   const morph = useRef<{
     from: DockIsland[];
@@ -384,7 +385,8 @@ export function FluidDockSurface({
     const scales = islands.map((island, i) =>
       pressScale(controls.current[island.slot ?? i] ?? null, performance.now()),
     );
-    const d = dockContour(w, islands, shape.current.tension, scales, 44);
+    const center = height.current / 2 + 12;
+    const d = dockContour(w, islands, shape.current.tension, scales, center);
     if (d !== lastPath.current) {
       glass.current.style.clipPath = `path("${d}")`;
       outline.current!.setAttribute("d", d);
@@ -399,7 +401,7 @@ export function FluidDockSurface({
       tinted.map(({ island }) => island),
       shape.current.tension,
       tinted.map(({ scale }) => scale),
-      44,
+      center,
     );
     if (accent.current) {
       if (a !== lastAccentPath.current) {
@@ -465,11 +467,12 @@ export function FluidDockSurface({
           `.context-island.context-${role}`,
         ) ?? null,
     );
+    const h = node.clientHeight || 56;
+    const radius = h / 2;
     let islands: DockIsland[];
     if (tabs) {
-      const side = node.clientHeight || 64;
+      const side = h;
       const inset = side + 10;
-      const radius = side / 2;
       islands =
         tabs.dataset.wide === "false"
           ? [
@@ -477,7 +480,7 @@ export function FluidDockSurface({
               { left: inset, width: w - 2 * inset, radius },
               { left: w - radius * 2, width: radius * 2, radius },
             ]
-          : joinedDock(w);
+          : joinedDock(w, radius);
     } else {
       const bounds = node.getBoundingClientRect();
       const scale = bounds.width / w || 1;
@@ -494,11 +497,13 @@ export function FluidDockSurface({
                     100,
                 ) / 100,
               width: element.offsetWidth,
-              radius: (node.clientHeight || 64) / 2,
+              radius,
             }
           : null;
       });
-      islands = slots.some(Boolean) ? dockSlots(w, slots) : joinedDock(w);
+      islands = slots.some(Boolean)
+        ? dockSlots(w, slots)
+        : joinedDock(w, radius);
     }
     islands = islands.map((island, i) => ({
       ...island,
@@ -509,16 +514,17 @@ export function FluidDockSurface({
       "--safari-press-scale",
       String(Math.max(1, Math.min(1.06, (window.innerWidth - 8) / w))),
     );
-    const key = JSON.stringify([w, islands]);
+    const key = JSON.stringify([w, h, islands]);
     if (key === target.current) {
       paint();
       return;
     }
     target.current = key;
     const from = shape.current;
-    const resized = width.current !== w;
+    const resized = width.current !== w || height.current !== h;
     width.current = w;
-    svg.current!.setAttribute("viewBox", `0 0 ${w + 24} 88`);
+    height.current = h;
+    svg.current!.setAttribute("viewBox", `0 0 ${w + 24} ${h + 24}`);
     if (!from || resized || reduceMotion()) {
       morph.current = null;
       cancelAnimationFrame(frame.current);
@@ -648,7 +654,7 @@ export function FluidDockSurface({
       <div ref={glass} className="safari-glass">
         <div ref={accent} className="fluid-dock-accent" />
       </div>
-      <svg ref={svg} width="100%" height="64" preserveAspectRatio="none">
+      <svg ref={svg} width="100%" height="80" preserveAspectRatio="none">
         <defs>
           <filter
             id={`${id}-shadow`}

@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import {
   BookOpen,
+  Check,
   MapPin,
   Plane,
   Pin,
@@ -932,6 +933,7 @@ function NoteEditor({
               })
             }
           >
+            <Check size={18} aria-hidden="true" />
             保存する
           </button>
         ),

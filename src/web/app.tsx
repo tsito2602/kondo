@@ -304,7 +304,12 @@ function Home() {
     <>
       <ThumbDock mode="context">
         <ContextDock
-          primary={<button onClick={() => setEditing(true)}>旅行を作成</button>}
+          primary={
+            <button onClick={() => setEditing(true)}>
+              <Plus size={18} aria-hidden="true" />
+              旅行を作成
+            </button>
+          }
           actions={
             <Link to="/settings" aria-label="設定">
               <Settings size={22} />

@@ -2,7 +2,15 @@ import { dismissModal } from "./motion";
 import { Button } from "./obsidian/button";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { Copy, FileText, Trash2, Download, Pencil } from "lucide-react";
+import {
+  Copy,
+  FileText,
+  Trash2,
+  Download,
+  Pencil,
+  Plus,
+  BookOpen,
+} from "lucide-react";
 import { useTravel } from "@/data/travel-provider";
 import { bookingDurationLabel } from "@/data/booking-duration";
 import { findAirportByCode } from "@/data/airports";
@@ -565,10 +573,12 @@ export function PlaceDetail({
         })
       }
     >
+      <BookOpen size={18} aria-hidden="true" />
       しおりを見る
     </button>
   ) : travel.canEdit ? (
     <button className="primary" onClick={() => setMode("schedule")}>
+      <Plus size={18} aria-hidden="true" />
       しおりへ追加
     </button>
   ) : null;

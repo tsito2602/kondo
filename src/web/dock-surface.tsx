@@ -55,28 +55,30 @@ export function dockOutline(
   side: number,
   inset: number,
   separation: number,
+  height = 64,
 ) {
+  const middle = height / 2;
   const t = Math.max(0, Math.min(1, separation));
-  const r = mix(32, Math.min(side, inset - 4) / 2, t);
-  const top = 32 - r,
-    bottom = 32 + r,
+  const r = mix(middle, Math.min(side, inset - 4) / 2, t);
+  const top = middle - r,
+    bottom = middle + r,
     k = r * 0.55228475;
   const center = inset + r,
     neck = (r + center) / 2;
   const distance = center - r,
     handle = distance * 0.14;
   const mirrorX = ([x, y]: Point): Point => [width - x, y];
-  const mirrorY = ([x, y]: Point): Point => [x, 64 - y];
+  const mirrorY = ([x, y]: Point): Point => [x, height - y];
   const leftOuter: Curve[] = [
     [
       [r, bottom],
       [r - k, bottom],
-      [0, 32 + k],
-      [0, 32],
+      [0, middle + k],
+      [0, middle],
     ],
     [
-      [0, 32],
-      [0, 32 - k],
+      [0, middle],
+      [0, middle - k],
       [r - k, top],
       [r, top],
     ],
@@ -88,12 +90,12 @@ export function dockOutline(
       [
         [r, top],
         [r + distance * 0.42, top],
-        [neck - handle, 32 - halfNeck],
-        [neck, 32 - halfNeck],
+        [neck - handle, middle - halfNeck],
+        [neck, middle - halfNeck],
       ],
       [
-        [neck, 32 - halfNeck],
-        [neck + handle, 32 - halfNeck],
+        [neck, middle - halfNeck],
+        [neck + handle, middle - halfNeck],
         [center - distance * 0.42, top],
         [center, top],
       ],
@@ -122,13 +124,13 @@ export function dockOutline(
   const lobe: Curve = [
     [r, top],
     [mix(r + distance * 0.42, r + k, release), top],
-    [mix(neck - handle, tip, release), mix(32, 32 - k, release)],
-    [tip, 32],
+    [mix(neck - handle, tip, release), mix(middle, middle - k, release)],
+    [tip, middle],
   ];
   const left = [lobe, mapCurve(reverse(lobe), mirrorY), ...leftOuter];
   const shoulder: Curve = [
-    [innerTip, 32],
-    [mix(neck + handle, innerTip, release), mix(32, 32 - k, release)],
+    [innerTip, middle],
+    [mix(neck + handle, innerTip, release), mix(middle, middle - k, release)],
     [mix(center - distance * 0.42, center - k, release), top],
     [center, top],
   ];
@@ -159,15 +161,15 @@ export function DockSurface({ split }: { split: boolean }) {
   const shadow = useRef<SVGPathElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const progress = useRef(split ? 1 : 0);
-  const geometry = useRef({ width: 360, side: 64, inset: 74 });
+  const geometry = useRef({ width: 360, side: 56, inset: 66 });
   const id = useId();
   const paint = () => {
     const { width, side, inset } = geometry.current;
-    const d = dockOutline(width, side, inset, progress.current);
+    const d = dockOutline(width, side, inset, progress.current, side);
     glass.current!.style.clipPath = `path("${d}")`;
     outline.current!.setAttribute("d", d);
     shadow.current!.setAttribute("d", d);
-    svg.current!.setAttribute("viewBox", `0 0 ${width} 64`);
+    svg.current!.setAttribute("viewBox", `0 0 ${width} ${side}`);
   };
   useLayoutEffect(() => {
     const measure = () => {
@@ -176,8 +178,8 @@ export function DockSurface({ split }: { split: boolean }) {
         // Press feedback scales the whole dock; contours use its layout width.
         width:
           parent.clientWidth || parent.getBoundingClientRect().width || 360,
-        side: parent.clientHeight || 64,
-        inset: (parent.clientHeight || 64) + 10,
+        side: parent.clientHeight || 56,
+        inset: (parent.clientHeight || 56) + 10,
       };
       // Keep the stronger press expansion inside even a narrow phone screen.
       parent.style.setProperty(
@@ -227,7 +229,7 @@ export function DockSurface({ split }: { split: boolean }) {
   return (
     <div ref={root} className="safari-surface" aria-hidden="true">
       <div ref={glass} className="safari-glass" />
-      <svg ref={svg} width="100%" height="64" preserveAspectRatio="none">
+      <svg ref={svg} width="100%" height="56" preserveAspectRatio="none">
         <defs>
           <filter
             id={`${id}-shadow`}
