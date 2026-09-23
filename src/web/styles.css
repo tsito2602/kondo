@@ -628,10 +628,57 @@ strong {
 .trip-heading {
   max-width: 1000px;
   margin: auto;
-  display: flex;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
   gap: 12px;
   padding: 14px 20px;
+}
+.trip-title {
+  min-width: 0;
+  text-align: center;
+}
+.trip-heading > .icon-button {
+  border-radius: 50%;
+  border: 1px solid var(--dock-border);
+  background: var(--dock-glass);
+}
+.trip-menu-popover {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 0;
+  width: min(300px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  border: 1px solid var(--dock-border);
+  border-radius: 26px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--paper) 68%, transparent);
+  -webkit-backdrop-filter: blur(28px) saturate(1.18);
+  backdrop-filter: blur(28px) saturate(1.18);
+  box-shadow:
+    inset 0 1px 1px var(--surface-glow),
+    0 12px 40px #0003;
+  overflow: auto;
+}
+.trip-menu-popover::backdrop {
+  background: #0000000a;
+}
+.trip-menu-body {
+  padding: 8px;
+}
+.trip-menu-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 10px;
+}
+.trip-menu-heading h2 {
+  font-size: 15px;
+}
+.trip-menu-sync {
+  padding: 4px 10px;
+  border-top: 1px solid var(--line);
 }
 .trip-heading h1 {
   font-size: 18px;
@@ -2346,7 +2393,84 @@ input::-webkit-date-and-time-value {
     width: min(100%, 288px);
   }
   .thumb-dock[data-mode="edit"] {
-    width: min(100%, 352px);
+    width: min(100%, 420px);
+  }
+  .thumb-dock[data-mode="context"],
+  .thumb-dock[data-mode="edit"] {
+    pointer-events: none;
+  }
+  .thumb-dock[data-mode="context"] > .thumb-dock-material,
+  .thumb-dock[data-mode="edit"] > .thumb-dock-material {
+    visibility: hidden;
+  }
+  .thumb-dock[data-mode="context"] > .thumb-dock-content,
+  .thumb-dock[data-mode="edit"] > .thumb-dock-content {
+    padding: 0;
+  }
+  .thumb-dock .thumb-dock-content > .context-dock {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 64px;
+    pointer-events: none;
+  }
+  .context-primary {
+    flex: 1;
+    min-width: 0;
+  }
+  .context-island {
+    position: relative;
+    isolation: isolate;
+    height: 52px;
+    border-radius: 26px;
+    pointer-events: auto;
+  }
+  .context-island::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--dock-glass);
+    border: 1px solid var(--dock-border);
+    -webkit-backdrop-filter: blur(24px) saturate(1.18);
+    backdrop-filter: blur(24px) saturate(1.18);
+    box-shadow:
+      inset 0 1px 1px var(--surface-glow),
+      0 5px 18px #10203018;
+    pointer-events: none;
+  }
+  .context-back,
+  .context-actions {
+    display: flex;
+    flex: none;
+  }
+  .context-island > button,
+  .context-island > a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    min-width: 44px;
+    padding: 0;
+    border-radius: 26px;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .context-primary > button,
+  .context-primary > a {
+    width: 100%;
+    padding: 0 8px;
+  }
+  .context-island > :not(.danger) {
+    color: var(--ink);
+  }
+  .detail-inline-action {
+    display: none;
   }
   .thumb-dock-material {
     position: absolute;
@@ -2755,6 +2879,8 @@ input::-webkit-date-and-time-value {
 }
 @media (prefers-reduced-transparency: reduce) {
   .safari-glass,
+  .context-island::before,
+  .trip-menu-popover,
   .trip-header,
   .date-strip {
     background: var(--paper);

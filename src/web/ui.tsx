@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import {
   ThumbDock,
+  ContextDock,
   ThumbAction,
   ThumbFormContext,
   useThumbForm,
@@ -129,12 +130,14 @@ export function Modal({
   full = false,
   action,
   preserveNavigation = false,
+  dockActions,
 }: PropsWithChildren<{
   title: string;
   onClose: () => void;
   full?: boolean;
   action?: ReactNode;
   preserveNavigation?: boolean;
+  dockActions?: { primary?: ReactNode; actions?: ReactNode };
 }>) {
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
@@ -265,11 +268,11 @@ export function Modal({
           <ToastMessage />
         </div>
         <ThumbDock
-          mode={saveAction ? "edit" : "detail"}
+          mode={saveAction ? "edit" : dockActions ? "context" : "detail"}
           target={() => ref.current}
           disabled={closing}
           navigation={
-            preserveNavigation && !saveAction
+            preserveNavigation && !saveAction && !dockActions
               ? {
                   back: close,
                   action,
@@ -282,21 +285,37 @@ export function Modal({
               : undefined
           }
         >
-          <button className="thumb-control" onClick={close}>
-            <ArrowLeft size={20} />
-            {saveAction ? "キャンセル" : "戻る"}
-          </button>
-          {saveAction ? (
-            <Button
-              className="thumb-control primary"
-              type="submit"
-              form={saveAction.formId}
-              disabled={saveAction.busy}
-            >
-              {saveAction.busy ? "保存中…" : "保存する"}
-            </Button>
+          {saveAction || dockActions ? (
+            <ContextDock
+              back={
+                <button aria-label="戻る" onClick={close}>
+                  <ArrowLeft size={22} />
+                </button>
+              }
+              primary={
+                saveAction ? (
+                  <Button
+                    variant="ghost"
+                    type="submit"
+                    form={saveAction.formId}
+                    disabled={saveAction.busy}
+                  >
+                    {saveAction.busy ? "保存中…" : "保存する"}
+                  </Button>
+                ) : (
+                  dockActions?.primary
+                )
+              }
+              actions={!saveAction ? dockActions?.actions : undefined}
+            />
           ) : (
-            action
+            <>
+              <button className="thumb-control" onClick={close}>
+                <ArrowLeft size={20} />
+                戻る
+              </button>
+              {action}
+            </>
           )}
         </ThumbDock>
       </ThumbFormContext.Provider>

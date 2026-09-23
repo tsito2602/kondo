@@ -14,7 +14,7 @@ import { reduceMotion } from "./motion";
 
 type DockEntry = {
   content: ReactNode;
-  mode: "browse" | "detail" | "edit";
+  mode: "browse" | "detail" | "edit" | "context";
   target?: () => HTMLElement | null;
   disabled?: boolean;
   navigation?: DockNavigation;
@@ -200,6 +200,29 @@ export function ThumbAction({ children }: PropsWithChildren) {
 }
 export function ThumbActions() {
   return <>{useContext(Actions)}</>;
+}
+
+/** Separate surfaces for the current screen's back, primary and icon actions. */
+export function ContextDock({
+  back,
+  primary,
+  actions,
+}: {
+  back?: ReactNode;
+  primary?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="context-dock">
+      {back && <div className="context-island context-back">{back}</div>}
+      <div className={`context-primary${primary ? " context-island" : ""}`}>
+        {primary}
+      </div>
+      {actions && (
+        <div className="context-island context-actions">{actions}</div>
+      )}
+    </div>
+  );
 }
 
 type SaveAction = { formId: string; busy: boolean };

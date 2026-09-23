@@ -922,6 +922,20 @@ function NoteEditor({
   return (
     <Modal
       title="メモ"
+      dockActions={{
+        primary: canEdit && (
+          <button
+            onClick={() =>
+              dismissModal(() => {
+                flush();
+                onClose();
+              })
+            }
+          >
+            保存する
+          </button>
+        ),
+      }}
       onClose={() => {
         flush();
         onClose();

@@ -207,10 +207,30 @@ export function BookingDetail({
       );
       setPreview({ url, file });
     });
+  const remove = () =>
+    void run(() => {
+      if (confirm("この予約を削除しますか？")) {
+        dismissModal(() => {
+          travel.deleteBooking(id);
+          onClose();
+        });
+      }
+    });
   return (
     <Modal
       title="予約詳細"
-      preserveNavigation
+      dockActions={{
+        actions: travel.canEdit && (
+          <>
+            <button aria-label="編集" onClick={() => setEditing(true)}>
+              <Pencil />
+            </button>
+            <button aria-label="予約を削除" className="danger" onClick={remove}>
+              <Trash2 />
+            </button>
+          </>
+        ),
+      }}
       onClose={onClose}
       full
       action={
@@ -400,17 +420,8 @@ export function BookingDetail({
         </section>
         {travel.canEdit && (
           <button
-            className="danger subtle"
-            onClick={() =>
-              void run(() => {
-                if (confirm("この予約を削除しますか？")) {
-                  dismissModal(() => {
-                    travel.deleteBooking(id);
-                    onClose();
-                  });
-                }
-              })
-            }
+            className="danger subtle detail-inline-action"
+            onClick={remove}
           >
             <Trash2 />
             予約を削除
@@ -437,10 +448,30 @@ export function ItemDetail({
   if (editing)
     return <ItemEditor item={item} onClose={() => setEditing(false)} />;
   const details = itemDetails(item);
+  const remove = () =>
+    void run(() => {
+      if (confirm("この予定を削除しますか？")) {
+        dismissModal(() => {
+          travel.deleteItem(id);
+          onClose();
+        });
+      }
+    });
   return (
     <Modal
       title="予定詳細"
-      preserveNavigation
+      dockActions={{
+        actions: travel.canEdit && (
+          <>
+            <button aria-label="編集" onClick={() => setEditing(true)}>
+              <Pencil />
+            </button>
+            <button aria-label="予定を削除" className="danger" onClick={remove}>
+              <Trash2 />
+            </button>
+          </>
+        ),
+      }}
       onClose={onClose}
       full
       action={
@@ -489,17 +520,8 @@ export function ItemDetail({
         )}
         {travel.canEdit && (
           <button
-            className="danger subtle"
-            onClick={() =>
-              void run(() => {
-                if (confirm("この予定を削除しますか？")) {
-                  dismissModal(() => {
-                    travel.deleteItem(id);
-                    onClose();
-                  });
-                }
-              })
-            }
+            className="danger subtle detail-inline-action"
+            onClick={remove}
           >
             <Trash2 />
             予定を削除
@@ -531,10 +553,50 @@ export function PlaceDetail({
     return (
       <ItemEditor item={linked} place={place} onClose={() => setMode("view")} />
     );
+  const itineraryAction = linked ? (
+    <button
+      className="primary"
+      onClick={() =>
+        dismissModal(() => {
+          onClose();
+          navigate(
+            `/trips/${travel.selectedTrip!.id}/itinerary?day=${linked.day}&item=${linked.id}`,
+          );
+        })
+      }
+    >
+      しおりを見る
+    </button>
+  ) : travel.canEdit ? (
+    <button className="primary" onClick={() => setMode("schedule")}>
+      しおりへ追加
+    </button>
+  ) : null;
+  const remove = () =>
+    void run(() => {
+      if (confirm("この場所を削除しますか？")) {
+        dismissModal(() => {
+          travel.deletePlace(id);
+          onClose();
+        });
+      }
+    });
   return (
     <Modal
       title="場所の詳細"
-      preserveNavigation
+      dockActions={{
+        primary: itineraryAction,
+        actions: travel.canEdit && (
+          <>
+            <button aria-label="編集" onClick={() => setMode("edit")}>
+              <Pencil />
+            </button>
+            <button aria-label="場所を削除" className="danger" onClick={remove}>
+              <Trash2 />
+            </button>
+          </>
+        ),
+      }}
       onClose={onClose}
       full
       action={
@@ -598,57 +660,21 @@ export function PlaceDetail({
             })}
           </section>
         ) : null}
-        {linked ? (
-          <>
-            <Button
-              variant="ghost"
-              className="primary"
-              onClick={() => {
-                dismissModal(() => {
-                  onClose();
-                  navigate(
-                    `/trips/${travel.selectedTrip!.id}/itinerary?day=${linked.day}&item=${linked.id}`,
-                  );
-                });
-              }}
-            >
-              しおりを見る
-            </Button>
-            {travel.canEdit && (
-              <Button
-                variant="ghost"
-                className="secondary"
-                onClick={() => setMode("schedule")}
-              >
-                <Pencil />
-                予定の日時を編集
-              </Button>
-            )}
-          </>
-        ) : (
-          travel.canEdit && (
-            <Button
-              variant="ghost"
-              className="primary"
-              onClick={() => setMode("schedule")}
-            >
-              しおりへ追加
-            </Button>
-          )
+        <div className="detail-inline-action">{itineraryAction}</div>
+        {linked && travel.canEdit && (
+          <Button
+            variant="ghost"
+            className="secondary"
+            onClick={() => setMode("schedule")}
+          >
+            <Pencil />
+            予定の日時を編集
+          </Button>
         )}
         {travel.canEdit && (
           <button
-            className="danger subtle"
-            onClick={() =>
-              void run(() => {
-                if (confirm("この場所を削除しますか？")) {
-                  dismissModal(() => {
-                    travel.deletePlace(id);
-                    onClose();
-                  });
-                }
-              })
-            }
+            className="danger subtle detail-inline-action"
+            onClick={remove}
           >
             <Trash2 />
             場所を削除

@@ -50,8 +50,14 @@ import type { TripMember } from "@/data/types";
 import { formatDate, localDate } from "@/utils/dates";
 import { TripEditor } from "./editors";
 import { SafariTabs, tripTabs } from "./safari-tabs";
+import { AnchoredMenu } from "./anchored-menu";
 import { dockKeyboardInset } from "./viewport";
-import { ThumbDock, ThumbDockProvider, ThumbActions } from "./thumb-dock";
+import {
+  ThumbDock,
+  ThumbDockProvider,
+  ThumbActions,
+  ContextDock,
+} from "./thumb-dock";
 import {
   BookingsScreen,
   ItineraryScreen,
@@ -296,18 +302,15 @@ function Home() {
   const past = travel.trips.filter((trip) => trip.endsOn < today);
   return (
     <>
-      <ThumbDock mode="detail">
-        <Link to="/settings" className="thumb-control">
-          <Settings size={20} />
-          設定
-        </Link>
-        <button
-          className="thumb-control primary"
-          onClick={() => setEditing(true)}
-        >
-          <Plus size={20} />
-          旅行を作成
-        </button>
+      <ThumbDock mode="context">
+        <ContextDock
+          primary={<button onClick={() => setEditing(true)}>旅行を作成</button>}
+          actions={
+            <Link to="/settings" aria-label="設定">
+              <Settings size={22} />
+            </Link>
+          }
+        />
       </ThumbDock>
       <header className="home-header">
         <Logo />
@@ -483,6 +486,7 @@ function TripLayout() {
   const notify = useToast();
   const location = useLocation();
   const [menu, setMenu] = useState(false);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
   const [editing, setEditing] = useState(false);
   const [progress, setProgress] = useState("");
   const { busy, run } = useAction();
@@ -525,16 +529,18 @@ function TripLayout() {
           <Link className="icon-button" to="/" aria-label="旅行一覧へ戻る">
             <ArrowLeft />
           </Link>
-          <div className="grow">
+          <div className="trip-title">
             <h1>{trip.name}</h1>
             <p>
               {formatDate(trip.startsOn)} — {formatDate(trip.endsOn)}
             </p>
           </div>
-          <SyncStatus />
           <Button
+            ref={menuTrigger}
             variant="ghost"
             className="icon-button"
+            aria-haspopup="dialog"
+            aria-expanded={menu}
             aria-label="旅行メニュー"
             onClick={() => setMenu(true)}
           >
@@ -573,74 +579,92 @@ function TripLayout() {
         <SafariTabs tripId={trip.id} onMenu={() => setMenu(true)} />
       </ThumbDock>
       {menu && (
-        <Modal title="旅行メニュー" onClose={() => setMenu(false)}>
-          <div className="thumb-page-tools">
-            <ThumbActions />
-          </div>
-          <div className="menu-list">
-            <button
-              onClick={() => {
-                dismissModal(() => {
-                  setMenu(false);
-                  navigate(`/trips/${trip.id}/members`);
-                });
-              }}
-            >
-              <Users />
-              メンバー管理
-            </button>
-            {travel.canEdit && (
-              <button
-                onClick={() => {
-                  dismissModal(() => {
-                    setMenu(false);
-                    setEditing(true);
-                  });
-                }}
-              >
-                <Pencil />
-                旅行を編集
-              </button>
-            )}
-            <button
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  const count = await travel.saveTripOffline((done, total) =>
-                    setProgress(`${done} / ${total}件の書類を保存中`),
-                  );
-                  setProgress("");
-                  notify(`旅行と${count}件の書類をオフライン保存しました`);
-                })
-              }
-            >
-              <Download />
-              オフライン保存
-            </button>
-            {progress && <p role="status">{progress}</p>}
-            {trip.role === "owner" && (
-              <button
-                disabled={busy}
-                className="danger"
-                onClick={() =>
-                  void run(async () => {
-                    if (
-                      confirm(
-                        `「${trip.name}」と旅行内のすべてのデータを削除しますか？この操作は取り消せません。`,
-                      )
-                    ) {
-                      await travel.deleteTrip(trip.id);
-                      navigate("/");
+        <AnchoredMenu trigger={menuTrigger} onClose={() => setMenu(false)}>
+          {(closeMenu) => (
+            <>
+              <div className="thumb-page-tools">
+                <ThumbActions />
+              </div>
+              <div className="menu-list">
+                <button
+                  onClick={() => {
+                    closeMenu(() => {
+                      navigate(`/trips/${trip.id}/members`);
+                    });
+                  }}
+                >
+                  <Users />
+                  メンバー管理
+                </button>
+                {travel.canEdit && (
+                  <button
+                    onClick={() => {
+                      closeMenu(() => {
+                        setEditing(true);
+                      });
+                    }}
+                  >
+                    <Pencil />
+                    旅行を編集
+                  </button>
+                )}
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      const count = await travel.saveTripOffline(
+                        (done, total) =>
+                          setProgress(`${done} / ${total}件の書類を保存中`),
+                      );
+                      setProgress("");
+                      notify(`旅行と${count}件の書類をオフライン保存しました`);
+                    })
+                  }
+                >
+                  <Download />
+                  オフライン保存
+                </button>
+                {progress && <p role="status">{progress}</p>}
+                <button
+                  onClick={() =>
+                    closeMenu(() =>
+                      navigate("/settings", {
+                        state: { returnTo: location.pathname },
+                      }),
+                    )
+                  }
+                >
+                  <Settings />
+                  設定
+                </button>
+                {trip.role === "owner" && (
+                  <button
+                    disabled={busy}
+                    className="danger"
+                    onClick={() =>
+                      void run(async () => {
+                        if (
+                          confirm(
+                            `「${trip.name}」と旅行内のすべてのデータを削除しますか？この操作は取り消せません。`,
+                          )
+                        ) {
+                          await travel.deleteTrip(trip.id);
+                          navigate("/");
+                        }
+                      })
                     }
-                  })
-                }
-              >
-                <Trash2 />
-                旅行を削除
-              </button>
-            )}
-          </div>
-        </Modal>
+                  >
+                    <Trash2 />
+                    旅行を削除
+                  </button>
+                )}
+              </div>
+              <div className="trip-menu-sync">
+                <SyncStatus />
+              </div>
+            </>
+          )}
+        </AnchoredMenu>
       )}
       {editing && <TripEditor trip={trip} onClose={() => setEditing(false)} />}
     </>
@@ -794,6 +818,9 @@ function MembersScreen() {
   );
 }
 function SettingsScreen() {
+  const location = useLocation();
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo;
+  const backTo = returnTo?.startsWith("/trips/") ? returnTo : "/";
   const auth = useAuth();
   const travel = useTravel();
   const theme = useTheme();
@@ -810,14 +837,20 @@ function SettingsScreen() {
   };
   return (
     <>
-      <ThumbDock mode="detail">
-        <Link to="/" className="thumb-control">
-          <ArrowLeft size={20} />
-          旅行一覧へ
-        </Link>
+      <ThumbDock mode="context">
+        <ContextDock
+          back={
+            <Link
+              to={backTo}
+              aria-label={backTo === "/" ? "旅行一覧へ戻る" : "旅行へ戻る"}
+            >
+              <ArrowLeft size={22} />
+            </Link>
+          }
+        />
       </ThumbDock>
       <header className="simple-header">
-        <Link className="icon-button" to="/" aria-label="戻る">
+        <Link className="icon-button" to={backTo} aria-label="戻る">
           <ArrowLeft />
         </Link>
         <h1>設定</h1>

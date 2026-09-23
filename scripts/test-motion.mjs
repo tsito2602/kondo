@@ -31,7 +31,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -50,6 +50,7 @@ new Function("require", "module", "exports", outputFiles[0].text)(
 );
 const {
   Modal,
+  AnchoredMenu,
   SafariTabs,
   dockOutline,
   animateDockPress,
@@ -162,6 +163,78 @@ test("dialog reverses its retained timeline and backdrop before dismissing, incl
 
 test.afterEach(() => {
   HTMLElement.prototype.animate = () => timeline();
+});
+
+test("header menu expands from its trigger and reverses before navigating, restoring focus", async () => {
+  const root = createRoot(document.getElementById("root"));
+  const trigger = document.createElement("button");
+  document.body.append(trigger);
+  trigger.focus();
+  trigger.getBoundingClientRect = () => ({
+    left: 926,
+    top: 20,
+    right: 970,
+    bottom: 64,
+    width: 44,
+    height: 44,
+  });
+  const originalBounds = HTMLElement.prototype.getBoundingClientRect;
+  HTMLElement.prototype.getBoundingClientRect = function () {
+    if (this.classList.contains("trip-menu-popover"))
+      return {
+        left: 670,
+        top: 20,
+        right: 970,
+        bottom: 360,
+        width: 300,
+        height: 340,
+      };
+    return originalBounds.call(this);
+  };
+  let motion,
+    frames,
+    navigated = 0;
+  HTMLElement.prototype.animate = (keyframes) => {
+    frames = keyframes;
+    return (motion = timeline());
+  };
+  function Harness() {
+    const [open, setOpen] = React.useState(true);
+    return open
+      ? React.createElement(
+          AnchoredMenu,
+          { trigger: { current: trigger }, onClose: () => setOpen(false) },
+          (close) =>
+            React.createElement(
+              "button",
+              { onClick: () => close(() => navigated++) },
+              "設定",
+            ),
+        )
+      : null;
+  }
+  try {
+    await act(async () => root.render(React.createElement(Harness)));
+    assert.match(frames[0].clipPath, /0px 0px 296px 256px/);
+    motion.currentTime = 440;
+    await act(async () => motion.finish());
+    await act(async () =>
+      [...document.querySelectorAll("dialog button")]
+        .find((node) => node.textContent === "設定")
+        .click(),
+    );
+    assert.equal(motion.playbackRate, -1);
+    assert.equal(navigated, 0);
+    assert.ok(document.querySelector(".trip-menu-popover[open]"));
+    await act(async () => motion.finish());
+    assert.equal(navigated, 1);
+    assert.equal(document.querySelector("dialog"), null);
+    assert.equal(document.activeElement, trigger);
+  } finally {
+    await act(async () => root.unmount());
+    HTMLElement.prototype.getBoundingClientRect = originalBounds;
+    trigger.remove();
+  }
 });
 
 test("reduced motion dismisses without waiting for a cosmetic animation", async () => {
@@ -292,7 +365,11 @@ test("one dock follows dialog focus scopes, restores the parent, and submits the
     assert.equal(dockButton("保存中…").disabled, true);
     await act(async () => setBusy(false));
     assert.equal(dockButton("保存する").form, detail.querySelector("form"));
-    await act(async () => dockButton("キャンセル").click());
+    assert.equal(host.querySelectorAll(".context-island").length, 2);
+    assert.ok(save.closest(".context-primary"));
+    await act(async () =>
+      host.querySelector('.context-back [aria-label="戻る"]').click(),
+    );
     await act(async () => new Promise((resolve) => setTimeout(resolve, 10)));
     assert.equal(host.parentElement, document.body);
     assert.equal(host.querySelector(".thumb-dock-material"), surface);

@@ -141,6 +141,10 @@ const fill = async (label, value) => {
   });
 };
 const submit = async () => {
+  const dock = document.querySelector(".thumb-dock-host");
+  const save = dock.querySelector('.context-primary button[type="submit"]');
+  assert.ok(dock.querySelector('.context-back [aria-label="戻る"]'));
+  assert.equal(save?.form, document.querySelector("dialog form"));
   await act(async () =>
     document
       .querySelector("dialog form")
@@ -289,6 +293,18 @@ test("legacy account cache and pending changes survive React migration; real for
       2,
       "end time supplies same-day end date",
     );
+    await click(
+      [...document.querySelectorAll(".timeline-entry")].find((entry) =>
+        entry.textContent.includes("市内を歩く"),
+      ),
+    );
+    assert.ok(
+      document.querySelector('.context-actions [aria-label="予定を削除"]'),
+    );
+    assert.equal(document.querySelector(".context-primary").textContent, "");
+    assert.equal(document.querySelector(".thumb-dock-host .safari-tabs"), null);
+    await click(document.querySelector('.context-back [aria-label="戻る"]'));
+    await tick(30);
     await click(byText("nav a", "予約"));
     await click(document.querySelector('[aria-label="予約を追加"]'));
     await fill("種類", "hotel");
@@ -297,19 +313,56 @@ test("legacy account cache and pending changes survive React migration; real for
     await fill("チェックアウト日", "2026-11-25");
     await submit();
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings").get().n, 1);
+    await click(document.querySelector(".booking-ticket"));
+    assert.equal(document.querySelector(".thumb-dock-host .safari-tabs"), null);
+    assert.equal(
+      document.querySelectorAll(".context-actions button").length,
+      2,
+    );
+    assert.ok(
+      document.querySelector('.context-actions [aria-label="予約を削除"]'),
+    );
+    await click(document.querySelector('.context-back [aria-label="戻る"]'));
+    await tick(30);
     await click(byText("nav a", "行きたい場所"));
     await click(document.querySelector('[aria-label="場所を追加"]'));
     await fill("場所の名前", "美術館");
     await submit();
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM places").get().n, 1);
     await click([...document.querySelectorAll(".place-card")][0]);
-    await click(byText("dialog button", "しおりへ追加"));
+    assert.ok(
+      document.querySelector('.context-actions [aria-label="場所を削除"]'),
+    );
+    assert.equal(document.querySelector(".thumb-dock-host .safari-tabs"), null);
+    await click(byText(".context-primary button", "しおりへ追加"));
     await fill("開始時刻", "16:00");
     await submit();
     assert.match(document.querySelector("dialog").textContent, /しおりを見る/);
     const link = db.prepare("SELECT item_id FROM place_itinerary_links").get();
     assert.ok(link.item_id);
-    await click(document.querySelector('dialog [aria-label="閉じる"]'));
+    assert.equal(
+      document.querySelector(".context-primary").textContent,
+      "しおりを見る",
+    );
+    globalThis.confirm = () => false;
+    await click(
+      document.querySelector('.context-actions [aria-label="場所を削除"]'),
+    );
+    assert.equal(
+      db.prepare("SELECT COUNT(*) AS n FROM places").get().n,
+      1,
+      "cancelled deletion preserves the place",
+    );
+    globalThis.confirm = () => true;
+    await click(document.querySelector('.context-actions [aria-label="編集"]'));
+    assert.ok(document.querySelector('.context-primary button[type="submit"]'));
+    await click(document.querySelector('.context-back [aria-label="戻る"]'));
+    await tick(30);
+    assert.equal(
+      document.querySelector(".context-primary").textContent,
+      "しおりを見る",
+    );
+    await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(200);
     await click(byText("nav a", "準備"));
     await click(document.querySelector('[aria-label="やることを追加"]'));
@@ -342,7 +395,7 @@ test("legacy account cache and pending changes survive React migration; real for
       db.prepare("SELECT COUNT(*) AS n FROM travel_notes").get().n,
       1,
     );
-    await click(byText("dialog button", "完了"));
+    await click(byText(".context-primary button", "保存する"));
     await tick();
     assert.deepEqual(
       failures,
@@ -350,6 +403,41 @@ test("legacy account cache and pending changes survive React migration; real for
       "all emitted form payloads are accepted by the existing API",
     );
     assert.equal((await loadTravelCache("owner")).pending.length, 0);
+    await click(
+      document.querySelector('.trip-heading [aria-label="旅行メニュー"]'),
+    );
+    assert.ok(document.querySelector(".trip-menu-popover[open]"));
+    assert.ok(
+      document.querySelector(".thumb-dock-host .safari-tabs"),
+      "header menu keeps the trip dock",
+    );
+    await click(byText(".trip-menu-popover button", "設定"));
+    await tick(30);
+    assert.equal(document.querySelector(".trip-menu-popover"), null);
+    await click(
+      document.querySelector('.context-back [aria-label="旅行へ戻る"]'),
+    );
+    assert.ok(document.querySelector(".trip-title"));
+    await click(
+      document.querySelector('.trip-heading [aria-label="旅行一覧へ戻る"]'),
+    );
+    assert.equal(
+      document.querySelector(".context-primary").textContent,
+      "旅行を作成",
+    );
+    assert.equal(document.querySelector(".context-back"), null);
+    await click(document.querySelector('.context-actions [aria-label="設定"]'));
+    assert.equal(document.querySelectorAll(".context-island").length, 1);
+    await click(
+      document.querySelector('.context-back [aria-label="旅行一覧へ戻る"]'),
+    );
+    await click(byText(".context-primary button", "旅行を作成"));
+    assert.equal(
+      document.querySelector('.context-primary button[type="submit"]').form,
+      document.querySelector("dialog form"),
+    );
+    await click(document.querySelector('.context-back [aria-label="戻る"]'));
+    await tick(30);
   } finally {
     await act(async () => root.unmount());
     db.close();
