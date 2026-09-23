@@ -303,44 +303,26 @@ export function ItemEditor({
             }
           />
         </Field>
-        <div className="form-grid">
-          <DatePicker
-            label="日付"
-            required
-            value={draft.day}
-            onChange={(day) => setDraft({ ...draft, day })}
-          />
-          <Field
-            label={details.category === "transport" ? "出発時刻" : "開始時刻"}
-          >
-            <Input
-              type="time"
-              value={draft.time}
-              onChange={(event) =>
-                setDraft({ ...draft, time: event.target.value })
-              }
-            />
-          </Field>
-        </div>
-        <div className="form-grid">
-          <DatePicker
-            label="終了日"
-            min={draft.day}
-            value={details.endDay ?? ""}
-            onChange={(endDay) => setDetails({ ...details, endDay })}
-          />
-          <Field
-            label={details.category === "transport" ? "到着時刻" : "終了時刻"}
-          >
-            <Input
-              type="time"
-              value={details.endTime}
-              onChange={(event) =>
-                setDetails({ ...details, endTime: event.target.value })
-              }
-            />
-          </Field>
-        </div>
+        <DatePicker
+          label={details.category === "transport" ? "出発" : "開始"}
+          startLabel={details.category === "transport" ? "出発" : "開始"}
+          required
+          showTime
+          value={draft.day}
+          startTime={draft.time}
+          onChange={(day, _end, time) => setDraft({ ...draft, day, time })}
+        />
+        <DatePicker
+          label={details.category === "transport" ? "到着" : "終了"}
+          startLabel={details.category === "transport" ? "到着" : "終了"}
+          showTime
+          min={draft.day}
+          value={details.endDay ?? ""}
+          startTime={details.endTime}
+          onChange={(endDay, _end, endTime) =>
+            setDetails({ ...details, endDay, endTime })
+          }
+        />
         {details.category === "transport" ? (
           <>
             <div className="form-grid">
@@ -558,6 +540,16 @@ export function BookingEditor({
     </Field>
   );
   const route = ["flight", "train", "car"].includes(draft.kind);
+  const rangeBooking = route || draft.kind === "hotel";
+  const dateLabels = {
+    flight: { label: "フライト日時", start: "出発", end: "到着" },
+    hotel: { label: "宿泊期間", start: "チェックイン", end: "チェックアウト" },
+    train: { label: "乗車日時", start: "出発", end: "到着" },
+    car: { label: "利用期間", start: "受取", end: "返却" },
+    restaurant: { label: "予約日・予約時刻", start: "予約日", end: "" },
+    ticket: { label: "利用日・利用時刻", start: "利用日", end: "" },
+    other: { label: "日付・時刻", start: "日付", end: "" },
+  }[draft.kind];
   return (
     <Modal title={booking ? "予約を編集" : "予約を追加"} onClose={onClose} full>
       <form className="form" onSubmit={submit}>
@@ -595,41 +587,27 @@ export function BookingEditor({
           </>
         )}
         {!route && field("location", "住所・Google MapsのURL")}
-        <div className="form-grid">
-          <DatePicker
-            label={draft.kind === "hotel" ? "チェックイン日" : "開始日（現地）"}
-            required
-            value={draft.day}
-            onChange={(day) => setDraft({ ...draft, day })}
-          />
-          <Field label="開始時刻（現地）">
-            <Input
-              type="time"
-              value={draft.time}
-              onChange={(event) =>
-                setDraft({ ...draft, time: event.target.value })
-              }
-            />
-          </Field>
-        </div>
-        <div className="form-grid">
-          <DatePicker
-            label={
-              draft.kind === "hotel" ? "チェックアウト日" : "終了日（現地）"
-            }
-            value={draft.endDay}
-            onChange={(endDay) => setDraft({ ...draft, endDay })}
-          />
-          <Field label="終了時刻（現地）">
-            <Input
-              type="time"
-              value={draft.endTime}
-              onChange={(event) =>
-                setDraft({ ...draft, endTime: event.target.value })
-              }
-            />
-          </Field>
-        </div>
+        <DatePicker
+          label={dateLabels.label}
+          startLabel={dateLabels.start}
+          endLabel={dateLabels.end}
+          range={rangeBooking}
+          required
+          showTime
+          value={draft.day}
+          endValue={draft.endDay}
+          startTime={draft.time}
+          endTime={draft.endTime}
+          onChange={(day, endDay, time, endTime) =>
+            setDraft({
+              ...draft,
+              day,
+              endDay,
+              time,
+              endTime: rangeBooking ? endTime : time,
+            })
+          }
+        />
         {["flight", "train"].includes(draft.kind) && (
           <Field label="所要時間（分・空欄なら自動計算）">
             <Input

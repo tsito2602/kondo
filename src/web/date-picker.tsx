@@ -1,5 +1,6 @@
 import { useId, useRef, useState } from "react";
 import { CalendarDays, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { RangeHighlight } from "./calendar/range-highlight";
 import { Modal } from "./ui";
 import { dismissModal } from "./motion";
 import { localDate, validDate } from "@/utils/dates";
@@ -15,7 +16,15 @@ type PickerProps = {
   label: string;
   value: string;
   endValue?: string;
-  onChange: (start: string, end: string) => void;
+  onChange: (
+    start: string,
+    end: string,
+    startTime: string,
+    endTime: string,
+  ) => void;
+  showTime?: boolean;
+  startTime?: string;
+  endTime?: string;
   range?: boolean;
   required?: boolean;
   min?: string;
@@ -46,6 +55,7 @@ export function DatePicker(props: PickerProps) {
         <span>
           <small>{props.range ? (props.startLabel ?? "出発日") : ""}</small>
           {displayDate(props.value)}
+          {props.showTime && props.startTime ? ` ${props.startTime}` : ""}
         </span>
         {props.range && (
           <>
@@ -53,6 +63,7 @@ export function DatePicker(props: PickerProps) {
             <span>
               <small>{props.endLabel ?? "帰着日"}</small>
               {displayDate(props.endValue ?? "")}
+              {props.showTime && props.endTime ? ` ${props.endTime}` : ""}
             </span>
           </>
         )}
@@ -68,6 +79,9 @@ export function CalendarPanel({
   endValue = "",
   range = false,
   required = false,
+  showTime = false,
+  startTime = "",
+  endTime = "",
   min,
   max,
   startLabel = "出発日",
@@ -83,9 +97,11 @@ export function CalendarPanel({
   const [phase, setPhase] = useState<"start" | "end">(
     range && value && !endValue ? "end" : "start",
   );
-  const initial = value || min || localDate();
+  const [anchorDate, setAnchorDate] = useState(value);
+  const [timePhase, setTimePhase] = useState<"start" | "end">("start");
+  const [times, setTimes] = useState({ startTime, endTime });
+  const initial = value || endValue || min || localDate();
   const [month, setMonth] = useState(initial.slice(0, 7));
-  const [yearText, setYearText] = useState(initial.slice(0, 4));
   const [hover, setHover] = useState("");
   const grid = useRef<HTMLDivElement>(null);
   const year = Number(month.slice(0, 4));
@@ -96,40 +112,43 @@ export function CalendarPanel({
     (!min || date >= min) &&
     (!max || date <= max) &&
     (!allowedDates || allowedDates.includes(date));
+  const years = Array.from(
+    { length: 201 },
+    (_, index) => new Date().getFullYear() - 100 + index,
+  );
+  if (!years.includes(year)) years.push(year);
+  years.sort((a, b) => a - b);
+  const validTime = (time: string) =>
+    !time || /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
   const valid =
-    (!required && !draft.startDate && !draft.endDate) ||
-    (allowed(draft.startDate) &&
-      (!range || (allowed(draft.endDate) && draft.endDate >= draft.startDate)));
+    validTime(times.startTime) &&
+    validTime(times.endTime) &&
+    ((!required && !draft.startDate && !draft.endDate) ||
+      (allowed(draft.startDate) &&
+        (!range ||
+          (allowed(draft.endDate) && draft.endDate >= draft.startDate))));
   const changeMonth = (next: string) => {
     setMonth(next);
-    setYearText(next.slice(0, 4));
     setHover("");
-  };
-  const applyYear = () => {
-    if (
-      /^\d{4}$/.test(yearText) &&
-      Number(yearText) >= 1 &&
-      Number(yearText) <= 9999
-    )
-      changeMonth(`${yearText}-${month.slice(5)}`);
-    else setYearText(month.slice(0, 4));
   };
   const choose = (date: string) => {
     if (!allowed(date)) return;
     const next = range
       ? selectRangeDate(draft, phase, date)
       : { startDate: date, endDate: date };
+    if (!range || !next.endDate) setAnchorDate(next.startDate);
     setDraft(next);
+    setTimePhase(range && next.endDate ? "end" : "start");
     setPhase(next.endDate ? "start" : "end");
     setHover("");
   };
   const preview =
-    range && phase === "end" && hover
+    range && phase === "end" && !draft.endDate && draft.startDate && hover
       ? selectRangeDate(draft, "end", hover)
       : draft;
   const confirm = () =>
     dismissModal(() => {
-      onChange(draft.startDate, draft.endDate);
+      onChange(draft.startDate, draft.endDate, times.startTime, times.endTime);
       onClose();
     });
   return (
@@ -149,20 +168,32 @@ export function CalendarPanel({
         <div className="calendar-summary">
           <button
             type="button"
-            aria-pressed={phase === "start"}
-            onClick={() => setPhase("start")}
+            aria-pressed={(showTime ? timePhase : phase) === "start"}
+            onClick={() => {
+              setPhase("start");
+              setTimePhase("start");
+            }}
           >
-            <small>{range ? startLabel : "日付"}</small>
-            <strong>{displayDate(draft.startDate)}</strong>
+            <small>{range || showTime ? startLabel : "日付"}</small>
+            <strong>
+              {displayDate(draft.startDate)}
+              {showTime && times.startTime ? ` ${times.startTime}` : ""}
+            </strong>
           </button>
           {range && (
             <button
               type="button"
-              aria-pressed={phase === "end"}
-              onClick={() => setPhase("end")}
+              aria-pressed={(showTime ? timePhase : phase) === "end"}
+              onClick={() => {
+                setPhase("end");
+                setTimePhase("end");
+              }}
             >
               <small>{endLabel}</small>
-              <strong>{displayDate(draft.endDate)}</strong>
+              <strong>
+                {displayDate(draft.endDate)}
+                {showTime && times.endTime ? ` ${times.endTime}` : ""}
+              </strong>
             </button>
           )}
         </div>
@@ -178,23 +209,21 @@ export function CalendarPanel({
           >
             <ChevronLeft />
           </button>
-          <label>
-            <input
-              aria-label="年を入力"
-              inputMode="numeric"
-              maxLength={4}
-              value={yearText}
-              onChange={(event) => setYearText(event.target.value)}
-              onBlur={applyYear}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  applyYear();
-                }
-              }}
-            />
-            年
-          </label>
+          <select
+            aria-label="年を選択"
+            value={year}
+            onChange={(event) =>
+              changeMonth(
+                `${event.target.value.padStart(4, "0")}-${month.slice(5)}`,
+              )
+            }
+          >
+            {years.map((option) => (
+              <option key={option} value={option}>
+                {option}年
+              </option>
+            ))}
+          </select>
           <strong>{monthIndex + 1}月</strong>
           <button
             type="button"
@@ -213,6 +242,15 @@ export function CalendarPanel({
           ref={grid}
           aria-label={`${year}年${monthIndex + 1}月`}
         >
+          <RangeHighlight
+            days={days}
+            range={
+              range ? preview : { startDate: draft.startDate, endDate: "" }
+            }
+            markers={draft}
+            anchorDate={anchorDate}
+            previewDate={hover}
+          />
           {["日", "月", "火", "水", "木", "金", "土"].map((day) => (
             <span className="calendar-weekday" key={day}>
               {day}
@@ -236,8 +274,11 @@ export function CalendarPanel({
                   date >= preview.startDate &&
                   date <= preview.endDate,
                 )}
-                onMouseEnter={() => setHover(date)}
-                onMouseLeave={() => setHover("")}
+                onPointerEnter={(event) => {
+                  if (event.pointerType === "mouse") setHover(date);
+                }}
+                onPointerLeave={() => setHover("")}
+                data-preview={date === hover}
                 onClick={() => choose(date)}
                 onKeyDown={(event) => {
                   const offset = (
@@ -275,11 +316,50 @@ export function CalendarPanel({
         </div>
         <p className="muted small" aria-live="polite">
           {range
-            ? phase === "end"
-              ? `${endLabel}を選択してください。同じ日も選べます。`
-              : `${startLabel}を選択してください。`
-            : "日付を選び「決定」を押してください。"}
+            ? phase === "end" && draft.startDate
+              ? `${endLabel}を選択。同じ日も選べます。`
+              : draft.endDate
+                ? "この期間でよければ「決定」を押してください。"
+                : `${startLabel}を選択してください。`
+            : "日付を選択してください。"}
         </p>
+        {showTime && (
+          <div className="calendar-time">
+            <label>
+              <span>
+                {range
+                  ? `${timePhase === "start" ? startLabel : endLabel}の時刻`
+                  : "時刻"}
+              </span>
+              <input
+                type="time"
+                step={60}
+                value={timePhase === "start" ? times.startTime : times.endTime}
+                onChange={(event) =>
+                  setTimes((current) => ({
+                    ...current,
+                    [timePhase === "start" ? "startTime" : "endTime"]:
+                      event.target.value,
+                  }))
+                }
+              />
+            </label>
+            {(timePhase === "start" ? times.startTime : times.endTime) && (
+              <button
+                type="button"
+                aria-label="時刻をクリア"
+                onClick={() =>
+                  setTimes((current) => ({
+                    ...current,
+                    [timePhase === "start" ? "startTime" : "endTime"]: "",
+                  }))
+                }
+              >
+                ×
+              </button>
+            )}
+          </div>
+        )}
         <div className="calendar-actions">
           <button
             type="button"
@@ -287,6 +367,9 @@ export function CalendarPanel({
             onClick={() => {
               setDraft({ startDate: "", endDate: "" });
               setPhase("start");
+              setTimePhase("start");
+              setTimes({ startTime: "", endTime: "" });
+              setHover("");
             }}
           >
             クリア

@@ -136,33 +136,50 @@ const fill = async (label, value) => {
   assert.ok(input, `field ${label} exists`);
   if (input.matches(".date-trigger")) {
     await click(input);
-    const yearInput = document.querySelector(
-      'dialog:last-of-type [aria-label="年を入力"]',
-    );
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(
-        dom.window.HTMLInputElement.prototype,
-        "value",
-      ).set.call(yearInput, value.slice(0, 4));
-      yearInput.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
-    });
-    await act(async () =>
-      yearInput.dispatchEvent(
-        new dom.window.FocusEvent("focusout", { bubbles: true }),
-      ),
-    );
-    const first = document.querySelector("dialog:last-of-type [data-date]");
-    const difference =
-      Number(value.slice(5, 7)) - Number(first.dataset.date.slice(5, 7));
-    for (let index = 0; index < Math.abs(difference); index++)
-      await click(
-        document.querySelector(
-          `dialog:last-of-type [aria-label="${difference > 0 ? "次の月" : "前の月"}"]`,
-        ),
+    const selection = typeof value === "string" ? { start: value } : value;
+    const chooseDate = async (date) => {
+      const yearSelect = document.querySelector(
+        'dialog:last-of-type [aria-label="年を選択"]',
       );
-    await click(
-      document.querySelector(`dialog:last-of-type [data-date="${value}"]`),
-    );
+      await act(async () => {
+        yearSelect.value = String(Number(date.slice(0, 4)));
+        yearSelect.dispatchEvent(
+          new dom.window.Event("change", { bubbles: true }),
+        );
+      });
+      const first = document.querySelector("dialog:last-of-type [data-date]");
+      const difference =
+        Number(date.slice(5, 7)) - Number(first.dataset.date.slice(5, 7));
+      for (let index = 0; index < Math.abs(difference); index++)
+        await click(
+          document.querySelector(
+            `dialog:last-of-type [aria-label="${difference > 0 ? "次の月" : "前の月"}"]`,
+          ),
+        );
+      await click(
+        document.querySelector(`dialog:last-of-type [data-date="${date}"]`),
+      );
+    };
+    if (selection.start) {
+      await click(
+        document.querySelector("dialog:last-of-type .calendar-summary button"),
+      );
+      await chooseDate(selection.start);
+    }
+    if (selection.end) await chooseDate(selection.end);
+    if (selection.time !== undefined) {
+      const time = document.querySelector(
+        'dialog:last-of-type input[type="time"]',
+      );
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(
+          dom.window.HTMLInputElement.prototype,
+          "value",
+        ).set.call(time, selection.time);
+        time.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+      });
+    }
+    assert.equal(byText(".context-primary button", "決定").disabled, false);
     await click(byText(".context-primary button", "決定"));
     await tick(30);
     return;
@@ -395,8 +412,8 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.equal(sessionStorage.getItem("tabi.session"), null);
     await click(document.querySelector('[aria-label="予定を追加"]'));
     await fill("タイトル", "市内を歩く");
-    await fill("開始時刻", "14:00");
-    await fill("終了時刻", "15:00");
+    await fill("開始", { time: "14:00" });
+    await fill("終了", { start: trip.startsOn, time: "15:00" });
     await submit();
     assert.equal(
       db.prepare("SELECT COUNT(*) AS n FROM itinerary_items").get().n,
@@ -420,8 +437,7 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(document.querySelector('[aria-label="予約を追加"]'));
     await fill("種類", "hotel");
     await fill("予約名", "テストホテル");
-    await fill("チェックイン日", trip.startsOn);
-    await fill("チェックアウト日", "2026-11-25");
+    await fill("宿泊期間", { start: trip.startsOn, end: "2026-11-25" });
     await submit();
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings").get().n, 1);
     await click(document.querySelector(".booking-ticket"));
@@ -450,7 +466,7 @@ test("legacy account cache and pending changes survive React migration; real for
     const placeDetail = document.querySelector("dialog[open]");
     await click(byText(".context-primary button", "しおりへ追加"));
     assert.equal(document.querySelectorAll("dialog[open]").length, 2);
-    await fill("開始時刻", "16:00");
+    await fill("開始", { time: "16:00" });
     await submit();
     assert.equal(document.querySelector("dialog[open]"), placeDetail);
     assert.match(document.querySelector("dialog").textContent, /しおりを見る/);
