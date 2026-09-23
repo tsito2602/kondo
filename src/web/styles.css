@@ -2487,6 +2487,10 @@ input::-webkit-date-and-time-value {
   }
   dialog .thumb-dock-host:not([hidden]) {
     --dock-fade-color: var(--paper);
+    /* The dialog already follows the visual viewport, including keyboard pan.
+       Anchor inside that shell instead of lifting a layout-viewport fixed dock. */
+    position: absolute;
+    bottom: calc(var(--dock-bottom-gap) + env(safe-area-inset-bottom));
   }
   .thumb-dock-host:not([hidden])::before {
     content: "";

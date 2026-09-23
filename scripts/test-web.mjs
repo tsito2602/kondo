@@ -44,6 +44,15 @@ globalThis.IntersectionObserver = class {
   observe() {}
   disconnect() {}
 };
+const visualViewport = Object.assign(new dom.window.EventTarget(), {
+  height: window.innerHeight,
+  offsetTop: 0,
+  scale: 1,
+});
+Object.defineProperty(window, "visualViewport", {
+  value: visualViewport,
+  configurable: true,
+});
 window.scrollTo = () => {};
 HTMLElement.prototype.scrollIntoView = () => {};
 dom.window.HTMLDialogElement.prototype.showModal = function () {
@@ -155,6 +164,43 @@ const submit = async () => {
   await tick(30);
 };
 
+// Safari can pan its visual viewport while the keyboard resizes it. Every
+// editor uses the same viewport-sized dialog; its dock must stay inside it.
+const keyboardWhileEditing = async () => {
+  const dialog = [...document.querySelectorAll("dialog[open]")].at(-1);
+  const dock = document.querySelector(".thumb-dock-host");
+  const field = dialog.querySelector('input:not([type="checkbox"]), textarea');
+  await act(async () => field.focus());
+  for (const offsetTop of [0, 64, 112]) {
+    await act(async () => {
+      visualViewport.height = 340;
+      visualViewport.offsetTop = offsetTop;
+      visualViewport.dispatchEvent(new dom.window.Event("resize"));
+      visualViewport.dispatchEvent(new dom.window.Event("scroll"));
+    });
+    assert.equal(
+      document.documentElement.style.getPropertyValue("--modal-height"),
+      "340px",
+    );
+    assert.equal(
+      document.documentElement.style.getPropertyValue("--modal-top"),
+      offsetTop + "px",
+    );
+    assert.equal(dock.parentElement, dialog);
+    assert.ok(dock.querySelector('button[type="submit"]'));
+  }
+  await act(async () => {
+    field.blur();
+    visualViewport.height = window.innerHeight;
+    visualViewport.offsetTop = 0;
+    visualViewport.dispatchEvent(new dom.window.Event("resize"));
+  });
+  assert.equal(
+    document.documentElement.style.getPropertyValue("--dock-keyboard-inset"),
+    "0px",
+  );
+};
+
 // Exercise real details/editors: a fresh dialog would replay its entrance and
 // lose scroll, even if it rendered exactly the same text after returning.
 const editAndReturn = async (label, value) => {
@@ -168,6 +214,7 @@ const editAndReturn = async (label, value) => {
     assert.equal(dialogs.length, 2, "detail stays behind its editor");
     assert.equal(dialogs[0], detail);
     assert.equal(dock.parentElement, dialogs[1]);
+    await keyboardWhileEditing();
     if (save) {
       await fill(label, value);
       await submit();
@@ -404,6 +451,16 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(document.querySelector('[aria-label="やることを追加"]'));
     assert.equal(document.activeElement, document.querySelector("dialog h2"));
     assert.equal(document.querySelector("dialog input[autofocus]"), null);
+    assert.equal(
+      document.querySelector("dialog").classList.contains("full"),
+      true,
+    );
+    assert.equal(field("期限"), undefined);
+    assert.equal(
+      byText("label", "期限を設定する").querySelector("input").checked,
+      false,
+    );
+    await keyboardWhileEditing();
     await fill("やること", "チケットを予約");
     await submit();
     assert.equal(
@@ -416,6 +473,54 @@ test("legacy account cache and pending changes survive React migration; real for
       byText(".check-content strong", "チケットを予約")?.closest("button"),
     );
     assert.equal(document.activeElement, document.querySelector("dialog h2"));
+    assert.equal(
+      document.querySelector("dialog").classList.contains("full"),
+      true,
+    );
+    const deadlineToggle = () =>
+      byText("label", "期限を設定する").querySelector("input");
+    assert.equal(deadlineToggle().checked, false);
+    assert.equal(
+      db.prepare("SELECT due_on FROM travel_tasks").get().due_on,
+      "",
+    );
+    await click(deadlineToggle());
+    assert.equal(field("期限").required, true);
+    await submit();
+    assert.match(
+      document.querySelector("dialog .error").textContent,
+      /正しい期限/,
+    );
+    await fill("期限", "2026-11-20");
+    await submit();
+    assert.equal(
+      db.prepare("SELECT due_on FROM travel_tasks").get().due_on,
+      "2026-11-20",
+    );
+    await click(
+      byText(".check-content strong", "チケットを予約").closest("button"),
+    );
+    assert.equal(deadlineToggle().checked, true);
+    assert.equal(field("期限").value, "2026-11-20");
+    await click(deadlineToggle());
+    assert.equal(field("期限"), undefined);
+    await click(deadlineToggle());
+    assert.equal(
+      field("期限").value,
+      "2026-11-20",
+      "temporary toggle keeps the draft date",
+    );
+    await click(deadlineToggle());
+    await submit();
+    assert.equal(
+      db.prepare("SELECT due_on FROM travel_tasks").get().due_on,
+      "",
+    );
+    await click(
+      byText(".check-content strong", "チケットを予約").closest("button"),
+    );
+    assert.equal(deadlineToggle().checked, false);
+    assert.equal(field("期限"), undefined);
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
     assert.equal(document.querySelector("dialog"), null);

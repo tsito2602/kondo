@@ -921,6 +921,7 @@ export function PreparationEditor({
   );
   const [assignee, setAssignee] = useState(item?.assignee ?? "");
   const [dueOn, setDueOn] = useState(item && "dueOn" in item ? item.dueOn : "");
+  const [hasDueDate, setHasDueDate] = useState(Boolean(dueOn));
   const [category, setCategory] = useState(
     item && "category" in item ? item.category : "その他",
   );
@@ -935,7 +936,7 @@ export function PreparationEditor({
       if (task) {
         const input = {
           title: name,
-          dueOn,
+          dueOn: hasDueDate ? dueOn : "",
           assignee,
           done: item && "done" in item ? item.done : false,
         };
@@ -957,7 +958,7 @@ export function PreparationEditor({
     () =>
       !name.trim()
         ? "名前を入力してください"
-        : dueOn && !validDate(dueOn)
+        : task && hasDueDate && !validDate(dueOn)
           ? "正しい期限を入力してください"
           : "",
     onClose,
@@ -966,6 +967,7 @@ export function PreparationEditor({
     <Modal
       title={`${task ? "やること" : "持ち物"}を${item ? "編集" : "追加"}`}
       onClose={onClose}
+      full={task}
     >
       <form className="form" onSubmit={submit}>
         <Field label={task ? "やること" : "持ち物"}>
@@ -998,13 +1000,26 @@ export function PreparationEditor({
           </select>
         </Field>
         {task ? (
-          <Field label="期限">
-            <Input
-              type="date"
-              value={dueOn}
-              onChange={(event) => setDueOn(event.target.value)}
-            />
-          </Field>
+          <>
+            <label className="check-line">
+              <input
+                type="checkbox"
+                checked={hasDueDate}
+                onChange={(event) => setHasDueDate(event.target.checked)}
+              />
+              期限を設定する
+            </label>
+            {hasDueDate && (
+              <Field label="期限">
+                <Input
+                  type="date"
+                  required
+                  value={dueOn}
+                  onChange={(event) => setDueOn(event.target.value)}
+                />
+              </Field>
+            )}
+          </>
         ) : (
           <>
             <div className="form-grid">

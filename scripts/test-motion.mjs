@@ -2180,3 +2180,21 @@ test("the mobile add button survives page replacement and uses the current page 
     await act(async () => root.unmount());
   }
 });
+
+test("panel docks anchor inside the visual viewport shell without applying keyboard lift twice", async () => {
+  const css = await readFile("src/web/styles.css", "utf8");
+  const panelDock = css.match(
+    /dialog \.thumb-dock-host:not\(\[hidden\]\)\s*\{([^}]+)\}/,
+  )?.[1];
+  assert.ok(panelDock);
+  assert.match(panelDock, /position: absolute;/);
+  assert.match(
+    panelDock,
+    /bottom: calc\(var\(--dock-bottom-gap\) \+ env\(safe-area-inset-bottom\)\);/,
+  );
+  assert.doesNotMatch(panelDock, /--dock-keyboard-inset/);
+  assert.match(
+    css,
+    /:root:has\(\.thumb-dock-host\) \.modal.full\s*\{[^}]*top: var\(--modal-top[^}]*height: var\(--modal-height/,
+  );
+});
