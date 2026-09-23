@@ -2601,11 +2601,13 @@ input::-webkit-date-and-time-value {
       height 480ms var(--safari-ease);
   }
   .safari-tabs {
+    --selection-extra: 12px;
     position: relative;
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     height: 100%;
-    padding: 0 4px;
+    /* Match all five tab centers to the widened pill's four travel steps. */
+    padding: 0 calc(4px + var(--selection-extra) * 0.625);
     touch-action: none;
     user-select: none;
     -webkit-touch-callout: none;
@@ -2622,7 +2624,6 @@ input::-webkit-date-and-time-value {
     pointer-events: auto;
   }
   .safari-selection {
-    --selection-extra: 12px;
     position: absolute;
     top: 50%;
     left: 4px;
