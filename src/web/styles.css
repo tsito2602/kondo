@@ -4076,26 +4076,32 @@ input::-webkit-date-and-time-value {
   padding-inline: 8px;
 }
 .preparation-tabs {
-  background: #000;
-  border: 1px solid #ffffff1a;
-  box-shadow: 0 2px 8px #0000000a;
-  border-radius: 999px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 var(--surface-glow);
+  border-radius: var(--radius-control);
 }
 .preparation-tabs button {
-  color: #aaa;
-  border-radius: 999px;
+  color: var(--muted);
+  border-radius: var(--radius-control);
 }
 .preparation-tabs[data-active-tab]::before,
 .preparation-tabs .selected {
-  background: #fff;
+  background: var(--paper);
+  box-shadow:
+    inset 0 1px 0 var(--surface-glow),
+    var(--shadow);
+}
+:root[data-theme="dark"] .preparation-tabs[data-active-tab]::before,
+:root[data-theme="dark"] .preparation-tabs .selected {
+  background: var(--selected);
 }
 .preparation-tabs [data-state="active"],
 .preparation-tabs .selected {
-  color: #171717;
+  color: var(--ink);
 }
 .preparation-tabs .tab-count {
-  color: inherit;
-  opacity: 0.75;
+  color: var(--muted);
 }
 
 .members-page {
