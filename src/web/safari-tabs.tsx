@@ -30,7 +30,7 @@ export const tripTabs = [
   { path: "notes", label: "メモ", icon: NotebookPen },
 ];
 
-/** Tap directly, or hold then scrub across the expanded tabs and release. */
+/** Preview on contact, scrub immediately, or hold to expand the detail dock. */
 export function SafariTabs({
   tripId,
   onMenu,
@@ -62,6 +62,8 @@ export function SafariTabs({
   const suppressClick = useRef(false);
   const [holding, setHolding] = useState(false);
   const [preview, setPreview] = useState(-1);
+  const [touching, setTouching] = useState(false);
+  const [pending, setPending] = useState(-1);
   const frame = useRef<number | undefined>(undefined);
   const transition = useRef<ViewTransition | undefined>(undefined);
   const nav = useRef<HTMLElement>(null);
@@ -74,6 +76,7 @@ export function SafariTabs({
     if (frame.current !== undefined) cancelAnimationFrame(frame.current);
     const id = pointer.current?.id;
     pointer.current = null;
+    setTouching(false);
     setPreview(-1);
     if (id !== undefined && nav.current?.hasPointerCapture?.(id))
       nav.current.releasePointerCapture(id);
@@ -100,8 +103,8 @@ export function SafariTabs({
     });
   const followPointer = () => {
     const gesture = pointer.current;
-    if (!gesture?.held) return;
-    if (gesture.dragged) setPreview(hitTab(gesture.x, gesture.y));
+    if (!gesture) return;
+    setPreview(hitTab(gesture.x, gesture.y));
     // Tabs move while the material expands; hit-test their live positions.
     frame.current = requestAnimationFrame(followPointer);
   };
@@ -111,6 +114,7 @@ export function SafariTabs({
     setExpanded(false);
   };
   const selectTab = (index: number) => {
+    setPending(index);
     const to = `/trips/${tripId}/${tripTabs[index].path}`;
     if (controls) {
       controls.beforeNavigate(() => navigate(to));
@@ -141,6 +145,7 @@ export function SafariTabs({
     stopGesture();
     setExpanded(false);
   }, [detail]);
+  useLayoutEffect(() => setPending(-1), [location.pathname]);
   useEffect(() => {
     if (!expanded) {
       if (restoreFocus.current)
@@ -178,6 +183,7 @@ export function SafariTabs({
         data-expanded={expanded}
         data-wide={!split}
         data-level={detail ? "detail" : "trip"}
+        data-touching={touching}
       >
         <DockSurface split={split} />
         <div
@@ -220,13 +226,20 @@ export function SafariTabs({
             data-dock-hold={holding}
             data-scrubbing={preview >= 0}
             onPointerDown={(event) => {
-              if (event.button !== 0 || !event.isPrimary) return;
+              if (
+                event.button !== 0 ||
+                !event.isPrimary ||
+                event.metaKey ||
+                event.ctrlKey ||
+                event.shiftKey ||
+                event.altKey
+              )
+                return;
               transition.current?.skipTransition();
               stopGesture();
               suppressClick.current = false;
               setHolding(false);
               event.currentTarget.dataset.dockHold = "false";
-              if (expanded) return;
               pointer.current = {
                 id: event.pointerId,
                 x: event.clientX,
@@ -236,16 +249,17 @@ export function SafariTabs({
                 held: false,
                 dragged: false,
               };
+              setTouching(true);
+              setPreview(hitTab(event.clientX, event.clientY));
+              nav.current?.setPointerCapture?.(event.pointerId);
+              followPointer();
+              if (expanded) return;
               holdTimer.current = setTimeout(() => {
                 const gesture = pointer.current;
                 if (!gesture) return;
                 gesture.held = true;
-                gesture.startX = gesture.x;
-                gesture.startY = gesture.y;
                 blockReleaseClick();
                 setExpanded(true);
-                nav.current?.setPointerCapture?.(gesture.id);
-                followPointer();
               }, 420);
             }}
             onPointerMove={(event) => {
@@ -257,28 +271,22 @@ export function SafariTabs({
                 gesture.x - gesture.startX,
                 gesture.y - gesture.startY,
               );
-              if (gesture.held) {
-                gesture.dragged ||= distance > 8;
-                if (gesture.dragged) setPreview(hitTab(gesture.x, gesture.y));
-              } else if (distance > 10) {
-                blockReleaseClick();
-                stopGesture();
-              }
+              gesture.dragged ||= distance > 8;
+              setPreview(hitTab(gesture.x, gesture.y));
+              if (gesture.dragged && !gesture.held)
+                clearTimeout(holdTimer.current);
             }}
             onPointerUp={(event) => {
               const gesture = pointer.current;
               if (!gesture || gesture.id !== event.pointerId) return;
-              if (!gesture.held) {
-                stopGesture();
-                return;
-              }
               event.preventDefault();
               blockReleaseClick();
               const selected = hitTab(event.clientX, event.clientY);
               const dragged = gesture.dragged;
+              const commit = !gesture.held || dragged;
               stopGesture();
-              if (dragged || selected < 0) collapse();
-              if (dragged && selected >= 0) selectTab(selected);
+              if (commit || selected < 0) collapse();
+              if (commit && selected >= 0) selectTab(selected);
             }}
             onPointerCancel={(event) => {
               if (pointer.current?.id !== event.pointerId) return;
@@ -313,8 +321,18 @@ export function SafariTabs({
                 setExpanded(true);
               }
             }}
-            style={{ "--active-tab": active } as CSSProperties}
+            style={
+              {
+                "--selection-tab":
+                  preview >= 0
+                    ? preview
+                    : pending >= 0
+                      ? pending
+                      : Math.max(0, active),
+              } as CSSProperties
+            }
           >
+            <span className="safari-selection" aria-hidden="true" />
             {tripTabs.map((tab, index) => (
               <NavLink
                 key={tab.path}
@@ -323,7 +341,7 @@ export function SafariTabs({
                 data-preview={preview === index}
                 draggable={false}
                 aria-keyshortcuts="ArrowUp"
-                data-dock-managed={controls ? "" : undefined}
+                data-dock-managed=""
                 onClick={(event) => {
                   if (
                     event.button !== 0 ||
@@ -334,10 +352,8 @@ export function SafariTabs({
                   )
                     return;
                   collapse();
-                  if (controls) {
-                    event.preventDefault();
-                    selectTab(index);
-                  }
+                  event.preventDefault();
+                  selectTab(index);
                 }}
               >
                 <tab.icon size={21} />

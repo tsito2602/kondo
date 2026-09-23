@@ -2526,6 +2526,13 @@ input::-webkit-date-and-time-value {
     position: relative;
     height: 64px;
     isolation: isolate;
+    transform-origin: center bottom;
+    transition: transform 240ms var(--safari-ease);
+  }
+  .safari-dock[data-touching="true"],
+  .safari-dock:has(.safari-side-button:active) {
+    transform: scale(1.025);
+    transition-duration: 140ms;
   }
   .safari-surface,
   .safari-glass,
@@ -2595,7 +2602,7 @@ input::-webkit-date-and-time-value {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     height: 100%;
-    padding: 0;
+    padding: 0 4px;
     touch-action: none;
     user-select: none;
     -webkit-touch-callout: none;
@@ -2611,39 +2618,35 @@ input::-webkit-date-and-time-value {
     color: var(--muted);
     pointer-events: auto;
   }
-  .safari-tabs a::before {
-    content: "";
+  .safari-selection {
     position: absolute;
     top: 50%;
-    left: 50%;
-    width: 30px;
+    left: 4px;
+    width: calc((100% - 8px) / 5);
     height: 34px;
     border-radius: 18px;
-    transform: translate(-50%, -50%);
-    background: transparent;
+    transform: translateX(calc(var(--selection-tab) * 100%)) translateY(-50%);
+    background: color-mix(in srgb, var(--brand) 13%, transparent);
+    pointer-events: none;
     transition:
+      transform 260ms var(--safari-ease),
       width 480ms var(--safari-ease),
       height 480ms var(--safari-ease),
       border-radius 480ms var(--safari-ease),
       background-color 160ms;
   }
+  .safari-dock[data-touching="true"] .safari-selection {
+    transition-duration: 120ms, 480ms, 480ms, 480ms, 120ms;
+    background: color-mix(in srgb, var(--brand) 20%, transparent);
+  }
   .safari-tabs a.active {
     color: var(--brand);
-  }
-  .safari-tabs a.active::before {
-    background: color-mix(in srgb, var(--brand) 13%, transparent);
   }
   .safari-tabs[data-scrubbing="true"] a.active {
     color: var(--muted);
   }
-  .safari-tabs[data-scrubbing="true"] a.active::before {
-    background: transparent;
-  }
   .safari-tabs[data-scrubbing="true"] a[data-preview="true"] {
     color: var(--brand);
-  }
-  .safari-tabs[data-scrubbing="true"] a[data-preview="true"]::before {
-    background: color-mix(in srgb, var(--brand) 20%, transparent);
   }
   .safari-tabs svg {
     position: relative;
@@ -2701,11 +2704,9 @@ input::-webkit-date-and-time-value {
     pointer-events: auto;
     min-height: 44px;
   }
-  .safari-dock[data-wide="true"] .safari-tabs a::before {
-    /* The 64px capsule has a 32px radius; inset its selection by 4px. */
-    width: calc(100% - 8px);
-    height: 56px;
-    border-radius: 28px;
+  .safari-dock[data-wide="true"] .safari-selection {
+    height: 48px;
+    border-radius: 24px;
   }
   .safari-dock[data-wide="true"] .safari-tabs svg {
     transform: translateY(-9px);
@@ -2752,6 +2753,7 @@ input::-webkit-date-and-time-value {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .safari-dock,
   .safari-dock *,
   .safari-dock *::before {
     transition: none !important;

@@ -716,6 +716,67 @@ test("hold and drag previews live tab bounds, commits once on release, and cance
   }
 });
 
+test("contact previews immediately and a short scrub commits once without waiting for a hold", async () => {
+  const root = createRoot(document.getElementById("root"));
+  const h = React.createElement;
+  let updateRoute;
+  let transitions = 0;
+  document.startViewTransition = (update) => {
+    transitions++;
+    updateRoute = update;
+    return { ready: Promise.resolve(), finished: Promise.resolve(), skipTransition() {} };
+  };
+  function Harness() {
+    useMotionNavigation();
+    return h(React.Fragment, null,
+      h("output", null, useLocation().pathname),
+      h(SafariTabs, { tripId: "demo", onMenu() {} }),
+    );
+  }
+  try {
+    await act(async () => root.render(h(MemoryRouter,
+      { initialEntries: ["/trips/demo/itinerary"] }, h(Harness))));
+    const nav = document.querySelector(".safari-tabs");
+    const dock = document.querySelector(".safari-dock");
+    const links = [...nav.querySelectorAll("a")];
+    const indicator = nav.querySelector(".safari-selection");
+    const selected = () => nav.style.getPropertyValue("--selection-tab");
+    layoutTabs(nav);
+    await act(async () => pointer(links[1], "pointerdown", 108, 130));
+    assert.equal(selected(), "1", "feedback starts before the hold timer");
+    assert.equal(dock.dataset.touching, "true");
+    assert.equal(dock.dataset.expanded, "false");
+    assert.equal(document.querySelector("output").textContent, "/trips/demo/itinerary");
+    await act(async () => pointer(nav, "pointermove", 324, 130));
+    assert.equal(selected(), "4", "short drags track the finger immediately");
+    await act(async () => {
+      pointer(nav, "pointerup", 324, 130);
+      links[1].click();
+    });
+    assert.equal(transitions, 1);
+    assert.equal(dock.dataset.touching, "false");
+    assert.equal(selected(), "4", "release must not flash the old tab while the route waits");
+    await act(async () => updateRoute());
+    assert.equal(document.querySelector("output").textContent, "/trips/demo/notes");
+    assert.equal(selected(), "4");
+    assert.equal(nav.querySelector(".safari-selection"), indicator, "one indicator survives navigation");
+    await act(async () => pointer(links[0], "pointerdown", 36, 130));
+    assert.equal(selected(), "0");
+    await act(async () => {
+      pointer(nav, "pointerup", 36, 70);
+      links[0].click();
+    });
+    assert.equal(selected(), "4", "outside release restores the current tab");
+    assert.equal(dock.dataset.touching, "false");
+    assert.equal(transitions, 1);
+    await act(async () => pointer(links[0], "pointerdown", 36, 130, { ctrlKey: true }));
+    assert.equal(dock.dataset.touching, "false", "modified links retain their browser behavior");
+  } finally {
+    await act(async () => root.unmount());
+    delete document.startViewTransition;
+  }
+});
+
 test("dock contour pinches continuously and separates into three surfaces at mobile widths", async () => {
   for (const [width, side, inset] of [
     [308, 44, 44],

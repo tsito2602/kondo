@@ -149,7 +149,9 @@ export function DockSurface({ split }: { split: boolean }) {
       const parent = root.current!.parentElement!;
       const style = window.getComputedStyle(parent);
       geometry.current = {
-        width: parent.getBoundingClientRect().width || 360,
+        // Press feedback scales the whole dock; contours use its layout width.
+        width:
+          parent.clientWidth || parent.getBoundingClientRect().width || 360,
         side: parseFloat(style.getPropertyValue("--safari-side-size")) || 52,
         inset:
           parseFloat(style.getPropertyValue("--safari-center-inset")) || 60,
