@@ -1,12 +1,13 @@
 import {
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
 } from "react";
 import { flushSync } from "react-dom";
-import { Link, NavLink, useLocation, useNavigate } from "react-router";
+import { NavLink, useLocation, useNavigate } from "react-router";
 import {
   ArrowLeft,
   BookOpen,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { reduceMotion } from "./motion";
+import { DockSurface } from "./dock-surface";
 import { DockNavigationContext } from "./thumb-dock";
 
 export const tripTabs = [
@@ -40,6 +42,11 @@ export function SafariTabs({
   const [expanded, setExpanded] = useState(false);
   const navigate = useNavigate();
   const controls = useContext(DockNavigationContext);
+  const previousControls = useRef(controls);
+  if (controls) previousControls.current = controls;
+  const sideControls = controls ?? previousControls.current;
+  const detail = Boolean(controls);
+  const split = detail && !expanded;
   const holdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
@@ -130,6 +137,10 @@ export function SafariTabs({
     },
     [],
   );
+  useLayoutEffect(() => {
+    stopGesture();
+    setExpanded(false);
+  }, [detail]);
   useEffect(() => {
     if (!expanded) {
       if (restoreFocus.current)
@@ -162,42 +173,34 @@ export function SafariTabs({
           onClick={collapse}
         />
       )}
-      <div className="safari-dock" data-expanded={expanded}>
-        <span className="safari-circle safari-left" aria-hidden="true" />
-        <span className="safari-circle safari-right" aria-hidden="true" />
-        <span className="safari-bridge safari-left" aria-hidden="true" />
-        <span className="safari-bridge safari-right" aria-hidden="true" />
+      <div
+        className="safari-dock"
+        data-expanded={expanded}
+        data-wide={!split}
+        data-level={detail ? "detail" : "trip"}
+      >
+        <DockSurface split={split} />
         <div
           className="safari-side safari-left"
-          inert={expanded}
-          aria-hidden={expanded}
+          inert={!split}
+          aria-hidden={!split}
         >
-          {controls ? (
-            <button
-              className="safari-side-button"
-              aria-label="詳細を閉じて戻る"
-              onClick={controls.back}
-            >
-              <ArrowLeft size={22} />
-            </button>
-          ) : (
-            <Link
-              to="/"
-              className="safari-side-button"
-              aria-label="旅行一覧へ戻る"
-            >
-              <ArrowLeft size={22} />
-            </Link>
-          )}
+          <button
+            className="safari-side-button"
+            aria-label="詳細を閉じて戻る"
+            onClick={sideControls?.back}
+          >
+            <ArrowLeft size={22} />
+          </button>
         </div>
         <div
           className="safari-side safari-right"
-          inert={expanded}
-          aria-hidden={expanded}
+          inert={!split}
+          aria-hidden={!split}
         >
-          {controls?.action ? (
+          {sideControls?.action ? (
             <div className="safari-side-button safari-detail-action">
-              {controls.action}
+              {sideControls.action}
             </div>
           ) : (
             <button
@@ -210,7 +213,6 @@ export function SafariTabs({
           )}
         </div>
         <div className="safari-center">
-          <div className="safari-material" aria-hidden="true" />
           <nav
             ref={nav}
             className="safari-tabs"

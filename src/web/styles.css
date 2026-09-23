@@ -2364,14 +2364,10 @@ input::-webkit-date-and-time-value {
     transform: scale(0.96);
   }
   :root:has(.thumb-dock-host) .trip-tabs,
-  :root:has(.thumb-dock-host) .trip-heading > .icon-button,
   :root:has(.thumb-dock-host) .home-header .icon-button,
   :root:has(.thumb-dock-host) .home-toolbar > button,
   :root:has(.thumb-dock-host) .simple-header > .icon-button {
     display: none;
-  }
-  :root:has(.thumb-dock-host) .trip-heading {
-    padding-inline: 20px;
   }
   :root:has(.thumb-dock-host) .timeline {
     padding-bottom: calc(
@@ -2457,7 +2453,7 @@ input::-webkit-date-and-time-value {
   }
 }
 
-/* Compact navigation: five persistent icons between two separate round controls. */
+/* Trip tabs stay joined; detail actions separate from the same surface. */
 .thumb-page-tools {
   display: flex;
   flex-wrap: wrap;
@@ -2495,26 +2491,20 @@ input::-webkit-date-and-time-value {
     height: 64px;
     isolation: isolate;
   }
-  .safari-circle,
-  .safari-material {
+  .safari-surface,
+  .safari-glass,
+  .safari-surface svg {
     position: absolute;
+    inset: 0;
     pointer-events: none;
+  }
+  .safari-surface svg {
+    overflow: visible;
+  }
+  .safari-glass {
     background: color-mix(in srgb, var(--paper) 82%, transparent);
     -webkit-backdrop-filter: blur(24px) saturate(1.18);
     backdrop-filter: blur(24px) saturate(1.18);
-    box-shadow:
-      inset 0 1px 1px var(--surface-glow),
-      inset 0 -1px 1px #0000000a,
-      0 6px 24px #10203022;
-  }
-  .safari-circle {
-    top: calc((64px - var(--safari-side-size)) / 2);
-    width: var(--safari-side-size);
-    height: var(--safari-side-size);
-    border-radius: 50%;
-    transition:
-      opacity 160ms 100ms,
-      transform 440ms var(--safari-ease);
   }
   .safari-left {
     left: 0;
@@ -2559,32 +2549,6 @@ input::-webkit-date-and-time-value {
       right 480ms var(--safari-ease),
       top 480ms var(--safari-ease),
       height 480ms var(--safari-ease);
-  }
-  .safari-material {
-    inset: 0;
-    border-radius: 28px;
-    transition: border-radius 480ms var(--safari-ease);
-  }
-  /* The narrow neck fills as the central material reaches each round surface. */
-  .safari-bridge {
-    position: absolute;
-    top: 23px;
-    width: 28px;
-    height: 18px;
-    opacity: 0;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--paper) 80%, transparent);
-    transition:
-      opacity 90ms,
-      height 240ms var(--safari-ease),
-      top 240ms var(--safari-ease);
-    pointer-events: none;
-  }
-  .safari-bridge.safari-left {
-    left: calc(var(--safari-center-inset) - 17px);
-  }
-  .safari-bridge.safari-right {
-    right: calc(var(--safari-center-inset) - 17px);
   }
   .safari-tabs {
     position: relative;
@@ -2675,51 +2639,35 @@ input::-webkit-date-and-time-value {
     background: transparent;
     pointer-events: auto;
   }
-  .safari-dock[data-expanded="true"] .safari-center {
+  .safari-dock[data-wide="true"] .safari-center {
     left: 0;
     right: 0;
     top: 0;
     height: 64px;
   }
-  .safari-dock[data-expanded="true"] .safari-material {
-    border-radius: 30px;
-  }
-  .safari-dock[data-expanded="true"]
-    .safari-side.safari-left
-    .safari-side-button {
+  .safari-dock[data-wide="true"] .safari-side.safari-left .safari-side-button {
     transform: translateX(-56px);
     opacity: 0;
   }
-  .safari-dock[data-expanded="true"]
-    .safari-side.safari-right
-    .safari-side-button {
+  .safari-dock[data-wide="true"] .safari-side.safari-right .safari-side-button {
     transform: translateX(56px);
     opacity: 0;
   }
-  .safari-dock[data-expanded="true"] .safari-side-button {
+  .safari-dock[data-wide="true"] .safari-side-button {
     pointer-events: none;
   }
-  .safari-dock[data-expanded="true"] .safari-circle {
-    opacity: 0;
-    transform: scale(0.94);
-  }
-  .safari-dock[data-expanded="true"] .safari-bridge {
-    top: 9px;
-    height: 46px;
-    animation: safari-neck 480ms both;
-  }
-  .safari-dock[data-expanded="true"] .safari-tabs a {
+  .safari-dock[data-wide="true"] .safari-tabs a {
     pointer-events: auto;
     min-height: 44px;
   }
-  .safari-dock[data-expanded="true"] .safari-tabs a::before {
+  .safari-dock[data-wide="true"] .safari-tabs a::before {
     width: calc(100% - 4px);
     height: 56px;
   }
-  .safari-dock[data-expanded="true"] .safari-tabs svg {
+  .safari-dock[data-wide="true"] .safari-tabs svg {
     transform: translateY(-9px);
   }
-  .safari-dock[data-expanded="true"] .safari-tabs a span {
+  .safari-dock[data-wide="true"] .safari-tabs a span {
     opacity: 1;
     transform: translateY(0);
     transition-delay: 100ms;
@@ -2750,9 +2698,7 @@ input::-webkit-date-and-time-value {
   }
 }
 @media (prefers-reduced-transparency: reduce) {
-  .safari-circle,
-  .safari-material,
-  .safari-bridge {
+  .safari-glass {
     background: var(--paper);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
@@ -2778,24 +2724,5 @@ input::-webkit-date-and-time-value {
   }
   .safari-dock {
     --safari-center-inset: 44px;
-  }
-  .safari-circle {
-    transform: scale(0.91);
-  }
-  .safari-material {
-    left: 2px;
-    right: 2px;
-  }
-}
-
-@keyframes safari-neck {
-  0%,
-  75%,
-  100% {
-    opacity: 0;
-  }
-  18%,
-  40% {
-    opacity: 1;
   }
 }

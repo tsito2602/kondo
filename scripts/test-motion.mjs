@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createRequire } from "node:module";
 import { build } from "esbuild";
+import sharp from "sharp";
 import { JSDOM } from "jsdom";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
@@ -30,7 +31,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { dockOutline } from './src/web/dock-surface'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -50,6 +51,7 @@ new Function("require", "module", "exports", outputFiles[0].text)(
 const {
   Modal,
   SafariTabs,
+  dockOutline,
   SaveButton,
   dismissModal,
   useMotionNavigation,
@@ -332,7 +334,7 @@ function layoutTabs(nav, width = () => 360) {
   };
 }
 
-test("compact tabs navigate with one tap; holding reveals names without navigating on release", async () => {
+test("trip tabs stay joined with names and support one-tap or hold selection", async () => {
   const root = createRoot(document.getElementById("root"));
   const h = React.createElement;
   let menus = 0;
@@ -372,6 +374,14 @@ test("compact tabs navigate with one tap; holding reveals names without navigati
     const places = nav.querySelector('a[href$="/places"]');
     const notes = nav.querySelector('a[href$="/notes"]');
     assert.equal(icons.length, 5);
+    assert.equal(dock.dataset.level, "trip");
+    assert.equal(dock.dataset.wide, "true");
+    assert.equal(document.querySelectorAll(".safari-side[inert]").length, 2);
+    assert.equal(
+      dock.querySelector('a[href="/"]'),
+      null,
+      "trip-list navigation belongs in the header",
+    );
     assert.equal(nav.hasAttribute("inert"), false);
     assert.equal(nav.querySelectorAll('a[tabindex="-1"]').length, 0);
     await act(async () => places.click());
@@ -435,10 +445,14 @@ test("compact tabs navigate with one tap; holding reveals names without navigati
     });
     await act(async () => new Promise((resolve) => setTimeout(resolve, 450)));
     assert.equal(dock.dataset.expanded, "false", "dragging cancels a hold");
-    await act(async () =>
-      document.querySelector('[aria-label="旅行メニュー"]').click(),
+    assert.equal(
+      document
+        .querySelector('[aria-label="旅行メニュー"]')
+        .closest(".safari-side")
+        .hasAttribute("inert"),
+      true,
     );
-    assert.equal(menus, 1);
+    assert.equal(menus, 0);
   } finally {
     await act(async () => root.unmount());
     delete document.startViewTransition;
@@ -492,11 +506,18 @@ test("details retain the same five tab nodes and close before one-tap navigation
       ),
     );
     const nav = document.querySelector(".safari-tabs");
+    const dock = document.querySelector(".safari-dock");
+    const material = dock.querySelector(".safari-glass");
+    assert.equal(dock.dataset.wide, "true");
     const icons = [...nav.querySelectorAll("svg")];
     const host = document.querySelector(".thumb-dock-host");
     for (const destination of ["bookings", "places", "notes"]) {
       await act(async () => openDetail());
       const dialog = document.querySelector("dialog");
+      assert.equal(dock.dataset.level, "detail");
+      assert.equal(dock.dataset.wide, "false");
+      assert.equal(dock.querySelector(".safari-glass"), material);
+      assert.equal(dock.querySelectorAll(".safari-side[inert]").length, 0);
       assert.equal(host.parentElement, dialog);
       assert.equal(dialog.querySelector(".safari-tabs"), nav);
       assert.deepEqual([...nav.querySelectorAll("svg")], icons);
@@ -511,6 +532,11 @@ test("details retain the same five tab nodes and close before one-tap navigation
         await act(async () => pointer(origin, "pointerdown", 108, 130));
         await act(
           async () => new Promise((resolve) => setTimeout(resolve, 450)),
+        );
+        assert.equal(
+          dock.dataset.wide,
+          "true",
+          "holding reunites detail controls with the tab bar",
         );
         await act(async () => pointer(nav, "pointermove", 324, 130));
         await act(async () => {
@@ -533,6 +559,9 @@ test("details retain the same five tab nodes and close before one-tap navigation
         `/trips/demo/${destination}`,
       );
       assert.equal(host.parentElement, document.body);
+      assert.equal(dock.dataset.level, "trip");
+      assert.equal(dock.dataset.wide, "true");
+      assert.equal(dock.querySelector(".safari-glass"), material);
       assert.equal(host.querySelector(".safari-tabs"), nav);
       assert.deepEqual([...nav.querySelectorAll("svg")], icons);
     }
@@ -683,5 +712,54 @@ test("hold and drag previews live tab bounds, commits once on release, and cance
   } finally {
     await act(async () => root.unmount());
     delete document.startViewTransition;
+  }
+});
+
+test("dock contour pinches continuously and separates into three surfaces at mobile widths", async () => {
+  for (const [width, side, inset] of [
+    [308, 44, 44],
+    [336, 44, 52],
+    [366, 52, 60],
+    [420, 52, 60],
+  ]) {
+    const pixel = async (progress, x, y) => {
+      const d = dockOutline(width, side, inset, progress);
+      assert.equal(/NaN|Infinity/.test(d), false);
+      const { data, info } = await sharp(
+        Buffer.from(
+          `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="64"><path d="${d}" fill="white" /></svg>`,
+        ),
+      )
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      return data[(Math.floor(y) * info.width + Math.floor(x)) * 4 + 3];
+    };
+    const gap = (Math.min(side, inset - 4) + inset) / 2;
+    assert.equal(
+      await pixel(0, gap, 32),
+      255,
+      "trip-level surface is connected",
+    );
+    assert.equal(
+      await pixel(1, gap, 32),
+      0,
+      "detail surface has an actual gap",
+    );
+    assert.equal(await pixel(1, side / 2, 32), 255);
+    assert.equal(await pixel(1, width / 2, 32), 255);
+    assert.equal(await pixel(1, width - side / 2, 32), 255);
+    const r = 32 + (Math.min(side, inset - 4) / 2 - 32) * 0.5;
+    const neck = r + inset / 2;
+    assert.equal(
+      await pixel(0.5, neck, 32),
+      255,
+      "material remains joined while the neck thins",
+    );
+    assert.equal(
+      await pixel(0.5, neck, 8),
+      0,
+      "upper contour forms a visible concave neck",
+    );
   }
 });
