@@ -33,11 +33,14 @@
   --shadow: 0 1px 2px #182a3806, 0 6px 20px #182a3808;
   --surface-glow: #ffffffbd;
   --panel-tint: #ffffffa3;
+  --panel-header-tint: #ffffffe0;
+  --field-tint: #ffffff66;
+  --content-card: #f3f3f3;
   --dock-glass: #ffffff52;
   --dock-bottom-gap: 32px;
   --control-size: 44px;
   --dock-height: 56px;
-  --menu-glass: #f5f5f5e0;
+  --menu-glass: #ffffffa3;
   --dock-accent: var(--brand);
   --dock-on-accent: #fff;
   --dock-max-width: 420px;
@@ -69,8 +72,11 @@
   --shadow: 0 1px 2px #0003, 0 8px 24px #0002;
   --surface-glow: #ffffff0e;
   --panel-tint: #1c1c1ca3;
+  --panel-header-tint: #202020e0;
+  --field-tint: #ffffff08;
+  --content-card: #1c1c1c;
   --dock-glass: #18181859;
-  --menu-glass: #242424e0;
+  --menu-glass: #242424a3;
   --dock-border: #ffffff18;
   --dock-border-top: #ffffff26;
   --dock-border-bottom: #ffffff10;
@@ -508,8 +514,8 @@ strong {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(120deg, #142d3d99, #142d3d33),
-    linear-gradient(0deg, #142330bb, transparent 95%);
+    linear-gradient(180deg, #00000040, transparent 55%),
+    linear-gradient(0deg, #00000080, transparent 75%);
 }
 .trip-photo-content {
   position: relative;
@@ -876,7 +882,7 @@ strong {
   letter-spacing: 0.05em;
 }
 .date-strip [aria-current="date"] {
-  background: var(--ink);
+  background: transparent;
   color: var(--paper);
 }
 .timeline {
@@ -3066,7 +3072,7 @@ input::-webkit-date-and-time-value {
   position: relative;
   height: clamp(220px, 32vw, 340px);
   overflow: hidden;
-  background: var(--brand);
+  background: #262626;
 }
 .itinerary-cover-caption {
   position: absolute;
@@ -3076,7 +3082,7 @@ input::-webkit-date-and-time-value {
   justify-content: flex-end;
   padding: 24px max(24px, calc((100vw - 704px) / 2));
   color: #fff;
-  background: linear-gradient(transparent 35%, #10182099);
+  background: linear-gradient(transparent 35%, #00000099);
 }
 .itinerary-cover-caption span {
   font-size: 12px;
@@ -3371,7 +3377,7 @@ input::-webkit-date-and-time-value {
     0 2px 8px #00000012;
 }
 .modal-header {
-  background: var(--dock-glass);
+  background: var(--panel-header-tint);
   border-bottom-color: color-mix(in srgb, var(--ink) 6%, transparent);
   box-shadow: none;
 }
@@ -3531,4 +3537,70 @@ input::-webkit-date-and-time-value {
   clip-path: inset(
     max(0px, calc(var(--route-new-header-bottom) - var(--route-new-top))) 0 0
   );
+}
+
+/* Keep form surfaces translucent, with a quieter, more opaque title bar. */
+.modal .field input:not([type="checkbox"]):not([type="radio"]),
+.modal .field select,
+.modal .field textarea,
+.modal .member-row select,
+.modal .date-trigger,
+.modal .calendar-month select,
+.modal .calendar-time input,
+.modal .settings-card {
+  background: var(--field-tint);
+}
+.modal select option {
+  background: var(--paper);
+  color: var(--ink);
+}
+.timeline-entry:not(.transport-entry) > div,
+.booking-ticket,
+.place-card,
+.note-card {
+  background: var(--content-card);
+}
+.segmented[data-active-tab],
+.segmented[data-active-tab]::before,
+.segmented[data-active-tab] button,
+.filter-strip button {
+  border-radius: 999px;
+}
+.filter-strip button {
+  padding-inline: 16px;
+}
+.date-strip {
+  isolation: isolate;
+}
+.date-strip button {
+  position: relative;
+  z-index: 1;
+  border-radius: 999px;
+}
+.date-selection {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  border-radius: 999px;
+  background: var(--ink);
+}
+.date-strip[data-ready="true"] .date-selection {
+  transition:
+    transform 320ms var(--ease-flow),
+    width 320ms var(--ease-flow),
+    height 320ms var(--ease-flow);
+}
+@media (prefers-reduced-motion: reduce) {
+  .date-strip[data-ready="true"] .date-selection {
+    transition: none;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  :root[data-theme="dark"] {
+    --field-tint: var(--paper);
+    --panel-header-tint: var(--paper);
+    --menu-glass: var(--paper);
+  }
 }

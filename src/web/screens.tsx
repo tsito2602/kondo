@@ -1,8 +1,9 @@
+import { DayStrip } from "./day-strip";
 import { TaskList } from "./task-list";
 import { CalendarPanel } from "./date-picker";
 import { TripCover } from "./trip-cover";
 import { useItineraryScroll } from "./itinerary-scroll";
-import { dismissModal } from "./motion";
+import { dismissModal, reduceMotion } from "./motion";
 import { ThumbAction } from "./thumb-dock";
 import { Button } from "./obsidian/button";
 import { Input } from "./obsidian/input";
@@ -174,23 +175,6 @@ export function ItineraryScreen() {
     const timer = setTimeout(() => selectDay(day, "instant"), 50);
     return () => clearTimeout(timer);
   }, [params, selectDay]);
-  useEffect(() => {
-    const tab = document.getElementById(`date-tab-${selectedDay}`);
-    const strip = tab?.parentElement;
-    if (!tab || !strip) return;
-    const bounds = tab.getBoundingClientRect();
-    const container = strip.getBoundingClientRect();
-    if (bounds.left < container.left || bounds.right > container.right) {
-      strip.scrollTo({
-        left:
-          strip.scrollLeft +
-          bounds.left -
-          container.left -
-          (strip.clientWidth - bounds.width) / 2,
-        behavior: "instant",
-      });
-    }
-  }, [selectedDay]);
   const connections = findFlightConnections(travel.bookings);
   return (
     <>
@@ -213,7 +197,9 @@ export function ItineraryScreen() {
           min={days[0]}
           max={days.at(-1)}
           onChange={(day) =>
-            requestAnimationFrame(() => selectDay(day, "instant"))
+            requestAnimationFrame(() =>
+              selectDay(day, reduceMotion() ? "instant" : "smooth"),
+            )
           }
           onClose={() => setDatePicker(false)}
         />
@@ -230,26 +216,7 @@ export function ItineraryScreen() {
           </div>
         </section>
       )}
-      <nav className="date-strip" aria-label="旅の日付">
-        {days.map((day, index) => (
-          <button
-            id={`date-tab-${day}`}
-            key={day}
-            aria-current={selectedDay === day ? "date" : undefined}
-            onClick={() => {
-              selectDay(
-                day,
-                matchMedia("(prefers-reduced-motion: reduce)").matches
-                  ? "instant"
-                  : "smooth",
-              );
-            }}
-          >
-            <small>DAY {index + 1}</small>
-            <span>{day.slice(5).replace("-", "/")}</span>
-          </button>
-        ))}
-      </nav>
+      <DayStrip days={days} selectedDay={selectedDay} onSelect={selectDay} />
       <div className="page timeline">
         {days.map((day, index) => (
           <section className="day-section" id={`day-${day}`} key={day}>

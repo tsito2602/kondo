@@ -34,7 +34,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -52,6 +52,7 @@ new Function("require", "module", "exports", outputFiles[0].text)(
   module.exports,
 );
 const {
+  DayStrip,
   TaskList,
   DatePicker,
   startTripTransition,
@@ -2592,5 +2593,69 @@ test("returning from bookings captures the full list without creating a disconne
     document.startViewTransition = nativeStart;
     window.scrollTo = originalScroll;
     host.innerHTML = "";
+  }
+});
+
+test("date strip slides to the selected day and scrolls only when needed, respecting reduced motion", async () => {
+  const root = createRoot(document.getElementById("root"));
+  const days = ["2026-10-07", "2026-10-08", "2026-10-09"];
+  const selections = [];
+  const scrolls = [];
+  const render = (selectedDay) =>
+    root.render(
+      React.createElement(DayStrip, {
+        days,
+        selectedDay,
+        onSelect: (...args) => selections.push(args),
+      }),
+    );
+  try {
+    await act(async () => render(days[0]));
+    const rail = document.querySelector(".date-strip");
+    const buttons = [...rail.querySelectorAll("button")];
+    const marker = rail.querySelector(".date-selection");
+    rail.scrollTo = (options) => scrolls.push(options);
+    rail.getBoundingClientRect = () => ({ left: 0, right: 150, width: 150 });
+    Object.defineProperty(rail, "clientWidth", { value: 150 });
+    buttons.forEach((button, index) => {
+      Object.defineProperties(button, {
+        offsetLeft: { value: 16 + index * 64 },
+        offsetTop: { value: 9 },
+        offsetWidth: { value: 58 },
+        offsetHeight: { value: 46 },
+      });
+      button.getBoundingClientRect = () => ({
+        left: 16 + index * 64,
+        right: 74 + index * 64,
+        width: 58,
+      });
+    });
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 20)));
+    await act(async () => buttons[2].click());
+    assert.deepEqual(selections.at(-1), [days[2], "smooth"]);
+    await act(async () => render(days[2]));
+    assert.equal(
+      marker,
+      rail.querySelector(".date-selection"),
+      "the same selection surface moves between days",
+    );
+    assert.equal(marker.style.transform, "translate(144px, 9px)");
+    assert.deepEqual(scrolls.at(-1), { left: 98, behavior: "smooth" });
+    assert.equal(buttons[2].getAttribute("aria-current"), "date");
+    const count = scrolls.length;
+    await act(async () => render(days[1]));
+    assert.equal(
+      scrolls.length,
+      count,
+      "a visible selected day does not move the strip",
+    );
+    reduced = true;
+    await act(async () => buttons[2].click());
+    assert.deepEqual(selections.at(-1), [days[2], "instant"]);
+    await act(async () => render(days[2]));
+    assert.equal(scrolls.at(-1).behavior, "instant");
+  } finally {
+    reduced = false;
+    await act(async () => root.unmount());
   }
 });
