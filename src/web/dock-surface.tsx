@@ -206,8 +206,8 @@ export function DockSurface({ split }: { split: boolean }) {
             <feComposite in2="SourceAlpha" operator="out" />
           </filter>
           <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="var(--surface-glow)" />
-            <stop offset="1" stopColor="transparent" />
+            <stop offset="0" stopColor="var(--dock-border-top)" />
+            <stop offset="1" stopColor="var(--dock-border-bottom)" />
           </linearGradient>
         </defs>
         <path

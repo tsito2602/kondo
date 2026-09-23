@@ -33,6 +33,10 @@
   --shadow: 0 1px 2px #182a3806, 0 6px 20px #182a3808;
   --surface-glow: #ffffffbd;
   --panel-tint: #ffffffed;
+  --dock-glass: color-mix(in srgb, var(--paper) 44%, transparent);
+  --dock-border: #20232612;
+  --dock-border-top: #2023261a;
+  --dock-border-bottom: #2023260b;
   --ease-flow: cubic-bezier(0.22, 1, 0.36, 1);
   --route-direction: 1;
   --trip-header-height: 132px;
@@ -57,6 +61,10 @@
   --shadow: 0 1px 2px #0003, 0 8px 24px #0002;
   --surface-glow: #ffffff0e;
   --panel-tint: #1b1e21f5;
+  --dock-glass: color-mix(in srgb, var(--paper) 50%, transparent);
+  --dock-border: #ffffff18;
+  --dock-border-top: #ffffff26;
+  --dock-border-bottom: #ffffff10;
 }
 * {
   box-sizing: border-box;
@@ -2287,6 +2295,7 @@ input::-webkit-date-and-time-value {
     );
   }
   .thumb-dock-host:not([hidden]) {
+    --dock-fade-color: var(--canvas);
     display: flex;
     position: fixed;
     z-index: 40;
@@ -2297,6 +2306,30 @@ input::-webkit-date-and-time-value {
         max(0px, 100dvh - var(--modal-height, 100dvh) - var(--modal-top, 0px))
     );
     justify-content: center;
+    pointer-events: none;
+  }
+  dialog .thumb-dock-host:not([hidden]) {
+    --dock-fade-color: var(--paper);
+  }
+  .thumb-dock-host:not([hidden])::before {
+    content: "";
+    position: fixed;
+    z-index: -1;
+    left: 0;
+    right: 0;
+    bottom: max(
+      0px,
+      100dvh - var(--modal-height, 100dvh) - var(--modal-top, 0px)
+    );
+    height: calc(160px + env(safe-area-inset-bottom));
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--dock-fade-color) 0%, transparent) 0%,
+      color-mix(in srgb, var(--dock-fade-color) 5%, transparent) 22%,
+      color-mix(in srgb, var(--dock-fade-color) 28%, transparent) 50%,
+      color-mix(in srgb, var(--dock-fade-color) 72%, transparent) 78%,
+      var(--dock-fade-color) 100%
+    );
     pointer-events: none;
   }
   .thumb-dock {
@@ -2319,7 +2352,8 @@ input::-webkit-date-and-time-value {
     z-index: -1;
     border-radius: 28px;
     transform-origin: center bottom;
-    background: color-mix(in srgb, var(--paper) 82%, transparent);
+    background: var(--dock-glass);
+    border: 1px solid var(--dock-border);
     -webkit-backdrop-filter: blur(24px) saturate(1.18);
     backdrop-filter: blur(24px) saturate(1.18);
     box-shadow:
@@ -2502,7 +2536,7 @@ input::-webkit-date-and-time-value {
     overflow: visible;
   }
   .safari-glass {
-    background: color-mix(in srgb, var(--paper) 82%, transparent);
+    background: var(--dock-glass);
     -webkit-backdrop-filter: blur(24px) saturate(1.18);
     backdrop-filter: blur(24px) saturate(1.18);
   }
