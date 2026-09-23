@@ -2524,16 +2524,18 @@ input::-webkit-date-and-time-value {
     --safari-center-inset: 60px;
     --safari-ease: cubic-bezier(0.22, 0.82, 0.24, 1);
     --safari-touch-ease: cubic-bezier(0.16, 1, 0.3, 1);
+    --safari-release-ease: cubic-bezier(0.22, 0.72, 0.18, 1);
     position: relative;
     height: 64px;
     isolation: isolate;
     transform-origin: center bottom;
-    transition: transform 520ms var(--safari-touch-ease);
+    transition: transform 900ms var(--safari-release-ease);
   }
   .safari-dock[data-touching="true"],
   .safari-dock:has(.safari-side-button:active) {
     transform: scale(var(--safari-press-scale, 1.06), 1.1);
     transition-duration: 320ms;
+    transition-timing-function: var(--safari-touch-ease);
   }
   .safari-surface,
   .safari-glass,
@@ -2636,7 +2638,7 @@ input::-webkit-date-and-time-value {
       width 480ms var(--safari-ease),
       height 480ms var(--safari-ease),
       border-radius 480ms var(--safari-ease),
-      background-color 240ms var(--safari-touch-ease);
+      background-color 900ms var(--safari-release-ease);
   }
   .safari-dock[data-touching="true"] .safari-selection {
     transition-duration: 240ms, 480ms, 480ms, 480ms, 240ms;

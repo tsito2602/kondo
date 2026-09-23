@@ -1,6 +1,31 @@
 import { useId, useLayoutEffect, useRef } from "react";
 import { reduceMotion } from "./motion";
 
+/** Start each release at its rendered scale, without CSS reversal shortening. */
+export function animateDockPress(
+  element: HTMLElement,
+  pressed: boolean,
+  previous?: Animation,
+) {
+  const style = window.getComputedStyle(element);
+  const from = style.transform || "none";
+  const scale = style.getPropertyValue("--safari-press-scale").trim() || "1.06";
+  previous?.cancel();
+  if (reduceMotion() || !element.animate) return undefined;
+  return element.animate(
+    [
+      { transform: from },
+      { transform: pressed ? `scale(${scale}, 1.1)` : "scale(1)" },
+    ],
+    {
+      duration: pressed ? 320 : 900,
+      easing: pressed
+        ? "cubic-bezier(0.16, 1, 0.3, 1)"
+        : "cubic-bezier(0.22, 0.72, 0.18, 1)",
+    },
+  );
+}
+
 type Point = [number, number];
 type Curve = [Point, Point, Point, Point];
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;

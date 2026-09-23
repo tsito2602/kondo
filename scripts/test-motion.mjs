@@ -31,7 +31,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline } from './src/web/dock-surface'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -52,6 +52,7 @@ const {
   Modal,
   SafariTabs,
   dockOutline,
+  animateDockPress,
   dockKeyboardInset,
   SaveButton,
   dismissModal,
@@ -157,6 +158,10 @@ test("dialog reverses its retained timeline and backdrop before dismissing, incl
       await act(async () => root.unmount());
     }
   }
+});
+
+test.afterEach(() => {
+  HTMLElement.prototype.animate = () => timeline();
 });
 
 test("reduced motion dismisses without waiting for a cosmetic animation", async () => {
@@ -462,7 +467,11 @@ test("trip tabs stay joined with names and support one-tap or hold selection", a
 
 test("details retain the same five tab nodes and close before one-tap navigation, including the current tab", async () => {
   let surface;
-  HTMLElement.prototype.animate = () => (surface = timeline());
+  HTMLElement.prototype.animate = function () {
+    const animation = timeline();
+    if (this.matches("dialog, .modal-inner")) surface = animation;
+    return animation;
+  };
   document.startViewTransition = () => {
     throw new Error("detail must close before route snapshots");
   };
@@ -724,29 +733,51 @@ test("contact previews immediately and a short scrub commits once without waitin
   document.startViewTransition = (update) => {
     transitions++;
     updateRoute = update;
-    return { ready: Promise.resolve(), finished: Promise.resolve(), skipTransition() {} };
+    return {
+      ready: Promise.resolve(),
+      finished: Promise.resolve(),
+      skipTransition() {},
+    };
   };
   function Harness() {
     useMotionNavigation();
-    return h(React.Fragment, null,
+    return h(
+      React.Fragment,
+      null,
       h("output", null, useLocation().pathname),
       h(SafariTabs, { tripId: "demo", onMenu() {} }),
     );
   }
   try {
-    await act(async () => root.render(h(MemoryRouter,
-      { initialEntries: ["/trips/demo/itinerary"] }, h(Harness))));
+    await act(async () =>
+      root.render(
+        h(
+          MemoryRouter,
+          { initialEntries: ["/trips/demo/itinerary"] },
+          h(Harness),
+        ),
+      ),
+    );
     const nav = document.querySelector(".safari-tabs");
     const dock = document.querySelector(".safari-dock");
     const links = [...nav.querySelectorAll("a")];
     const indicator = nav.querySelector(".safari-selection");
+    const pressMotions = [];
+    dock.animate = (frames, options) => {
+      const animation = timeline();
+      pressMotions.push({ animation, options });
+      return animation;
+    };
     const selected = () => nav.style.getPropertyValue("--selection-tab");
     layoutTabs(nav);
     await act(async () => pointer(links[1], "pointerdown", 108, 130));
     assert.equal(selected(), "1", "feedback starts before the hold timer");
     assert.equal(dock.dataset.touching, "true");
     assert.equal(dock.dataset.expanded, "false");
-    assert.equal(document.querySelector("output").textContent, "/trips/demo/itinerary");
+    assert.equal(
+      document.querySelector("output").textContent,
+      "/trips/demo/itinerary",
+    );
     await act(async () => pointer(nav, "pointermove", 324, 130));
     assert.equal(selected(), "4", "short drags track the finger immediately");
     await act(async () => {
@@ -755,11 +786,29 @@ test("contact previews immediately and a short scrub commits once without waitin
     });
     assert.equal(transitions, 1);
     assert.equal(dock.dataset.touching, "false");
-    assert.equal(selected(), "4", "release must not flash the old tab while the route waits");
+    assert.equal(pressMotions.at(-1).options.duration, 900);
+    assert.equal(
+      pressMotions.at(-1).animation.cancelled,
+      false,
+      "routing must retain the release animation",
+    );
+    assert.equal(
+      selected(),
+      "4",
+      "release must not flash the old tab while the route waits",
+    );
     await act(async () => updateRoute());
-    assert.equal(document.querySelector("output").textContent, "/trips/demo/notes");
+    assert.equal(pressMotions.at(-1).animation.cancelled, false);
+    assert.equal(
+      document.querySelector("output").textContent,
+      "/trips/demo/notes",
+    );
     assert.equal(selected(), "4");
-    assert.equal(nav.querySelector(".safari-selection"), indicator, "one indicator survives navigation");
+    assert.equal(
+      nav.querySelector(".safari-selection"),
+      indicator,
+      "one indicator survives navigation",
+    );
     await act(async () => pointer(links[0], "pointerdown", 36, 130));
     assert.equal(selected(), "0");
     await act(async () => {
@@ -769,11 +818,61 @@ test("contact previews immediately and a short scrub commits once without waitin
     assert.equal(selected(), "4", "outside release restores the current tab");
     assert.equal(dock.dataset.touching, "false");
     assert.equal(transitions, 1);
-    await act(async () => pointer(links[0], "pointerdown", 36, 130, { ctrlKey: true }));
-    assert.equal(dock.dataset.touching, "false", "modified links retain their browser behavior");
+    await act(async () =>
+      pointer(links[0], "pointerdown", 36, 130, { ctrlKey: true }),
+    );
+    assert.equal(
+      dock.dataset.touching,
+      "false",
+      "modified links retain their browser behavior",
+    );
   } finally {
     await act(async () => root.unmount());
     delete document.startViewTransition;
+  }
+});
+
+test("dock release keeps its full duration after a short tap and retouches continue from the rendered scale", () => {
+  const dock = document.createElement("div");
+  document.body.append(dock);
+  const calls = [];
+  dock.animate = (frames, options) => {
+    calls.push({ frames, options });
+    return {
+      cancel() {
+        dock.style.transform = "scale(1)";
+      },
+    };
+  };
+  dock.style.setProperty("--safari-press-scale", "1.04");
+  try {
+    const press = animateDockPress(dock, true);
+    dock.style.transform = "matrix(1.01, 0, 0, 1.025, 0, 0)";
+    const release = animateDockPress(dock, false, press);
+    assert.equal(
+      calls[1].options.duration,
+      900,
+      "short contact does not shorten the release",
+    );
+    assert.equal(
+      calls[1].frames[0].transform,
+      "matrix(1.01, 0, 0, 1.025, 0, 0)",
+    );
+    assert.equal(calls[1].frames[1].transform, "scale(1)");
+    dock.style.transform = "matrix(1.005, 0, 0, 1.012, 0, 0)";
+    animateDockPress(dock, true, release);
+    assert.equal(
+      calls[2].frames[0].transform,
+      "matrix(1.005, 0, 0, 1.012, 0, 0)",
+      "sample before cancelling the old animation",
+    );
+    assert.equal(calls[2].frames[1].transform, "scale(1.04, 1.1)");
+    reduced = true;
+    assert.equal(animateDockPress(dock, false, release), undefined);
+    assert.equal(calls.length, 3);
+  } finally {
+    reduced = false;
+    dock.remove();
   }
 });
 

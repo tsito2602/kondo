@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 
 import { reduceMotion } from "./motion";
-import { DockSurface } from "./dock-surface";
+import { animateDockPress, DockSurface } from "./dock-surface";
 import { DockNavigationContext } from "./thumb-dock";
 
 export const tripTabs = [
@@ -67,6 +67,16 @@ export function SafariTabs({
   const frame = useRef<number | undefined>(undefined);
   const transition = useRef<ViewTransition | undefined>(undefined);
   const nav = useRef<HTMLElement>(null);
+  const dock = useRef<HTMLDivElement>(null);
+  const pressAnimation = useRef<Animation | undefined>(undefined);
+  const pressDock = (pressed: boolean) => {
+    if (dock.current)
+      pressAnimation.current = animateDockPress(
+        dock.current,
+        pressed,
+        pressAnimation.current,
+      );
+  };
   const restoreFocus = useRef(false);
   const active = tripTabs.findIndex((tab) =>
     location.pathname.endsWith(`/${tab.path}`),
@@ -75,6 +85,7 @@ export function SafariTabs({
     clearTimeout(holdTimer.current);
     if (frame.current !== undefined) cancelAnimationFrame(frame.current);
     const id = pointer.current?.id;
+    if (id !== undefined) pressDock(false);
     pointer.current = null;
     setTouching(false);
     setPreview(-1);
@@ -138,6 +149,7 @@ export function SafariTabs({
       clearTimeout(holdTimer.current);
       if (frame.current !== undefined) cancelAnimationFrame(frame.current);
       transition.current?.skipTransition();
+      pressAnimation.current?.cancel();
     },
     [],
   );
@@ -179,6 +191,7 @@ export function SafariTabs({
         />
       )}
       <div
+        ref={dock}
         className="safari-dock"
         data-expanded={expanded}
         data-wide={!split}
@@ -250,6 +263,7 @@ export function SafariTabs({
                 dragged: false,
               };
               setTouching(true);
+              pressDock(true);
               setPreview(hitTab(event.clientX, event.clientY));
               nav.current?.setPointerCapture?.(event.pointerId);
               followPointer();
