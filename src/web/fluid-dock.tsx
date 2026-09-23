@@ -48,14 +48,25 @@ export function morphDock(
 ) {
   if (t >= 1) return { islands: to, tension: 0 };
   if (t <= 0) return { islands: from, tension };
-  const p = ease(t);
+  // Stretch slowly against a persistent bridge, then release quickly. The
+  // final damped squeeze is horizontal so every surface keeps the same height.
+  const release = Math.max(0, Math.min(1, (t - 0.52) / 0.22));
+  const p = t < 0.52 ? 0.68 * ease(t / 0.52) : 0.68 + 0.32 * ease(release);
+  const settle = Math.max(0, (t - 0.66) / 0.34);
+  const recoil =
+    0.065 * Math.sin(settle * Math.PI * 2) ** 2 * (1 - settle) ** 2;
+  const stick = ease(Math.min(1, t / 0.24)) * (1 - ease(release));
   return {
-    islands: from.map((island, i) => ({
-      left: island.left + (to[i].left - island.left) * p,
-      width: island.width + (to[i].width - island.width) * p,
-      radius: island.radius + (to[i].radius - island.radius) * p,
-    })),
-    tension: tension * (1 - p) + 1800 * Math.sin(Math.PI * p) ** 2,
+    islands: from.map((island, i) => {
+      const width = island.width + (to[i].width - island.width) * p;
+      const squeeze = width * recoil;
+      return {
+        left: island.left + (to[i].left - island.left) * p + squeeze / 2,
+        width: width - squeeze,
+        radius: island.radius + (to[i].radius - island.radius) * p,
+      };
+    }),
+    tension: tension * (1 - p) + 2200 * stick,
   };
 }
 
@@ -157,12 +168,9 @@ export function FluidDockSurface({
     const tabs = node.querySelector<HTMLElement>(".safari-dock");
     let islands: DockIsland[];
     if (tabs) {
-      const style = window.getComputedStyle(tabs);
-      const side =
-        parseFloat(style.getPropertyValue("--safari-side-size")) || 52;
-      const inset =
-        parseFloat(style.getPropertyValue("--safari-center-inset")) || 60;
-      const radius = Math.min(side, inset - 4) / 2;
+      const side = node.clientHeight || 64;
+      const inset = side + 10;
+      const radius = side / 2;
       islands =
         tabs.dataset.wide === "false"
           ? [
@@ -187,11 +195,11 @@ export function FluidDockSurface({
                     100,
                 ) / 100,
               width: element.offsetWidth,
-              radius: 26,
+              radius: (node.clientHeight || 64) / 2,
             }
           : null;
       });
-      islands = slots.some(Boolean) ? dockSlots(w, slots) : joinedDock(w, 30);
+      islands = slots.some(Boolean) ? dockSlots(w, slots) : joinedDock(w);
     }
     node.style.setProperty(
       "--safari-press-scale",

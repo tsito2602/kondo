@@ -35,6 +35,8 @@
   --panel-tint: #ffffffed;
   --dock-glass: color-mix(in srgb, var(--paper) 30%, transparent);
   --dock-bottom-gap: 24px;
+  --dock-height: 64px;
+  --dock-max-width: 420px;
   --dock-border: #20232612;
   --dock-border-top: #2023261a;
   --dock-border-bottom: #2023260b;
@@ -2384,13 +2386,10 @@ input::-webkit-date-and-time-value {
   .thumb-dock {
     position: relative;
     isolation: isolate;
-    width: min(100%, 420px);
+    width: min(100%, var(--dock-max-width));
     pointer-events: auto;
     border-radius: 28px;
     color: var(--ink);
-  }
-  .thumb-dock[data-mode="edit"] {
-    width: min(100%, 420px);
   }
   .thumb-dock[data-mode="context"],
   .thumb-dock[data-mode="edit"] {
@@ -2405,7 +2404,7 @@ input::-webkit-date-and-time-value {
     align-items: center;
     gap: 10px;
     width: 100%;
-    height: 64px;
+    height: var(--dock-height);
     pointer-events: none;
   }
   .context-primary {
@@ -2415,8 +2414,8 @@ input::-webkit-date-and-time-value {
   .context-island {
     position: relative;
     isolation: isolate;
-    height: 52px;
-    border-radius: 26px;
+    height: var(--dock-height);
+    border-radius: calc(var(--dock-height) / 2);
     pointer-events: auto;
   }
   .context-back,
@@ -2429,11 +2428,11 @@ input::-webkit-date-and-time-value {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 52px;
-    height: 52px;
+    width: var(--dock-height);
+    height: var(--dock-height);
     min-width: 44px;
     padding: 0;
-    border-radius: 26px;
+    border-radius: calc(var(--dock-height) / 2);
     background: transparent;
     font-size: 13px;
     font-weight: 600;
@@ -2457,7 +2456,8 @@ input::-webkit-date-and-time-value {
     pointer-events: none;
   }
   .thumb-dock-content {
-    padding: 6px;
+    height: var(--dock-height);
+    padding: 0;
     animation: thumb-content-enter 280ms var(--ease-flow) both;
   }
   .thumb-dock:not([data-mode="browse"]) .thumb-dock-content {
@@ -2609,13 +2609,13 @@ input::-webkit-date-and-time-value {
   }
   .thumb-dock,
   .safari-dock {
-    --safari-side-size: 52px;
-    --safari-center-inset: 60px;
+    --safari-side-size: var(--dock-height);
+    --safari-center-inset: calc(var(--dock-height) + 10px);
     --safari-ease: cubic-bezier(0.22, 0.82, 0.24, 1);
     --safari-touch-ease: cubic-bezier(0.16, 1, 0.3, 1);
     --safari-release-ease: cubic-bezier(0.22, 0.72, 0.18, 1);
     position: relative;
-    height: 64px;
+    height: var(--dock-height);
     isolation: isolate;
     transform-origin: center bottom;
     transition: transform 900ms var(--safari-release-ease);
@@ -2637,7 +2637,7 @@ input::-webkit-date-and-time-value {
   .safari-surface svg {
     /* Override the shared 20px icon rule; SVG attributes do not override CSS. */
     width: 100%;
-    height: 64px;
+    height: var(--dock-height);
     display: block;
     overflow: visible;
   }
@@ -2656,7 +2656,7 @@ input::-webkit-date-and-time-value {
     overflow: hidden;
     border-radius: 50%;
     position: absolute;
-    top: calc((64px - var(--safari-side-size)) / 2);
+    top: calc((var(--dock-height) - var(--safari-side-size)) / 2);
     z-index: 3;
     width: var(--safari-side-size);
     height: var(--safari-side-size);
@@ -2682,7 +2682,7 @@ input::-webkit-date-and-time-value {
     z-index: 2;
     left: var(--safari-center-inset);
     right: var(--safari-center-inset);
-    top: calc((64px - var(--safari-side-size)) / 2);
+    top: calc((var(--dock-height) - var(--safari-side-size)) / 2);
     height: var(--safari-side-size);
     transition:
       left 480ms var(--safari-ease),
@@ -2788,7 +2788,7 @@ input::-webkit-date-and-time-value {
     left: 0;
     right: 0;
     top: 0;
-    height: 64px;
+    height: var(--dock-height);
   }
   .safari-dock[data-wide="true"] .safari-side.safari-left .safari-side-button {
     transform: translateX(-56px);
@@ -2806,7 +2806,7 @@ input::-webkit-date-and-time-value {
     min-height: 44px;
   }
   .safari-dock[data-wide="true"] .safari-selection {
-    height: 56px;
+    height: calc(var(--dock-height) - 8px);
   }
   .safari-dock[data-wide="true"] .safari-tabs svg {
     transform: translateY(-9px);
@@ -2861,19 +2861,9 @@ input::-webkit-date-and-time-value {
   }
 }
 
-@media (max-width: 379px) {
-  .thumb-dock,
-  .safari-dock {
-    --safari-side-size: 44px;
-    --safari-center-inset: 52px;
-  }
-}
 @media (max-width: 359px) {
   .thumb-dock-host {
     left: max(6px, env(safe-area-inset-left));
     right: max(6px, env(safe-area-inset-right));
-  }
-  .safari-dock {
-    --safari-center-inset: 44px;
   }
 }

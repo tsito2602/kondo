@@ -159,7 +159,7 @@ export function DockSurface({ split }: { split: boolean }) {
   const shadow = useRef<SVGPathElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const progress = useRef(split ? 1 : 0);
-  const geometry = useRef({ width: 360, side: 52, inset: 60 });
+  const geometry = useRef({ width: 360, side: 64, inset: 74 });
   const id = useId();
   const paint = () => {
     const { width, side, inset } = geometry.current;
@@ -172,14 +172,12 @@ export function DockSurface({ split }: { split: boolean }) {
   useLayoutEffect(() => {
     const measure = () => {
       const parent = root.current!.parentElement!;
-      const style = window.getComputedStyle(parent);
       geometry.current = {
         // Press feedback scales the whole dock; contours use its layout width.
         width:
           parent.clientWidth || parent.getBoundingClientRect().width || 360,
-        side: parseFloat(style.getPropertyValue("--safari-side-size")) || 52,
-        inset:
-          parseFloat(style.getPropertyValue("--safari-center-inset")) || 60,
+        side: parent.clientHeight || 64,
+        inset: (parent.clientHeight || 64) + 10,
       };
       // Keep the stronger press expansion inside even a narrow phone screen.
       parent.style.setProperty(

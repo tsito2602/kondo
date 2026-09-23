@@ -1069,18 +1069,18 @@ test("dock ignores top-edge rubber banding and only lifts for a focused software
 
 test("all dock layouts morph through a shared contour with real necks and clean separated endpoints", async () => {
   for (const width of [308, 366, 420]) {
-    const capsule = (left, width, radius = 26) => ({ left, width, radius });
+    const capsule = (left, width, radius = 32) => ({ left, width, radius });
     const layouts = [
       joinedDock(width),
       dockSlots(width, [
-        capsule(0, 52),
-        capsule(62, width - 176),
-        capsule(width - 104, 104),
+        capsule(0, 64),
+        capsule(74, width - 212),
+        capsule(width - 128, 128),
       ]),
-      dockSlots(width, [capsule(0, 52), null, capsule(width - 104, 104)]),
-      dockSlots(width, [capsule(0, 52), capsule(62, width - 62), null]),
-      dockSlots(width, [null, capsule(0, width - 62), capsule(width - 52, 52)]),
-      dockSlots(width, [capsule(0, 52), null, null]),
+      dockSlots(width, [capsule(0, 64), null, capsule(width - 128, 128)]),
+      dockSlots(width, [capsule(0, 64), capsule(74, width - 74), null]),
+      dockSlots(width, [null, capsule(0, width - 74), capsule(width - 64, 64)]),
+      dockSlots(width, [capsule(0, 64), null, null]),
     ];
     for (const from of layouts) {
       for (const to of layouts) {
@@ -1116,20 +1116,20 @@ test("all dock layouts morph through a shared contour with real necks and clean 
     };
     const joined = await raster(layouts[0], layouts[1], 0);
     const split = await raster(layouts[0], layouts[1], 1);
-    assert.equal(joined(57, 32), 255);
-    assert.equal(split(57, 32), 0, "back/primary gap is transparent");
+    assert.equal(joined(69, 32), 255);
+    assert.equal(split(69, 32), 0, "back/primary gap is transparent");
     assert.equal(
-      split(width - 109, 32),
+      split(width - 133, 32),
       0,
       "primary/actions gap is transparent",
     );
-    for (const x of [26, width / 2, width - 52])
+    for (const x of [32, width / 2, width - 64])
       assert.equal(split(x, 32), 255);
     // Fixed nearby islands actually pull together through a concave bridge,
     // then separate again, even when the surrounding layout is already split.
     const neck = await raster(layouts[1], layouts[3], 0.5);
-    assert.equal(neck(57, 32), 255);
-    assert.equal(neck(57, 8), 0, "the bridge must have a visible waist");
+    assert.equal(neck(69, 32), 255);
+    assert.equal(neck(69, 8), 0, "the bridge must have a visible waist");
   }
 });
 
@@ -1154,15 +1154,15 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
   const w = 366;
   function box(element) {
     const context = element.closest(".context-dock");
-    const back = context?.querySelector(".context-back") ? 52 : 0;
-    const actions = context?.querySelector(".context-actions") ? 104 : 0;
+    const back = context?.querySelector(".context-back") ? 64 : 0;
+    const actions = context?.querySelector(".context-actions") ? 128 : 0;
     if (element.classList.contains("context-back"))
       return { left: 0, width: back };
     if (element.classList.contains("context-actions"))
       return { left: w - actions, width: actions };
     if (element.classList.contains("context-primary"))
       return {
-        left: back ? 62 : 0,
+        left: back ? 74 : 0,
         width: w - back - actions - (back ? 10 : 0) - (actions ? 10 : 0),
       };
     return { left: 0, width: w };
@@ -1240,7 +1240,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
     assert.equal(pending.size, 1, "only the new animation remains active");
     advance(820);
     const settings = dockSlots(w, [
-      { left: 0, width: 52, radius: 26 },
+      { left: 0, width: 64, radius: 32 },
       null,
       null,
     ]);
