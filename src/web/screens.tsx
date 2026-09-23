@@ -1,3 +1,5 @@
+import { CalendarPanel } from "./date-picker";
+import { TripCover } from "./trip-cover";
 import { useItineraryScroll } from "./itinerary-scroll";
 import { dismissModal } from "./motion";
 import { ThumbAction } from "./thumb-dock";
@@ -202,25 +204,30 @@ export function ItineraryScreen() {
         </button>
       </ThumbAction>
       {datePicker && (
-        <Modal title="日付を選ぶ" onClose={() => setDatePicker(false)}>
-          <div className="thumb-date-grid">
-            {days.map((day, index) => (
-              <button
-                key={day}
-                aria-pressed={selectedDay === day}
-                onClick={() =>
-                  dismissModal(() => {
-                    setDatePicker(false);
-                    requestAnimationFrame(() => selectDay(day, "instant"));
-                  })
-                }
-              >
-                <small>DAY {index + 1}</small>
-                <span>{day.slice(5).replace("-", "/")}</span>
-              </button>
-            ))}
+        <CalendarPanel
+          label="日付を選ぶ"
+          required
+          value={selectedDay}
+          allowedDates={days}
+          min={days[0]}
+          max={days.at(-1)}
+          onChange={(day) =>
+            requestAnimationFrame(() => selectDay(day, "instant"))
+          }
+          onClose={() => setDatePicker(false)}
+        />
+      )}
+      {travel.selectedTrip!.coverImage && (
+        <section className="itinerary-cover" aria-label="旅行のカバー">
+          <TripCover
+            id={travel.selectedTrip!.id}
+            src={travel.selectedTrip!.coverImage}
+          />
+          <div className="itinerary-cover-caption">
+            <span>{travel.selectedTrip!.destination}</span>
+            <h2>{travel.selectedTrip!.name}</h2>
           </div>
-        </Modal>
+        </section>
       )}
       <nav className="date-strip" aria-label="旅の日付">
         {days.map((day, index) => (

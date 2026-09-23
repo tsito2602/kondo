@@ -34,7 +34,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -52,6 +52,8 @@ new Function("require", "module", "exports", outputFiles[0].text)(
   module.exports,
 );
 const {
+  DatePicker,
+  startTripTransition,
   menuDepth,
   Modal,
   AddButton,
@@ -2197,4 +2199,190 @@ test("panel docks anchor inside the visual viewport shell without applying keybo
     css,
     /:root:has\(\.thumb-dock-host\) \.modal.full\s*\{[^}]*top: var\(--modal-top[^}]*height: var\(--modal-height/,
   );
+});
+
+test("calendar floats above its editor, commits ranges only on confirmation and restores the editor dock", async () => {
+  reduced = true;
+  const root = createRoot(document.getElementById("root"));
+  const h = React.createElement;
+  function Harness() {
+    const [dates, setDates] = React.useState(["2028-02-20", "2028-02-24"]);
+    return h(
+      ThumbDockProvider,
+      null,
+      h(
+        Modal,
+        { title: "旅行を編集", full: true, onClose() {} },
+        h("input", { defaultValue: "編集中の旅行名" }),
+        h(DatePicker, {
+          label: "旅行期間",
+          value: dates[0],
+          endValue: dates[1],
+          range: true,
+          required: true,
+          min: "2028-02-05",
+          onChange: (start, end) => setDates([start, end]),
+        }),
+      ),
+    );
+  }
+  const click = async (node) => {
+    assert.ok(node);
+    await act(async () => node.click());
+  };
+  const closeWait = async () =>
+    act(async () => new Promise((resolve) => setTimeout(resolve, 15)));
+  try {
+    await act(async () => root.render(h(Harness)));
+    const editor = document.querySelector("dialog");
+    const trigger = editor.querySelector(".date-trigger");
+    const input = editor.querySelector("input");
+    const host = document.querySelector(".thumb-dock-host");
+    await click(trigger);
+    const panel = [...document.querySelectorAll("dialog")].at(-1);
+    assert.notEqual(panel, editor);
+    assert.equal(
+      panel.classList.contains("full"),
+      false,
+      "calendar is a floating child panel",
+    );
+    assert.equal(
+      host.parentElement,
+      panel,
+      "keyboard-safe dock follows the foreground panel",
+    );
+    assert.equal(
+      panel.querySelector('[data-date="2028-02-04"]').disabled,
+      true,
+    );
+    assert.ok(
+      panel.querySelector('[data-date="2028-02-29"]'),
+      "leap day selectable",
+    );
+    await click(panel.querySelector('[data-date="2028-02-29"]'));
+    assert.equal(
+      host.querySelector(".context-primary button").disabled,
+      true,
+      "range needs its second date",
+    );
+    await click(panel.querySelector('[data-date="2028-02-12"]'));
+    assert.equal(
+      trigger.dataset.dateValue,
+      "2028-02-20",
+      "changes stay in the child draft",
+    );
+    await click(host.querySelector(".context-primary button"));
+    await closeWait();
+    assert.equal(document.querySelectorAll("dialog").length, 1);
+    assert.equal(trigger.dataset.dateValue, "2028-02-12");
+    assert.equal(
+      trigger.dataset.dateEnd,
+      "2028-02-29",
+      "earlier second date swaps the endpoints",
+    );
+    assert.equal(host.parentElement, editor);
+    assert.equal(editor.querySelector("input"), input);
+    assert.equal(input.value, "編集中の旅行名");
+    await click(trigger);
+    const cancelled = [...document.querySelectorAll("dialog")].at(-1);
+    await click(cancelled.querySelector('[data-date="2028-02-06"]'));
+    await click(host.querySelector('[aria-label="戻る"]'));
+    await closeWait();
+    assert.equal(
+      trigger.dataset.dateValue,
+      "2028-02-12",
+      "closing without confirming preserves both dates",
+    );
+    assert.equal(trigger.dataset.dateEnd, "2028-02-29");
+    assert.equal(host.parentElement, editor);
+  } finally {
+    await act(async () => root.unmount());
+    reduced = false;
+  }
+});
+
+test("trip expansion shares the cover across snapshots, restores list scroll and cleans up on interruption", async () => {
+  const root = createRoot(document.getElementById("root"));
+  const h = React.createElement;
+  const originalScroll = window.scrollTo;
+  const originalY = window.scrollY;
+  const nativeStart = document.startViewTransition;
+  let navigate;
+  let scroll;
+  const captures = [];
+  window.scrollTo = (options) => {
+    scroll = options.top;
+  };
+  window.scrollY = 560;
+  document.startViewTransition = (update) => {
+    const motion = timeline();
+    captures.push({ update, motion });
+    return {
+      ready: Promise.resolve(),
+      finished: motion.finished,
+      skipTransition: () => motion.finish(),
+    };
+  };
+  function Harness() {
+    const [page, setPage] = React.useState("list");
+    navigate = setPage;
+    return h(
+      page === "list" ? "article" : "main",
+      { "data-trip-surface": "trip1" },
+      h("img", { "data-trip-cover": "trip1", src: "/cover.jpg" }),
+      page,
+    );
+  }
+  const cover = () => document.querySelector("[data-trip-cover]");
+  try {
+    await act(async () => root.render(h(Harness)));
+    const oldCover = cover();
+    startTripTransition(() => navigate("itinerary"), "trip1");
+    assert.equal(oldCover.style.viewTransitionName, "trip-cover");
+    await act(async () => captures[0].update());
+    assert.notEqual(cover(), oldCover);
+    assert.equal(cover().style.viewTransitionName, "trip-cover");
+    assert.equal(
+      document.querySelector("main").style.viewTransitionName,
+      "trip-surface",
+    );
+    assert.equal(scroll, 0);
+    captures[0].motion.finish();
+    await act(async () => {});
+    assert.equal(cover().style.viewTransitionName, "");
+    assert.equal(oldCover.style.viewTransitionName, "");
+    startTripTransition(() => navigate("list"), "trip1", true);
+    await act(async () => captures[1].update());
+    assert.equal(scroll, 560);
+    document.dispatchEvent(new dom.window.Event("pointerdown"));
+    await act(async () => {});
+    assert.equal(document.documentElement.dataset.tripTransition, undefined);
+    assert.equal(cover().style.viewTransitionName, "");
+    startTripTransition(() => navigate("stale"), "trip1");
+    startTripTransition(() => navigate("itinerary"), "trip1");
+    await act(async () => captures[2].update());
+    assert.ok(
+      document.querySelector("article"),
+      "superseded callback cannot replace the newer navigation",
+    );
+    await act(async () => captures[3].update());
+    captures[3].motion.finish();
+    await act(async () => {});
+    reduced = true;
+    await act(async () =>
+      startTripTransition(() => navigate("list"), "trip1", true),
+    );
+    assert.equal(
+      captures.length,
+      4,
+      "reduced motion commits without snapshots",
+    );
+    assert.ok(document.querySelector("article"));
+  } finally {
+    await act(async () => root.unmount());
+    document.startViewTransition = nativeStart;
+    window.scrollTo = originalScroll;
+    window.scrollY = originalY;
+    reduced = false;
+  }
 });

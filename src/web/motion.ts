@@ -143,6 +143,7 @@ export function useMotionNavigation() {
       if (
         !link ||
         link.hasAttribute("data-dock-managed") ||
+        link.hasAttribute("data-motion-managed") ||
         link.closest('[data-dock-hold="true"]') ||
         event.defaultPrevented ||
         event.button !== 0 ||
@@ -158,6 +159,7 @@ export function useMotionNavigation() {
       if (
         url.origin !== window.location.origin ||
         url.hash ||
+        url.pathname === "/settings" ||
         url.pathname === window.location.pathname
       )
         return;

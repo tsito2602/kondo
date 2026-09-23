@@ -1,3 +1,4 @@
+import { DatePicker } from "./date-picker";
 import { dismissModal } from "./motion";
 import { Button } from "./obsidian/button";
 import { Input } from "./obsidian/input";
@@ -184,29 +185,16 @@ export function TripEditor({
             }
           />
         </Field>
-        <div className="form-grid">
-          <Field label="出発日">
-            <Input
-              required
-              type="date"
-              value={draft.startsOn}
-              onChange={(event) =>
-                setDraft({ ...draft, startsOn: event.target.value })
-              }
-            />
-          </Field>
-          <Field label="帰宅日">
-            <Input
-              required
-              type="date"
-              min={draft.startsOn}
-              value={draft.endsOn}
-              onChange={(event) =>
-                setDraft({ ...draft, endsOn: event.target.value })
-              }
-            />
-          </Field>
-        </div>
+        <DatePicker
+          label="旅行期間"
+          range
+          required
+          value={draft.startsOn}
+          endValue={draft.endsOn}
+          onChange={(startsOn, endsOn) =>
+            setDraft({ ...draft, startsOn, endsOn })
+          }
+        />
         <ErrorText message={error} />
         <SaveButton busy={busy || imageBusy} />
       </form>
@@ -316,16 +304,12 @@ export function ItemEditor({
           />
         </Field>
         <div className="form-grid">
-          <Field label="日付">
-            <Input
-              type="date"
-              required
-              value={draft.day}
-              onChange={(event) =>
-                setDraft({ ...draft, day: event.target.value })
-              }
-            />
-          </Field>
+          <DatePicker
+            label="日付"
+            required
+            value={draft.day}
+            onChange={(day) => setDraft({ ...draft, day })}
+          />
           <Field
             label={details.category === "transport" ? "出発時刻" : "開始時刻"}
           >
@@ -339,16 +323,12 @@ export function ItemEditor({
           </Field>
         </div>
         <div className="form-grid">
-          <Field label="終了日">
-            <Input
-              type="date"
-              min={draft.day}
-              value={details.endDay}
-              onChange={(event) =>
-                setDetails({ ...details, endDay: event.target.value })
-              }
-            />
-          </Field>
+          <DatePicker
+            label="終了日"
+            min={draft.day}
+            value={details.endDay ?? ""}
+            onChange={(endDay) => setDetails({ ...details, endDay })}
+          />
           <Field
             label={details.category === "transport" ? "到着時刻" : "終了時刻"}
           >
@@ -616,18 +596,12 @@ export function BookingEditor({
         )}
         {!route && field("location", "住所・Google MapsのURL")}
         <div className="form-grid">
-          <Field
+          <DatePicker
             label={draft.kind === "hotel" ? "チェックイン日" : "開始日（現地）"}
-          >
-            <Input
-              required
-              type="date"
-              value={draft.day}
-              onChange={(event) =>
-                setDraft({ ...draft, day: event.target.value })
-              }
-            />
-          </Field>
+            required
+            value={draft.day}
+            onChange={(day) => setDraft({ ...draft, day })}
+          />
           <Field label="開始時刻（現地）">
             <Input
               type="time"
@@ -639,19 +613,13 @@ export function BookingEditor({
           </Field>
         </div>
         <div className="form-grid">
-          <Field
+          <DatePicker
             label={
               draft.kind === "hotel" ? "チェックアウト日" : "終了日（現地）"
             }
-          >
-            <Input
-              type="date"
-              value={draft.endDay}
-              onChange={(event) =>
-                setDraft({ ...draft, endDay: event.target.value })
-              }
-            />
-          </Field>
+            value={draft.endDay}
+            onChange={(endDay) => setDraft({ ...draft, endDay })}
+          />
           <Field label="終了時刻（現地）">
             <Input
               type="time"
@@ -1010,14 +978,12 @@ export function PreparationEditor({
               期限を設定する
             </label>
             {hasDueDate && (
-              <Field label="期限">
-                <Input
-                  type="date"
-                  required
-                  value={dueOn}
-                  onChange={(event) => setDueOn(event.target.value)}
-                />
-              </Field>
+              <DatePicker
+                label="期限"
+                required
+                value={dueOn}
+                onChange={(day) => setDueOn(day)}
+              />
             )}
           </>
         ) : (

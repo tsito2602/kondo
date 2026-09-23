@@ -1,3 +1,5 @@
+import { startTripTransition } from "./trip-transition";
+import { TripCover } from "./trip-cover";
 import {
   captureMotionOrigin,
   dismissModal,
@@ -21,6 +23,7 @@ import {
   Route,
   Routes,
   useLocation,
+  type Location,
   useNavigate,
   useParams,
   useSearchParams,
@@ -204,9 +207,15 @@ function TravelApp() {
   const travel = useTravel();
   const auth = useAuth();
   const location = useLocation();
+  const settingsOpen = location.pathname === "/settings";
+  const background = (location.state as { background?: Location } | null)
+    ?.background;
+  const routeLocation = settingsOpen ? (background ?? "/") : location;
+  const routePath =
+    typeof routeLocation === "string" ? routeLocation : routeLocation.pathname;
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
-  }, [location.pathname]);
+  }, [routePath]);
   if (!travel.ready) return <Loading />;
   return (
     <>
@@ -219,9 +228,8 @@ function TravelApp() {
           <button onClick={auth.exitDemo}>終了</button>
         </div>
       )}
-      <Routes>
+      <Routes location={routeLocation}>
         <Route path="/" element={<Home />} />
-        <Route path="/settings" element={<SettingsScreen />} />
         <Route path="/trips/:tripId" element={<TripLayout />}>
           <Route index element={<Navigate to="itinerary" replace />} />
           <Route path="itinerary" element={<ItineraryScreen />} />
@@ -243,6 +251,7 @@ function TravelApp() {
           }
         />
       </Routes>
+      {settingsOpen && <SettingsScreen />}
     </>
   );
 }
@@ -289,6 +298,7 @@ function SyncStatus() {
 function Home() {
   const travel = useTravel();
   const navigate = useNavigate();
+  const location = useLocation();
   const [editing, setEditing] = useState(false);
   const [params, setParams] = useSearchParams();
   const [invite, setInvite] = useState(params.get("invite") ?? "");
@@ -307,24 +317,27 @@ function Home() {
             </button>
           }
           actions={
-            <Link to="/settings" aria-label="設定">
+            <Link
+              to="/settings"
+              state={{ background: location }}
+              aria-label="設定"
+            >
               <Settings size={22} />
             </Link>
           }
         />
       </ThumbDock>
-      <header className="home-header">
-        <Logo />
-        <div className="row">
-          <SyncStatus />
-          <Link className="icon-button" aria-label="設定" to="/settings">
-            <Settings />
-          </Link>
-        </div>
-      </header>
       <main id="main-content" className="page home-page">
         <div className="home-toolbar">
           <h1>旅行</h1>
+          <Link
+            className="icon-button home-settings"
+            to="/settings"
+            state={{ background: location }}
+            aria-label="設定"
+          >
+            <Settings />
+          </Link>
           <Button
             variant="ghost"
             className="primary"
@@ -361,17 +374,28 @@ function Home() {
                   {group.trips.map((trip) => (
                     <Link
                       className="trip-ticket"
+                      data-trip-surface={trip.id}
+                      data-motion-managed
+                      onClick={(event) => {
+                        if (
+                          event.button !== 0 ||
+                          event.metaKey ||
+                          event.ctrlKey ||
+                          event.shiftKey ||
+                          event.altKey
+                        )
+                          return;
+                        event.preventDefault();
+                        startTripTransition(() => {
+                          travel.selectTrip(trip.id);
+                          navigate(`/trips/${trip.id}/itinerary`);
+                        }, trip.id);
+                      }}
                       key={trip.id}
                       to={`/trips/${trip.id}/itinerary`}
                     >
-                      <div
-                        className="trip-photo"
-                        style={
-                          trip.coverImage
-                            ? { backgroundImage: `url(${trip.coverImage})` }
-                            : undefined
-                        }
-                      >
+                      <div className="trip-photo">
+                        <TripCover id={trip.id} src={trip.coverImage ?? ""} />
                         <div className="trip-photo-content">
                           {trip.destination && (
                             <span className="trip-destination">
@@ -526,7 +550,24 @@ function TripLayout() {
     <>
       <header className="trip-header" ref={ref}>
         <div className="trip-heading">
-          <Link className="icon-button" to="/" aria-label="旅行一覧へ戻る">
+          <Link
+            className="icon-button"
+            to="/"
+            aria-label="旅行一覧へ戻る"
+            data-motion-managed
+            onClick={(event) => {
+              if (
+                event.button !== 0 ||
+                event.metaKey ||
+                event.ctrlKey ||
+                event.shiftKey ||
+                event.altKey
+              )
+                return;
+              event.preventDefault();
+              startTripTransition(() => navigate("/"), trip.id, true);
+            }}
+          >
             <ArrowLeft />
           </Link>
           <div className="trip-title">
@@ -562,7 +603,7 @@ function TripLayout() {
           ))}
         </nav>
       </header>
-      <main id="main-content" key={trip.id}>
+      <main id="main-content" key={trip.id} data-trip-surface={trip.id}>
         <Outlet />
       </main>
       <ThumbDock mode="browse">
@@ -619,7 +660,10 @@ function TripLayout() {
                 onClick={() =>
                   closeMenu(() =>
                     navigate("/settings", {
-                      state: { returnTo: location.pathname },
+                      state: {
+                        returnTo: location.pathname,
+                        background: location,
+                      },
                     }),
                   )
                 }
@@ -825,26 +869,17 @@ function SettingsScreen() {
     });
   };
   return (
-    <>
-      <ThumbDock mode="context">
-        <ContextDock
-          back={
-            <Link
-              to={backTo}
-              aria-label={backTo === "/" ? "旅行一覧へ戻る" : "旅行へ戻る"}
-            >
-              <ArrowLeft size={22} />
-            </Link>
-          }
-        />
-      </ThumbDock>
-      <header className="simple-header">
-        <Link className="icon-button" to={backTo} aria-label="戻る">
-          <ArrowLeft />
-        </Link>
-        <h1>設定</h1>
-      </header>
-      <main id="main-content" className="page settings-page">
+    <Modal
+      title="設定"
+      full
+      dockActions={{}}
+      onClose={() => {
+        if ((location.state as { background?: Location } | null)?.background)
+          navigate(-1);
+        else navigate(backTo, { replace: true });
+      }}
+    >
+      <div className="settings-page">
         <Card className="settings-card">
           <h2>アカウント</h2>
           <div className="member-row">
@@ -917,8 +952,8 @@ function SettingsScreen() {
           <LogOut />
           {auth.isDemo ? "サンプルを終了" : "ログアウト"}
         </Button>
-      </main>
-    </>
+      </div>
+    </Modal>
   );
 }
 type InstallEvent = Event & { prompt: () => Promise<void> };

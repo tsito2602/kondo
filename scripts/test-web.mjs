@@ -128,12 +128,45 @@ const click = async (node) => {
   await tick();
 };
 const field = (label) =>
-  [...document.querySelectorAll("dialog label.field")]
+  [...document.querySelectorAll("dialog .field")]
     .find((node) => node.querySelector("span")?.textContent === label)
-    ?.querySelector("input,select,textarea");
+    ?.querySelector("input,select,textarea,.date-trigger");
 const fill = async (label, value) => {
   const input = field(label);
   assert.ok(input, `field ${label} exists`);
+  if (input.matches(".date-trigger")) {
+    await click(input);
+    const yearInput = document.querySelector(
+      'dialog:last-of-type [aria-label="年を入力"]',
+    );
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        dom.window.HTMLInputElement.prototype,
+        "value",
+      ).set.call(yearInput, value.slice(0, 4));
+      yearInput.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    });
+    await act(async () =>
+      yearInput.dispatchEvent(
+        new dom.window.FocusEvent("focusout", { bubbles: true }),
+      ),
+    );
+    const first = document.querySelector("dialog:last-of-type [data-date]");
+    const difference =
+      Number(value.slice(5, 7)) - Number(first.dataset.date.slice(5, 7));
+    for (let index = 0; index < Math.abs(difference); index++)
+      await click(
+        document.querySelector(
+          `dialog:last-of-type [aria-label="${difference > 0 ? "次の月" : "前の月"}"]`,
+        ),
+      );
+    await click(
+      document.querySelector(`dialog:last-of-type [data-date="${value}"]`),
+    );
+    await click(byText(".context-primary button", "決定"));
+    await tick(30);
+    return;
+  }
   const proto =
     input instanceof dom.window.HTMLSelectElement
       ? dom.window.HTMLSelectElement.prototype
@@ -485,7 +518,7 @@ test("legacy account cache and pending changes survive React migration; real for
       "",
     );
     await click(deadlineToggle());
-    assert.equal(field("期限").required, true);
+    assert.equal(field("期限").getAttribute("aria-required"), "true");
     await submit();
     assert.match(
       document.querySelector("dialog .error").textContent,
@@ -501,12 +534,12 @@ test("legacy account cache and pending changes survive React migration; real for
       byText(".check-content strong", "チケットを予約").closest("button"),
     );
     assert.equal(deadlineToggle().checked, true);
-    assert.equal(field("期限").value, "2026-11-20");
+    assert.equal(field("期限").dataset.dateValue, "2026-11-20");
     await click(deadlineToggle());
     assert.equal(field("期限"), undefined);
     await click(deadlineToggle());
     assert.equal(
-      field("期限").value,
+      field("期限").dataset.dateValue,
       "2026-11-20",
       "temporary toggle keeps the draft date",
     );
@@ -568,9 +601,12 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(byText(".trip-menu-popover button", "設定"));
     await tick(30);
     assert.equal(document.querySelector(".trip-menu-popover"), null);
-    await click(
-      document.querySelector('.context-back [aria-label="旅行へ戻る"]'),
-    );
+    const settingsBackground = document.querySelector("#main-content");
+    assert.equal(document.querySelector("dialog h2").textContent, "設定");
+    assert.ok(document.querySelector("dialog.full .settings-page"));
+    await click(document.querySelector('.context-back [aria-label="戻る"]'));
+    await tick(30);
+    assert.equal(document.querySelector("#main-content"), settingsBackground);
     assert.ok(document.querySelector(".trip-title"));
     await click(
       document.querySelector('.trip-heading [aria-label="旅行一覧へ戻る"]'),
@@ -582,9 +618,8 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.equal(document.querySelector(".context-back"), null);
     await click(document.querySelector('.context-actions [aria-label="設定"]'));
     assert.equal(document.querySelectorAll(".context-island").length, 1);
-    await click(
-      document.querySelector('.context-back [aria-label="旅行一覧へ戻る"]'),
-    );
+    await click(document.querySelector('.context-back [aria-label="戻る"]'));
+    await tick(30);
     await click(byText(".context-primary button", "旅行を作成"));
     assert.equal(
       document.querySelector('.context-primary button[type="submit"]').form,
