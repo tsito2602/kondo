@@ -1661,6 +1661,91 @@ progress::-moz-progress-bar {
   margin-top: 4px;
   min-height: 48px;
 }
+.form.place-form {
+  gap: 16px;
+}
+.place-form .field {
+  gap: 6px;
+}
+.place-form .field textarea {
+  min-height: 80px;
+}
+.place-links {
+  min-width: 0;
+}
+.place-links legend {
+  margin-bottom: 8px;
+}
+.place-form .place-link-add {
+  min-height: 44px;
+  padding: 8px 14px;
+  font-size: 12px;
+}
+.place-link-add svg {
+  width: 16px;
+  height: 16px;
+}
+.place-links .link-input {
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-field);
+  background: var(--soft);
+}
+.place-links .link-input .field:nth-child(2) {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+.place-links .link-input > button {
+  grid-column: 2;
+  grid-row: 1;
+  width: 44px;
+  height: 46px;
+}
+.place-options {
+  border-top: 1px solid var(--line);
+}
+.place-options > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  cursor: pointer;
+  list-style: none;
+  min-height: 56px;
+}
+.place-options > summary::-webkit-details-marker {
+  display: none;
+}
+.place-options summary strong,
+.place-options summary small {
+  display: block;
+}
+.place-options summary strong {
+  font-size: 12px;
+  font-weight: 550;
+}
+.place-options summary small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.place-options summary > svg {
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: transform 180ms var(--ease-flow);
+}
+.place-options[open] summary > svg {
+  transform: rotate(180deg);
+}
+.place-options-fields {
+  display: grid;
+  gap: 14px;
+  padding-bottom: 4px;
+}
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -471,7 +471,35 @@ test("legacy account cache and pending changes survive React migration; real for
     await tick(30);
     await click(byText("nav a", "行きたい場所"));
     await click(document.querySelector('[aria-label="場所を追加"]'));
+    assert.equal(document.querySelector(".place-options").open, false);
+    assert.equal(field("訪問ステータス").value, "want");
+    assert.equal(field("予約状況").value, "not_needed");
+    assert.notEqual(
+      document.activeElement,
+      field("場所の名前"),
+      "opening does not activate the keyboard",
+    );
     await fill("場所の名前", "美術館");
+    await fill("メモ", "見たい展示");
+    await click(document.querySelector(".place-options summary"));
+    await fill("営業時間", "10:00〜18:00");
+    await fill("予約状況", "needed");
+    await click(document.querySelector(".place-options summary"));
+    assert.equal(document.querySelector(".place-options").open, false);
+    assert.match(
+      document.querySelector(".place-options summary").textContent,
+      /要予約/,
+    );
+    await click(byText("dialog button", "リンクを追加"));
+    await fill("URL", "https://example.com/museum");
+    await fill("名前", "公式サイト");
+    await click(byText("dialog button", "リンクを追加"));
+    await click(document.querySelectorAll('[aria-label="リンクを削除"]')[1]);
+    assert.equal(
+      field("URL").value,
+      "https://example.com/museum",
+      "removing a new link preserves the existing link",
+    );
     await submit();
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM places").get().n, 1);
     await click([...document.querySelectorAll(".place-card-main")][0]);
@@ -479,6 +507,16 @@ test("legacy account cache and pending changes survive React migration; real for
       document.querySelector('.context-actions [aria-label="場所を削除"]'),
     );
     await editAndReturn("場所の名前", "更新した美術館");
+    const savedPlace = db
+      .prepare("SELECT note, opening_hours, reservation_status FROM places")
+      .get();
+    assert.equal(savedPlace.note, "見たい展示");
+    assert.equal(savedPlace.opening_hours, "10:00〜18:00");
+    assert.equal(
+      savedPlace.reservation_status,
+      "needed",
+      "collapsed options survive saving and editing the name",
+    );
     assert.equal(document.querySelector(".thumb-dock-host .safari-tabs"), null);
     const placeDetail = document.querySelector("dialog[open]");
     await click(byText(".context-primary button", "しおりへ追加"));
@@ -509,6 +547,12 @@ test("legacy account cache and pending changes survive React migration; real for
     globalThis.confirm = () => true;
     await click(document.querySelector('.context-actions [aria-label="編集"]'));
     assert.ok(document.querySelector('.context-primary button[type="submit"]'));
+    assert.equal(
+      document.querySelector(".place-options").open,
+      true,
+      "existing additional information starts expanded",
+    );
+    assert.equal(field("URL").value, "https://example.com/museum");
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
     assert.equal(

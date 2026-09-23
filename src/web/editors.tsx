@@ -4,7 +4,7 @@ import { Button } from "./obsidian/button";
 import { Input } from "./obsidian/input";
 import { Textarea } from "./obsidian/textarea";
 import { type FormEvent, useRef, useState } from "react";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, ChevronDown } from "lucide-react";
 import { findAirports } from "@/data/airports";
 import { findMatchingItineraryItem } from "@/data/booking-match";
 import { useTravel } from "@/data/travel-provider";
@@ -687,6 +687,13 @@ export function PlaceEditor({
     referenceLinks: place?.referenceLinks ?? [],
     itineraryItemId: place?.itineraryItemId,
   });
+  const [detailsOpen, setDetailsOpen] = useState(
+    Boolean(
+      place?.openingHours ||
+      (place &&
+        (place.status !== "want" || place.reservationStatus !== "not_needed")),
+    ),
+  );
   const { error, busy, submit } = useSubmit(
     () => {
       if (place) travel.updatePlace(place.id, draft);
@@ -708,10 +715,11 @@ export function PlaceEditor({
       onClose={onClose}
       full
     >
-      <form className="form" onSubmit={submit}>
+      <form className="form place-form" onSubmit={submit}>
         <Field label="場所の名前">
           <Input
             required
+            placeholder="お店やスポットの名前"
             maxLength={160}
             value={draft.title}
             onChange={(event) =>
@@ -719,84 +727,39 @@ export function PlaceEditor({
             }
           />
         </Field>
-        <div className="form-grid">
-          <Field label="訪問ステータス">
-            <select
-              value={draft.status}
-              onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  status: event.target.value as Place["status"],
-                })
-              }
-            >
-              {placeStatuses.map((entry) => (
-                <option key={entry.value} value={entry.value}>
-                  {entry.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="予約状況">
-            <select
-              value={draft.reservationStatus}
-              onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  reservationStatus: event.target
-                    .value as Place["reservationStatus"],
-                })
-              }
-            >
-              {reservationStatuses.map((entry) => (
-                <option key={entry.value} value={entry.value}>
-                  {entry.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
         <Field label="住所・Google MapsのURL">
           <Input
             maxLength={2000}
+            placeholder="住所または地図のリンクを貼り付け"
+            autoCapitalize="none"
+            autoCorrect="off"
             value={draft.location}
             onChange={(event) =>
               setDraft({ ...draft, location: event.target.value })
             }
           />
         </Field>
-        <Field label="営業時間">
-          <Input
-            maxLength={500}
-            value={draft.openingHours}
+        <Field label="メモ">
+          <Textarea
+            rows={3}
+            placeholder="気になること、食べたいものなど"
+            value={draft.note}
+            maxLength={4000}
             onChange={(event) =>
-              setDraft({ ...draft, openingHours: event.target.value })
+              setDraft({ ...draft, note: event.target.value })
             }
           />
         </Field>
-        <fieldset>
+        <fieldset className="place-links">
           <legend>参照リンク</legend>
           {draft.referenceLinks.map((link, index) => (
             <div className="link-input" key={index}>
-              <Field label="名前">
-                <Input
-                  maxLength={120}
-                  value={link.label}
-                  onChange={(event) =>
-                    setDraft({
-                      ...draft,
-                      referenceLinks: draft.referenceLinks.map((entry, i) =>
-                        i === index
-                          ? { ...entry, label: event.target.value }
-                          : entry,
-                      ),
-                    })
-                  }
-                />
-              </Field>
               <Field label="URL">
                 <Input
                   type="url"
+                  placeholder="https://"
+                  autoCapitalize="none"
+                  autoCorrect="off"
                   required
                   maxLength={2000}
                   value={link.url}
@@ -806,6 +769,23 @@ export function PlaceEditor({
                       referenceLinks: draft.referenceLinks.map((entry, i) =>
                         i === index
                           ? { ...entry, url: event.target.value }
+                          : entry,
+                      ),
+                    })
+                  }
+                />
+              </Field>
+              <Field label="名前">
+                <Input
+                  maxLength={120}
+                  placeholder="公式サイトなど（任意）"
+                  value={link.label}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      referenceLinks: draft.referenceLinks.map((entry, i) =>
+                        i === index
+                          ? { ...entry, label: event.target.value }
                           : entry,
                       ),
                     })
@@ -833,7 +813,7 @@ export function PlaceEditor({
           <Button
             variant="ghost"
             type="button"
-            className="secondary"
+            className="secondary place-link-add"
             disabled={draft.referenceLinks.length >= 20}
             onClick={() =>
               setDraft({
@@ -849,16 +829,79 @@ export function PlaceEditor({
             リンクを追加
           </Button>
         </fieldset>
-        <Field label="メモ">
-          <Textarea
-            rows={5}
-            value={draft.note}
-            maxLength={4000}
-            onChange={(event) =>
-              setDraft({ ...draft, note: event.target.value })
-            }
-          />
-        </Field>
+        <details
+          className="place-options"
+          open={detailsOpen}
+          onToggle={(event) => setDetailsOpen(event.currentTarget.open)}
+        >
+          <summary>
+            <span>
+              <strong>営業時間・ステータス</strong>
+              <small>
+                {
+                  placeStatuses.find((entry) => entry.value === draft.status)
+                    ?.label
+                }{" "}
+                ·{" "}
+                {
+                  reservationStatuses.find(
+                    (entry) => entry.value === draft.reservationStatus,
+                  )?.label
+                }
+                {draft.openingHours ? " · 営業時間あり" : ""}
+              </small>
+            </span>
+            <ChevronDown size={18} aria-hidden="true" />
+          </summary>
+          <div className="place-options-fields">
+            <Field label="営業時間">
+              <Input
+                maxLength={500}
+                value={draft.openingHours}
+                onChange={(event) =>
+                  setDraft({ ...draft, openingHours: event.target.value })
+                }
+              />
+            </Field>
+            <div className="form-grid">
+              <Field label="訪問ステータス">
+                <select
+                  value={draft.status}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      status: event.target.value as Place["status"],
+                    })
+                  }
+                >
+                  {placeStatuses.map((entry) => (
+                    <option key={entry.value} value={entry.value}>
+                      {entry.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="予約状況">
+                <select
+                  value={draft.reservationStatus}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      reservationStatus: event.target
+                        .value as Place["reservationStatus"],
+                    })
+                  }
+                >
+                  {reservationStatuses.map((entry) => (
+                    <option key={entry.value} value={entry.value}>
+                      {entry.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+          </div>
+        </details>
         <ErrorText message={error} />
         <SaveButton busy={busy} />
       </form>
