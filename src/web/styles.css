@@ -1225,8 +1225,8 @@ strong {
 }
 .ticket-main .ticket-date-summary {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 2px 8px;
   margin-top: auto;
   padding-top: 8px;
@@ -3356,6 +3356,17 @@ input::-webkit-date-and-time-value {
 }
 .date-trigger > span {
   min-width: 0;
+}
+.date-trigger-value {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-self: flex-start;
+  gap: 3px;
+}
+.date-trigger-time {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .date-trigger small {
   display: block;

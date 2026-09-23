@@ -52,18 +52,22 @@ export function DatePicker(props: PickerProps) {
         onClick={() => setOpen(true)}
       >
         <CalendarDays size={20} aria-hidden="true" />
-        <span>
-          <small>{props.range ? (props.startLabel ?? "出発日") : ""}</small>
-          {displayDate(props.value)}
-          {props.showTime && props.startTime ? ` ${props.startTime}` : ""}
+        <span className="date-trigger-value">
+          {props.range && <small>{props.startLabel ?? "出発日"}</small>}
+          <span>{displayDate(props.value)}</span>
+          {props.showTime && props.startTime && (
+            <span className="date-trigger-time">{props.startTime}</span>
+          )}
         </span>
         {props.range && (
           <>
             <span aria-hidden="true">—</span>
-            <span>
+            <span className="date-trigger-value">
               <small>{props.endLabel ?? "帰着日"}</small>
-              {displayDate(props.endValue ?? "")}
-              {props.showTime && props.endTime ? ` ${props.endTime}` : ""}
+              <span>{displayDate(props.endValue ?? "")}</span>
+              {props.showTime && props.endTime && (
+                <span className="date-trigger-time">{props.endTime}</span>
+              )}
             </span>
           </>
         )}
