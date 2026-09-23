@@ -17,8 +17,8 @@ export function menuDepth(
     : Array.from(
         document.querySelectorAll<HTMLElement>(
           foreground
-            ? "#root > header, #root > .demo-banner, #main-content"
-            : "#root > header, #root > .demo-banner, #main-content, body > .thumb-dock-host .thumb-dock",
+            ? "#root > header, #root > .demo-banner, #main-content, body > .persistent-add:not([hidden])"
+            : "#root > header, #root > .demo-banner, #main-content, body > .thumb-dock-host .thumb-dock, body > .persistent-add:not([hidden])",
         ),
       );
   const restore: (() => void)[] = [];

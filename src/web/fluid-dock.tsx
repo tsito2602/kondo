@@ -349,7 +349,7 @@ export function FluidDockSurface({
   const shape = useRef<{ islands: DockIsland[]; tension: number } | null>(null);
   const target = useRef("");
   const width = useRef(0);
-  const height = useRef(48);
+  const height = useRef(56);
   const frame = useRef(0);
   const morph = useRef<{
     from: DockIsland[];
@@ -467,7 +467,7 @@ export function FluidDockSurface({
           `.context-island.context-${role}`,
         ) ?? null,
     );
-    const h = node.clientHeight || 48;
+    const h = node.clientHeight || 56;
     const radius = h / 2;
     let islands: DockIsland[];
     if (tabs) {

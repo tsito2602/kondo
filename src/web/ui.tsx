@@ -30,6 +30,7 @@ import {
   ThumbDock,
   ContextDock,
   ThumbAction,
+  FloatingAddAction,
   ThumbFormContext,
   useThumbForm,
 } from "./thumb-dock";
@@ -422,14 +423,17 @@ export function AddButton({
   floating?: boolean;
 }) {
   return (
-    <Button
-      className={floating ? "floating-add" : "primary add-action"}
-      onClick={onClick}
-      aria-label={label}
-    >
-      <Plus />
-      <span>{label}</span>
-    </Button>
+    <>
+      <FloatingAddAction label={label} onClick={onClick} />
+      <Button
+        className={`page-add ${floating ? "floating-add" : "primary add-action"}`}
+        onClick={onClick}
+        aria-label={label}
+      >
+        <Plus />
+        <span>{label}</span>
+      </Button>
+    </>
   );
 }
 export function ErrorText({ message }: { message: string }) {

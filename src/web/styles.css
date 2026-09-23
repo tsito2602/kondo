@@ -36,8 +36,9 @@
   --dock-glass: color-mix(in srgb, var(--paper) 18%, transparent);
   --dock-bottom-gap: 32px;
   --control-size: 44px;
-  --dock-height: 48px;
+  --dock-height: 56px;
   --menu-glass: color-mix(in srgb, var(--paper) 68%, transparent);
+  --dock-accent: color-mix(in srgb, var(--brand) 90%, transparent);
   --dock-on-accent: #fff;
   --dock-max-width: 420px;
   --dock-border: #20232612;
@@ -408,6 +409,9 @@ strong {
 }
 .empty p {
   font-size: 13px;
+}
+.floating-add.persistent-add {
+  display: none;
 }
 .floating-add {
   position: fixed;
@@ -1990,6 +1994,17 @@ input::-webkit-date-and-time-value {
   view-transition-name: route-content;
   background: var(--canvas);
 }
+::view-transition-group(floating-add) {
+  animation: none;
+  z-index: 1;
+}
+::view-transition-old(floating-add) {
+  display: none;
+}
+::view-transition-new(floating-add) {
+  animation: none;
+  mix-blend-mode: normal;
+}
 ::view-transition-group(route-content) {
   animation: none;
   transform: none;
@@ -2786,7 +2801,7 @@ input::-webkit-date-and-time-value {
   .fluid-dock-accent {
     position: absolute;
     inset: 0;
-    background: color-mix(in srgb, var(--brand) 90%, transparent);
+    background: var(--dock-accent);
     opacity: 0;
   }
   .safari-left {
@@ -2961,8 +2976,7 @@ input::-webkit-date-and-time-value {
     transform: translateY(0);
     transition-delay: 100ms;
   }
-  :root:has(.thumb-dock-host) .page-toolbar .add-action,
-  :root:has(.thumb-dock-host) .floating-add {
+  :root:has(.thumb-dock-host) .persistent-add:not([hidden]) {
     position: fixed;
     right: max(18px, env(safe-area-inset-right));
     bottom: calc(
@@ -2979,9 +2993,11 @@ input::-webkit-date-and-time-value {
     align-items: center;
     justify-content: center;
     box-shadow: 0 5px 20px #10203022;
+    background: var(--dock-accent);
+    color: var(--dock-on-accent);
+    view-transition-name: floating-add;
   }
-  :root:has(.thumb-dock-host) .page-toolbar .add-action span,
-  :root:has(.thumb-dock-host) .floating-add span {
+  :root:has(.thumb-dock-host) .page-add {
     display: none;
   }
   :root:has(.thumb-dock-host) .page,
@@ -2994,6 +3010,7 @@ input::-webkit-date-and-time-value {
 @media (prefers-reduced-transparency: reduce) {
   :root {
     --menu-glass: var(--paper);
+    --dock-accent: var(--brand);
   }
   .fluid-dock-accent {
     background: var(--brand);

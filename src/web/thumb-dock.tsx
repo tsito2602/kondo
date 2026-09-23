@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { Plus } from "lucide-react";
 import { DockContent } from "./dock-content";
 import { FluidDockSurface, type FluidDockHandle } from "./fluid-dock";
 
@@ -27,10 +28,11 @@ type DockNavigation = {
 };
 export const SharedDockSurfaceContext = createContext(false);
 export const DockNavigationContext = createContext<DockNavigation | null>(null);
+type AddAction = { label: string; onClick: () => void };
 type Entry = {
-  value: DockEntry | ReactNode;
+  value: DockEntry | AddAction | ReactNode;
   order: number;
-  scope: "dock" | "action";
+  scope: "dock" | "action" | "add";
 };
 const Registry = createContext<{
   put: (id: string, scope: Entry["scope"], value: Entry["value"]) => void;
@@ -74,6 +76,8 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
   const ordered = [...entries.values()].sort((a, b) => a.order - b.order);
   const activeEntry = ordered.filter((entry) => entry.scope === "dock").at(-1);
   const active = activeEntry?.value as DockEntry | undefined;
+  const add = ordered.filter((entry) => entry.scope === "add").at(-1)?.value as
+    AddAction | undefined;
   const browse = ordered
     .filter(
       (entry) =>
@@ -104,6 +108,17 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
     <Registry.Provider value={registry}>
       <Actions.Provider value={actions}>
         {children}
+        {createPortal(
+          <button
+            className="floating-add persistent-add"
+            hidden={!add}
+            aria-label={add?.label}
+            onClick={add?.onClick}
+          >
+            <Plus />
+          </button>,
+          document.body,
+        )}
         {createPortal(
           <SharedDockSurfaceContext.Provider value={true}>
             <DockNavigationContext.Provider value={active?.navigation ?? null}>
@@ -154,6 +169,11 @@ export function ThumbAction({ children }: PropsWithChildren) {
       {children}
     </span>,
   );
+  return null;
+}
+/** The mobile button stays mounted while each page supplies its current action. */
+export function FloatingAddAction(props: AddAction) {
+  useEntry("add", props);
   return null;
 }
 export function ThumbActions() {

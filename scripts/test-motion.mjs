@@ -34,7 +34,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -54,6 +54,7 @@ new Function("require", "module", "exports", outputFiles[0].text)(
 const {
   menuDepth,
   Modal,
+  AddButton,
   installPressFeedback,
   AppRouter,
   useItineraryScroll,
@@ -1571,15 +1572,15 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
   const w = 366;
   function box(element) {
     const context = element.closest(".context-dock");
-    const back = context?.querySelector(".context-back") ? 48 : 0;
-    const actions = context?.querySelector(".context-actions") ? 96 : 0;
+    const back = context?.querySelector(".context-back") ? 56 : 0;
+    const actions = context?.querySelector(".context-actions") ? 112 : 0;
     if (element.classList.contains("context-back"))
       return { left: 0, width: back };
     if (element.classList.contains("context-actions"))
       return { left: w - actions, width: actions };
     if (element.classList.contains("context-primary"))
       return {
-        left: back ? 58 : 0,
+        left: back ? 66 : 0,
         width: w - back - actions - (back ? 10 : 0) - (actions ? 10 : 0),
       };
     return { left: 0, width: w };
@@ -1597,7 +1598,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
     },
   });
   HTMLElement.prototype.getBoundingClientRect = function () {
-    return { ...box(this), top: 0, bottom: 48, height: 48 };
+    return { ...box(this), top: 0, bottom: 56, height: 56 };
   };
   globalThis.requestAnimationFrame = (callback) => {
     pending.set(++sequence, callback);
@@ -1640,7 +1641,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
     assert.ok(initial);
     assert.equal(
       material.querySelector("svg").getAttribute("viewBox"),
-      `0 0 ${w + 24} 72`,
+      `0 0 ${w + 24} 80`,
     );
     await act(async () => setMode("place"));
     assert.equal(border.getAttribute("d"), initial, "no jump on registration");
@@ -1661,7 +1662,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
     assert.equal(pending.size, 1, "only the new animation remains active");
     advance(820);
     const settings = dockSlots(w, [
-      { left: 0, width: 48, radius: 24 },
+      { left: 0, width: 56, radius: 28 },
       null,
       null,
     ]);
@@ -1672,7 +1673,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
         settings.map((island) => ({ ...island, left: island.left + 12 })),
         0,
         [],
-        36,
+        40,
       ),
     );
     assert.equal(pending.size, 0);
@@ -1697,7 +1698,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
         settings.map((island) => ({ ...island, left: island.left + 12 })),
         0,
         [],
-        36,
+        40,
       ),
     );
     await act(async () => pointer(button, "pointerup"));
@@ -2111,5 +2112,71 @@ test("a foreground panel leaves the dock sharp and a nested panel only recedes i
     main.remove();
     first.remove();
     dockHost.remove();
+  }
+});
+
+test("the mobile add button survives page replacement and uses the current page action", async () => {
+  const h = React.createElement;
+  const root = createRoot(document.getElementById("root"));
+  let change;
+  const clicked = [];
+  function Harness() {
+    const [page, setPage] = React.useState("予定");
+    change = setPage;
+    return h(
+      ThumbDockProvider,
+      null,
+      h(
+        "main",
+        { id: "main-content" },
+        page &&
+          h(AddButton, {
+            key: page,
+            label: page + "を追加",
+            onClick: () => clicked.push(page),
+          }),
+      ),
+    );
+  }
+  try {
+    await act(async () => root.render(h(Harness)));
+    const button = document.querySelector(".persistent-add");
+    assert.equal(
+      button.parentElement,
+      document.body,
+      "outside the moving route",
+    );
+    for (const page of ["予定", "予約", "場所", "メモ", "予定"]) {
+      await act(async () => change(page));
+      assert.equal(document.querySelector(".persistent-add"), button);
+      assert.equal(button.hidden, false);
+      assert.equal(button.getAttribute("aria-label"), page + "を追加");
+      await act(async () => button.click());
+      assert.equal(clicked.at(-1), page);
+    }
+    await act(async () => change(null));
+    assert.equal(
+      button.hidden,
+      true,
+      "viewer/no-add pages expose no stale action",
+    );
+    await act(async () => change("予約"));
+    assert.equal(document.querySelector(".persistent-add"), button);
+    assert.equal(button.hidden, false);
+    const css = await readFile("src/web/styles.css", "utf8");
+    assert.match(
+      css,
+      /::view-transition-group\(floating-add\)\s*\{[^}]*animation: none/,
+    );
+    assert.match(
+      css,
+      /::view-transition-old\(floating-add\)\s*\{[^}]*display: none/,
+    );
+    assert.match(
+      css,
+      /::view-transition-new\(floating-add\)\s*\{[^}]*animation: none/,
+    );
+  } finally {
+    await act(async () => root.unmount());
   }
 });
