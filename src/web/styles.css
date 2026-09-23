@@ -92,6 +92,20 @@ body {
 #root {
   min-height: 100dvh;
 }
+/* Every route paints the whole reading area, including a short/empty memo
+   page. Otherwise a taller outgoing snapshot survives below the new page. */
+#root:has(> #main-content) {
+  display: flex;
+  flex-direction: column;
+}
+#root > #main-content {
+  flex: 1 0 auto;
+  width: 100%;
+}
+#root > header,
+#root > .demo-banner {
+  flex-shrink: 0;
+}
 /* The viewport uses contain: the browser owns the device safe area.
    Do not add the top inset again to individual headers or the demo banner. */
 button,
@@ -1944,11 +1958,19 @@ input::-webkit-date-and-time-value {
 }
 ::view-transition {
   pointer-events: none;
+  clip-path: inset(
+    max(
+        var(--route-old-header-bottom, 0px),
+        var(--route-new-header-bottom, 0px)
+      )
+      0 var(--route-clip-bottom, 0px) 0
+  );
 }
-/* The outgoing surface stays opaque beneath the incoming one. There is never
-   a frame with both surfaces faded down, nor a second entry animation afterward. */
+/* Fade every outgoing pixel to zero before its snapshot is removed, including
+   pixels outside the incoming page's bounds. No opaque fragments snap away. */
 @keyframes route-out {
   to {
+    opacity: 0;
     transform: translateX(calc(-12px * var(--route-direction)));
   }
 }
@@ -2000,9 +2022,7 @@ input::-webkit-date-and-time-value {
      fixed nav. Keep their snapshots out of its entire safe-area-aware footprint
      so the live nav and its moving selection indicator remain visible. */
   :root:has(.trip-tabs)::view-transition {
-    clip-path: inset(
-      0 0 calc(var(--nav-height) + env(safe-area-inset-bottom)) 0
-    );
+    --route-clip-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom));
   }
   .page {
     padding: 24px 16px
@@ -2371,9 +2391,7 @@ input::-webkit-date-and-time-value {
     --nav-height: calc(var(--dock-height) + 12px + var(--dock-bottom-gap));
   }
   :root:has(.thumb-dock-host:not([hidden]))::view-transition {
-    clip-path: inset(
-      0 0 calc(var(--nav-height) + env(safe-area-inset-bottom)) 0
-    );
+    --route-clip-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom));
   }
   .thumb-dock-host:not([hidden]) {
     --dock-fade-color: var(--canvas);

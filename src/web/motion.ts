@@ -106,6 +106,15 @@ export function startRouteTransition(update: () => void) {
         `${bounds?.[property] ?? 0}px`,
       );
     }
+    // View-transition snapshots paint above sticky/fixed chrome regardless of
+    // its z-index. Keep scrolled itinerary pixels out of the live header.
+    const header = document.querySelector<HTMLElement>(
+      ".trip-header, .home-header, .simple-header",
+    );
+    document.documentElement.style.setProperty(
+      `--route-${side}-header-bottom`,
+      `${Math.max(0, header?.getBoundingClientRect().bottom ?? 0)}px`,
+    );
   };
   capture("old");
   const transition = document.startViewTransition(() => {

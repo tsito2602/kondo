@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createRequire } from "node:module";
+import { readFile } from "node:fs/promises";
 import { build } from "esbuild";
 import sharp from "sharp";
 import { JSDOM } from "jsdom";
@@ -215,6 +216,8 @@ test("real router commits the new page inside the snapshot update, retaining the
   const root = createRoot(document.getElementById("root"));
   const originalBounds = HTMLElement.prototype.getBoundingClientRect;
   HTMLElement.prototype.getBoundingClientRect = function () {
+    if (this.tagName === "HEADER")
+      return { bottom: this.textContent === "/bookings" ? 108 : 72 };
     return this.textContent === "/bookings"
       ? { top: 72, left: 0, width: 390, height: 500 }
       : { top: -1200, left: 0, width: 390, height: 3000 };
@@ -235,9 +238,14 @@ test("real router commits the new page inside the snapshot update, retaining the
     const navigate = useNavigate();
     go = () => startRouteTransition(() => navigate("/bookings"));
     return React.createElement(
-      "main",
-      { id: "main-content" },
-      location.pathname,
+      React.Fragment,
+      null,
+      React.createElement(
+        "header",
+        { className: "trip-header" },
+        location.pathname,
+      ),
+      React.createElement("main", { id: "main-content" }, location.pathname),
     );
   }
   try {
@@ -266,12 +274,34 @@ test("real router commits the new page inside the snapshot update, retaining the
     });
     assert.equal(style.getPropertyValue("--route-old-top"), "-1200px");
     assert.equal(style.getPropertyValue("--route-old-height"), "3000px");
+    assert.equal(style.getPropertyValue("--route-old-header-bottom"), "72px");
+    assert.equal(style.getPropertyValue("--route-new-header-bottom"), "108px");
   } finally {
     await act(async () => root.unmount());
     document.startViewTransition = nativeStart;
     HTMLElement.prototype.getBoundingClientRect = originalBounds;
     window.history.replaceState(null, "", "/");
   }
+});
+
+test("route layers cover short pages, clip header and dock, and leave no opaque outgoing fragments", async () => {
+  const css = await readFile("src/web/styles.css", "utf8");
+  assert.match(
+    css,
+    /#root:has\(> #main-content\)\s*\{[^}]*display: flex;[^}]*flex-direction: column;/,
+  );
+  assert.match(css, /#root > #main-content\s*\{[^}]*flex: 1 0 auto;/);
+  assert.match(
+    css,
+    /::view-transition\s*\{[^}]*clip-path: inset\([^}]*--route-old-header-bottom[^}]*--route-new-header-bottom[^}]*--route-clip-bottom/,
+  );
+  assert.match(css, /@keyframes route-out\s*\{\s*to\s*\{[^}]*opacity: 0;/);
+  assert.equal((css.match(/clip-path: inset\(/g) ?? []).length >= 1, true);
+  // Mobile dock rules may supply a bottom inset, but must not replace the top clip.
+  assert.doesNotMatch(
+    css,
+    /:root:has\([^}]+::view-transition\s*\{[^}]*clip-path:/,
+  );
 });
 
 test("dialog reverses its retained timeline and backdrop before dismissing, including interrupted opening and Save", async () => {
