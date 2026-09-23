@@ -220,8 +220,25 @@ const keyboardWhileEditing = async () => {
   const dialog = [...document.querySelectorAll("dialog[open]")].at(-1);
   const dock = document.querySelector(".thumb-dock-host");
   const field = dialog.querySelector('input:not([type="checkbox"]), textarea');
+  const panel = dialog.querySelector(".modal-inner");
+  const header = panel.querySelector(".modal-header");
+  const measurePanel = panel.getBoundingClientRect;
+  const measureHeader = header.getBoundingClientRect;
+  const measureField = field.getBoundingClientRect;
+  panel.getBoundingClientRect = () => ({
+    top: visualViewport.offsetTop,
+    bottom: visualViewport.offsetTop + visualViewport.height - 100,
+  });
+  header.getBoundingClientRect = () => ({
+    bottom: visualViewport.offsetTop + 56,
+  });
+  field.getBoundingClientRect = () => ({
+    top: visualViewport.offsetTop + 380 - panel.scrollTop,
+    bottom: visualViewport.offsetTop + 426 - panel.scrollTop,
+  });
   await act(async () => field.focus());
   for (const offsetTop of [0, 64, 112]) {
+    panel.scrollTop = 0;
     await act(async () => {
       visualViewport.height = 340;
       visualViewport.offsetTop = offsetTop;
@@ -236,9 +253,18 @@ const keyboardWhileEditing = async () => {
       document.documentElement.style.getPropertyValue("--modal-top"),
       offsetTop + "px",
     );
+    await tick(30);
+    assert.equal(
+      panel.scrollTop,
+      198,
+      "viewport resize reveals the focused field above the dock",
+    );
     assert.equal(dock.parentElement, dialog);
     assert.ok(dock.querySelector('button[type="submit"]'));
   }
+  panel.getBoundingClientRect = measurePanel;
+  header.getBoundingClientRect = measureHeader;
+  field.getBoundingClientRect = measureField;
   await act(async () => {
     field.blur();
     visualViewport.height = window.innerHeight;

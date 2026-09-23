@@ -34,7 +34,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { PlaceCard } from './src/web/place-card'; export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { PlaceCard } from './src/web/place-card'; export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset, revealModalField } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -78,6 +78,7 @@ const {
   ContextDock,
   animateDockPress,
   dockKeyboardInset,
+  revealModalField,
   SaveButton,
   dismissModal,
   useMotionNavigation,
@@ -2850,5 +2851,65 @@ test("card contact scales the whole surface, keeps actions independent and relea
   } finally {
     cleanup();
     host.remove();
+  }
+});
+
+test("focused modal fields remain between the sticky header and panel bottom after keyboard resize", () => {
+  const dialog = document.createElement("dialog");
+  dialog.open = true;
+  dialog.innerHTML =
+    '<div class="modal-inner"><header class="modal-header"></header><label class="field"><textarea></textarea></label></div>';
+  document.body.append(dialog);
+  const panel = dialog.firstElementChild;
+  const header = panel.firstElementChild;
+  const field = panel.lastElementChild;
+  const input = field.firstElementChild;
+  let panelTop = 64;
+  let panelBottom = 340;
+  let inputTop = 420;
+  let inputHeight = 80;
+  panel.getBoundingClientRect = () => ({ top: panelTop, bottom: panelBottom });
+  header.getBoundingClientRect = () => ({ bottom: panelTop + 56 });
+  input.getBoundingClientRect = () => ({
+    top: inputTop - panel.scrollTop,
+    bottom: inputTop + inputHeight - panel.scrollTop,
+  });
+  field.getBoundingClientRect = () => ({
+    top: inputTop - 24 - panel.scrollTop,
+  });
+  try {
+    revealModalField(input);
+    assert.equal(
+      panel.scrollTop,
+      172,
+      "lower field and label clear the panel bottom",
+    );
+    revealModalField(input);
+    assert.equal(panel.scrollTop, 172, "visible field does not move again");
+    panelBottom = 280;
+    revealModalField(input);
+    assert.equal(panel.scrollTop, 232, "follows the keyboard's later resize");
+    inputTop = 270;
+    revealModalField(input);
+    assert.equal(panel.scrollTop, 114, "previous field clears sticky header");
+    inputHeight = 400;
+    revealModalField(input);
+    assert.equal(
+      panel.scrollTop,
+      138,
+      "oversized textarea starts below header",
+    );
+    revealModalField(input);
+    assert.equal(panel.scrollTop, 138, "oversized textarea does not oscillate");
+    dialog.classList.add("closing");
+    inputTop = 700;
+    revealModalField(input);
+    assert.equal(panel.scrollTop, 138, "closing panels do not scroll");
+    dialog.classList.remove("closing");
+    panel.setAttribute("inert", "");
+    revealModalField(input);
+    assert.equal(panel.scrollTop, 138, "background panels do not scroll");
+  } finally {
+    dialog.remove();
   }
 });

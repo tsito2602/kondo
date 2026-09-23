@@ -58,7 +58,7 @@ import { TripEditor } from "./editors";
 import { SafariTabs, tripTabs } from "./safari-tabs";
 import { AnchoredMenu } from "./anchored-menu";
 import { installPressFeedback } from "./press-feedback";
-import { dockKeyboardInset } from "./viewport";
+import { dockKeyboardInset, revealModalField } from "./viewport";
 import { ThumbDock, ThumbDockProvider, ContextDock } from "./thumb-dock";
 import {
   BookingsScreen,
@@ -124,6 +124,7 @@ export function App() {
   }, []);
   useEffect(() => {
     const viewport = window.visualViewport;
+    let revealFrame = 0;
     const update = () => {
       document.documentElement.style.setProperty(
         "--modal-height",
@@ -137,6 +138,13 @@ export function App() {
         "--dock-keyboard-inset",
         `${dockKeyboardInset(window.innerHeight, viewport, document.activeElement)}px`,
       );
+      // Safari's native focus scroll runs before our panel has shrunk. Measure
+      // after the viewport styles apply, including keyboard animation/panning.
+      cancelAnimationFrame(revealFrame);
+      revealFrame = requestAnimationFrame(() => {
+        if (!viewport || Math.abs(viewport.scale - 1) <= 0.01)
+          revealModalField(document.activeElement);
+      });
     };
     update();
     viewport?.addEventListener("resize", update);
@@ -145,6 +153,7 @@ export function App() {
     document.addEventListener("focusin", update);
     document.addEventListener("focusout", update);
     return () => {
+      cancelAnimationFrame(revealFrame);
       viewport?.removeEventListener("resize", update);
       viewport?.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
