@@ -31,7 +31,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { DockContent } from './src/web/dock-content'; export { dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -54,6 +54,7 @@ const {
   AnchoredMenu,
   SafariTabs,
   dockOutline,
+  prepareDockMorph,
   dockContour,
   dockField,
   dockFieldPath,
@@ -1127,11 +1128,13 @@ test("all dock layouts morph through a shared contour with real necks and clean 
     );
     for (const x of [32, width / 2, width - 64])
       assert.equal(split(x, 32), 255);
-    // Fixed nearby islands actually pull together through a concave bridge,
-    // then separate again, even when the surrounding layout is already split.
-    const neck = await raster(layouts[1], layouts[3], 0.2);
-    assert.equal(neck(69, 32), 255);
-    assert.equal(neck(69, 8), 0, "the bridge must have a visible waist");
+    const neck = await raster(layouts[1], layouts[3], 0.1);
+    assert.equal(neck(69, 32), 0, "stationary back stays detached");
+    assert.equal(
+      neck(width - 133, 32),
+      255,
+      "the changing primary and actions surfaces join",
+    );
   }
 });
 
@@ -1413,7 +1416,14 @@ test("edit/delete stretches left into save without shrinking, rebounding, or mov
         const shape = morphDock(from, to, 0, frame / 120);
         const visible = shape.islands.filter((island) => island.width > 0);
         assert.equal(visible.length, 2, "no new droplet is created");
-        assert.deepEqual(visible[0], back);
+        assert.deepEqual(
+          {
+            left: visible[0].left,
+            width: visible[0].width,
+            radius: visible[0].radius,
+          },
+          back,
+        );
         const right = visible[1];
         assert.ok(
           Math.abs(right.left + right.width - w) < 0.001,
@@ -1487,4 +1497,107 @@ test("exact dock capsules retain transparent gaps, round edges, and pressed geom
     1,
     "joined tabs have one contour without internal borders",
   );
+});
+
+test("all colored and neutral dock layouts reshape existing surfaces without zero-size seeds", () => {
+  for (const w of [308, 366, 420]) {
+    const c = (left, width) => ({ left, width, radius: 32 });
+    const tag = (slots) =>
+      dockSlots(w, slots).map((island, slot) => ({
+        ...island,
+        slot,
+        tint: slot === 1 && slots[1] ? 1 : 0,
+      }));
+    const home = tag([null, c(0, w - 74), c(w - 64, 64)]);
+    const tabs = joinedDock(w).map((island) => ({
+      ...island,
+      slot: -1,
+      tint: 0,
+    }));
+    const layouts = [
+      home,
+      tabs,
+      tag([c(0, 64), c(74, w - 212), c(w - 128, 128)]),
+      tag([c(0, 64), null, c(w - 128, 128)]),
+      tag([c(0, 64), c(74, w - 74), null]),
+      tag([c(0, 64), null, null]),
+    ];
+    const sameField = (a, b, label) => {
+      const field = dockField(w, a),
+        other = dockField(w, b);
+      field.forEach((value, i) =>
+        assert.ok(Math.abs(value - other[i]) < 0.00001, label),
+      );
+    };
+    for (const from of layouts)
+      for (const to of layouts) {
+        const plan = prepareDockMorph(from, to);
+        sameField(
+          from,
+          plan.from,
+          "planning preserves the entire source silhouette",
+        );
+        sameField(
+          to,
+          plan.to,
+          "planning preserves the entire destination silhouette",
+        );
+        if (from.some((island) => island.tint > 0))
+          sameField(
+            from.filter((island) => island.tint > 0),
+            plan.from.filter((island) => island.tint > 0),
+            "splitting preserves the whole colored surface",
+          );
+        for (const t of [0.001, 0.1, 0.3, 0.5, 0.75, 0.999]) {
+          const shape = morphDock(from, to, 0, t, plan);
+          for (const island of shape.islands) {
+            assert.equal(island.radius, 32);
+            assert.ok(
+              island.width >= 64 - 0.00001,
+              "a surface never sprouts from a point",
+            );
+            assert.ok(
+              island.left >= -0.00001 &&
+                island.left + island.width <= w + 0.00001,
+            );
+          }
+          const uncolored = morphDock(
+            from.map((island) => ({ ...island, tint: 0 })),
+            to.map((island) => ({ ...island, tint: 0 })),
+            0,
+            t,
+          );
+          sameField(
+            shape.islands,
+            uncolored.islands,
+            "color never changes shape correspondence",
+          );
+        }
+      }
+    for (const [from, to] of [
+      [home, tabs],
+      [tabs, home],
+    ]) {
+      for (const t of [0.001, 0.05, 0.1, 0.4, 0.8]) {
+        const shape = morphDock(from, to, 0, t);
+        assert.equal(
+          Math.min(...shape.islands.map((island) => island.left)),
+          0,
+        );
+        assert.equal(
+          Math.max(
+            ...shape.islands.map((island) => island.left + island.width),
+          ),
+          w,
+        );
+        const colored = shape.islands.filter((island) => island.tint > 0);
+        if (colored.length)
+          assert.equal(
+            Math.min(...colored.map((island) => island.left)),
+            0,
+            "create tint remains on the left edge, never the center",
+          );
+      }
+    }
+  }
 });

@@ -2681,11 +2681,6 @@ input::-webkit-date-and-time-value {
     inset: 0;
     background: var(--brand);
     opacity: 0;
-    transition: opacity 140ms ease-out;
-  }
-  .safari-glass[data-accent="true"] .fluid-dock-accent {
-    opacity: 1;
-    transition: opacity 240ms 180ms var(--ease-flow);
   }
   .safari-left {
     left: 0;

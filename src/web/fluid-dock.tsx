@@ -9,7 +9,14 @@ import {
 import { reduceMotion } from "./motion";
 import { animateDockPress } from "./dock-surface";
 
-export type DockIsland = { left: number; width: number; radius: number };
+export type DockIsland = {
+  left: number;
+  width: number;
+  radius: number;
+  slot?: number;
+  tint?: number;
+  blend?: boolean;
+};
 const samples = 320;
 const ease = (t: number) => 1 - (1 - t) ** 3;
 
@@ -41,27 +48,101 @@ export function dockSlots(
   });
 }
 
-/** Preserve visible surfaces by position when a control changes its role. */
-export function matchDockIslands(from: DockIsland[], to: DockIsland[]) {
-  const visible = (islands: DockIsland[]) =>
-    islands
-      .map((island, index) => ({ island, index }))
-      .filter(({ island }) => island.width > 0 && island.radius > 0)
-      .sort((a, b) => a.island.left - b.island.left);
-  const a = visible(from),
-    b = visible(to);
-  if (a.length !== b.length || a.length > 2) return from;
-  const matched = from.slice();
-  b.forEach(({ index }, i) => {
-    matched[index] = a[i].island;
-  });
-  const absent = from.filter(
-    (island) => island.width === 0 || island.radius === 0,
-  );
-  to.forEach((island, i) => {
-    if (island.width === 0 || island.radius === 0) matched[i] = absent.shift()!;
-  });
-  return matched;
+/** Reduce representation-only lobes to the actual visible capsule. */
+function visibleDock(islands: DockIsland[]) {
+  const result: DockIsland[] = [];
+  for (const island of islands
+    .filter((item) => item.width > 0 && item.radius > 0)
+    .sort((a, b) => a.left - b.left)) {
+    const previous = result.at(-1);
+    if (
+      previous &&
+      previous.blend === undefined &&
+      island.blend === undefined &&
+      previous.radius === island.radius &&
+      (previous.tint ?? 0) === (island.tint ?? 0) &&
+      previous.slot === island.slot &&
+      island.left + island.radius <=
+        previous.left + previous.width - previous.radius + 0.001
+    ) {
+      previous.width =
+        Math.max(previous.left + previous.width, island.left + island.width) -
+        previous.left;
+    } else result.push({ ...island });
+  }
+  return result;
+}
+
+type DockMorphPlan = { from: DockIsland[]; to: DockIsland[]; simple: boolean };
+
+/** Split along a capsule's straight spine; the pieces still draw the exact same surface. */
+function splitDock(donors: DockIsland[], references: DockIsland[]) {
+  let best: DockIsland[] = [],
+    bestCost = Infinity;
+  const allocate = (counts: number[], remaining: number) => {
+    if (counts.length < donors.length - 1) {
+      for (
+        let count = 1;
+        count <= remaining - (donors.length - counts.length - 1);
+        count++
+      )
+        allocate([...counts, count], remaining - count);
+      return;
+    }
+    const allocation = [...counts, remaining];
+    const parts: DockIsland[] = [];
+    let offset = 0,
+      cost = 0;
+    donors.forEach((donor, i) => {
+      const group = references.slice(offset, offset + allocation[i]);
+      const first = group[0],
+        last = group.at(-1)!;
+      cost +=
+        Math.abs(donor.left - first.left) +
+        Math.abs(donor.left + donor.width - last.left - last.width);
+      const radius = Math.min(donor.radius, donor.width / 2);
+      const start = donor.left + radius,
+        end = donor.left + donor.width - radius;
+      const cuts = [start];
+      for (let j = 1; j < group.length; j++) {
+        const left = group[j - 1],
+          right = group[j];
+        const seam =
+          (left.left + left.width - left.radius + right.left + right.radius) /
+          2;
+        cuts.push(Math.max(cuts.at(-1)!, Math.min(end, seam)));
+      }
+      cuts.push(end);
+      for (let j = 0; j < group.length; j++)
+        parts.push({
+          ...donor,
+          left: cuts[j] - radius,
+          width: cuts[j + 1] - cuts[j] + radius * 2,
+          radius,
+        });
+      offset += group.length;
+    });
+    if (cost < bestCost) {
+      best = parts;
+      bestCost = cost;
+    }
+  };
+  allocate([], references.length);
+  return best;
+}
+
+/** Correspond by visible position, expanding/splitting existing material, never a zero-sized slot. */
+export function prepareDockMorph(
+  from: DockIsland[],
+  to: DockIsland[],
+): DockMorphPlan {
+  let a = visibleDock(from),
+    b = visibleDock(to);
+  const simple = a.length === b.length && a.length <= 2;
+  if (!a.length || !b.length) return { from, to, simple };
+  if (a.length < b.length) a = splitDock(a, b);
+  else if (b.length < a.length) b = splitDock(b, a);
+  return { from: a, to: b, simple };
 }
 
 export function morphDock(
@@ -69,25 +150,27 @@ export function morphDock(
   to: DockIsland[],
   tension: number,
   t: number,
+  plan = prepareDockMorph(from, to),
 ) {
   if (t >= 1) return { islands: to, tension: 0 };
   if (t <= 0) return { islands: from, tension };
-  from = matchDockIslands(from, to);
-  const visibleCount = (islands: DockIsland[]) =>
-    islands.filter((island) => island.width > 0 && island.radius > 0).length;
-  const simpleResize =
-    visibleCount(from) === visibleCount(to) && visibleCount(to) <= 2;
-  // One monotonic curve: no mid-flight stop, restart or settling oscillation.
   const p = ease(t);
+  const fadeOut = 1 - ease(Math.min(1, (t * 600) / 140));
+  const fadeIn = ease(Math.max(0, Math.min(1, (t * 600 - 180) / 240)));
   return {
-    islands: from.map((island, i) => ({
-      left: island.left + (to[i].left - island.left) * p,
-      width: island.width + (to[i].width - island.width) * p,
-      radius: island.radius + (to[i].radius - island.radius) * p,
+    islands: plan.from.map((island, i) => ({
+      left: island.left + (plan.to[i].left - island.left) * p,
+      width: island.width + (plan.to[i].width - island.width) * p,
+      radius: island.radius + (plan.to[i].radius - island.radius) * p,
+      slot: plan.to[i].slot,
+      blend:
+        Math.abs(plan.to[i].left - island.left) > 0.001 ||
+        Math.abs(plan.to[i].width - island.width) > 0.001 ||
+        (tension > 0 && island.blend !== false),
+      tint: (island.tint ?? 0) * fadeOut + (plan.to[i].tint ?? 0) * fadeIn,
     })),
     tension:
-      tension * (1 - p) +
-      (simpleResize ? 0 : 1800 * Math.sin(Math.PI * p) ** 2),
+      tension * (1 - p) + (plan.simple ? 0 : 1800 * Math.sin(Math.PI * p) ** 2),
   };
 }
 
@@ -101,9 +184,23 @@ export function dockField(
   const ceiling = Math.max(
     ...islands.map((island, i) => (island.radius * (scales[i]?.y ?? 1)) ** 2),
   );
+  const cores = islands.flatMap((island, i) => {
+    if (island.width <= 0 || island.radius <= 0) return [];
+    const sx = scales[i]?.x ?? 1;
+    const r = Math.min(island.radius, island.width / 2);
+    const center = island.left + island.width / 2;
+    return [
+      center - (island.width / 2 - r) * sx,
+      center + (island.width / 2 - r) * sx,
+    ];
+  });
+  const leftCore = Math.min(...cores),
+    rightCore = Math.max(...cores);
   return Array.from({ length: samples + 1 }, (_, i) => {
     const x = (i / samples) * width;
     let value = -width * width;
+    let stationary = -width * width;
+    let plain = -width * width;
     for (const [index, island] of islands.entries()) {
       const { x: sx, y: sy } = scales[index] ?? { x: 1, y: 1 };
       const localX =
@@ -118,6 +215,11 @@ export function dockField(
         localX - (island.left + island.width - r),
       );
       const next = (r * r - dx * dx) * sy * sy;
+      plain = Math.max(plain, next);
+      if (island.blend === false) {
+        stationary = Math.max(stationary, next);
+        continue;
+      }
       // Smooth union draws a neck between nearby droplets, without double blur
       // or a border through the join. Distant islands remain separate.
       const h = tension
@@ -125,7 +227,11 @@ export function dockField(
         : 0;
       value = Math.max(value, next) + h * h * tension * 0.25;
     }
-    return Math.min(value, ceiling);
+    // Neck smoothing only joins inner edges, never inflates the outside edge.
+    return Math.min(
+      x < leftCore || x > rightCore ? plain : Math.max(value, stationary),
+      ceiling,
+    );
   });
 }
 
@@ -173,6 +279,7 @@ export function dockContour(
   scales: DockScale[] = [],
   center = 32,
 ) {
+  if (!islands.length) return "";
   if (tension > 0)
     return dockFieldPath(
       width,
@@ -248,6 +355,7 @@ export function FluidDockSurface({
     to: DockIsland[];
     tension: number;
     start: number;
+    plan: DockMorphPlan;
   } | null>(null);
   const presses = useRef(
     new Map<
@@ -263,7 +371,7 @@ export function FluidDockSurface({
   );
   const lastPath = useRef("");
   const lastAccentPath = useRef("");
-  const accentIndex = useRef(1);
+
   const controls = useRef<(HTMLElement | null)[]>([]);
   const id = useId();
   const paint = () => {
@@ -273,8 +381,8 @@ export function FluidDockSurface({
       ...island,
       left: island.left + 12,
     }));
-    const scales = controls.current.map((element) =>
-      pressScale(element, performance.now()),
+    const scales = islands.map((island, i) =>
+      pressScale(controls.current[island.slot ?? i] ?? null, performance.now()),
     );
     const d = dockContour(w, islands, shape.current.tension, scales, 44);
     if (d !== lastPath.current) {
@@ -283,16 +391,24 @@ export function FluidDockSurface({
       shadow.current!.setAttribute("d", d);
       lastPath.current = d;
     }
+    const tinted = islands
+      .map((island, i) => ({ island, scale: scales[i] }))
+      .filter(({ island }) => (island.tint ?? 0) > 0);
     const a = dockContour(
       w,
-      [islands[accentIndex.current]],
-      0,
-      [scales[accentIndex.current]],
+      tinted.map(({ island }) => island),
+      shape.current.tension,
+      tinted.map(({ scale }) => scale),
       44,
     );
-    if (accent.current && a !== lastAccentPath.current) {
-      accent.current.style.clipPath = `path("${a}")`;
-      lastAccentPath.current = a;
+    if (accent.current) {
+      if (a !== lastAccentPath.current) {
+        accent.current.style.clipPath = a ? `path("${a}")` : "inset(50%)";
+        lastAccentPath.current = a;
+      }
+      accent.current.style.opacity = String(
+        Math.max(0, ...tinted.map(({ island }) => island.tint ?? 0)),
+      );
     }
   };
   const pressScale = (element: HTMLElement | null, now: number): DockScale => {
@@ -314,7 +430,7 @@ export function FluidDockSurface({
     if (morph.current) {
       const m = morph.current;
       const t = Math.min(1, Math.max(0, (now - m.start) / 600));
-      shape.current = morphDock(m.from, m.to, m.tension, t);
+      shape.current = morphDock(m.from, m.to, m.tension, t, m.plan);
       if (t >= 1) morph.current = null;
     }
     let pressing = false;
@@ -348,10 +464,6 @@ export function FluidDockSurface({
         content?.querySelector<HTMLElement>(
           `.context-island.context-${role}`,
         ) ?? null,
-    );
-    glass.current?.setAttribute(
-      "data-accent",
-      String(Boolean(controls.current[1])),
     );
     let islands: DockIsland[];
     if (tabs) {
@@ -388,6 +500,11 @@ export function FluidDockSurface({
       });
       islands = slots.some(Boolean) ? dockSlots(w, slots) : joinedDock(w);
     }
+    islands = islands.map((island, i) => ({
+      ...island,
+      slot: tabs ? -1 : i,
+      tint: !tabs && i === 1 && controls.current[1] ? 1 : 0,
+    }));
     node.style.setProperty(
       "--safari-press-scale",
       String(Math.max(1, Math.min(1.06, (window.innerWidth - 8) / w))),
@@ -399,15 +516,6 @@ export function FluidDockSurface({
     }
     target.current = key;
     const from = shape.current;
-    accentIndex.current =
-      controls.current[1] || !from
-        ? 1
-        : Math.max(
-            0,
-            matchDockIslands(from.islands, islands).indexOf(
-              from.islands[accentIndex.current],
-            ),
-          );
     const resized = width.current !== w;
     width.current = w;
     svg.current!.setAttribute("viewBox", `0 0 ${w + 24} 88`);
@@ -426,6 +534,7 @@ export function FluidDockSurface({
       to: islands,
       tension: from.tension,
       start: performance.now(),
+      plan: prepareDockMorph(from.islands, islands),
     };
     schedule();
   };
