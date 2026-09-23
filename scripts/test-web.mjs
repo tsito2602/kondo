@@ -155,6 +155,36 @@ const submit = async () => {
   await tick(30);
 };
 
+// Exercise real details/editors: a fresh dialog would replay its entrance and
+// lose scroll, even if it rendered exactly the same text after returning.
+const editAndReturn = async (label, value) => {
+  const detail = document.querySelector("dialog[open]");
+  const panel = detail.querySelector(".modal-inner");
+  const dock = document.querySelector(".thumb-dock-host");
+  panel.scrollTop = 137;
+  for (const save of [false, true, false]) {
+    await click(document.querySelector('.context-actions [aria-label="編集"]'));
+    const dialogs = [...document.querySelectorAll("dialog[open]")];
+    assert.equal(dialogs.length, 2, "detail stays behind its editor");
+    assert.equal(dialogs[0], detail);
+    assert.equal(dock.parentElement, dialogs[1]);
+    if (save) {
+      await fill(label, value);
+      await submit();
+    } else {
+      await click(document.querySelector('.context-back [aria-label="戻る"]'));
+      await tick(30);
+    }
+    assert.equal(document.querySelectorAll("dialog[open]").length, 1);
+    assert.equal(document.querySelector("dialog[open]"), detail);
+    assert.equal(detail.querySelector(".modal-inner"), panel);
+    assert.equal(panel.scrollTop, 137);
+    assert.equal(dock.parentElement, detail);
+    assert.equal(document.body.style.overflow, "hidden");
+    if (save) assert.ok(detail.textContent.includes(value));
+  }
+};
+
 test("legacy account cache and pending changes survive React migration; real forms sync through Hono", async () => {
   const db = new DatabaseSync(":memory:");
   db.exec("PRAGMA foreign_keys=ON");
@@ -301,6 +331,7 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.ok(
       document.querySelector('.context-actions [aria-label="予定を削除"]'),
     );
+    await editAndReturn("タイトル", "市内を散策");
     assert.equal(document.querySelector(".context-primary").textContent, "");
     assert.equal(document.querySelector(".thumb-dock-host .safari-tabs"), null);
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
@@ -322,6 +353,7 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.ok(
       document.querySelector('.context-actions [aria-label="予約を削除"]'),
     );
+    await editAndReturn("予約名", "更新したホテル");
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
     await click(byText("nav a", "行きたい場所"));
@@ -333,10 +365,14 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.ok(
       document.querySelector('.context-actions [aria-label="場所を削除"]'),
     );
+    await editAndReturn("場所の名前", "更新した美術館");
     assert.equal(document.querySelector(".thumb-dock-host .safari-tabs"), null);
+    const placeDetail = document.querySelector("dialog[open]");
     await click(byText(".context-primary button", "しおりへ追加"));
+    assert.equal(document.querySelectorAll("dialog[open]").length, 2);
     await fill("開始時刻", "16:00");
     await submit();
+    assert.equal(document.querySelector("dialog[open]"), placeDetail);
     assert.match(document.querySelector("dialog").textContent, /しおりを見る/);
     const link = db.prepare("SELECT item_id FROM place_itinerary_links").get();
     assert.ok(link.item_id);

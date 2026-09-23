@@ -136,37 +136,6 @@ export function BookingDetail({
   );
   const booking = travel.bookings.find((entry) => entry.id === id);
   if (!booking) return null;
-  if (preview)
-    return (
-      <Modal
-        title={preview.file.filename}
-        onClose={() => setPreview(null)}
-        full
-      >
-        <div className="document-preview">
-          {preview.file.contentType === "application/pdf" ? (
-            <iframe title={preview.file.filename} src={preview.url} />
-          ) : ["image/heic", "image/heif"].includes(
-              preview.file.contentType,
-            ) ? (
-            <p>この画像は端末に保存して開けます。</p>
-          ) : (
-            <img alt={preview.file.filename} src={preview.url} />
-          )}
-          <a
-            className="secondary"
-            href={preview.url}
-            download={preview.file.filename}
-          >
-            端末に保存
-          </a>
-        </div>
-      </Modal>
-    );
-  if (editing)
-    return (
-      <BookingEditor booking={booking} onClose={() => setEditing(false)} />
-    );
   const documents = travel.documentsByBooking[id] ?? [];
   const connection = findFlightConnections(travel.bookings).find(
     (entry) => entry.arrivalBookingId === id,
@@ -225,218 +194,260 @@ export function BookingDetail({
       }
     });
   return (
-    <Modal
-      title="予約詳細"
-      dockActions={{
-        actions: travel.canEdit && (
-          <>
-            <button aria-label="編集" onClick={() => setEditing(true)}>
-              <Pencil />
-            </button>
-            <button aria-label="予約を削除" className="danger" onClick={remove}>
-              <Trash2 />
-            </button>
-          </>
-        ),
-      }}
-      onClose={onClose}
-      full
-      action={
-        travel.canEdit && (
-          <Button
-            variant="ghost"
-            className="text-button"
-            onClick={() => setEditing(true)}
-          >
-            編集
-          </Button>
-        )
-      }
-    >
-      <div className="detail-stack">
-        <span className="badge">
-          {bookingKinds.find((entry) => entry.value === booking.kind)?.label}
-        </span>
-        <h1>{booking.title}</h1>
-        <p>{booking.detail}</p>
-        {["flight", "train", "car"].includes(booking.kind) && (
-          <BookingRoute booking={booking} />
-        )}
-        <div className="detail-grid">
-          <section>
-            <h3>{booking.kind === "hotel" ? "チェックイン" : "開始・出発"}</h3>
-            {booking.kind === "flight" ? (
-              <FlightTime
-                day={booking.day}
-                time={booking.time}
-                code={booking.originCode}
-              />
-            ) : (
-              <p>
-                {formatDate(booking.day)} {booking.time}
-              </p>
-            )}
-          </section>
-          <section>
-            <h3>
-              {booking.kind === "hotel" ? "チェックアウト" : "終了・到着"}
-            </h3>
-            {booking.kind === "flight" ? (
-              <FlightTime
-                day={booking.endDay || booking.day}
-                time={booking.endTime}
-                code={booking.destinationCode}
-              />
-            ) : (
-              <p>
-                {formatDate(booking.endDay || booking.day)} {booking.endTime}
-              </p>
-            )}
-          </section>
-        </div>
-        {bookingDurationLabel(booking) && (
-          <p className="badge">{bookingDurationLabel(booking)}</p>
-        )}
-        {(booking.location || (booking.kind === "hotel" && booking.detail)) && (
-          <section>
-            <h3>場所</h3>
-            <p>{booking.location || booking.detail}</p>
-            <MapLink url={mapUrl(booking.location || booking.detail)} />
-          </section>
-        )}
-        {booking.confirmationCode && (
-          <section>
-            <h3>予約番号</h3>
-            <button
-              className="copy-code"
-              onClick={() =>
-                void run(async () => {
-                  await copyText(booking.confirmationCode);
-                  notify("予約番号をコピーしました");
-                })
-              }
+    <>
+      <Modal
+        title="予約詳細"
+        dockActions={{
+          actions: travel.canEdit && (
+            <>
+              <button aria-label="編集" onClick={() => setEditing(true)}>
+                <Pencil />
+              </button>
+              <button
+                aria-label="予約を削除"
+                className="danger"
+                onClick={remove}
+              >
+                <Trash2 />
+              </button>
+            </>
+          ),
+        }}
+        onClose={onClose}
+        full
+        action={
+          travel.canEdit && (
+            <Button
+              variant="ghost"
+              className="text-button"
+              onClick={() => setEditing(true)}
             >
-              {booking.confirmationCode}
-              <Copy size={17} />
-            </button>
-          </section>
-        )}
-        {booking.note && (
-          <section>
-            <h3>メモ</h3>
-            <p className="pre-wrap">{booking.note}</p>
-          </section>
-        )}
-        {booking.kind === "flight" && (
-          <section>
-            <h3>乗り継ぎ</h3>
-            {connection ? (
-              <p>
-                {connection.airportName} ·{" "}
-                {formatConnectionDuration(connection.durationMinutes)}
+              編集
+            </Button>
+          )
+        }
+      >
+        <div className="detail-stack">
+          <span className="badge">
+            {bookingKinds.find((entry) => entry.value === booking.kind)?.label}
+          </span>
+          <h1>{booking.title}</h1>
+          <p>{booking.detail}</p>
+          {["flight", "train", "car"].includes(booking.kind) && (
+            <BookingRoute booking={booking} />
+          )}
+          <div className="detail-grid">
+            <section>
+              <h3>
+                {booking.kind === "hotel" ? "チェックイン" : "開始・出発"}
+              </h3>
+              {booking.kind === "flight" ? (
+                <FlightTime
+                  day={booking.day}
+                  time={booking.time}
+                  code={booking.originCode}
+                />
+              ) : (
+                <p>
+                  {formatDate(booking.day)} {booking.time}
+                </p>
+              )}
+            </section>
+            <section>
+              <h3>
+                {booking.kind === "hotel" ? "チェックアウト" : "終了・到着"}
+              </h3>
+              {booking.kind === "flight" ? (
+                <FlightTime
+                  day={booking.endDay || booking.day}
+                  time={booking.endTime}
+                  code={booking.destinationCode}
+                />
+              ) : (
+                <p>
+                  {formatDate(booking.endDay || booking.day)} {booking.endTime}
+                </p>
+              )}
+            </section>
+          </div>
+          {bookingDurationLabel(booking) && (
+            <p className="badge">{bookingDurationLabel(booking)}</p>
+          )}
+          {(booking.location ||
+            (booking.kind === "hotel" && booking.detail)) && (
+            <section>
+              <h3>場所</h3>
+              <p>{booking.location || booking.detail}</p>
+              <MapLink url={mapUrl(booking.location || booking.detail)} />
+            </section>
+          )}
+          {booking.confirmationCode && (
+            <section>
+              <h3>予約番号</h3>
+              <button
+                className="copy-code"
+                onClick={() =>
+                  void run(async () => {
+                    await copyText(booking.confirmationCode);
+                    notify("予約番号をコピーしました");
+                  })
+                }
+              >
+                {booking.confirmationCode}
+                <Copy size={17} />
+              </button>
+            </section>
+          )}
+          {booking.note && (
+            <section>
+              <h3>メモ</h3>
+              <p className="pre-wrap">{booking.note}</p>
+            </section>
+          )}
+          {booking.kind === "flight" && (
+            <section>
+              <h3>乗り継ぎ</h3>
+              {connection ? (
+                <p>
+                  {connection.airportName} ·{" "}
+                  {formatConnectionDuration(connection.durationMinutes)}
+                </p>
+              ) : (
+                <p className="muted">設定された乗り継ぎはありません</p>
+              )}
+              {travel.canEdit && (
+                <Field label="乗り継ぎの設定">
+                  <select
+                    value={
+                      booking.connectionMode === "manual"
+                        ? (booking.nextFlightId ?? "auto")
+                        : (booking.connectionMode ?? "auto")
+                    }
+                    onChange={(event) =>
+                      void run(() => {
+                        const value = event.target.value;
+                        travel.setFlightConnection(
+                          id,
+                          value === "auto" || value === "none"
+                            ? value
+                            : "manual",
+                          value === "auto" || value === "none" ? null : value,
+                        );
+                      })
+                    }
+                  >
+                    <option value="auto">自動で検出</option>
+                    <option value="none">乗り継ぎなし</option>
+                    {candidates.map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.title} · {entry.day} {entry.time}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+            </section>
+          )}
+          <section
+            className="documents"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              if (travel.canEdit) upload(event.dataTransfer.files);
+            }}
+          >
+            <h3>予約書類</h3>
+            {documents.map((file) => (
+              <div className="document-row" key={file.id}>
+                <FileText />
+                <button
+                  className="grow text-button"
+                  disabled={busy}
+                  onClick={() => download(file)}
+                >
+                  {file.filename}
+                  <small>{(file.size / 1024).toFixed(0)} KB</small>
+                </button>
+                <Download size={17} />
+                {travel.canEdit && (
+                  <Button
+                    variant="ghost"
+                    disabled={busy}
+                    className="icon-button danger"
+                    aria-label={`${file.filename}を削除`}
+                    onClick={() => {
+                      if (confirm("この書類を削除しますか？"))
+                        travel.deleteBookingDocument(id, file.id);
+                    }}
+                  >
+                    <Trash2 />
+                  </Button>
+                )}
+              </div>
+            ))}
+            {!documents.length && (
+              <p className="muted">
+                PDFやチケットの画像をまとめて保存できます。
               </p>
-            ) : (
-              <p className="muted">設定された乗り継ぎはありません</p>
             )}
             {travel.canEdit && (
-              <Field label="乗り継ぎの設定">
-                <select
-                  value={
-                    booking.connectionMode === "manual"
-                      ? (booking.nextFlightId ?? "auto")
-                      : (booking.connectionMode ?? "auto")
-                  }
-                  onChange={(event) =>
-                    void run(() => {
-                      const value = event.target.value;
-                      travel.setFlightConnection(
-                        id,
-                        value === "auto" || value === "none" ? value : "manual",
-                        value === "auto" || value === "none" ? null : value,
-                      );
-                    })
-                  }
-                >
-                  <option value="auto">自動で検出</option>
-                  <option value="none">乗り継ぎなし</option>
-                  {candidates.map((entry) => (
-                    <option key={entry.id} value={entry.id}>
-                      {entry.title} · {entry.day} {entry.time}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+              <label className={`secondary ${busy ? "disabled" : ""}`}>
+                {busy ? "処理中…" : "書類を追加"}
+                <input
+                  hidden
+                  disabled={busy}
+                  type="file"
+                  multiple
+                  accept="application/pdf,image/jpeg,image/png,image/gif,image/webp,.heic,.heif"
+                  onChange={(event) => {
+                    if (event.target.files) upload(event.target.files);
+                    event.target.value = "";
+                  }}
+                />
+              </label>
             )}
           </section>
-        )}
-        <section
-          className="documents"
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={(event) => {
-            event.preventDefault();
-            if (travel.canEdit) upload(event.dataTransfer.files);
-          }}
-        >
-          <h3>予約書類</h3>
-          {documents.map((file) => (
-            <div className="document-row" key={file.id}>
-              <FileText />
-              <button
-                className="grow text-button"
-                disabled={busy}
-                onClick={() => download(file)}
-              >
-                {file.filename}
-                <small>{(file.size / 1024).toFixed(0)} KB</small>
-              </button>
-              <Download size={17} />
-              {travel.canEdit && (
-                <Button
-                  variant="ghost"
-                  disabled={busy}
-                  className="icon-button danger"
-                  aria-label={`${file.filename}を削除`}
-                  onClick={() => {
-                    if (confirm("この書類を削除しますか？"))
-                      travel.deleteBookingDocument(id, file.id);
-                  }}
-                >
-                  <Trash2 />
-                </Button>
-              )}
-            </div>
-          ))}
-          {!documents.length && (
-            <p className="muted">PDFやチケットの画像をまとめて保存できます。</p>
-          )}
           {travel.canEdit && (
-            <label className={`secondary ${busy ? "disabled" : ""}`}>
-              {busy ? "処理中…" : "書類を追加"}
-              <input
-                hidden
-                disabled={busy}
-                type="file"
-                multiple
-                accept="application/pdf,image/jpeg,image/png,image/gif,image/webp,.heic,.heif"
-                onChange={(event) => {
-                  if (event.target.files) upload(event.target.files);
-                  event.target.value = "";
-                }}
-              />
-            </label>
+            <button
+              className="danger subtle detail-inline-action"
+              onClick={remove}
+            >
+              <Trash2 />
+              予約を削除
+            </button>
           )}
-        </section>
-        {travel.canEdit && (
-          <button
-            className="danger subtle detail-inline-action"
-            onClick={remove}
-          >
-            <Trash2 />
-            予約を削除
-          </button>
-        )}
-      </div>
-    </Modal>
+        </div>
+      </Modal>
+      {editing && (
+        <BookingEditor booking={booking} onClose={() => setEditing(false)} />
+      )}
+      {preview && (
+        <Modal
+          title={preview.file.filename}
+          onClose={() => setPreview(null)}
+          full
+        >
+          <div className="document-preview">
+            {preview.file.contentType === "application/pdf" ? (
+              <iframe title={preview.file.filename} src={preview.url} />
+            ) : ["image/heic", "image/heif"].includes(
+                preview.file.contentType,
+              ) ? (
+              <p>この画像は端末に保存して開けます。</p>
+            ) : (
+              <img alt={preview.file.filename} src={preview.url} />
+            )}
+            <a
+              className="secondary"
+              href={preview.url}
+              download={preview.file.filename}
+            >
+              端末に保存
+            </a>
+          </div>
+        </Modal>
+      )}
+    </>
   );
 }
 export function ItemDetail({
@@ -453,8 +464,6 @@ export function ItemDetail({
   const place = travel.places.find((entry) => entry.itineraryItemId === id);
   if (place) return <PlaceDetail id={place.id} onClose={onClose} />;
   if (!item) return null;
-  if (editing)
-    return <ItemEditor item={item} onClose={() => setEditing(false)} />;
   const details = itemDetails(item);
   const remove = () =>
     void run(() => {
@@ -466,77 +475,84 @@ export function ItemDetail({
       }
     });
   return (
-    <Modal
-      title="予定詳細"
-      dockActions={{
-        actions: travel.canEdit && (
-          <>
-            <button aria-label="編集" onClick={() => setEditing(true)}>
-              <Pencil />
-            </button>
-            <button aria-label="予定を削除" className="danger" onClick={remove}>
+    <>
+      <Modal
+        title="予定詳細"
+        dockActions={{
+          actions: travel.canEdit && (
+            <>
+              <button aria-label="編集" onClick={() => setEditing(true)}>
+                <Pencil />
+              </button>
+              <button
+                aria-label="予定を削除"
+                className="danger"
+                onClick={remove}
+              >
+                <Trash2 />
+              </button>
+            </>
+          ),
+        }}
+        onClose={onClose}
+        full
+        action={
+          travel.canEdit && (
+            <Button
+              variant="ghost"
+              className="text-button"
+              onClick={() => setEditing(true)}
+            >
+              編集
+            </Button>
+          )
+        }
+      >
+        <div className="detail-stack">
+          <span className="badge">{itemCategory(item).label}</span>
+          <h1>{item.title}</h1>
+          <p>
+            {formatDate(item.day)} {item.time}
+            {details.endTime &&
+              ` 〜 ${details.endDay && details.endDay !== item.day ? formatDate(details.endDay) : ""} ${details.endTime}`}
+          </p>
+          {details.category === "transport" && (
+            <>
+              <p>
+                {transportLabel(details)} ·{" "}
+                {durationLabel(durationMinutes(item.day, item.time, details))}
+              </p>
+              <p>
+                {details.transport?.origin} → {details.transport?.destination}
+              </p>
+            </>
+          )}
+          {details.location && (
+            <section>
+              <h3>場所</h3>
+              <p>{details.location}</p>
+              <MapLink url={mapUrl(details.location)} />
+            </section>
+          )}
+          {item.note && (
+            <section>
+              <h3>メモ</h3>
+              <p className="pre-wrap">{item.note}</p>
+            </section>
+          )}
+          {travel.canEdit && (
+            <button
+              className="danger subtle detail-inline-action"
+              onClick={remove}
+            >
               <Trash2 />
+              予定を削除
             </button>
-          </>
-        ),
-      }}
-      onClose={onClose}
-      full
-      action={
-        travel.canEdit && (
-          <Button
-            variant="ghost"
-            className="text-button"
-            onClick={() => setEditing(true)}
-          >
-            編集
-          </Button>
-        )
-      }
-    >
-      <div className="detail-stack">
-        <span className="badge">{itemCategory(item).label}</span>
-        <h1>{item.title}</h1>
-        <p>
-          {formatDate(item.day)} {item.time}
-          {details.endTime &&
-            ` 〜 ${details.endDay && details.endDay !== item.day ? formatDate(details.endDay) : ""} ${details.endTime}`}
-        </p>
-        {details.category === "transport" && (
-          <>
-            <p>
-              {transportLabel(details)} ·{" "}
-              {durationLabel(durationMinutes(item.day, item.time, details))}
-            </p>
-            <p>
-              {details.transport?.origin} → {details.transport?.destination}
-            </p>
-          </>
-        )}
-        {details.location && (
-          <section>
-            <h3>場所</h3>
-            <p>{details.location}</p>
-            <MapLink url={mapUrl(details.location)} />
-          </section>
-        )}
-        {item.note && (
-          <section>
-            <h3>メモ</h3>
-            <p className="pre-wrap">{item.note}</p>
-          </section>
-        )}
-        {travel.canEdit && (
-          <button
-            className="danger subtle detail-inline-action"
-            onClick={remove}
-          >
-            <Trash2 />
-            予定を削除
-          </button>
-        )}
-      </div>
-    </Modal>
+          )}
+        </div>
+      </Modal>
+      {editing && <ItemEditor item={item} onClose={() => setEditing(false)} />}
+    </>
   );
 }
 export function PlaceDetail({
@@ -555,12 +571,6 @@ export function PlaceDetail({
   const linked = travel.items.find(
     (entry) => entry.id === place.itineraryItemId,
   );
-  if (mode === "edit")
-    return <PlaceEditor place={place} onClose={() => setMode("view")} />;
-  if (mode === "schedule")
-    return (
-      <ItemEditor item={linked} place={place} onClose={() => setMode("view")} />
-    );
   const itineraryAction = linked ? (
     <button
       className="primary"
@@ -592,105 +602,124 @@ export function PlaceDetail({
       }
     });
   return (
-    <Modal
-      title="場所の詳細"
-      dockActions={{
-        primary: itineraryAction,
-        actions: travel.canEdit && (
-          <>
-            <button aria-label="編集" onClick={() => setMode("edit")}>
+    <>
+      <Modal
+        title="場所の詳細"
+        dockActions={{
+          primary: itineraryAction,
+          actions: travel.canEdit && (
+            <>
+              <button aria-label="編集" onClick={() => setMode("edit")}>
+                <Pencil />
+              </button>
+              <button
+                aria-label="場所を削除"
+                className="danger"
+                onClick={remove}
+              >
+                <Trash2 />
+              </button>
+            </>
+          ),
+        }}
+        onClose={onClose}
+        full
+        action={
+          travel.canEdit && (
+            <Button
+              variant="ghost"
+              className="text-button"
+              onClick={() => setMode("edit")}
+            >
+              編集
+            </Button>
+          )
+        }
+      >
+        <div className="detail-stack">
+          <div className="row">
+            <span className={`badge status-${place.status}`}>
+              {
+                placeStatuses.find((entry) => entry.value === place.status)
+                  ?.label
+              }
+            </span>
+            <span className="badge">
+              {
+                reservationStatuses.find(
+                  (entry) => entry.value === place.reservationStatus,
+                )?.label
+              }
+            </span>
+          </div>
+          <h1>{place.title}</h1>
+          {place.location && <p>{place.location}</p>}
+          <MapLink url={mapUrl(place.location, place.title)} />
+          {place.openingHours && (
+            <section>
+              <h3>営業時間</h3>
+              <p className="pre-wrap">{place.openingHours}</p>
+            </section>
+          )}
+          {place.note && (
+            <section>
+              <h3>メモ</h3>
+              <p className="pre-wrap">{place.note}</p>
+            </section>
+          )}
+          {place.referenceLinks?.length ? (
+            <section>
+              <h3>参照リンク</h3>
+              {place.referenceLinks.map((link, index) => {
+                const url = referenceUrl(link.url);
+                return (
+                  url && (
+                    <a
+                      key={index}
+                      className="reference-link"
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {link.label || new URL(url).hostname}
+                    </a>
+                  )
+                );
+              })}
+            </section>
+          ) : null}
+          <div className="detail-inline-action">{itineraryAction}</div>
+          {linked && travel.canEdit && (
+            <Button
+              variant="ghost"
+              className="secondary"
+              onClick={() => setMode("schedule")}
+            >
               <Pencil />
-            </button>
-            <button aria-label="場所を削除" className="danger" onClick={remove}>
+              予定の日時を編集
+            </Button>
+          )}
+          {travel.canEdit && (
+            <button
+              className="danger subtle detail-inline-action"
+              onClick={remove}
+            >
               <Trash2 />
+              場所を削除
             </button>
-          </>
-        ),
-      }}
-      onClose={onClose}
-      full
-      action={
-        travel.canEdit && (
-          <Button
-            variant="ghost"
-            className="text-button"
-            onClick={() => setMode("edit")}
-          >
-            編集
-          </Button>
-        )
-      }
-    >
-      <div className="detail-stack">
-        <div className="row">
-          <span className={`badge status-${place.status}`}>
-            {placeStatuses.find((entry) => entry.value === place.status)?.label}
-          </span>
-          <span className="badge">
-            {
-              reservationStatuses.find(
-                (entry) => entry.value === place.reservationStatus,
-              )?.label
-            }
-          </span>
+          )}
         </div>
-        <h1>{place.title}</h1>
-        {place.location && <p>{place.location}</p>}
-        <MapLink url={mapUrl(place.location, place.title)} />
-        {place.openingHours && (
-          <section>
-            <h3>営業時間</h3>
-            <p className="pre-wrap">{place.openingHours}</p>
-          </section>
-        )}
-        {place.note && (
-          <section>
-            <h3>メモ</h3>
-            <p className="pre-wrap">{place.note}</p>
-          </section>
-        )}
-        {place.referenceLinks?.length ? (
-          <section>
-            <h3>参照リンク</h3>
-            {place.referenceLinks.map((link, index) => {
-              const url = referenceUrl(link.url);
-              return (
-                url && (
-                  <a
-                    key={index}
-                    className="reference-link"
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {link.label || new URL(url).hostname}
-                  </a>
-                )
-              );
-            })}
-          </section>
-        ) : null}
-        <div className="detail-inline-action">{itineraryAction}</div>
-        {linked && travel.canEdit && (
-          <Button
-            variant="ghost"
-            className="secondary"
-            onClick={() => setMode("schedule")}
-          >
-            <Pencil />
-            予定の日時を編集
-          </Button>
-        )}
-        {travel.canEdit && (
-          <button
-            className="danger subtle detail-inline-action"
-            onClick={remove}
-          >
-            <Trash2 />
-            場所を削除
-          </button>
-        )}
-      </div>
-    </Modal>
+      </Modal>
+      {mode === "edit" && (
+        <PlaceEditor place={place} onClose={() => setMode("view")} />
+      )}
+      {mode === "schedule" && (
+        <ItemEditor
+          item={linked}
+          place={place}
+          onClose={() => setMode("view")}
+        />
+      )}
+    </>
   );
 }
