@@ -129,7 +129,7 @@ export function StayCards({
       {stays.map((booking) => {
         const label =
           day === booking.day
-            ? "宿泊開始"
+            ? "チェックイン"
             : day === booking.endDay
               ? "チェックアウト日"
               : "連泊";
