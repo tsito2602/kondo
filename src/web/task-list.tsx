@@ -110,7 +110,6 @@ export function TaskList({
               onClick={() => onEdit(item.id)}
             >
               <SquarePen size={18} />
-              <span>編集</span>
             </button>
           )}
         </div>

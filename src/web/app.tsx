@@ -30,6 +30,9 @@ import {
 } from "react-router";
 import {
   ArrowLeft,
+  Monitor,
+  Sun,
+  Moon,
   Settings,
   Users,
   Download,
@@ -909,21 +912,23 @@ function SettingsScreen() {
         </Card>
         <Card className="settings-card">
           <h2>外観</h2>
-          <div className="segmented" aria-label="表示モード">
+          <div className="segmented appearance-control" aria-label="表示モード">
             {(
               [
-                { value: "system", label: "端末に合わせる" },
-                { value: "light", label: "ライト" },
-                { value: "dark", label: "ダーク" },
+                { value: "system", label: "端末に合わせる", icon: Monitor },
+                { value: "light", label: "ライト", icon: Sun },
+                { value: "dark", label: "ダーク", icon: Moon },
               ] as const
             ).map((entry) => (
               <button
                 key={entry.value}
+                aria-label={entry.label}
                 aria-pressed={theme.preference === entry.value}
                 className={theme.preference === entry.value ? "selected" : ""}
                 onClick={() => theme.setPreference(entry.value)}
               >
-                {entry.label}
+                <entry.icon size={18} aria-hidden="true" />
+                {entry.value === "system" ? "自動" : entry.label}
               </button>
             ))}
           </div>

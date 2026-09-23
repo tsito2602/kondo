@@ -2426,6 +2426,15 @@ test("trip expansion shares the cover across snapshots, restores list scroll and
     startTripTransition(() => navigate("list"), "trip1", true);
     await act(async () => captures[1].update());
     assert.equal(scroll, 560);
+    assert.equal(
+      cover().style.viewTransitionName,
+      "",
+      "return keeps the card and photo together",
+    );
+    assert.equal(
+      document.querySelector("article").style.viewTransitionName,
+      "",
+    );
     document.dispatchEvent(new dom.window.Event("pointerdown"));
     await act(async () => {});
     assert.equal(document.documentElement.dataset.tripTransition, undefined);
@@ -2517,5 +2526,71 @@ test("task list strikes before reordering, preserves row identity, and keeps edi
     );
   } finally {
     await act(async () => root.unmount());
+  }
+});
+
+test("returning from bookings captures the full list without creating a disconnected cover layer", async () => {
+  const nativeStart = document.startViewTransition;
+  const originalScroll = window.scrollTo;
+  const host = document.getElementById("root");
+  let update;
+  const motion = timeline();
+  document.startViewTransition = (callback) => {
+    update = callback;
+    return {
+      ready: Promise.resolve(),
+      finished: motion.finished,
+      skipTransition: () => motion.finish(),
+    };
+  };
+  window.scrollTo = () => {};
+  try {
+    host.innerHTML =
+      '<main id="main-content" data-trip-surface="trip1"><p>Bookings</p></main>';
+    const oldMain = host.firstElementChild;
+    oldMain.getBoundingClientRect = () => ({
+      top: -240,
+      left: 0,
+      width: 390,
+      height: 1800,
+    });
+    startTripTransition(
+      () => {
+        host.innerHTML =
+          '<main id="main-content"><article data-trip-surface="trip1"><img data-trip-cover="trip1"><h2>Trip title</h2></article></main>';
+        host.firstElementChild.getBoundingClientRect = () => ({
+          top: 64,
+          left: 0,
+          width: 390,
+          height: 700,
+        });
+      },
+      "trip1",
+      true,
+    );
+    assert.equal(oldMain.style.viewTransitionName, "");
+    await update();
+    assert.equal(
+      document.documentElement.style.getPropertyValue("--route-old-top"),
+      "-240px",
+    );
+    assert.equal(
+      document.documentElement.style.getPropertyValue("--route-new-top"),
+      "64px",
+    );
+    assert.equal(host.querySelector("img").style.viewTransitionName, "");
+    assert.equal(host.querySelector("article").style.viewTransitionName, "");
+    assert.equal(
+      document.documentElement.style.getPropertyValue("--route-direction"),
+      "-1",
+    );
+    motion.finish();
+    await act(async () => {});
+    assert.equal(document.documentElement.dataset.tripTransition, undefined);
+  } finally {
+    motion.finish();
+    document.startViewTransition = nativeStart;
+    window.scrollTo = originalScroll;
+    host.innerHTML = "";
   }
 });

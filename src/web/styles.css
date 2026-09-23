@@ -7,7 +7,7 @@
   --color-card: var(--paper);
   --color-card-foreground: var(--ink);
   --color-primary: var(--brand);
-  --color-primary-foreground: #fff;
+  --color-primary-foreground: var(--dock-on-accent);
   --color-secondary: var(--soft);
   --color-secondary-foreground: var(--ink);
   --color-muted: var(--soft);
@@ -28,17 +28,17 @@
   --line: #e5e5e5;
   --soft: #f2f2f2;
   --selected: #e8e8e8;
-  --brand: #496b80;
+  --brand: #171717;
   --danger: #b42318;
   --shadow: 0 1px 2px #182a3806, 0 6px 20px #182a3808;
   --surface-glow: #ffffffbd;
   --panel-tint: #f8f8f8e6;
-  --dock-glass: #f5f5f5c9;
+  --dock-glass: #ffffff52;
   --dock-bottom-gap: 32px;
   --control-size: 44px;
   --dock-height: 56px;
   --menu-glass: #f5f5f5e0;
-  --dock-accent: color-mix(in srgb, var(--brand) 90%, transparent);
+  --dock-accent: var(--brand);
   --dock-on-accent: #fff;
   --dock-max-width: 420px;
   --dock-border: #20232612;
@@ -55,7 +55,7 @@
   background: var(--canvas);
 }
 :root[data-theme="dark"] {
-  --dock-on-accent: #202326;
+  --dock-on-accent: #171717;
   color-scheme: dark;
   --canvas: #000;
   --paper: #1c1c1c;
@@ -64,12 +64,12 @@
   --line: #333;
   --soft: #262626;
   --selected: #383838;
-  --brand: #a7c4d6;
+  --brand: #fff;
   --danger: #ffa69d;
   --shadow: 0 1px 2px #0003, 0 8px 24px #0002;
   --surface-glow: #ffffff0e;
   --panel-tint: #242424e6;
-  --dock-glass: #262626c9;
+  --dock-glass: #18181859;
   --menu-glass: #242424e0;
   --dock-border: #ffffff18;
   --dock-border-top: #ffffff26;
@@ -256,8 +256,8 @@ strong {
     transform 150ms;
 }
 .primary {
-  color: #fff;
-  background: #496b80;
+  color: var(--dock-on-accent);
+  background: var(--brand);
 }
 .secondary {
   background: var(--paper);
@@ -420,8 +420,8 @@ strong {
   min-height: 48px;
   border-radius: 14px;
   padding: 12px 18px;
-  background: #496b80;
-  color: #fff;
+  background: var(--brand);
+  color: var(--dock-on-accent);
   font-size: 13px;
   font-weight: 600;
   box-shadow: 0 4px 16px #172d4430;
@@ -495,7 +495,7 @@ strong {
   isolation: isolate;
 }
 .trip-photo {
-  background: #496b80;
+  background: #262626;
   background-position: center;
   background-size: cover;
   position: relative;
@@ -1811,7 +1811,7 @@ input::-webkit-date-and-time-value {
 .login-art {
   height: 460px;
   border-radius: 20px;
-  background: #496b80;
+  background: #262626;
   position: relative;
   display: grid;
   place-items: center;
@@ -1944,7 +1944,7 @@ input::-webkit-date-and-time-value {
   box-shadow: inset 0 1px 3px #00000008;
   border-radius: 14px;
 }
-.segmented::before {
+.segmented[data-active-tab]::before {
   content: "";
   position: absolute;
   z-index: -1;
@@ -3085,7 +3085,7 @@ input::-webkit-date-and-time-value {
   margin: 6px 0 0;
   font-size: 24px;
 }
-:root[data-trip-transition] #main-content {
+:root[data-trip-transition="open"] #main-content {
   view-transition-name: none;
 }
 :root[data-trip-transition]::view-transition {
@@ -3358,7 +3358,7 @@ input::-webkit-date-and-time-value {
 .trip-header,
 .simple-header,
 .home-header {
-  background: color-mix(in srgb, var(--canvas) 72%, transparent);
+  background: var(--dock-glass);
   -webkit-backdrop-filter: blur(28px);
   backdrop-filter: blur(28px);
   border-bottom-color: color-mix(in srgb, var(--ink) 7%, transparent);
@@ -3371,7 +3371,7 @@ input::-webkit-date-and-time-value {
     0 2px 8px #00000012;
 }
 .modal-header {
-  background: color-mix(in srgb, var(--panel-tint) 72%, transparent);
+  background: var(--dock-glass);
   border-bottom-color: color-mix(in srgb, var(--ink) 6%, transparent);
   box-shadow: none;
 }
@@ -3470,13 +3470,10 @@ input::-webkit-date-and-time-value {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-direction: column;
-  gap: 3px;
   min-width: 48px;
   min-height: 48px;
   border-radius: 14px;
   color: var(--muted);
-  font-size: 10px;
 }
 .task-toggle:disabled {
   opacity: 1;
@@ -3501,4 +3498,33 @@ input::-webkit-date-and-time-value {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
+}
+
+/* Appearance is a three-option control, independent of the preparation tabs. */
+.appearance-control {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+.appearance-control button {
+  min-width: 0;
+  min-height: 72px;
+  padding: 10px 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  border-radius: 10px;
+}
+/* Return as one page: never float an isolated photo over the outgoing rows. */
+:root[data-trip-transition="close"]::view-transition-old(route-content) {
+  clip-path: inset(
+    max(0px, calc(var(--route-old-header-bottom) - var(--route-old-top))) 0 0
+  );
+}
+:root[data-trip-transition="close"]::view-transition-new(route-content) {
+  clip-path: inset(
+    max(0px, calc(var(--route-new-header-bottom) - var(--route-new-top))) 0 0
+  );
 }
