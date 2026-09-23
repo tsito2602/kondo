@@ -1,4 +1,4 @@
-import { BookingSchedule } from "./booking-schedule";
+import { BookingSchedule, ItemSchedule } from "./booking-schedule";
 import { dismissModal } from "./motion";
 import { Button } from "./obsidian/button";
 import { useEffect, useState } from "react";
@@ -11,6 +11,10 @@ import {
   Pencil,
   Plus,
   BookOpen,
+  MapPin,
+  Clock,
+  Link as LinkIcon,
+  ChevronRight,
 } from "lucide-react";
 import { useTravel } from "@/data/travel-provider";
 import { bookingDurationLabel } from "@/data/booking-duration";
@@ -39,7 +43,6 @@ import type {
   ItineraryItem,
   Place,
 } from "@/data/types";
-import { formatDate } from "@/utils/dates";
 import {
   BookingEditor,
   ItemEditor,
@@ -190,28 +193,43 @@ export function BookingDetail({
         }
       >
         <div className="detail-stack">
-          <span className="badge">
-            {bookingKinds.find((entry) => entry.value === booking.kind)?.label}
-          </span>
-          <h1>{booking.title}</h1>
-          <p>{booking.detail}</p>
-          {["flight", "train", "car"].includes(booking.kind) && (
-            <BookingRoute booking={booking} />
-          )}
-          <BookingSchedule booking={booking} />
-          {bookingDurationLabel(booking) && (
-            <p className="badge">{bookingDurationLabel(booking)}</p>
-          )}
+          <header className="detail-hero">
+            <span className="badge">
+              {
+                bookingKinds.find((entry) => entry.value === booking.kind)
+                  ?.label
+              }
+            </span>
+            <h1>{booking.title}</h1>
+            {booking.detail && (
+              <p className="detail-subtitle">{booking.detail}</p>
+            )}
+          </header>
+          <div className="detail-primary">
+            {["flight", "train", "car"].includes(booking.kind) && (
+              <BookingRoute booking={booking} />
+            )}
+            <BookingSchedule booking={booking} />
+            {bookingDurationLabel(booking) && (
+              <p className="detail-duration">
+                <Clock size={15} />
+                {bookingDurationLabel(booking)}
+              </p>
+            )}
+          </div>
           {(booking.location ||
             (booking.kind === "hotel" && booking.detail)) && (
-            <section>
-              <h3>場所</h3>
+            <section className="detail-section">
+              <h3>
+                <MapPin size={16} />
+                場所
+              </h3>
               <p>{booking.location || booking.detail}</p>
               <MapLink url={mapUrl(booking.location || booking.detail)} />
             </section>
           )}
           {booking.confirmationCode && (
-            <section>
+            <section className="detail-section detail-confirmation">
               <h3>予約番号</h3>
               <button
                 className="copy-code"
@@ -228,13 +246,13 @@ export function BookingDetail({
             </section>
           )}
           {booking.note && (
-            <section>
+            <section className="detail-section">
               <h3>メモ</h3>
               <p className="pre-wrap">{booking.note}</p>
             </section>
           )}
           {booking.kind === "flight" && (
-            <section>
+            <section className="detail-section">
               <h3>乗り継ぎ</h3>
               {connection ? (
                 <p>
@@ -278,7 +296,7 @@ export function BookingDetail({
             </section>
           )}
           <section
-            className="documents"
+            className="documents detail-section"
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
               event.preventDefault();
@@ -438,33 +456,46 @@ export function ItemDetail({
         }
       >
         <div className="detail-stack">
-          <span className="badge">{itemCategory(item).label}</span>
-          <h1>{item.title}</h1>
-          <p>
-            {formatDate(item.day)} {item.time}
-            {details.endTime &&
-              ` 〜 ${details.endDay && details.endDay !== item.day ? formatDate(details.endDay) : ""} ${details.endTime}`}
-          </p>
-          {details.category === "transport" && (
-            <>
-              <p>
-                {transportLabel(details)} ·{" "}
-                {durationLabel(durationMinutes(item.day, item.time, details))}
+          <header className="detail-hero">
+            <span className="badge">{itemCategory(item).label}</span>
+            <h1>{item.title}</h1>
+          </header>
+          <div className="detail-primary">
+            {details.category === "transport" &&
+              (details.transport?.origin || details.transport?.destination) && (
+                <div className="detail-route">
+                  <span>{details.transport?.origin || "出発地未設定"}</span>
+                  <ChevronRight size={18} />
+                  <span>
+                    {details.transport?.destination || "到着地未設定"}
+                  </span>
+                </div>
+              )}
+            <ItemSchedule item={item} />
+            {details.category === "transport" && (
+              <p className="detail-duration">
+                <Clock size={15} />
+                {[
+                  transportLabel(details),
+                  durationLabel(durationMinutes(item.day, item.time, details)),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </p>
-              <p>
-                {details.transport?.origin} → {details.transport?.destination}
-              </p>
-            </>
-          )}
+            )}
+          </div>
           {details.location && (
-            <section>
-              <h3>場所</h3>
+            <section className="detail-section">
+              <h3>
+                <MapPin size={16} />
+                場所
+              </h3>
               <p>{details.location}</p>
               <MapLink url={mapUrl(details.location)} />
             </section>
           )}
           {item.note && (
-            <section>
+            <section className="detail-section">
               <h3>メモ</h3>
               <p className="pre-wrap">{item.note}</p>
             </section>
@@ -566,39 +597,74 @@ export function PlaceDetail({
         }
       >
         <div className="detail-stack">
-          <div className="row">
-            <span className={`badge status-${place.status}`}>
-              {
-                placeStatuses.find((entry) => entry.value === place.status)
-                  ?.label
-              }
-            </span>
-            <span className="badge">
-              {
-                reservationStatuses.find(
-                  (entry) => entry.value === place.reservationStatus,
-                )?.label
-              }
-            </span>
-          </div>
-          <h1>{place.title}</h1>
-          {place.location && <p>{place.location}</p>}
-          <MapLink url={mapUrl(place.location, place.title)} />
+          <header className="detail-hero">
+            <div className="detail-tags">
+              <span className={`badge status-${place.status}`}>
+                {
+                  placeStatuses.find((entry) => entry.value === place.status)
+                    ?.label
+                }
+              </span>
+              <span className="badge">
+                {
+                  reservationStatuses.find(
+                    (entry) => entry.value === place.reservationStatus,
+                  )?.label
+                }
+              </span>
+            </div>
+            <h1>{place.title}</h1>
+          </header>
+          {linked && (
+            <div className="detail-primary detail-visit">
+              <p className="detail-eyebrow">
+                <BookOpen size={15} />
+                しおりの予定
+              </p>
+              <ItemSchedule item={linked} />
+              {travel.canEdit && (
+                <Button
+                  variant="ghost"
+                  className="secondary"
+                  onClick={() => setMode("schedule")}
+                >
+                  <Pencil size={16} />
+                  予定の日時を編集
+                </Button>
+              )}
+            </div>
+          )}
+          <section className="detail-section">
+            <h3>
+              <MapPin size={16} />
+              場所
+            </h3>
+            {place.location && !/^https?:\/\//i.test(place.location) && (
+              <p>{place.location}</p>
+            )}
+            <MapLink url={mapUrl(place.location, place.title)} />
+          </section>
           {place.openingHours && (
-            <section>
-              <h3>営業時間</h3>
+            <section className="detail-section">
+              <h3>
+                <Clock size={16} />
+                営業時間
+              </h3>
               <p className="pre-wrap">{place.openingHours}</p>
             </section>
           )}
           {place.note && (
-            <section>
+            <section className="detail-section">
               <h3>メモ</h3>
               <p className="pre-wrap">{place.note}</p>
             </section>
           )}
           {place.referenceLinks?.length ? (
-            <section>
-              <h3>参照リンク</h3>
+            <section className="detail-section">
+              <h3>
+                <LinkIcon size={16} />
+                参照リンク
+              </h3>
               {place.referenceLinks.map((link, index) => {
                 const url = referenceUrl(link.url);
                 return (
@@ -610,7 +676,11 @@ export function PlaceDetail({
                       target="_blank"
                       rel="noreferrer"
                     >
-                      {link.label || new URL(url).hostname}
+                      <span>
+                        <strong>{link.label || new URL(url).hostname}</strong>
+                        {link.label && <small>{new URL(url).hostname}</small>}
+                      </span>
+                      <ChevronRight size={16} />
                     </a>
                   )
                 );
@@ -618,16 +688,6 @@ export function PlaceDetail({
             </section>
           ) : null}
           <div className="detail-inline-action">{itineraryAction}</div>
-          {linked && travel.canEdit && (
-            <Button
-              variant="ghost"
-              className="secondary"
-              onClick={() => setMode("schedule")}
-            >
-              <Pencil />
-              予定の日時を編集
-            </Button>
-          )}
           {travel.canEdit && (
             <button
               className="danger subtle detail-inline-action"

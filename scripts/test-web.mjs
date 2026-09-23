@@ -457,7 +457,7 @@ test("legacy account cache and pending changes survive React migration; real for
     await fill("場所の名前", "美術館");
     await submit();
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM places").get().n, 1);
-    await click([...document.querySelectorAll(".place-card")][0]);
+    await click([...document.querySelectorAll(".place-card-main")][0]);
     assert.ok(
       document.querySelector('.context-actions [aria-label="場所を削除"]'),
     );
@@ -472,6 +472,10 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.match(document.querySelector("dialog").textContent, /しおりを見る/);
     const link = db.prepare("SELECT item_id FROM place_itinerary_links").get();
     assert.ok(link.item_id);
+    assert.equal(
+      document.querySelector(".detail-visit .booking-time-clock").textContent,
+      "16:00",
+    );
     assert.equal(
       document.querySelector(".context-primary").textContent,
       "しおりを見る",
@@ -702,7 +706,7 @@ test("all-day hotel checkout remains visible in itinerary without an end time", 
   );
 });
 
-test("booking clocks keep local time prominent and normalize seasonal offsets to UTC without duplicate Japan time", async () => {
+test("booking clocks align Japan conversions in a shared row and preserve seasonal UTC offsets", async () => {
   const { BookingSchedule } = await bundle(
     "export { BookingSchedule } from './src/web/booking-schedule';",
   );
@@ -737,10 +741,37 @@ test("booking clocks keep local time prominent and normalize seasonal offsets to
     [...doc.querySelectorAll(".booking-time-zone")].map((n) => n.textContent),
     ["現地時刻 · UTC+9", "現地時刻 · UTC+4"],
   );
-  assert.equal(doc.querySelectorAll(".booking-time-japan").length, 1);
+  assert.equal(doc.querySelectorAll(".booking-japan-row").length, 1);
   assert.match(
-    doc.querySelector(".booking-time-japan").textContent,
+    doc.querySelector(".booking-japan-row").textContent,
     /9\/29 10:30/,
+  );
+  assert.deepEqual(
+    [...doc.querySelectorAll(".booking-japan-row dt")].map(
+      (n) => n.textContent,
+    ),
+    ["出発", "到着"],
+  );
+  assert.deepEqual(
+    [...doc.querySelectorAll(".booking-japan-row dd")].map(
+      (n) => n.textContent,
+    ),
+    ["9/28 22:20", "9/29 10:30"],
+  );
+  assert.equal(
+    doc.querySelectorAll(".booking-time .booking-japan-row").length,
+    0,
+    "both local-clock columns keep the same structure",
+  );
+  assert.equal(
+    render({ destinationCode: "HND" }).querySelectorAll(".booking-japan-row")
+      .length,
+    0,
+  );
+  const partial = render({ originCode: "XXX" });
+  assert.equal(
+    partial.querySelector(".booking-japan-row dd").textContent,
+    "時差未確認",
   );
   assert.ok(!doc.body.textContent.includes("GMT"));
   assert.match(
@@ -757,11 +788,11 @@ test("booking clocks keep local time prominent and normalize seasonal offsets to
   );
   const unknown = render({ destinationCode: "XXX" });
   assert.match(unknown.body.textContent, /時差未確認/);
-  assert.equal(unknown.querySelectorAll(".booking-time-japan").length, 0);
+  assert.equal(unknown.querySelectorAll(".booking-japan-row").length, 0);
   const missing = render({ endTime: "" });
   assert.match(missing.body.textContent, /時刻未設定/);
   assert.equal(missing.querySelectorAll("time").length, 1);
-  assert.equal(missing.querySelectorAll(".booking-time-japan").length, 0);
+  assert.equal(missing.querySelectorAll(".booking-japan-row").length, 0);
 });
 
 test("booking details use kind-specific labels and keep single-date reservations to one column", async () => {

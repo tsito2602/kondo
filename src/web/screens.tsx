@@ -1,4 +1,5 @@
 import { DayStrip } from "./day-strip";
+import { PlaceCard } from "./place-card";
 import { TaskList } from "./task-list";
 import { CalendarPanel } from "./date-picker";
 import { TripCover } from "./trip-cover";
@@ -46,7 +47,7 @@ import {
   findFlightConnections,
   formatConnectionDuration,
 } from "@/data/flight-connections";
-import { placeStatuses, reservationStatuses } from "@/data/places";
+import { placeStatuses } from "@/data/places";
 import {
   matchesPreparationFilter,
   preparationFilterOptions,
@@ -54,6 +55,7 @@ import {
 import { assigneeName } from "@/data/assignee";
 import type {
   Booking,
+  Place,
   ItineraryItem,
   PackingItem,
   TravelTask,
@@ -406,6 +408,7 @@ export function PlacesScreen() {
   const travel = useTravel();
   const [id, setId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [scheduling, setScheduling] = useState<Place | null>(null);
   const [filter, setFilter] = useState("all");
   const places = travel.places.filter(
     (place) => filter === "all" || place.status === filter,
@@ -466,46 +469,23 @@ export function PlacesScreen() {
       ) : (
         <div className="place-grid">
           {places.map((place) => (
-            <button
-              className="place-card"
+            <PlaceCard
               key={place.id}
-              onClick={() => setId(place.id)}
-            >
-              <div className="place-top">
-                <span className={`place-icon status-${place.status}`}>
-                  {place.status === "visited" ? <CircleCheck /> : <MapPin />}
-                </span>
-                <Badge
-                  variant="secondary"
-                  className={`badge status-${place.status}`}
-                >
-                  {
-                    placeStatuses.find((entry) => entry.value === place.status)
-                      ?.label
-                  }
-                </Badge>
-              </div>
-              <h2>{place.title}</h2>
-              <p className="clamp muted">{place.note || place.location}</p>
-              <div className="row between">
-                <small>
-                  {
-                    reservationStatuses.find(
-                      (entry) => entry.value === place.reservationStatus,
-                    )?.label
-                  }
-                </small>
-                <span className="text-link">
-                  {travel.items.some(
-                    (item) => item.id === place.itineraryItemId,
-                  )
-                    ? "しおりを見る"
-                    : "しおりへ"}
-                </span>
-              </div>
-            </button>
+              place={place}
+              linked={travel.items.find(
+                (item) => item.id === place.itineraryItemId,
+              )}
+              tripId={travel.selectedTrip!.id}
+              onOpen={() => setId(place.id)}
+              onSchedule={
+                travel.canEdit ? () => setScheduling(place) : undefined
+              }
+            />
           ))}
         </div>
+      )}
+      {scheduling && (
+        <ItemEditor place={scheduling} onClose={() => setScheduling(null)} />
       )}
       {adding && <PlaceEditor onClose={() => setAdding(false)} />}
       {id && <PlaceDetail id={id} onClose={() => setId(null)} />}

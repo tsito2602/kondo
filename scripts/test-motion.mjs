@@ -34,7 +34,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { PlaceCard } from './src/web/place-card'; export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -52,6 +52,7 @@ new Function("require", "module", "exports", outputFiles[0].text)(
   module.exports,
 );
 const {
+  PlaceCard,
   DayStrip,
   TaskList,
   DatePicker,
@@ -2656,6 +2657,66 @@ test("date strip slides to the selected day and scrolls only when needed, respec
     assert.equal(scrolls.at(-1).behavior, "instant");
   } finally {
     reduced = false;
+    await act(async () => root.unmount());
+  }
+});
+
+test("place cards separate detail and scheduling actions, and link scheduled visits to the correct itinerary", async () => {
+  const root = createRoot(document.getElementById("root"));
+  const place = {
+    id: "p",
+    title: "美術館",
+    status: "want",
+    reservationStatus: "needed",
+    location: "旧市街",
+    note: "展示を見る",
+  };
+  let opened = 0;
+  let scheduled = 0;
+  const render = (props = {}) =>
+    root.render(
+      React.createElement(
+        MemoryRouter,
+        null,
+        React.createElement(PlaceCard, {
+          place,
+          tripId: "trip",
+          onOpen: () => opened++,
+          onSchedule: () => scheduled++,
+          ...props,
+        }),
+      ),
+    );
+  try {
+    await act(async () => render());
+    await act(async () => document.querySelector(".place-card-main").click());
+    assert.equal(opened, 1);
+    assert.equal(scheduled, 0);
+    await act(async () => document.querySelector(".place-card-action").click());
+    assert.equal(scheduled, 1);
+    assert.equal(opened, 1, "scheduling does not also open the detail panel");
+    await act(async () =>
+      render({
+        linked: { id: "item", day: "2026-11-22", time: "16:00" },
+        onSchedule: undefined,
+      }),
+    );
+    assert.equal(
+      document.querySelector(".place-card-action").getAttribute("href"),
+      "/trips/trip/itinerary?day=2026-11-22&item=item",
+    );
+    assert.match(
+      document.querySelector(".place-card-schedule").textContent,
+      /16:00/,
+    );
+    await act(async () => render({ onSchedule: undefined }));
+    assert.equal(
+      document.querySelector(".place-card-action"),
+      null,
+      "read-only visitors cannot schedule",
+    );
+    assert.ok(document.querySelector(".place-card-main"));
+  } finally {
     await act(async () => root.unmount());
   }
 });
