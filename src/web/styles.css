@@ -34,9 +34,9 @@
   --surface-glow: #ffffffbd;
   --panel-tint: #ffffffed;
   --dock-glass: color-mix(in srgb, var(--paper) 18%, transparent);
-  --dock-bottom-gap: 24px;
+  --dock-bottom-gap: 32px;
   --control-size: 44px;
-  --dock-height: var(--control-size);
+  --dock-height: 48px;
   --menu-glass: color-mix(in srgb, var(--paper) 68%, transparent);
   --dock-on-accent: #fff;
   --dock-max-width: 420px;
@@ -2883,17 +2883,17 @@ input::-webkit-date-and-time-value {
     color: var(--brand);
   }
   .safari-tabs svg {
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     position: relative;
     flex-shrink: 0;
     transition: transform 480ms var(--safari-ease);
   }
   .safari-tabs a span {
     position: absolute;
-    bottom: 4px;
-    font-size: 9px;
-    line-height: 11px;
+    bottom: 5px;
+    font-size: 10px;
+    line-height: 12px;
     white-space: nowrap;
     opacity: 0;
     transform: translateY(4px);

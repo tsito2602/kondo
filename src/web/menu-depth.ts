@@ -57,7 +57,7 @@ export function menuDepth(reduced: boolean, timing: KeyframeAnimationOptions) {
         layer.animate(
           [
             { scale: "1", filter: "blur(0px)", transformOrigin: origin },
-            { scale: ".965", filter: "blur(6px)", transformOrigin: origin },
+            { scale: ".94", filter: "blur(6px)", transformOrigin: origin },
           ],
           timing,
         ),

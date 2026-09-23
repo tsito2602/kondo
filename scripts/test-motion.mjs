@@ -1557,15 +1557,15 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
   const w = 366;
   function box(element) {
     const context = element.closest(".context-dock");
-    const back = context?.querySelector(".context-back") ? 44 : 0;
-    const actions = context?.querySelector(".context-actions") ? 88 : 0;
+    const back = context?.querySelector(".context-back") ? 48 : 0;
+    const actions = context?.querySelector(".context-actions") ? 96 : 0;
     if (element.classList.contains("context-back"))
       return { left: 0, width: back };
     if (element.classList.contains("context-actions"))
       return { left: w - actions, width: actions };
     if (element.classList.contains("context-primary"))
       return {
-        left: back ? 54 : 0,
+        left: back ? 58 : 0,
         width: w - back - actions - (back ? 10 : 0) - (actions ? 10 : 0),
       };
     return { left: 0, width: w };
@@ -1583,7 +1583,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
     },
   });
   HTMLElement.prototype.getBoundingClientRect = function () {
-    return { ...box(this), top: 0, bottom: 44, height: 44 };
+    return { ...box(this), top: 0, bottom: 48, height: 48 };
   };
   globalThis.requestAnimationFrame = (callback) => {
     pending.set(++sequence, callback);
@@ -1626,7 +1626,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
     assert.ok(initial);
     assert.equal(
       material.querySelector("svg").getAttribute("viewBox"),
-      `0 0 ${w + 24} 68`,
+      `0 0 ${w + 24} 72`,
     );
     await act(async () => setMode("place"));
     assert.equal(border.getAttribute("d"), initial, "no jump on registration");
@@ -1647,7 +1647,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
     assert.equal(pending.size, 1, "only the new animation remains active");
     advance(820);
     const settings = dockSlots(w, [
-      { left: 0, width: 44, radius: 22 },
+      { left: 0, width: 48, radius: 24 },
       null,
       null,
     ]);
@@ -1658,7 +1658,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
         settings.map((island) => ({ ...island, left: island.left + 12 })),
         0,
         [],
-        34,
+        36,
       ),
     );
     assert.equal(pending.size, 0);
@@ -1683,7 +1683,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
         settings.map((island) => ({ ...island, left: island.left + 12 })),
         0,
         [],
-        34,
+        36,
       ),
     );
     await act(async () => pointer(button, "pointerup"));
@@ -2038,7 +2038,7 @@ test("menu depth keeps scrolled fixed controls in place and reverses from an int
     assert.equal(add.style.top, "1850px");
     assert.equal(add.style.left, "320px");
     assert.equal(calls[0].element, main);
-    assert.equal(calls[0].frames[1].scale, ".965");
+    assert.equal(calls[0].frames[1].scale, ".94");
     assert.equal(calls[0].frames[1].filter, "blur(6px)");
     assert.equal(
       calls[0].frames[1].transformOrigin,
