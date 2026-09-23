@@ -36,6 +36,7 @@
   --dock-glass: color-mix(in srgb, var(--paper) 30%, transparent);
   --dock-bottom-gap: 24px;
   --dock-height: 64px;
+  --dock-on-accent: #fff;
   --dock-max-width: 420px;
   --dock-border: #20232612;
   --dock-border-top: #2023261a;
@@ -51,6 +52,7 @@
   background: var(--canvas);
 }
 :root[data-theme="dark"] {
+  --dock-on-accent: #202326;
   color-scheme: dark;
   --canvas: #111315;
   --paper: #1b1e21;
@@ -2446,6 +2448,23 @@ input::-webkit-date-and-time-value {
   .context-island > :not(.danger) {
     color: var(--ink);
   }
+  .context-island.context-primary > :not(.danger) {
+    color: var(--dock-on-accent);
+  }
+  .context-island {
+    transform-origin: center;
+  }
+  .context-island[data-pressed="true"] {
+    transform: scale(var(--safari-press-scale, 1.06), 1.1);
+  }
+  .thumb-dock-content[data-outgoing] {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .thumb-dock-content[data-outgoing] * {
+    pointer-events: none !important;
+  }
   .detail-inline-action {
     display: none;
   }
@@ -2458,15 +2477,14 @@ input::-webkit-date-and-time-value {
   .thumb-dock-content {
     height: var(--dock-height);
     padding: 0;
-    animation: thumb-content-enter 280ms var(--ease-flow) both;
   }
-  .thumb-dock:not([data-mode="browse"]) .thumb-dock-content {
+  .thumb-dock-content:not([data-mode="browse"]) {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
   }
-  .thumb-dock:not([data-mode="browse"]) .thumb-dock-content > * {
+  .thumb-dock-content:not([data-mode="browse"]) > * {
     flex: 1;
     min-height: 48px;
     border-radius: 23px;
@@ -2563,6 +2581,12 @@ input::-webkit-date-and-time-value {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .fluid-dock-accent {
+    transition: none !important;
+  }
+  .context-island[data-pressed="true"] {
+    transform: none;
+  }
   .thumb-dock-content {
     animation: none;
   }
@@ -2645,6 +2669,23 @@ input::-webkit-date-and-time-value {
     background: var(--dock-glass);
     -webkit-backdrop-filter: blur(24px) saturate(1.18);
     backdrop-filter: blur(24px) saturate(1.18);
+  }
+  .thumb-dock-material > .safari-glass,
+  .thumb-dock-material > svg {
+    inset: -12px;
+    width: calc(100% + 24px);
+    height: calc(var(--dock-height) + 24px);
+  }
+  .fluid-dock-accent {
+    position: absolute;
+    inset: 0;
+    background: var(--brand);
+    opacity: 0;
+    transition: opacity 140ms ease-out;
+  }
+  .safari-glass[data-accent="true"] .fluid-dock-accent {
+    opacity: 1;
+    transition: opacity 280ms 300ms var(--ease-flow);
   }
   .safari-left {
     left: 0;

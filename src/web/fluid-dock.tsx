@@ -7,6 +7,7 @@ import {
   type RefObject,
 } from "react";
 import { reduceMotion } from "./motion";
+import { animateDockPress } from "./dock-surface";
 
 export type DockIsland = { left: number; width: number; radius: number };
 const samples = 320;
@@ -71,20 +72,32 @@ export function morphDock(
 }
 
 /** A capsule's horizontal slice: y² < field(x). Negative values are real gaps. */
-export function dockField(width: number, islands: DockIsland[], tension = 0) {
-  const ceiling = Math.max(...islands.map((island) => island.radius ** 2));
+export function dockField(
+  width: number,
+  islands: DockIsland[],
+  tension = 0,
+  scales: { x: number; y: number }[] = [],
+) {
+  const ceiling = Math.max(
+    ...islands.map((island, i) => (island.radius * (scales[i]?.y ?? 1)) ** 2),
+  );
   return Array.from({ length: samples + 1 }, (_, i) => {
     const x = (i / samples) * width;
     let value = -width * width;
-    for (const island of islands) {
+    for (const [index, island] of islands.entries()) {
+      const { x: sx, y: sy } = scales[index] ?? { x: 1, y: 1 };
+      const localX =
+        (x - island.left - island.width / 2) / sx +
+        island.left +
+        island.width / 2;
       const r = Math.min(island.radius, island.width / 2);
       if (r <= 0) continue;
       const dx = Math.max(
-        island.left + r - x,
+        island.left + r - localX,
         0,
-        x - (island.left + island.width - r),
+        localX - (island.left + island.width - r),
       );
-      const next = r * r - dx * dx;
+      const next = (r * r - dx * dx) * sy * sy;
       // Smooth union draws a neck between nearby droplets, without double blur
       // or a border through the join. Distant islands remain separate.
       const h = tension
@@ -97,7 +110,7 @@ export function dockField(width: number, islands: DockIsland[], tension = 0) {
 }
 
 /** Trace one closed contour per connected region, including subpixel pinch-off. */
-export function dockFieldPath(width: number, field: number[]) {
+export function dockFieldPath(width: number, field: number[], center = 32) {
   const step = width / (field.length - 1);
   const contours: string[] = [];
   let points: [number, number][] = [];
@@ -108,9 +121,9 @@ export function dockFieldPath(width: number, field: number[]) {
       return;
     }
     contours.push(
-      `M ${points.map(([x, y]) => point(x, 32 - y)).join(" L ")} L ${points
+      `M ${points.map(([x, y]) => point(x, center - y)).join(" L ")} L ${points
         .reverse()
-        .map(([x, y]) => point(x, 32 + y))
+        .map(([x, y]) => point(x, center + y))
         .join(" L ")} Z`,
     );
     points = [];
@@ -141,6 +154,7 @@ export function FluidDockSurface({
   ref: Ref<FluidDockHandle>;
 }) {
   const glass = useRef<HTMLDivElement>(null);
+  const accent = useRef<HTMLDivElement>(null);
   const outline = useRef<SVGPathElement>(null);
   const shadow = useRef<SVGPathElement>(null);
   const svg = useRef<SVGSVGElement>(null);
@@ -148,24 +162,54 @@ export function FluidDockSurface({
   const target = useRef("");
   const width = useRef(0);
   const frame = useRef(0);
+  const pressFrame = useRef(0);
+  const controls = useRef<(HTMLElement | null)[]>([]);
   const id = useId();
   const paint = () => {
     if (!shape.current || !glass.current) return;
+    const w = width.current + 24;
+    const islands = shape.current.islands.map((island) => ({
+      ...island,
+      left: island.left + 12,
+    }));
+    const scales = controls.current.map((element) => {
+      const matrix =
+        element &&
+        window.getComputedStyle(element).transform.match(/^matrix\(([^)]+)\)$/);
+      const values = matrix?.[1].split(",").map(Number);
+      return { x: values?.[0] || 1, y: values?.[3] || 1 };
+    });
     const d = dockFieldPath(
-      width.current,
-      dockField(width.current, shape.current.islands, shape.current.tension),
+      w,
+      dockField(w, islands, shape.current.tension, scales),
+      44,
     );
     glass.current.style.clipPath = `path("${d}")`;
+    if (accent.current)
+      accent.current.style.clipPath = `path("${dockFieldPath(w, dockField(w, [islands[1]], 0, [scales[1] ?? { x: 1, y: 1 }]), 44)}")`;
     outline.current!.setAttribute("d", d);
     shadow.current!.setAttribute("d", d);
-    svg.current!.setAttribute("viewBox", `0 0 ${width.current} 64`);
+    svg.current!.setAttribute("viewBox", `0 0 ${w} 88`);
   };
   const measure = () => {
     const node = root.current;
     if (!node) return;
     const w = node.clientWidth;
     if (!w) return; // Hidden desktop dock or a host not yet in the top layer.
-    const tabs = node.querySelector<HTMLElement>(".safari-dock");
+    const content = node.querySelector<HTMLElement>(
+      ".thumb-dock-content:not([data-outgoing])",
+    );
+    const tabs = content?.querySelector<HTMLElement>(".safari-dock");
+    controls.current = ["back", "primary", "actions"].map(
+      (role) =>
+        content?.querySelector<HTMLElement>(
+          `.context-island.context-${role}`,
+        ) ?? null,
+    );
+    glass.current?.setAttribute(
+      "data-accent",
+      String(Boolean(controls.current[1])),
+    );
     let islands: DockIsland[];
     if (tabs) {
       const side = node.clientHeight || 64;
@@ -182,16 +226,16 @@ export function FluidDockSurface({
     } else {
       const bounds = node.getBoundingClientRect();
       const scale = bounds.width / w || 1;
-      const slots = ["back", "primary", "actions"].map((role) => {
-        const element = node.querySelector<HTMLElement>(
-          `.context-island.context-${role}`,
-        );
+      const slots = controls.current.map((element) => {
         return element
           ? {
               left:
                 Math.round(
                   ((element.getBoundingClientRect().left - bounds.left) /
-                    scale) *
+                    scale +
+                    (element.getBoundingClientRect().width / scale -
+                      element.offsetWidth) /
+                      2) *
                     100,
                 ) / 100,
               width: element.offsetWidth,
@@ -206,7 +250,10 @@ export function FluidDockSurface({
       String(Math.max(1, Math.min(1.06, (window.innerWidth - 8) / w))),
     );
     const key = JSON.stringify([w, islands]);
-    if (key === target.current) return;
+    if (key === target.current) {
+      paint();
+      return;
+    }
     target.current = key;
     cancelAnimationFrame(frame.current);
     const from = shape.current;
@@ -228,6 +275,74 @@ export function FluidDockSurface({
     };
     frame.current = requestAnimationFrame(tick);
   };
+  useEffect(() => {
+    const node = root.current;
+    if (!node) return;
+    let pressed: HTMLElement | null = null;
+    let pointerId: number | null = null;
+    const animations = new Map<HTMLElement, Animation>();
+    const feedback = (element: HTMLElement, down: boolean) => {
+      const motion = animateDockPress(element, down, animations.get(element));
+      if (motion) {
+        animations.set(element, motion);
+        void motion.finished.then(
+          () => {
+            if (animations.get(element) === motion) animations.delete(element);
+          },
+          () => {},
+        );
+      }
+      element.dataset.pressed = String(down);
+      cancelAnimationFrame(pressFrame.current);
+      const start = performance.now();
+      const tick = () => {
+        paint();
+        if (!reduceMotion() && performance.now() - start < 920)
+          pressFrame.current = requestAnimationFrame(tick);
+      };
+      tick();
+    };
+    const release = () => {
+      if (pressed) feedback(pressed, false);
+      pressed = null;
+      pointerId = null;
+    };
+    const down = (event: PointerEvent) => {
+      if (event.button !== 0 || event.isPrimary === false) return;
+      const target = event.target as HTMLElement;
+      const element = target.closest<HTMLElement>(".context-island");
+      if (!element || target.closest("[disabled], [inert], [data-outgoing]"))
+        return;
+      release();
+      pressed = element;
+      pointerId = event.pointerId;
+      feedback(element, true);
+    };
+    const up = (event: PointerEvent) => {
+      if (event.pointerId === pointerId) release();
+    };
+    const out = (event: PointerEvent) => {
+      if (
+        event.pointerId === pointerId &&
+        !pressed?.contains(event.relatedTarget as Node | null)
+      )
+        release();
+    };
+    node.addEventListener("pointerdown", down);
+    node.addEventListener("pointerout", out);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    window.addEventListener("blur", release);
+    return () => {
+      node.removeEventListener("pointerdown", down);
+      node.removeEventListener("pointerout", out);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      window.removeEventListener("blur", release);
+      animations.forEach((animation) => animation.cancel());
+      cancelAnimationFrame(pressFrame.current);
+    };
+  }, []);
   useImperativeHandle(ref, () => ({ measure }));
   useEffect(() => {
     const observer =
@@ -253,7 +368,9 @@ export function FluidDockSurface({
   }, []);
   return (
     <div className="thumb-dock-material safari-surface" aria-hidden="true">
-      <div ref={glass} className="safari-glass" />
+      <div ref={glass} className="safari-glass">
+        <div ref={accent} className="fluid-dock-accent" />
+      </div>
       <svg ref={svg} width="100%" height="64" preserveAspectRatio="none">
         <defs>
           <filter

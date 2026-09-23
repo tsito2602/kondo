@@ -31,7 +31,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { DockContent } from './src/web/dock-content'; export { dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -50,6 +50,7 @@ new Function("require", "module", "exports", outputFiles[0].text)(
 );
 const {
   Modal,
+  DockContent,
   AnchoredMenu,
   SafariTabs,
   dockOutline,
@@ -1246,9 +1247,58 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
     ]);
     assert.equal(
       border.getAttribute("d"),
-      dockFieldPath(w, dockField(w, settings)),
+      dockFieldPath(
+        w + 24,
+        dockField(
+          w + 24,
+          settings.map((island) => ({ ...island, left: island.left + 12 })),
+        ),
+        44,
+      ),
     );
     assert.equal(pending.size, 0);
+    const back = document.querySelector(".context-back");
+    const button = back.querySelector("button");
+    const motions = [];
+    back.animate = (frames, options) => {
+      const animation = timeline();
+      motions.push({ frames, options, animation });
+      return animation;
+    };
+    await act(async () => pointer(button, "pointerdown"));
+    assert.equal(back.dataset.pressed, "true");
+    assert.equal(motions[0].options.duration, 320);
+    back.style.transform = "matrix(1.06, 0, 0, 1.1, 0, 0)";
+    advance(320);
+    const expanded = border.getAttribute("d");
+    assert.notEqual(
+      expanded,
+      dockFieldPath(
+        w + 24,
+        dockField(
+          w + 24,
+          settings.map((island) => ({ ...island, left: island.left + 12 })),
+        ),
+        44,
+      ),
+    );
+    await act(async () => pointer(button, "pointerup"));
+    assert.equal(back.dataset.pressed, "false");
+    assert.equal(motions[1].options.duration, 900);
+    assert.equal(
+      motions[1].frames[0].transform,
+      "matrix(1.06, 0, 0, 1.1, 0, 0)",
+    );
+    back.style.transform = "none";
+    advance(920);
+    button.disabled = true;
+    await act(async () => pointer(button, "pointerdown"));
+    assert.equal(motions.length, 2, "disabled controls do not expand");
+    button.disabled = false;
+    await act(async () => pointer(button, "pointerdown"));
+    await act(async () => pointer(button, "pointercancel"));
+    assert.equal(back.dataset.pressed, "false");
+    advance(920);
     reduced = true;
     await act(async () => setMode("tabs"));
     assert.equal(border.getAttribute("d"), initial);
@@ -1279,5 +1329,71 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
     globalThis.requestAnimationFrame = originalRAF;
     globalThis.cancelAnimationFrame = originalCancel;
     performance.now = originalNow;
+  }
+});
+
+test("dock labels fade out before replacement appears, with inert snapshots and interruption cleanup", async () => {
+  const original = HTMLElement.prototype.animate;
+  const calls = [];
+  HTMLElement.prototype.animate = function (frames, options) {
+    const animation = timeline();
+    calls.push({ node: this, frames, options, animation });
+    return animation;
+  };
+  const root = createRoot(document.getElementById("root"));
+  const h = React.createElement;
+  const render = (identity, label) =>
+    act(async () =>
+      root.render(
+        h(
+          DockContent,
+          { identity, mode: "context" },
+          h("button", { id: "dock-save", form: "editor" }, label),
+        ),
+      ),
+    );
+  try {
+    await render("home", "旅行を作成");
+    await render("save", "保存する");
+    const current = document.querySelector(
+      ".thumb-dock-content:not([data-outgoing])",
+    );
+    const old = document.querySelector("[data-outgoing]");
+    assert.equal(old.textContent, "旅行を作成");
+    assert.equal(old.inert, true);
+    assert.equal(old.getAttribute("aria-hidden"), "true");
+    assert.equal(old.querySelector("[id], [form]"), null);
+    assert.equal(
+      current.inert,
+      true,
+      "invisible incoming controls cannot be activated",
+    );
+    assert.equal(calls[1].frames[0].opacity, 0);
+    assert.ok(calls[1].options.delay >= calls[0].options.duration);
+    await render("save", "保存中…");
+    assert.equal(
+      calls.length,
+      2,
+      "busy/validation updates do not restart the transition",
+    );
+    await render("detail", "編集");
+    assert.equal(old.isConnected, false);
+    assert.equal(calls[1].animation.cancelled, true);
+    assert.equal(document.querySelectorAll("[data-outgoing]").length, 1);
+    await act(async () => {
+      calls.at(-2).animation.finish();
+      calls.at(-1).animation.finish();
+    });
+    assert.equal(document.querySelector("[data-outgoing]"), null);
+    assert.equal(current.inert, false);
+    reduced = true;
+    await render("settings", "戻る");
+    assert.equal(calls.length, 4);
+    assert.equal(current.inert, false);
+  } finally {
+    reduced = false;
+    await act(async () => root.unmount());
+    if (original) HTMLElement.prototype.animate = original;
+    else delete HTMLElement.prototype.animate;
   }
 });

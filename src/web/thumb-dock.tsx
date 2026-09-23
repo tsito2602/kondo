@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { DockContent } from "./dock-content";
 import { FluidDockSurface, type FluidDockHandle } from "./fluid-dock";
 
 type DockEntry = {
@@ -71,8 +72,8 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
     };
   }, []);
   const ordered = [...entries.values()].sort((a, b) => a.order - b.order);
-  const active = ordered.filter((entry) => entry.scope === "dock").at(-1)
-    ?.value as DockEntry | undefined;
+  const activeEntry = ordered.filter((entry) => entry.scope === "dock").at(-1);
+  const active = activeEntry?.value as DockEntry | undefined;
   const browse = ordered
     .filter(
       (entry) =>
@@ -113,9 +114,12 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
                 inert={active?.disabled}
               >
                 <FluidDockSurface root={surface} ref={morph} />
-                <div className="thumb-dock-content" key={visible?.mode}>
+                <DockContent
+                  identity={`${activeEntry?.order}:${visible?.mode}`}
+                  mode={visible?.mode ?? "browse"}
+                >
                   {visible?.content}
-                </div>
+                </DockContent>
               </div>
             </DockNavigationContext.Provider>
           </SharedDockSurfaceContext.Provider>,
