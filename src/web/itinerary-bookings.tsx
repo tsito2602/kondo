@@ -1,4 +1,11 @@
-import { ArrowRight, Hotel } from "lucide-react";
+import {
+  ArrowRight,
+  BedDouble,
+  LogIn,
+  LogOut,
+  PlaneLanding,
+  PlaneTakeoff,
+} from "lucide-react";
 import type { Booking } from "@/data/types";
 import type { Entry } from "./screens";
 
@@ -83,7 +90,15 @@ export function JourneyPair({
         },
       ].map((point) => (
         <div className="journey-point" key={point.label}>
-          <span className="journey-point-label">{point.label}</span>
+          <span className="journey-point-label">
+            {booking.kind === "flight" &&
+              (point.label === "到着" ? (
+                <PlaneLanding size={13} aria-hidden="true" />
+              ) : (
+                <PlaneTakeoff size={13} aria-hidden="true" />
+              ))}
+            {point.label}
+          </span>
           <div className="journey-point-main">
             <span className="journey-clock">{point.time || "時刻未定"}</span>
             <strong>{point.place}</strong>
@@ -118,6 +133,12 @@ export function StayCards({
             : day === booking.endDay
               ? "チェックアウト日"
               : "連泊";
+        const StayIcon =
+          day === booking.day
+            ? LogIn
+            : day === booking.endDay
+              ? LogOut
+              : BedDouble;
         return (
           <button
             className="stay-card"
@@ -126,7 +147,7 @@ export function StayCards({
             onClick={() => onOpen(booking.id)}
           >
             <div className="stay-heading">
-              <Hotel size={16} />
+              <StayIcon size={16} aria-hidden="true" />
               <span>{label}</span>
             </div>
             <h3>{booking.title}</h3>

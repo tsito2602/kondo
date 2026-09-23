@@ -24,6 +24,8 @@ import {
   Check,
   MapPin,
   Plane,
+  PlaneLanding,
+  PlaneTakeoff,
   Pin,
   Search,
   Trash2,
@@ -279,7 +281,13 @@ export function ItineraryScreen() {
               )}
               {dayEntries.map((entry) => {
                 const BookingIcon = entry.booking
-                  ? bookingIcons[entry.booking.kind]
+                  ? entry.booking.kind === "flight"
+                    ? entry.endpoint === "end"
+                      ? PlaneLanding
+                      : PlaneTakeoff
+                    : entry.booking.kind === "train" && entry.endpoint === "end"
+                      ? MapPin
+                      : bookingIcons[entry.booking.kind]
                   : BookOpen;
                 const transport =
                   entry.item &&
