@@ -36,3 +36,7 @@ yarn-error.*
 *.tsbuildinfo
 
 example
+
+# Local-only Worker secrets
+.dev.vars
+.dev.vars.*

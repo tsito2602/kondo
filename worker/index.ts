@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
+import { Hono } from 'hono';
 import { validDate } from '../src/utils/dates';
 import { itineraryCategories, transportModes, itineraryDetailsError } from '../src/data/itinerary';
 import type { ItineraryDetails } from '../src/data/types';
@@ -242,7 +243,7 @@ async function placesRoute(request: Request, env: Env, user: User, tripId: strin
       if (!item) fields.itineraryItemId = null;
     }
     const legacyReservationStatus = reservationStatus === 'unavailable' ? 'not_needed' : reservationStatus;
-    const id = placeId ?? idField(body.id) ?? crypto.randomUUID();
+    const id = placeId ?? idField(isObject(body) ? body.id : undefined) ?? crypto.randomUUID();
     const statement = placeId
       ? await env.DB.prepare('UPDATE places SET title=?, note=?, opening_hours=?, reservation_status=?, location=?, status=?, updated_by=?, updated_at=unixepoch() WHERE id=? AND trip_id=?').bind(title, note, openingHours, legacyReservationStatus, location, status, user.id, id, tripId)
       : await env.DB.prepare(`INSERT INTO places (id, trip_id, title, note, opening_hours, reservation_status, location, status, updated_by) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title, note=excluded.note, opening_hours=excluded.opening_hours, reservation_status=excluded.reservation_status, location=excluded.location, status=excluded.status, updated_by=excluded.updated_by, updated_at=unixepoch() WHERE places.trip_id=excluded.trip_id`).bind(id, tripId, title, note, openingHours, legacyReservationStatus, location, status, user.id);
@@ -343,7 +344,7 @@ async function createItem(request: Request, env: Env, user: User, tripId: string
   const body = await request.json().catch(() => null);
   const fields = isObject(body) ? itineraryFields(body) : null;
   if (!fields) return json({ error: '正しい旅程を入力してください' }, 400);
-  const id = idField(body?.id) ?? crypto.randomUUID();
+  const id = idField(isObject(body) ? body.id : undefined) ?? crypto.randomUUID();
   const statement = env.DB.prepare(`
     INSERT INTO itinerary_items (id, trip_id, day, time, kind, title, note, updated_by)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -476,7 +477,7 @@ async function createBooking(request: Request, env: Env, user: User, tripId: str
   const body = await request.json().catch(() => null);
   const fields = isObject(body) ? bookingFields(body) : null;
   if (!fields) return json({ error: '正しい予約情報を入力してください' }, 400);
-  const id = idField(body?.id) ?? crypto.randomUUID();
+  const id = idField(isObject(body) ? body.id : undefined) ?? crypto.randomUUID();
   const [bookingResult] = await env.DB.batch([
     env.DB.prepare(`
       INSERT INTO bookings (id, trip_id, kind, title, detail, day, time, confirmation_code, note, updated_by)
@@ -701,7 +702,7 @@ async function writePackingItem(request: Request, env: Env, user: User, tripId: 
   const body = await request.json().catch(() => null);
   const fields = isObject(body) ? packingFields(body) : null;
   if (!fields) return json({ error: '正しい持ち物情報を入力してください' }, 400);
-  const id = itemId ?? idField(body?.id) ?? crypto.randomUUID();
+  const id = itemId ?? idField(isObject(body) ? body.id : undefined) ?? crypto.randomUUID();
   const invalidAssignee = await validatePackingAssignee(env, tripId, fields.assignee, id);
   if (invalidAssignee) return invalidAssignee;
   const statement = itemId
@@ -781,7 +782,7 @@ async function createTask(request: Request, env: Env, user: User, tripId: string
   const body = await request.json().catch(() => null);
   const fields = isObject(body) ? taskFields(body) : null;
   if (!fields) return json({ error: '正しいタスク情報を入力してください' }, 400);
-  const id = idField(body?.id) ?? crypto.randomUUID();
+  const id = idField(isObject(body) ? body.id : undefined) ?? crypto.randomUUID();
   const invalidAssignee = await validateAssignee(env, tripId, fields.assignee, id);
   if (invalidAssignee) return invalidAssignee;
   const result = await env.DB.prepare(`
@@ -891,106 +892,77 @@ async function acceptInvite(env: Env, user: User, token: string) {
   return json({ tripId: invite.tripId });
 }
 
-async function api(request: Request, env: Env, url: URL) {
-  if (request.method === 'POST' && url.pathname === '/v1/auth/google') return googleLogin(request, env);
-  const user = await currentUser(request, env);
+const app = new Hono<{ Bindings: Env; Variables: { user: User } }>();
+app.use('/v1/*', async (c, next) => {
+  const headers = cors(c.req.raw, c.env);
+  headers.forEach((value, key) => c.header(key, value));
+  c.header('Cache-Control', 'no-store');
+  if (c.req.method === 'OPTIONS') return c.body(null, 204);
+  await next();
+});
+app.post('/v1/auth/google', (c) => googleLogin(c.req.raw, c.env));
+app.use('/v1/*', async (c, next) => {
+  const user = await currentUser(c.req.raw, c.env);
   if (!user) return json({ error: 'ログインが必要です' }, 401);
-  if (request.method === 'GET' && url.pathname === '/v1/me') return json({ user });
-  if (request.method === 'PATCH' && url.pathname === '/v1/me') {
-    const body = await request.json().catch(() => null);
-    const name = isObject(body) ? textField(body.name, 100, true) : null;
-    if (!name) return json({ error: '表示名は1〜100文字で入力してください' }, 400);
-    await env.DB.prepare('UPDATE users SET display_name = ?, updated_at = unixepoch() WHERE id = ?').bind(name, user.id).run();
-    return json({ user: { ...user, name } });
-  }
-  if (request.method === 'POST' && url.pathname === '/v1/auth/logout') {
-    const token = request.headers.get('authorization')?.slice(7);
-    if (token) await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await hashToken(token)).run();
-    return json({ ok: true });
-  }
-  if (request.method === 'GET' && url.pathname === '/v1/trips') return listTrips(env, user);
-  if (request.method === 'POST' && url.pathname === '/v1/trips') return createTrip(request, env, user);
-
-  // This gate also protects old clients and document uploads after a role change.
-  const scope = url.pathname.match(/^\/v1\/trips\/([^/]+)(?:\/|$)/);
-  if (scope && request.method !== 'GET' && await memberRole(env, scope[1], user.id) === 'viewer') {
+  c.set('user', user);
+  const scope = c.req.path.match(/^\/v1\/trips\/([^/]+)(?:\/|$)/);
+  if (scope && c.req.method !== 'GET' && await memberRole(c.env, scope[1], user.id) === 'viewer') {
     return json({ error: 'この旅行は閲覧のみです' }, 403);
   }
-  const membersMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/members(?:\/([^/]+))?$/);
-  if (membersMatch) return membersRoute(request, env, user, membersMatch[1], membersMatch[2]);
-  const tripMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)$/);
-  if (tripMatch && request.method === 'DELETE') return deleteTrip(env, user, tripMatch[1]);
-  const notesMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/notes(?:\/([^/]+))?$/);
-  if (notesMatch) return notesRoute(request, env, user, notesMatch[1], notesMatch[2]);
-  const placesMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/places(?:\/([^/]+))?$/);
-  if (placesMatch) return placesRoute(request, env, user, placesMatch[1], placesMatch[2]);
-  if (tripMatch && request.method === 'PATCH') return updateTrip(request, env, user, tripMatch[1]);
-
-  const itemsMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/items$/);
-  if (itemsMatch && request.method === 'GET') return listItems(env, user, itemsMatch[1]);
-  if (itemsMatch && request.method === 'POST') return createItem(request, env, user, itemsMatch[1]);
-
-  const itemMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/items\/([^/]+)$/);
-  if (itemMatch && request.method === 'PATCH') return updateItem(request, env, user, itemMatch[1], itemMatch[2]);
-  if (itemMatch && request.method === 'DELETE') return deleteItem(env, user, itemMatch[1], itemMatch[2]);
-
-  const bookingsMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/bookings$/);
-  if (bookingsMatch && request.method === 'GET') return listBookings(env, user, bookingsMatch[1]);
-  if (bookingsMatch && request.method === 'POST') return createBooking(request, env, user, bookingsMatch[1]);
-
-  const bookingMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/bookings\/([^/]+)$/);
-  if (bookingMatch && request.method === 'PATCH') return updateBooking(request, env, user, bookingMatch[1], bookingMatch[2]);
-  if (bookingMatch && request.method === 'DELETE') return deleteBooking(env, user, bookingMatch[1], bookingMatch[2]);
-
-  const connectionMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/bookings\/([^/]+)\/connection$/);
-  if (connectionMatch && request.method === 'PATCH') return updateFlightConnection(request, env, user, connectionMatch[1], connectionMatch[2]);
-
-  const bookingDocumentsMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/booking-documents$/);
-  if (bookingDocumentsMatch && request.method === 'GET') return listBookingDocuments(env, user, bookingDocumentsMatch[1]);
-
-  const bookingDocumentCollectionMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/bookings\/([^/]+)\/documents$/);
-  if (bookingDocumentCollectionMatch && request.method === 'POST') return uploadBookingDocument(request, env, user, bookingDocumentCollectionMatch[1], bookingDocumentCollectionMatch[2]);
-
-  const bookingDocumentMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/bookings\/([^/]+)\/documents\/([^/]+)$/);
-  if (bookingDocumentMatch && request.method === 'GET') return getBookingDocument(env, user, bookingDocumentMatch[1], bookingDocumentMatch[2], bookingDocumentMatch[3]);
-  if (bookingDocumentMatch && request.method === 'DELETE') return deleteBookingDocument(env, user, bookingDocumentMatch[1], bookingDocumentMatch[2], bookingDocumentMatch[3]);
-
-  const packingItemsMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/packing$/);
-  if (packingItemsMatch && request.method === 'GET') return listPacking(env, user, packingItemsMatch[1]);
-  if (packingItemsMatch && request.method === 'POST') return createPackingItem(request, env, user, packingItemsMatch[1]);
-
-  const packingItemMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/packing\/([^/]+)$/);
-  if (packingItemMatch && request.method === 'PATCH') return updatePackingItem(request, env, user, packingItemMatch[1], packingItemMatch[2]);
-  if (packingItemMatch && request.method === 'DELETE') return deletePackingItem(env, user, packingItemMatch[1], packingItemMatch[2]);
-
-  const tasksMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/tasks$/);
-  if (tasksMatch && request.method === 'GET') return listTasks(env, user, tasksMatch[1]);
-  if (tasksMatch && request.method === 'POST') return createTask(request, env, user, tasksMatch[1]);
-
-  const taskMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/tasks\/([^/]+)$/);
-  if (taskMatch && request.method === 'PATCH') return updateTask(request, env, user, taskMatch[1], taskMatch[2]);
-  if (taskMatch && request.method === 'DELETE') return deleteTask(env, user, taskMatch[1], taskMatch[2]);
-
-  const inviteMatch = url.pathname.match(/^\/v1\/trips\/([^/]+)\/invites$/);
-  if (inviteMatch && request.method === 'DELETE') return revokeInvites(env, user, inviteMatch[1]);
-  if (inviteMatch && request.method === 'POST') return createInvite(env, user, inviteMatch[1], url);
-  const acceptMatch = url.pathname.match(/^\/v1\/invites\/([^/]+)\/accept$/);
-  if (acceptMatch && request.method === 'POST') return acceptInvite(env, user, acceptMatch[1]);
-  return json({ error: 'Not found' }, 404);
-}
-
-const worker = {
-  async fetch(request: Request, env: Env) {
-    const url = new URL(request.url);
-    const corsHeaders = cors(request, env);
-    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
-    if (url.pathname.startsWith('/v1/')) {
-      const response = await api(request, env, url);
-      corsHeaders.forEach((value, key) => response.headers.set(key, value));
-      return response;
-    }
-    return env.ASSETS.fetch(request);
-  },
-};
-
-export default worker;
+  await next();
+});
+app.get('/v1/me', (c) => json({ user: c.get('user') }));
+app.patch('/v1/me', async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const name = isObject(body) ? textField(body.name, 100, true) : null;
+  if (!name) return json({ error: '表示名は1〜100文字で入力してください' }, 400);
+  const user = c.get('user');
+  await c.env.DB.prepare('UPDATE users SET display_name = ?, updated_at = unixepoch() WHERE id = ?').bind(name, user.id).run();
+  return json({ user: { ...user, name } });
+});
+app.post('/v1/auth/logout', async (c) => {
+  const token = c.req.header('authorization')?.slice(7);
+  if (token) await c.env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await hashToken(token)).run();
+  return json({ ok: true });
+});
+app.get('/v1/trips', (c) => listTrips(c.env, c.get('user')));
+app.post('/v1/trips', (c) => createTrip(c.req.raw, c.env, c.get('user')));
+app.patch('/v1/trips/:tripId', (c) => updateTrip(c.req.raw, c.env, c.get('user'), c.req.param('tripId')));
+app.delete('/v1/trips/:tripId', (c) => deleteTrip(c.env, c.get('user'), c.req.param('tripId')));
+app.get('/v1/trips/:tripId/items', (c) => listItems(c.env, c.get('user'), c.req.param('tripId')));
+app.post('/v1/trips/:tripId/items', (c) => createItem(c.req.raw, c.env, c.get('user'), c.req.param('tripId')));
+app.patch('/v1/trips/:tripId/items/:itemId', (c) => updateItem(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('itemId')));
+app.delete('/v1/trips/:tripId/items/:itemId', (c) => deleteItem(c.env, c.get('user'), c.req.param('tripId'), c.req.param('itemId')));
+app.get('/v1/trips/:tripId/bookings', (c) => listBookings(c.env, c.get('user'), c.req.param('tripId')));
+app.post('/v1/trips/:tripId/bookings', (c) => createBooking(c.req.raw, c.env, c.get('user'), c.req.param('tripId')));
+app.patch('/v1/trips/:tripId/bookings/:bookingId', (c) => updateBooking(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId')));
+app.delete('/v1/trips/:tripId/bookings/:bookingId', (c) => deleteBooking(c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId')));
+app.patch('/v1/trips/:tripId/bookings/:bookingId/connection', (c) => updateFlightConnection(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId')));
+app.get('/v1/trips/:tripId/booking-documents', (c) => listBookingDocuments(c.env, c.get('user'), c.req.param('tripId')));
+app.post('/v1/trips/:tripId/bookings/:bookingId/documents', (c) => uploadBookingDocument(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId')));
+app.get('/v1/trips/:tripId/bookings/:bookingId/documents/:documentId', (c) => getBookingDocument(c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId'), c.req.param('documentId')));
+app.delete('/v1/trips/:tripId/bookings/:bookingId/documents/:documentId', (c) => deleteBookingDocument(c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId'), c.req.param('documentId')));
+app.get('/v1/trips/:tripId/packing', (c) => listPacking(c.env, c.get('user'), c.req.param('tripId')));
+app.post('/v1/trips/:tripId/packing', (c) => createPackingItem(c.req.raw, c.env, c.get('user'), c.req.param('tripId')));
+app.patch('/v1/trips/:tripId/packing/:itemId', (c) => updatePackingItem(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('itemId')));
+app.delete('/v1/trips/:tripId/packing/:itemId', (c) => deletePackingItem(c.env, c.get('user'), c.req.param('tripId'), c.req.param('itemId')));
+app.get('/v1/trips/:tripId/tasks', (c) => listTasks(c.env, c.get('user'), c.req.param('tripId')));
+app.post('/v1/trips/:tripId/tasks', (c) => createTask(c.req.raw, c.env, c.get('user'), c.req.param('tripId')));
+app.patch('/v1/trips/:tripId/tasks/:taskId', (c) => updateTask(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('taskId')));
+app.delete('/v1/trips/:tripId/tasks/:taskId', (c) => deleteTask(c.env, c.get('user'), c.req.param('tripId'), c.req.param('taskId')));
+app.delete('/v1/trips/:tripId/invites', (c) => revokeInvites(c.env, c.get('user'), c.req.param('tripId')));
+app.post('/v1/invites/:token/accept', (c) => acceptInvite(c.env, c.get('user'), c.req.param('token')));
+app.all('/v1/trips/:tripId/members', (c) => membersRoute(c.req.raw, c.env, c.get('user'), c.req.param('tripId')));
+app.all('/v1/trips/:tripId/members/:id', (c) => membersRoute(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('id')));
+app.all('/v1/trips/:tripId/places', (c) => placesRoute(c.req.raw, c.env, c.get('user'), c.req.param('tripId')));
+app.all('/v1/trips/:tripId/places/:id', (c) => placesRoute(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('id')));
+app.all('/v1/trips/:tripId/notes', (c) => notesRoute(c.req.raw, c.env, c.get('user'), c.req.param('tripId')));
+app.all('/v1/trips/:tripId/notes/:id', (c) => notesRoute(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('id')));
+app.post('/v1/trips/:tripId/invites', (c) => createInvite(c.env, c.get('user'), c.req.param('tripId'), new URL(c.req.url)));
+app.all('/v1/*', () => json({ error: 'Not found' }, 404));
+app.all('*', (c) => c.env.ASSETS.fetch(c.req.raw));
+app.onError((error) => {
+  console.error('API request failed', error);
+  return json({ error: '処理に失敗しました。時間をおいて再試行してください' }, 500);
+});
+export default app;

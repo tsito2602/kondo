@@ -1,6 +1,6 @@
 # デプロイ構成
 
-Web/PWAと共有APIは **Cloudflare Workers Builds** で検証・配信する。GitHubはコード・Issue・PRの管理に使い、Webの自動Actions実行は行わない。ネイティブのExpo/EASビルドは別系統で、明示依頼時だけ実行する。
+Web/PWAと共有APIは **Cloudflare Workers Builds** で検証・配信する。GitHubはコード・Issue・PRの管理に使い、Webの自動Actions実行は行わない。React/ViteとHonoを同じWorkerで配信する。
 
 **この文書やスクリプトが存在するだけではGit連携は有効にならない。** Cloudflare側の接続・対象ブランチ・変数・watch pathsを設定し、実際のBuildと配信先の成功を確認して移行完了とする。
 
@@ -30,7 +30,7 @@ Build commandを空にするのは検証を省くためではない。Deploy com
 
 上記ブランチとwatch pathsは**Cloudflareの外部設定**であり、Wrangler設定から自動適用されない。staging用Workerの「Production branch」は`staging`で正しい。非本番ビルドをOFFにすると、feature/PR更新ごとのプレビューは作成しない。
 
-watch pathsは空変更push、20コミット以上または3,000ファイル以上のpushでは評価が省略されるため、完全な課金上限ではない。再実行用の空コミットは作らない。キャッシュはnpmのダウンロードを再利用するもので、Expoのビルド出力が自動キャッシュされると仮定しない。環境ごとにAPI URLとOAuth IDが異なるため、stagingのdistを本番へ流用しない。
+watch pathsは空変更push、20コミット以上または3,000ファイル以上のpushでは評価が省略されるため、完全な課金上限ではない。再実行用の空コミットは作らない。キャッシュはnpmのダウンロードを再利用するもので、Viteのビルド出力が自動キャッシュされると仮定しない。環境ごとにAPI URLとOAuth IDが異なるため、stagingのdistを本番へ流用しない。
 
 ## ビルド変数・トークン
 
@@ -50,12 +50,12 @@ watch pathsは空変更push、20コミット以上または3,000ファイル以�
 
 `EXPO_PUBLIC_API_URL`・`EXPO_PUBLIC_ENABLE_DEMO`・`ALLOWED_ORIGINS`はスクリプトが環境別に固定するので通常は設定不要。残っている設定が矛盾すれば依存導入前に停止する。productionはサンプルOFF。`WORKERS_CI`・`WORKERS_CI_BRANCH`・`WORKERS_CI_COMMIT_SHA`はCloudflareの値を使用し、手動で上書きしない。
 
-本番のGoogle JavaScript生成元は`https://tabi.tsito-apps.workers.dev`、リダイレクトURIは`https://tabi.tsito-apps.workers.dev/oauth`。スコープは`openid`・`email`・`profile`。現在の実装にGoogle Client Secret・Gmail token・セッション署名鍵・R2のS3キーは不要。実行時の既存secretsは削除せず、公開のOAuth IDと許可originは生成Wrangler設定から反映する。
+本番のGoogle JavaScript生成元は`https://tabi.tsito-apps.workers.dev`。Google Identity Servicesのpopup方式を使う。スコープは`openid`・`email`・`profile`。現在の実装にGoogle Client Secret・Gmail token・セッション署名鍵・R2のS3キーは不要。実行時の既存secretsは削除せず、公開のOAuth IDと許可originは生成Wrangler設定から反映する。
 
 ## 1回の実行内容
 
 1. 対象ブランチ・checkout SHA・環境変数・Worker/D1/R2の対応を検証し、既存D1のUUIDと名前をAPIで照合する。権限や設定エラーはインストール前に止める。
-2. 依存不要の`node --test scripts/test-workers-build.mjs` → `npm ci --include=dev --prefer-offline --no-audit --no-fund` → `npm run check`を各1回実行する。checkには型・lint・既存テスト・Web/PWAビルドが含まれる。
+2. 依存不要の`node --test scripts/test-workers-build.mjs` → `npm ci --include=dev --prefer-offline --no-audit --no-fund` → `npm run check`を各1回実行する。checkには型・Reactフォーム/API統合・既存テスト・Web/PWAビルドが含まれる。
 3. 生成設定を用い、既存の`worker/schema.sql`適用 → lockfileのWranglerで配信する。リソースの毎回の一覧探索・作成、別ビルド、配信の自動再試行は行わない。
 4. ホームのHTML、未認証`/v1/me`の401 JSON、`/sw.js`を確認する。これはHTTP疎通確認であり、Googleログインや画面操作の実機検証を代替しない。
 

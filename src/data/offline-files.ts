@@ -1,2 +1,3 @@
-export async function readOfflineFile(_scope: string, _id: string): Promise<ArrayBuffer | undefined> { return undefined; }
-export async function saveOfflineFile(_scope: string, _id: string, _bytes: ArrayBuffer): Promise<void> {}
+import { readStored, writeStored } from './browser-store';
+export const readOfflineFile = (scope: string, id: string) => readStored<ArrayBuffer>(`document:${scope}:${id}`);
+export const saveOfflineFile = (scope: string, id: string, bytes: ArrayBuffer) => writeStored(`document:${scope}:${id}`, bytes);

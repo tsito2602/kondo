@@ -1,6 +1,6 @@
 # ログインとホーム画面アイコン
 
-サンプル旅行はローカル開発（`__DEV__`）、ネイティブのpreview、または`EXPO_PUBLIC_ENABLE_DEMO=true`でビルドしたstagingだけで有効。本番のデプロイでは明示的に`false`を指定する。本番では以前保存された`tabi.demo-active`を削除し、サンプルデータを自動で開かない。旅行やログイン済みアカウントの保存データは削除しない。
+サンプル旅行はVite開発、または`VITE_ENABLE_DEMO=true`（既存Buildsでは`EXPO_PUBLIC_ENABLE_DEMO=true`）でビルドしたstagingだけで有効。本番のデプロイでは明示的に`false`を指定する。本番では以前保存された`tabi.demo-active`を削除し、サンプルデータを自動で開かない。旅行やログイン済みアカウントの保存データは削除しない。
 
 iOSのホーム画面用アイコンは`/icons/apple-touch-icon-transparent.png`（180px、文字なし、透明背景のRGBA PNG）。ユーザー実機でライト／ダークの背景切り替えが確認できた比較Cと同一バイトの画像を使う。`npm run icons:export`で、konogoroの書き出しと同じ`density: 384`、`compressionLevel: 9`、`palette: false`を使って再生成する。ネイティブストア用の`removeAlpha()`処理をWeb用画像には適用しない。
 

@@ -1,4 +1,4 @@
-/* This template is versioned and populated by build-pwa.mjs after Expo export. */
+/* This template is versioned and populated by build-pwa.mjs after Vite build. */
 const CACHE = 'tabi-shell-__VERSION__';
 const PRECACHE = __PRECACHE__;
 const SHELL = '/';

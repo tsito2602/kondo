@@ -1,22 +1,24 @@
-import { File, Paths } from 'expo-file-system';
-
+import { readStored, writeStored } from './browser-store';
 import { emptyTravelCache, normalizeTravelCache, TravelCache } from './types';
 
-const fileFor = (scope?: string) => new File(Paths.document, scope ? `tabi-travel-cache-${scope}.json` : 'tabi-travel-cache.json');
-
+const CACHE_KEY = 'tabi.travel-cache.v1';
 export async function loadTravelCache(scope?: string): Promise<TravelCache> {
-  const cacheFile = fileFor(scope);
-  if (!cacheFile.exists) return emptyTravelCache();
+  const key = scope ? `${CACHE_KEY}.${scope}` : CACHE_KEY;
+  const saved = await readStored<TravelCache>(key);
+  if (saved?.version === 1) return normalizeTravelCache(saved);
+  // Only migrate the old shared cache for the session that already owned it.
+  const legacyKey = scope && localStorage.getItem('tabi.legacy-cache-owner') === scope ? CACHE_KEY : key;
+  const raw = localStorage.getItem(legacyKey);
+  if (!raw) return emptyTravelCache();
   try {
-    const value = JSON.parse(await cacheFile.text()) as TravelCache;
-    return value.version === 1 ? normalizeTravelCache(value) : emptyTravelCache();
-  } catch {
-    return emptyTravelCache();
-  }
+    const value = JSON.parse(raw) as TravelCache;
+    if (value.version !== 1) return emptyTravelCache();
+    const normalized = normalizeTravelCache(value);
+    await writeStored(key, normalized);
+    localStorage.removeItem(legacyKey);
+    return normalized;
+  } catch { return emptyTravelCache(); }
 }
-
 export async function saveTravelCache(value: TravelCache, scope?: string) {
-  const cacheFile = fileFor(scope);
-  if (!cacheFile.exists) cacheFile.create({ intermediates: true, overwrite: true });
-  cacheFile.write(JSON.stringify(value));
+  await writeStored(scope ? `${CACHE_KEY}.${scope}` : CACHE_KEY, value);
 }
