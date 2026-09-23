@@ -31,7 +31,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -53,6 +53,12 @@ const {
   AnchoredMenu,
   SafariTabs,
   dockOutline,
+  dockField,
+  dockFieldPath,
+  dockSlots,
+  joinedDock,
+  morphDock,
+  ContextDock,
   animateDockPress,
   dockKeyboardInset,
   SaveButton,
@@ -594,7 +600,10 @@ test("details retain the same five tab nodes and close before one-tap navigation
     );
     const nav = document.querySelector(".safari-tabs");
     const dock = document.querySelector(".safari-dock");
-    const material = dock.querySelector(".safari-glass");
+    const material = document.querySelector(
+      ".thumb-dock-material .safari-glass",
+    );
+    assert.ok(material);
     assert.equal(dock.dataset.wide, "true");
     const icons = [...nav.querySelectorAll("svg")];
     const host = document.querySelector(".thumb-dock-host");
@@ -603,7 +612,10 @@ test("details retain the same five tab nodes and close before one-tap navigation
       const dialog = document.querySelector("dialog");
       assert.equal(dock.dataset.level, "detail");
       assert.equal(dock.dataset.wide, "false");
-      assert.equal(dock.querySelector(".safari-glass"), material);
+      assert.equal(
+        document.querySelector(".thumb-dock-material .safari-glass"),
+        material,
+      );
       assert.equal(dock.querySelectorAll(".safari-side[inert]").length, 0);
       assert.equal(host.parentElement, dialog);
       assert.equal(dialog.querySelector(".safari-tabs"), nav);
@@ -648,7 +660,10 @@ test("details retain the same five tab nodes and close before one-tap navigation
       assert.equal(host.parentElement, document.body);
       assert.equal(dock.dataset.level, "trip");
       assert.equal(dock.dataset.wide, "true");
-      assert.equal(dock.querySelector(".safari-glass"), material);
+      assert.equal(
+        document.querySelector(".thumb-dock-material .safari-glass"),
+        material,
+      );
       assert.equal(host.querySelector(".safari-tabs"), nav);
       assert.deepEqual([...nav.querySelectorAll("svg")], icons);
     }
@@ -1050,4 +1065,209 @@ test("dock ignores top-edge rubber banding and only lifts for a focused software
     "checkbox focus does not require a keyboard",
   );
   assert.equal(dockKeyboardInset(800, null, input), 0);
+});
+
+test("all dock layouts morph through a shared contour with real necks and clean separated endpoints", async () => {
+  for (const width of [308, 366, 420]) {
+    const capsule = (left, width, radius = 26) => ({ left, width, radius });
+    const layouts = [
+      joinedDock(width),
+      dockSlots(width, [
+        capsule(0, 52),
+        capsule(62, width - 176),
+        capsule(width - 104, 104),
+      ]),
+      dockSlots(width, [capsule(0, 52), null, capsule(width - 104, 104)]),
+      dockSlots(width, [capsule(0, 52), capsule(62, width - 62), null]),
+      dockSlots(width, [null, capsule(0, width - 62), capsule(width - 52, 52)]),
+      dockSlots(width, [capsule(0, 52), null, null]),
+    ];
+    for (const from of layouts) {
+      for (const to of layouts) {
+        for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+          const shape = morphDock(from, to, 0, t);
+          const field = dockField(width, shape.islands, shape.tension);
+          assert.ok(field.every(Number.isFinite));
+          assert.ok(
+            Math.max(...field) <= 1024.001,
+            "material stays within the dock's height",
+          );
+          assert.equal(/NaN|Infinity/.test(dockFieldPath(width, field)), false);
+          if (t === 1) assert.deepEqual(shape.islands, to);
+        }
+      }
+    }
+    const raster = async (from, to, t) => {
+      const shape = morphDock(from, to, 0, t);
+      const d = dockFieldPath(
+        width,
+        dockField(width, shape.islands, shape.tension),
+      );
+      const { data, info } = await sharp(
+        Buffer.from(
+          `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="64"><path d="${d}" fill="white"/></svg>`,
+        ),
+      )
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      return (x, y) =>
+        data[(Math.floor(y) * info.width + Math.floor(x)) * 4 + 3];
+    };
+    const joined = await raster(layouts[0], layouts[1], 0);
+    const split = await raster(layouts[0], layouts[1], 1);
+    assert.equal(joined(57, 32), 255);
+    assert.equal(split(57, 32), 0, "back/primary gap is transparent");
+    assert.equal(
+      split(width - 109, 32),
+      0,
+      "primary/actions gap is transparent",
+    );
+    for (const x of [26, width / 2, width - 52])
+      assert.equal(split(x, 32), 255);
+    // Fixed nearby islands actually pull together through a concave bridge,
+    // then separate again, even when the surrounding layout is already split.
+    const neck = await raster(layouts[1], layouts[3], 0.5);
+    assert.equal(neck(57, 32), 255);
+    assert.equal(neck(57, 8), 0, "the bridge must have a visible waist");
+  }
+});
+
+test("shared glass retargets from the rendered shape, survives layout changes, and honors reduced motion", async () => {
+  const h = React.createElement;
+  const originalBounds = HTMLElement.prototype.getBoundingClientRect;
+  const client = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    "clientWidth",
+  );
+  const offset = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    "offsetWidth",
+  );
+  const originalRAF = globalThis.requestAnimationFrame;
+  const originalCancel = globalThis.cancelAnimationFrame;
+  const originalNow = performance.now;
+  const pending = new Map();
+  let clock = 0,
+    sequence = 0,
+    setMode;
+  const w = 366;
+  function box(element) {
+    const context = element.closest(".context-dock");
+    const back = context?.querySelector(".context-back") ? 52 : 0;
+    const actions = context?.querySelector(".context-actions") ? 104 : 0;
+    if (element.classList.contains("context-back"))
+      return { left: 0, width: back };
+    if (element.classList.contains("context-actions"))
+      return { left: w - actions, width: actions };
+    if (element.classList.contains("context-primary"))
+      return {
+        left: back ? 62 : 0,
+        width: w - back - actions - (back ? 10 : 0) - (actions ? 10 : 0),
+      };
+    return { left: 0, width: w };
+  }
+  Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+    configurable: true,
+    get() {
+      return this.classList.contains("thumb-dock") ? w : 0;
+    },
+  });
+  Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
+    configurable: true,
+    get() {
+      return box(this).width;
+    },
+  });
+  HTMLElement.prototype.getBoundingClientRect = function () {
+    return { ...box(this), top: 0, bottom: 64, height: 64 };
+  };
+  globalThis.requestAnimationFrame = (callback) => {
+    pending.set(++sequence, callback);
+    return sequence;
+  };
+  globalThis.cancelAnimationFrame = (id) => pending.delete(id);
+  performance.now = () => clock;
+  const advance = (ms) => {
+    clock += ms;
+    const callbacks = [...pending.values()];
+    pending.clear();
+    callbacks.forEach((callback) => callback(clock));
+  };
+  const root = createRoot(document.getElementById("root"));
+  function Harness() {
+    const [mode, update] = React.useState("tabs");
+    setMode = update;
+    return h(
+      ThumbDockProvider,
+      null,
+      h(
+        ThumbDock,
+        { mode: mode === "tabs" ? "browse" : "context" },
+        mode === "tabs"
+          ? h("div", { className: "safari-dock", "data-wide": "true" })
+          : h(ContextDock, {
+              back: h("button", null, "戻る"),
+              primary: mode === "place" ? h("button", null, "追加") : null,
+              actions: mode === "place" ? h("button", null, "編集") : null,
+            }),
+      ),
+    );
+  }
+  try {
+    await act(async () => root.render(h(Harness)));
+    const material = document.querySelector(".thumb-dock-material");
+    const glass = material.querySelector(".safari-glass");
+    const border = material.querySelector("path[stroke]");
+    const initial = border.getAttribute("d");
+    assert.ok(initial);
+    await act(async () => setMode("place"));
+    assert.equal(border.getAttribute("d"), initial, "no jump on registration");
+    advance(410);
+    const midway = border.getAttribute("d");
+    assert.notEqual(midway, initial);
+    assert.equal(
+      glass.style.clipPath,
+      `path("${midway}")`,
+      "border and blur follow exactly the same contour",
+    );
+    await act(async () => setMode("settings"));
+    assert.equal(
+      border.getAttribute("d"),
+      midway,
+      "interruptions retain the visible neck",
+    );
+    assert.equal(pending.size, 1, "only the new animation remains active");
+    advance(820);
+    const settings = dockSlots(w, [
+      { left: 0, width: 52, radius: 26 },
+      null,
+      null,
+    ]);
+    assert.equal(
+      border.getAttribute("d"),
+      dockFieldPath(w, dockField(w, settings)),
+    );
+    assert.equal(pending.size, 0);
+    reduced = true;
+    await act(async () => setMode("tabs"));
+    assert.equal(border.getAttribute("d"), initial);
+    assert.equal(pending.size, 0, "reduced motion settles immediately");
+    assert.equal(document.querySelectorAll(".safari-glass").length, 1);
+    assert.equal(document.querySelector(".thumb-dock-material"), material);
+  } finally {
+    await act(async () => root.unmount());
+    assert.equal(pending.size, 0);
+    reduced = false;
+    HTMLElement.prototype.getBoundingClientRect = originalBounds;
+    if (client)
+      Object.defineProperty(HTMLElement.prototype, "clientWidth", client);
+    else delete HTMLElement.prototype.clientWidth;
+    if (offset)
+      Object.defineProperty(HTMLElement.prototype, "offsetWidth", offset);
+    else delete HTMLElement.prototype.offsetWidth;
+    globalThis.requestAnimationFrame = originalRAF;
+    globalThis.cancelAnimationFrame = originalCancel;
+    performance.now = originalNow;
+  }
 });

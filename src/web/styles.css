@@ -2389,19 +2389,12 @@ input::-webkit-date-and-time-value {
     border-radius: 28px;
     color: var(--ink);
   }
-  .thumb-dock[data-mode="detail"] {
-    width: min(100%, 288px);
-  }
   .thumb-dock[data-mode="edit"] {
     width: min(100%, 420px);
   }
   .thumb-dock[data-mode="context"],
   .thumb-dock[data-mode="edit"] {
     pointer-events: none;
-  }
-  .thumb-dock[data-mode="context"] > .thumb-dock-material,
-  .thumb-dock[data-mode="edit"] > .thumb-dock-material {
-    visibility: hidden;
   }
   .thumb-dock[data-mode="context"] > .thumb-dock-content,
   .thumb-dock[data-mode="edit"] > .thumb-dock-content {
@@ -2425,21 +2418,6 @@ input::-webkit-date-and-time-value {
     height: 52px;
     border-radius: 26px;
     pointer-events: auto;
-  }
-  .context-island::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    border-radius: inherit;
-    background: var(--dock-glass);
-    border: 1px solid var(--dock-border);
-    -webkit-backdrop-filter: blur(24px) saturate(1.18);
-    backdrop-filter: blur(24px) saturate(1.18);
-    box-shadow:
-      inset 0 1px 1px var(--surface-glow),
-      0 5px 18px #10203018;
-    pointer-events: none;
   }
   .context-back,
   .context-actions {
@@ -2476,17 +2454,6 @@ input::-webkit-date-and-time-value {
     position: absolute;
     inset: 0;
     z-index: -1;
-    border-radius: 28px;
-    transform-origin: center bottom;
-    background: var(--dock-glass);
-    border: 1px solid var(--dock-border);
-    -webkit-backdrop-filter: blur(24px) saturate(1.18);
-    backdrop-filter: blur(24px) saturate(1.18);
-    box-shadow:
-      inset 0 1px 1px var(--surface-glow),
-      inset 0 -1px 1px #00000008,
-      0 8px 32px #10203025,
-      0 2px 5px #1020300c;
     pointer-events: none;
   }
   .thumb-dock-content {
@@ -2589,7 +2556,7 @@ input::-webkit-date-and-time-value {
   }
 }
 @media (prefers-reduced-transparency: reduce) {
-  .thumb-dock-material {
+  .safari-glass {
     background: var(--paper);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
@@ -2636,13 +2603,11 @@ input::-webkit-date-and-time-value {
   .thumb-dock[data-mode="browse"] {
     pointer-events: none;
   }
-  .thumb-dock[data-mode="browse"] > .thumb-dock-material {
-    visibility: hidden;
-  }
   .thumb-dock[data-mode="browse"] > .thumb-dock-content {
     padding: 0;
     animation: none;
   }
+  .thumb-dock,
   .safari-dock {
     --safari-side-size: 52px;
     --safari-center-inset: 60px;
@@ -2655,8 +2620,9 @@ input::-webkit-date-and-time-value {
     transform-origin: center bottom;
     transition: transform 900ms var(--safari-release-ease);
   }
-  .safari-dock[data-touching="true"],
-  .safari-dock:has(.safari-side-button:active) {
+  .thumb-dock:has(.safari-dock[data-touching="true"]),
+  .thumb-dock:has(.safari-side-button:active),
+  .safari-dock[data-touching="true"]:not(.thumb-dock .safari-dock) {
     transform: scale(var(--safari-press-scale, 1.06), 1.1);
     transition-duration: 320ms;
     transition-timing-function: var(--safari-touch-ease);
@@ -2879,7 +2845,6 @@ input::-webkit-date-and-time-value {
 }
 @media (prefers-reduced-transparency: reduce) {
   .safari-glass,
-  .context-island::before,
   .trip-menu-popover,
   .trip-header,
   .date-strip {
@@ -2897,6 +2862,7 @@ input::-webkit-date-and-time-value {
 }
 
 @media (max-width: 379px) {
+  .thumb-dock,
   .safari-dock {
     --safari-side-size: 44px;
     --safari-center-inset: 52px;

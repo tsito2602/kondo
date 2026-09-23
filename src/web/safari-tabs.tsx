@@ -20,7 +20,7 @@ import {
 
 import { reduceMotion } from "./motion";
 import { animateDockPress, DockSurface } from "./dock-surface";
-import { DockNavigationContext } from "./thumb-dock";
+import { DockNavigationContext, SharedDockSurfaceContext } from "./thumb-dock";
 
 export const tripTabs = [
   { path: "itinerary", label: "しおり", icon: BookOpen },
@@ -69,10 +69,11 @@ export function SafariTabs({
   const nav = useRef<HTMLElement>(null);
   const dock = useRef<HTMLDivElement>(null);
   const pressAnimation = useRef<Animation | undefined>(undefined);
+  const sharedSurface = useContext(SharedDockSurfaceContext);
   const pressDock = (pressed: boolean) => {
     if (dock.current)
       pressAnimation.current = animateDockPress(
-        dock.current,
+        dock.current.closest<HTMLElement>(".thumb-dock") ?? dock.current,
         pressed,
         pressAnimation.current,
       );
@@ -198,7 +199,7 @@ export function SafariTabs({
         data-level={detail ? "detail" : "trip"}
         data-touching={touching}
       >
-        <DockSurface split={split} />
+        {!sharedSurface && <DockSurface split={split} />}
         <div
           className="safari-side safari-left"
           inert={!split}

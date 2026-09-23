@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { reduceMotion } from "./motion";
+import { FluidDockSurface, type FluidDockHandle } from "./fluid-dock";
 
 type DockEntry = {
   content: ReactNode;
@@ -24,6 +24,7 @@ type DockNavigation = {
   action: ReactNode;
   beforeNavigate: (navigate: () => void) => void;
 };
+export const SharedDockSurfaceContext = createContext(false);
 export const DockNavigationContext = createContext<DockNavigation | null>(null);
 type Entry = {
   value: DockEntry | ReactNode;
@@ -46,20 +47,10 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
     }),
   );
   const surface = useRef<HTMLDivElement>(null);
-  const previous = useRef<DOMRect | null>(null);
-  const pendingBounds = useRef<DOMRect | null>(null);
-  const animation = useRef<Animation | null>(null);
+  const morph = useRef<FluidDockHandle>(null);
   const registry = useMemo(() => {
-    const capture = () => {
-      if (pendingBounds.current) return;
-      const bounds = surface.current
-        ?.querySelector(".thumb-dock-material")
-        ?.getBoundingClientRect();
-      if (bounds?.width) pendingBounds.current = bounds;
-    };
     return {
       put: (id: string, scope: Entry["scope"], value: Entry["value"]) => {
-        capture();
         setEntries((old) => {
           const next = new Map(old);
           next.set(id, {
@@ -71,7 +62,6 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
         });
       },
       remove: (id: string) => {
-        capture();
         setEntries((old) => {
           const next = new Map(old);
           next.delete(id);
@@ -101,48 +91,10 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
     const parent = active?.target?.() ?? document.body;
     if (host.parentElement !== parent) parent.appendChild(host);
     host.hidden = !active;
-    const node = surface.current;
-    if (!node || !active) {
-      previous.current = null;
-      pendingBounds.current = null;
-      return;
-    }
-    const bounds = node.getBoundingClientRect();
-    const from = pendingBounds.current ?? previous.current;
-    pendingBounds.current = null;
-    // Deform only the material. Labels and touch targets stay sharp and full size.
-    if (
-      from?.width &&
-      bounds.width &&
-      !reduceMotion() &&
-      typeof node.animate === "function" &&
-      (Math.abs(from.width - bounds.width) > 1 ||
-        Math.abs(from.height - bounds.height) > 1)
-    ) {
-      animation.current?.cancel();
-      const material = node.querySelector<HTMLElement>(".thumb-dock-material")!;
-      animation.current = material.animate(
-        [
-          {
-            transform: `translateY(${from.bottom - bounds.bottom}px) scale(${from.width / bounds.width}, ${from.height / bounds.height})`,
-            borderRadius: "30px",
-          },
-          {
-            transform: "scale(1.018, .982)",
-            borderRadius: "32px",
-            offset: 0.7,
-          },
-          { transform: "scale(1, 1)", borderRadius: "28px" },
-        ],
-        { duration: 480, easing: "cubic-bezier(.22,.8,.28,1)" },
-      );
-      void animation.current.finished.catch(() => undefined);
-    }
-    previous.current = bounds;
+    if (active) morph.current?.measure();
   });
   useLayoutEffect(
     () => () => {
-      animation.current?.cancel();
       host.remove();
     },
     [host],
@@ -152,19 +104,21 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
       <Actions.Provider value={actions}>
         {children}
         {createPortal(
-          <DockNavigationContext.Provider value={active?.navigation ?? null}>
-            <div
-              ref={surface}
-              className="thumb-dock"
-              data-mode={visible?.mode ?? "browse"}
-              inert={active?.disabled}
-            >
-              <div className="thumb-dock-material" aria-hidden="true" />
-              <div className="thumb-dock-content" key={visible?.mode}>
-                {visible?.content}
+          <SharedDockSurfaceContext.Provider value={true}>
+            <DockNavigationContext.Provider value={active?.navigation ?? null}>
+              <div
+                ref={surface}
+                className="thumb-dock"
+                data-mode={visible?.mode ?? "browse"}
+                inert={active?.disabled}
+              >
+                <FluidDockSurface root={surface} ref={morph} />
+                <div className="thumb-dock-content" key={visible?.mode}>
+                  {visible?.content}
+                </div>
               </div>
-            </div>
-          </DockNavigationContext.Provider>,
+            </DockNavigationContext.Provider>
+          </SharedDockSurfaceContext.Provider>,
           host,
         )}
       </Actions.Provider>
