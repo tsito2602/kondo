@@ -1224,15 +1224,21 @@ strong {
   color: var(--ink);
 }
 .ticket-main .ticket-date-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
   margin-top: auto;
   padding-top: 8px;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
-.ticket-stub > strong {
-  font-size: 19px;
+.ticket-start-time {
+  white-space: nowrap;
+}
+.ticket-stub > svg {
+  flex-shrink: 0;
   color: var(--ink);
-  font-variant-numeric: tabular-nums;
 }
 .booking-route {
   display: flex;
@@ -2412,9 +2418,6 @@ input::-webkit-date-and-time-value {
   .ticket-stub {
     padding: 16px 7px;
     gap: 10px;
-  }
-  .ticket-stub > strong {
-    font-size: 16px;
   }
   .booking-route {
     gap: 10px;

@@ -422,7 +422,6 @@ export function BookingsScreen() {
                 >
                   <div className="ticket-main">
                     <div className="ticket-category">
-                      <BookingIcon size={14} aria-hidden="true" />
                       <span>
                         {
                           bookingKinds.find(
@@ -445,20 +444,27 @@ export function BookingsScreen() {
                         </p>
                       )}
                     <p className="ticket-date-summary">
-                      {ticketDate(booking.day)}
-                      {booking.kind === "hotel" &&
-                      booking.endDay &&
-                      booking.endDay !== booking.day
-                        ? ` 〜 ${ticketDate(booking.endDay, booking.day)}`
-                        : ""}
+                      <span>
+                        {ticketDate(booking.day)}
+                        {booking.kind === "hotel" &&
+                        booking.endDay &&
+                        booking.endDay !== booking.day
+                          ? ` 〜 ${ticketDate(booking.endDay, booking.day)}`
+                          : ""}
+                      </span>
+                      <span className="ticket-start-time">
+                        {booking.time
+                          ? `${booking.time}${booking.kind === "hotel" ? "〜" : ""}`
+                          : "時刻未定"}
+                      </span>
                     </p>
                   </div>
                   <div className="ticket-stub">
-                    <strong>
-                      {booking.time
-                        ? `${booking.time}${booking.kind === "hotel" ? "〜" : ""}`
-                        : "未定"}
-                    </strong>
+                    <BookingIcon
+                      size={24}
+                      strokeWidth={1.5}
+                      aria-hidden="true"
+                    />
                   </div>
                 </button>
               );
