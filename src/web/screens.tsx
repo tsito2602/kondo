@@ -1,3 +1,4 @@
+import { TaskList } from "./task-list";
 import { CalendarPanel } from "./date-picker";
 import { TripCover } from "./trip-cover";
 import { useItineraryScroll } from "./itinerary-scroll";
@@ -669,67 +670,30 @@ export function PackingScreen() {
             <p>{tab === "task" ? "やること" : "持ち物"}を追加しましょう。</p>
           </Empty>
         ) : (
-          <div className="check-list">
-            {items.map((item) => (
-              <div
-                className={`check-row ${complete(item) ? "completed" : ""}`}
-                key={item.id}
-              >
-                <input
-                  type="checkbox"
-                  disabled={!travel.canEdit}
-                  checked={complete(item)}
-                  aria-label={`${"title" in item ? item.title : item.name}を${complete(item) ? "未完了" : "完了"}にする`}
-                  onChange={(event) =>
-                    void run(() =>
-                      "done" in item
-                        ? travel.updateTask(item.id, {
-                            ...item,
-                            done: event.target.checked,
-                          })
-                        : travel.updatePackingItem(item.id, {
-                            ...item,
-                            packed: event.target.checked,
-                          }),
-                    )
-                  }
-                />
-                <button
-                  className="check-content"
-                  onClick={() =>
-                    travel.canEdit && setEditing({ item, type: tab })
-                  }
-                >
-                  <strong>{"title" in item ? item.title : item.name}</strong>
-                  <span>
-                    {"quantity" in item
-                      ? `${item.category} · ${item.quantity}個${item.shared ? " · 共用" : ""}`
-                      : item.dueOn
-                        ? `${formatDate(item.dueOn)}まで`
-                        : "期限なし"}{" "}
-                    · {assigneeName(item.assignee ?? "", travel.members)}
-                  </span>
-                </button>
-                {travel.canEdit && (
-                  <Button
-                    variant="ghost"
-                    className="icon-button danger"
-                    aria-label={`${"title" in item ? item.title : item.name}を削除`}
-                    onClick={() =>
-                      void run(() => {
-                        if (confirm("削除しますか？")) {
-                          if ("done" in item) travel.deleteTask(item.id);
-                          else travel.deletePackingItem(item.id);
-                        }
-                      })
-                    }
-                  >
-                    <Trash2 size={16} />
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
+          <TaskList
+            key={tab + filter}
+            canEdit={travel.canEdit}
+            items={items.map((item) => ({
+              id: item.id,
+              title: "title" in item ? item.title : item.name,
+              done: complete(item),
+              meta: `${"quantity" in item ? `${item.category} · ${item.quantity}個${item.shared ? " · 共用" : ""}` : item.dueOn ? `${formatDate(item.dueOn)}まで` : "期限なし"} · ${assigneeName(item.assignee ?? "", travel.members)}`,
+            }))}
+            onToggle={(id, checked) => {
+              const item = items.find((item) => item.id === id)!;
+              void run(() =>
+                "done" in item
+                  ? travel.updateTask(id, { ...item, done: checked })
+                  : travel.updatePackingItem(id, { ...item, packed: checked }),
+              );
+            }}
+            onEdit={(id) =>
+              setEditing({
+                item: items.find((item) => item.id === id),
+                type: tab,
+              })
+            }
+          />
         )}
         {editing && (
           <PreparationEditor

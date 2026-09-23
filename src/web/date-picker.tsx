@@ -224,7 +224,21 @@ export function CalendarPanel({
               </option>
             ))}
           </select>
-          <strong>{monthIndex + 1}月</strong>
+          <select
+            aria-label="月を選択"
+            value={monthIndex + 1}
+            onChange={(event) =>
+              changeMonth(
+                `${month.slice(0, 4)}-${event.target.value.padStart(2, "0")}`,
+              )
+            }
+          >
+            {Array.from({ length: 12 }, (_, index) => (
+              <option key={index} value={index + 1}>
+                {index + 1}月
+              </option>
+            ))}
+          </select>
           <button
             type="button"
             className="icon-button"

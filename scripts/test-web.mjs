@@ -519,7 +519,7 @@ test("legacy account cache and pending changes survive React migration; real for
     const preparationPanel = document.querySelector('[role="tabpanel"]');
     preparationPanel.focus();
     await click(
-      byText(".check-content strong", "チケットを予約")?.closest("button"),
+      document.querySelector('[aria-label="チケットを予約の詳細を編集"]'),
     );
     assert.equal(document.activeElement, document.querySelector("dialog h2"));
     assert.equal(
@@ -547,7 +547,7 @@ test("legacy account cache and pending changes survive React migration; real for
       "2026-11-20",
     );
     await click(
-      byText(".check-content strong", "チケットを予約").closest("button"),
+      document.querySelector('[aria-label="チケットを予約の詳細を編集"]'),
     );
     assert.equal(deadlineToggle().checked, true);
     assert.equal(field("期限").dataset.dateValue, "2026-11-20");
@@ -566,7 +566,7 @@ test("legacy account cache and pending changes survive React migration; real for
       "",
     );
     await click(
-      byText(".check-content strong", "チケットを予約").closest("button"),
+      document.querySelector('[aria-label="チケットを予約の詳細を編集"]'),
     );
     assert.equal(deadlineToggle().checked, false);
     assert.equal(field("期限"), undefined);
@@ -574,6 +574,35 @@ test("legacy account cache and pending changes survive React migration; real for
     await tick(30);
     assert.equal(document.querySelector("dialog"), null);
     assert.notEqual(document.activeElement, preparationPanel);
+    assert.equal(
+      document.querySelector('.task-list [aria-label*="削除"]'),
+      null,
+    );
+    await click(
+      document.querySelector('[aria-label="チケットを予約の詳細を編集"]'),
+    );
+    const taskDelete = document.querySelector(
+      '.context-actions [aria-label="やることを削除"]',
+    );
+    assert.ok(
+      taskDelete,
+      "delete sits to the right of save in the task editor",
+    );
+    assert.ok(document.querySelector('.context-primary button[type="submit"]'));
+    globalThis.confirm = () => false;
+    await click(taskDelete);
+    assert.equal(
+      db.prepare("SELECT COUNT(*) AS n FROM travel_tasks").get().n,
+      1,
+    );
+    globalThis.confirm = () => true;
+    await click(taskDelete);
+    await tick(30);
+    assert.equal(
+      db.prepare("SELECT COUNT(*) AS n FROM travel_tasks").get().n,
+      0,
+    );
+    assert.equal(document.querySelector("dialog"), null);
     await click(document.querySelector('[role="tab"][aria-label="持ち物"]'));
     await click(document.querySelector('[aria-label="持ち物を追加"]'));
     await fill("持ち物", "充電器");

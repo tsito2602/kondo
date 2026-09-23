@@ -909,11 +909,32 @@ export function PreparationEditor({
           : "",
     onClose,
   );
+  const { run: runDelete, busy: deleting } = useAction();
+  const deleteButton = item ? (
+    <button
+      type="button"
+      className="icon-button danger"
+      aria-label={`${task ? "やること" : "持ち物"}を削除`}
+      disabled={busy || deleting}
+      onClick={() => {
+        if (!confirm(`「${name}」を削除しますか？`)) return;
+        void runDelete(() => {
+          if (task) travel.deleteTask(item.id);
+          else travel.deletePackingItem(item.id);
+          dismissModal(onClose);
+        });
+      }}
+    >
+      <Trash2 size={20} />
+    </button>
+  ) : undefined;
   return (
     <Modal
       title={`${task ? "やること" : "持ち物"}を${item ? "編集" : "追加"}`}
       onClose={onClose}
       full={task}
+      action={deleteButton}
+      dockActions={{ actions: deleteButton }}
     >
       <form className="form" onSubmit={submit}>
         <Field label={task ? "やること" : "持ち物"}>

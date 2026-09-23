@@ -34,7 +34,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -52,6 +52,7 @@ new Function("require", "module", "exports", outputFiles[0].text)(
   module.exports,
 );
 const {
+  TaskList,
   DatePicker,
   startTripTransition,
   menuDepth,
@@ -2257,6 +2258,22 @@ test("calendar floats above its editor, commits ranges only on confirmation and 
     );
     const yearSelect = panel.querySelector('[aria-label="年を選択"]');
     assert.equal(yearSelect.tagName, "SELECT", "year uses the OS selection UI");
+    const monthSelect = panel.querySelector('[aria-label="月を選択"]');
+    assert.equal(monthSelect.tagName, "SELECT");
+    await act(async () => {
+      monthSelect.value = "3";
+      monthSelect.dispatchEvent(
+        new dom.window.Event("change", { bubbles: true }),
+      );
+    });
+    assert.ok(panel.querySelector('[data-date="2028-03-31"]'));
+    await act(async () => {
+      monthSelect.value = "2";
+      monthSelect.dispatchEvent(
+        new dom.window.Event("change", { bubbles: true }),
+      );
+    });
+
     await act(async () => {
       yearSelect.value = "2027";
       yearSelect.dispatchEvent(
@@ -2439,5 +2456,66 @@ test("trip expansion shares the cover across snapshots, restores list scroll and
     window.scrollTo = originalScroll;
     window.scrollY = originalY;
     reduced = false;
+  }
+});
+
+test("task list strikes before reordering, preserves row identity, and keeps edit separate from completion", async () => {
+  const h = React.createElement;
+  const root = createRoot(document.getElementById("root"));
+  const edits = [];
+  let readOnly;
+  function Harness() {
+    const [canEdit, setEditable] = React.useState(true);
+    readOnly = () => setEditable(false);
+    const [items, setItems] = React.useState([
+      { id: "a", title: "航空券", meta: "期限なし", done: false },
+      { id: "b", title: "パスポート", meta: "期限なし", done: false },
+      { id: "c", title: "ホテル", meta: "期限なし", done: true },
+    ]);
+    return h(TaskList, {
+      items,
+      canEdit,
+      onToggle: (id, done) =>
+        setItems((items) =>
+          items.map((item) => (item.id === id ? { ...item, done } : item)),
+        ),
+      onEdit: (id) => edits.push(id),
+    });
+  }
+  const ids = () =>
+    [...document.querySelectorAll("[data-task-id]")].map(
+      (row) => row.dataset.taskId,
+    );
+  try {
+    await act(async () => root.render(h(Harness)));
+    const row = document.querySelector('[data-task-id="a"]');
+    await act(async () => row.querySelector(".task-edit").click());
+    assert.deepEqual(edits, ["a"]);
+    assert.equal(
+      row.querySelector('[role="checkbox"]').getAttribute("aria-checked"),
+      "false",
+    );
+    await act(async () => row.querySelector('[role="checkbox"]').click());
+    assert.equal(row.classList.contains("is-done"), true);
+    assert.deepEqual(
+      ids(),
+      ["a", "b", "c"],
+      "strike plays before the row moves",
+    );
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 270)));
+    assert.deepEqual(ids(), ["b", "a", "c"]);
+    assert.equal(document.querySelector('[data-task-id="a"]'), row);
+    await act(async () => row.querySelector('[role="checkbox"]').click());
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 270)));
+    assert.deepEqual(ids(), ["a", "b", "c"]);
+    await act(async () => readOnly());
+    assert.equal(document.querySelector(".task-edit"), null);
+    assert.ok(
+      [...document.querySelectorAll('[role="checkbox"]')].every(
+        (button) => button.disabled,
+      ),
+    );
+  } finally {
+    await act(async () => root.unmount());
   }
 });
