@@ -489,11 +489,15 @@ test("header menu expands from its trigger and reverses before navigating, resto
     return originalBounds.call(this);
   };
   let motion,
+    contentMotion,
     frames,
     navigated = 0;
-  HTMLElement.prototype.animate = (keyframes) => {
-    frames = keyframes;
-    return (motion = timeline());
+  HTMLElement.prototype.animate = function (keyframes) {
+    if (this.classList.contains("trip-menu-surface")) {
+      frames = keyframes;
+      return (motion = timeline());
+    }
+    return (contentMotion = timeline());
   };
   function Harness() {
     const [open, setOpen] = React.useState(true);
@@ -512,7 +516,23 @@ test("header menu expands from its trigger and reverses before navigating, resto
   }
   try {
     await act(async () => root.render(React.createElement(Harness)));
-    assert.match(frames[0].clipPath, /0px 0px 296px 256px/);
+    assert.equal(
+      trigger.style.visibility,
+      "hidden",
+      "one material replaces the original button",
+    );
+    assert.equal(frames[0].width, "44px");
+    assert.equal(frames[0].height, "44px");
+    assert.equal(frames[0].borderRadius, "22px");
+    assert.equal(frames[0].transform, "translate(256px, 0px)");
+    assert.equal(frames[1].width, "300px");
+    assert.equal(frames[1].height, "340px");
+    assert.equal(
+      frames[0].clipPath,
+      undefined,
+      "the border and material resize instead of revealing a separate panel",
+    );
+    assert.equal(document.querySelectorAll(".trip-menu-close").length, 1);
     motion.currentTime = 440;
     await act(async () => motion.finish());
     await act(async () =>
@@ -521,12 +541,14 @@ test("header menu expands from its trigger and reverses before navigating, resto
         .click(),
     );
     assert.equal(motion.playbackRate, -1);
+    assert.equal(contentMotion.playbackRate, -1);
     assert.equal(navigated, 0);
     assert.ok(document.querySelector(".trip-menu-popover[open]"));
     await act(async () => motion.finish());
     assert.equal(navigated, 1);
     assert.equal(document.querySelector("dialog"), null);
     assert.equal(document.activeElement, trigger);
+    assert.equal(trigger.style.visibility, "");
   } finally {
     await act(async () => root.unmount());
     HTMLElement.prototype.getBoundingClientRect = originalBounds;
