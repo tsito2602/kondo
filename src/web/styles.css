@@ -1019,6 +1019,131 @@ strong {
   width: 13px;
   height: 13px;
 }
+.day-stays {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.stay-card {
+  width: 100%;
+  min-width: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--paper);
+  text-align: left;
+}
+.stay-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.stay-card h3 {
+  margin: 7px 0 14px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.stay-range {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 15px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+}
+.stay-range > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 7px;
+  min-width: 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.stay-range > div > span:first-child {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 10px;
+}
+.stay-range strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.stay-range > svg {
+  color: var(--muted);
+}
+.journey-pair {
+  display: grid;
+  gap: 16px;
+  margin-top: 14px;
+}
+.journey-point {
+  position: relative;
+  padding-left: 17px;
+  min-width: 0;
+}
+.journey-point::before {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  left: 0;
+  top: 5px;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  background: var(--ink);
+}
+.journey-point:first-child::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 14px;
+  bottom: -18px;
+  border-left: 1px solid var(--muted);
+  opacity: 0.4;
+}
+.journey-point:last-child::before {
+  background: var(--content-card);
+}
+.journey-point-label,
+.journey-date {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+}
+.journey-point-main {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px 10px;
+  margin: 3px 0;
+  overflow-wrap: anywhere;
+}
+.journey-clock {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.journey-point-main strong {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+.journey-arrival {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+.journey-arrival strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.journey-arrival > span {
+  font-size: 10px;
+  color: var(--muted);
+}
 .bookings-page {
   max-width: 880px;
 }

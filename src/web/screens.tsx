@@ -1,5 +1,11 @@
 import { PlaceStatusLabel } from "./place-status";
 import { DayStrip } from "./day-strip";
+import {
+  dayTimeline,
+  isJourney,
+  JourneyPair,
+  StayCards,
+} from "./itinerary-bookings";
 import { PlaceCard } from "./place-card";
 import { TaskList } from "./task-list";
 import { CalendarPanel } from "./date-picker";
@@ -78,7 +84,7 @@ import {
   PlaceDetail,
 } from "./details";
 
-type Entry = {
+export type Entry = {
   key: string;
   day: string;
   time: string;
@@ -86,6 +92,7 @@ type Entry = {
   item?: ItineraryItem;
   booking?: Booking;
   stage?: string;
+  endpoint?: "start" | "end";
 };
 const stages = {
   flight: ["出発", "到着"],
@@ -126,20 +133,22 @@ export function timelineEntries(
           title: booking.title,
           booking,
           stage: stages[booking.kind][0],
+          endpoint: "start",
         },
       ];
       if (
-        booking.endDay &&
-        (booking.endDay !== booking.day ||
+        (booking.endDay || booking.endTime) &&
+        ((booking.endDay && booking.endDay !== booking.day) ||
           (booking.endTime && booking.endTime !== booking.time))
       )
         entries.push({
           key: `booking-${booking.id}-end`,
-          day: booking.endDay,
+          day: booking.endDay || booking.day,
           time: booking.endTime,
           title: booking.title,
           booking,
           stage: stages[booking.kind][1],
+          endpoint: "end",
         });
       return entries;
     }),
@@ -160,6 +169,15 @@ export function ItineraryScreen() {
   );
   const days = useMemo(() => {
     const values = new Set(entries.map((entry) => entry.day));
+    for (const booking of travel.bookings) {
+      if (booking.kind !== "hotel") continue;
+      for (
+        let day = booking.day, count = 0;
+        day <= booking.endDay && count < 1096;
+        day = addDays(day, 1), count++
+      )
+        values.add(day);
+    }
     const trip = travel.selectedTrip!;
     for (
       let day = trip.startsOn, count = 0;
@@ -168,7 +186,7 @@ export function ItineraryScreen() {
     )
       values.add(day);
     return [...values].sort();
-  }, [entries, travel.selectedTrip]);
+  }, [entries, travel.selectedTrip, travel.bookings]);
   const { selectedDay, selectDay } = useItineraryScroll(
     days,
     params.get("day") ?? travel.selectedTrip!.startsOn,
@@ -222,37 +240,44 @@ export function ItineraryScreen() {
       )}
       <DayStrip days={days} selectedDay={selectedDay} onSelect={selectDay} />
       <div className="page timeline">
-        {days.map((day, index) => (
-          <section className="day-section" id={`day-${day}`} key={day}>
-            <div className="day-heading">
-              <span className="eyebrow">
-                DAY {String(index + 1).padStart(2, "0")}
-              </span>
-              <h2>{formatDate(day)}</h2>
-            </div>
-            {!entries.some((entry) => entry.day === day) && (
-              <button
-                className="timeline-entry timeline-empty"
-                disabled={!travel.canEdit}
-                aria-label={
-                  travel.canEdit ? `${formatDate(day)}に予定を追加` : undefined
-                }
-                onClick={() => setAdding(day)}
-              >
-                <div data-press-card>
-                  <p>まだ予定はありません</p>
-                  {travel.canEdit && (
-                    <span className="empty-add">
-                      <Plus size={16} />
-                      予定を追加
-                    </span>
-                  )}
-                </div>
-              </button>
-            )}
-            {entries
-              .filter((entry) => entry.day === day)
-              .map((entry) => {
+        {days.map((day, index) => {
+          const dayEntries = dayTimeline(entries, day);
+          return (
+            <section className="day-section" id={`day-${day}`} key={day}>
+              <div className="day-heading">
+                <span className="eyebrow">
+                  DAY {String(index + 1).padStart(2, "0")}
+                </span>
+                <h2>{formatDate(day)}</h2>
+              </div>
+              <StayCards
+                bookings={travel.bookings}
+                day={day}
+                onOpen={(id) => setDetail({ type: "booking", id })}
+              />
+              {!dayEntries.length && (
+                <button
+                  className="timeline-entry timeline-empty"
+                  disabled={!travel.canEdit}
+                  aria-label={
+                    travel.canEdit
+                      ? `${formatDate(day)}に予定を追加`
+                      : undefined
+                  }
+                  onClick={() => setAdding(day)}
+                >
+                  <div data-press-card>
+                    <p>まだ予定はありません</p>
+                    {travel.canEdit && (
+                      <span className="empty-add">
+                        <Plus size={16} />
+                        予定を追加
+                      </span>
+                    )}
+                  </div>
+                </button>
+              )}
+              {dayEntries.map((entry) => {
                 const BookingIcon = entry.booking
                   ? bookingIcons[entry.booking.kind]
                   : BookOpen;
@@ -261,7 +286,7 @@ export function ItineraryScreen() {
                   itemDetails(entry.item).category === "transport";
                 const connection =
                   entry.booking &&
-                  entry.stage === "到着" &&
+                  (entry.stage === "到着" || entry.joinedArrival) &&
                   connections.find(
                     (connection) =>
                       connection.arrivalBookingId === entry.booking!.id,
@@ -270,7 +295,7 @@ export function ItineraryScreen() {
                   <div key={entry.key}>
                     <button
                       id={entry.item ? `item-${entry.item.id}` : undefined}
-                      className={`timeline-entry ${transport ? "transport-entry" : ""} ${params.get("item") === entry.item?.id ? "highlight" : ""}`}
+                      className={`timeline-entry ${transport ? "transport-entry" : ""} ${isJourney(entry.booking) ? "journey-entry" : ""} ${params.get("item") === entry.item?.id ? "highlight" : ""}`}
                       onClick={() =>
                         setDetail({
                           type: entry.item ? "item" : "booking",
@@ -294,19 +319,28 @@ export function ItineraryScreen() {
                             ? transport
                               ? `${transportLabel(itemDetails(entry.item))} ${durationLabel(durationMinutes(entry.item.day, entry.item.time, itemDetails(entry.item)))}`
                               : itemCategory(entry.item).label
-                            : entry.stage}
+                            : isJourney(entry.booking)
+                              ? `${entry.booking!.kind === "flight" ? "フライト" : "鉄道"}${entry.endpoint === "end" ? " · 到着" : ""}`
+                              : entry.stage}
                         </small>
                         <h3>{entry.title}</h3>
-                        {entry.booking && (
-                          <p className="muted">
-                            {entry.booking.originCode || entry.booking.origin}
-                            {entry.booking.destinationCode ||
-                            entry.booking.destination
-                              ? " → "
-                              : ""}
-                            {entry.booking.destinationCode ||
-                              entry.booking.destination}
-                          </p>
+                        {entry.booking && isJourney(entry.booking) ? (
+                          <JourneyPair
+                            booking={entry.booking}
+                            arrival={entry.endpoint === "end"}
+                          />
+                        ) : (
+                          entry.booking && (
+                            <p className="muted">
+                              {entry.booking.originCode || entry.booking.origin}
+                              {entry.booking.destinationCode ||
+                              entry.booking.destination
+                                ? " → "
+                                : ""}
+                              {entry.booking.destinationCode ||
+                                entry.booking.destination}
+                            </p>
+                          )
                         )}
                       </div>
                     </button>
@@ -325,8 +359,9 @@ export function ItineraryScreen() {
                   </div>
                 );
               })}
-          </section>
-        ))}
+            </section>
+          );
+        })}
       </div>
       {travel.canEdit && (
         <AddButton

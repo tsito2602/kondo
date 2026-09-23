@@ -753,6 +753,105 @@ test("all-day hotel checkout remains visible in itinerary without an end time", 
   );
 });
 
+test("journeys join endpoints without moving intervening events; stays do not interrupt flights", async () => {
+  const { dayTimeline, staysOnDay, JourneyPair, StayCards } = await bundle(
+    "export * from './src/web/itinerary-bookings';",
+  );
+  const day = "2026-11-22";
+  const flight = {
+    id: "flight",
+    kind: "flight",
+    title: "EK127",
+    day,
+    time: "14:00",
+    endDay: day,
+    endTime: "18:00",
+    originCode: "DXB",
+    destinationCode: "VIE",
+  };
+  const hotel = {
+    id: "hotel",
+    kind: "hotel",
+    title: "Astoria",
+    day,
+    time: "15:00",
+    endDay: "2026-11-25",
+    endTime: "11:00",
+  };
+  const bookings = [flight, hotel];
+  const joined = dayTimeline(timelineEntries([], bookings), day);
+  assert.equal(
+    joined.length,
+    1,
+    "a check-in while flying belongs in the stay band",
+  );
+  assert.equal(joined[0].joinedArrival, true);
+  const event = { id: "event", day, time: "16:00", title: "別の予定" };
+  const split = dayTimeline(timelineEntries([event], bookings), day);
+  assert.deepEqual(
+    split.map((entry) => entry.key),
+    ["booking-flight-start", "item-event", "booking-flight-end"],
+  );
+  assert.equal(split[0].joinedArrival, false);
+  const overnight = timelineEntries(
+    [],
+    [{ ...flight, endDay: "2026-11-23", endTime: "02:00" }],
+  );
+  assert.equal(dayTimeline(overnight, day)[0].joinedArrival, false);
+  assert.equal(dayTimeline(overnight, "2026-11-23")[0].endpoint, "end");
+  const sameDayFallback = dayTimeline(
+    timelineEntries([], [{ ...flight, endDay: "" }]),
+    day,
+  );
+  assert.equal(sameDayFallback[0].joinedArrival, true);
+  assert.equal(staysOnDay(bookings, "2026-11-21").length, 0);
+  assert.equal(staysOnDay(bookings, "2026-11-23").length, 1);
+  assert.equal(staysOnDay(bookings, "2026-11-25").length, 1);
+  assert.equal(staysOnDay(bookings, "2026-11-26").length, 0);
+  const nextHotel = {
+    ...hotel,
+    id: "next-hotel",
+    day: "2026-11-25",
+    endDay: "2026-11-26",
+  };
+  assert.deepEqual(
+    staysOnDay([...bookings, nextHotel], "2026-11-25").map((b) => b.id),
+    ["hotel", "next-hotel"],
+  );
+
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const pair = renderToStaticMarkup(
+    React.createElement(JourneyPair, { booking: flight, arrival: false }),
+  );
+  assert.match(pair, /14:00/);
+  assert.match(pair, /18:00/);
+  assert.match(pair, /現地時刻/);
+  const arrival = renderToStaticMarkup(
+    React.createElement(JourneyPair, { booking: flight, arrival: true }),
+  );
+  assert.match(arrival, /DXB/);
+  assert.match(arrival, /VIE/);
+  const stay = renderToStaticMarkup(
+    React.createElement(StayCards, {
+      bookings,
+      day: "2026-11-23",
+      onOpen() {},
+    }),
+  );
+  assert.match(stay, /連泊/);
+  assert.match(stay, /15:00〜/);
+  assert.match(stay, /11:00まで/);
+  const untimed = renderToStaticMarkup(
+    React.createElement(StayCards, {
+      bookings: [{ ...hotel, time: "", endTime: "" }],
+      day: "2026-11-25",
+      onOpen() {},
+    }),
+  );
+  assert.match(untimed, /チェックアウト日/);
+  assert.match(untimed, /時刻未定/);
+});
+
 test("booking clocks align Japan conversions in a shared row and preserve seasonal UTC offsets", async () => {
   const { BookingSchedule } = await bundle(
     "export { BookingSchedule } from './src/web/booking-schedule';",
