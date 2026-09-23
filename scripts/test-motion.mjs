@@ -34,7 +34,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -52,6 +52,7 @@ new Function("require", "module", "exports", outputFiles[0].text)(
   module.exports,
 );
 const {
+  menuDepth,
   Modal,
   installPressFeedback,
   AppRouter,
@@ -2000,5 +2001,64 @@ test("all colored and neutral dock layouts reshape existing surfaces without zer
           );
       }
     }
+  }
+});
+
+test("menu depth keeps scrolled fixed controls in place and reverses from an interrupted opening", () => {
+  const main = document.createElement("main");
+  main.id = "main-content";
+  main.style.position = "relative";
+  const add = document.createElement("button");
+  add.className = "floating-add";
+  add.style.position = "fixed";
+  const originalStyle = add.getAttribute("style");
+  main.append(add);
+  document.getElementById("root").append(main);
+  main.getBoundingClientRect = () => ({
+    left: 0,
+    top: -1200,
+    width: 390,
+    height: 3000,
+  });
+  add.getBoundingClientRect = () => ({
+    left: 320,
+    top: 650,
+    width: 52,
+    height: 52,
+  });
+  const calls = [];
+  HTMLElement.prototype.animate = function (frames) {
+    const motion = timeline();
+    calls.push({ element: this, frames, motion });
+    return motion;
+  };
+  try {
+    const effect = menuDepth(false, { duration: 440, fill: "both" });
+    assert.equal(add.style.position, "absolute");
+    assert.equal(add.style.top, "1850px");
+    assert.equal(add.style.left, "320px");
+    assert.equal(calls[0].element, main);
+    assert.equal(calls[0].frames[1].scale, ".965");
+    assert.equal(calls[0].frames[1].filter, "blur(6px)");
+    assert.equal(
+      calls[0].frames[1].transformOrigin,
+      `${window.innerWidth / 2}px ${window.innerHeight / 2 + 1200}px`,
+    );
+    effect.reverse(120);
+    assert.equal(calls[0].motion.currentTime, 120);
+    assert.equal(calls[0].motion.playbackRate, -1);
+    effect.cancel();
+    assert.equal(calls[0].motion.cancelled, true);
+    assert.equal(add.getAttribute("style"), originalStyle);
+    assert.equal(main.style.position, "relative");
+    calls.length = 0;
+    const reducedEffect = menuDepth(true, { duration: 440 });
+    assert.equal(calls.length, 0);
+    assert.equal(main.style.filter, "blur(6px)");
+    reducedEffect.cancel();
+    assert.equal(main.style.filter, "");
+    assert.equal(add.getAttribute("style"), originalStyle);
+  } finally {
+    main.remove();
   }
 });

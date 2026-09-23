@@ -52,12 +52,7 @@ import { SafariTabs, tripTabs } from "./safari-tabs";
 import { AnchoredMenu } from "./anchored-menu";
 import { installPressFeedback } from "./press-feedback";
 import { dockKeyboardInset } from "./viewport";
-import {
-  ThumbDock,
-  ThumbDockProvider,
-  ThumbActions,
-  ContextDock,
-} from "./thumb-dock";
+import { ThumbDock, ThumbDockProvider, ContextDock } from "./thumb-dock";
 import {
   BookingsScreen,
   ItineraryScreen,
@@ -581,9 +576,6 @@ function TripLayout() {
       >
         {(closeMenu) => (
           <>
-            <div className="thumb-page-tools">
-              <ThumbActions />
-            </div>
             <div className="menu-list">
               <button
                 onClick={() => {

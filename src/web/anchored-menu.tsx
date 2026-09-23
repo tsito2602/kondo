@@ -9,6 +9,7 @@ import {
 import { createPortal } from "react-dom";
 import { MoreHorizontal } from "lucide-react";
 import { reduceMotion } from "./motion";
+import { menuDepth } from "./menu-depth";
 
 /** Keep the same button in a stable portal, including while in the top layer. */
 export function AnchoredMenu({
@@ -30,6 +31,7 @@ export function AnchoredMenu({
   const body = useRef<HTMLDivElement>(null);
   const animation = useRef<Animation | null>(null);
   const contentAnimation = useRef<Animation | null>(null);
+  const depth = useRef<ReturnType<typeof menuDepth> | null>(null);
   const [closing, setClosing] = useState(false);
   const [pressed, setPressed] = useState(false);
   const pending = useRef<(() => void) | undefined>(undefined);
@@ -94,12 +96,12 @@ export function AnchoredMenu({
     // The button owns the material. Its icon has fixed top/right coordinates;
     // neither the button nor the icon is translated or replaced.
     Object.assign(control.style, expanded);
+    const timing: KeyframeAnimationOptions = {
+      duration: 440,
+      easing: "cubic-bezier(.22,.8,.2,1)",
+      fill: "both",
+    };
     if (control.animate && !reduceMotion()) {
-      const timing: KeyframeAnimationOptions = {
-        duration: 440,
-        easing: "cubic-bezier(.22,.8,.2,1)",
-        fill: "both",
-      };
       animation.current = control.animate([folded, expanded], timing);
       contentAnimation.current = body.current!.animate(
         [
@@ -114,9 +116,28 @@ export function AnchoredMenu({
         timing,
       );
     }
-    window.addEventListener("resize", position);
+    depth.current = menuDepth(reduceMotion(), timing);
+    const resize = () => close();
+    const preventBackgroundScroll = (event: Event) => {
+      if (
+        !(event.target instanceof Node) ||
+        !body.current?.contains(event.target)
+      )
+        event.preventDefault();
+    };
+    window.addEventListener("resize", resize);
+    document.addEventListener("wheel", preventBackgroundScroll, {
+      passive: false,
+    });
+    document.addEventListener("touchmove", preventBackgroundScroll, {
+      passive: false,
+    });
     return () => {
-      window.removeEventListener("resize", position);
+      window.removeEventListener("resize", resize);
+      document.removeEventListener("wheel", preventBackgroundScroll);
+      document.removeEventListener("touchmove", preventBackgroundScroll);
+      depth.current?.cancel();
+      depth.current = null;
       animation.current?.cancel();
       contentAnimation.current?.cancel();
       animation.current = contentAnimation.current = null;
@@ -133,6 +154,7 @@ export function AnchoredMenu({
     if (motion && !reduceMotion()) {
       motion.playbackRate = -1;
       motion.play();
+      depth.current?.reverse(motion.currentTime);
       if (contentAnimation.current) {
         contentAnimation.current.currentTime = motion.currentTime;
         contentAnimation.current.playbackRate = -1;
