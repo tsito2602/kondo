@@ -24,6 +24,8 @@ import {
   Plus,
   LoaderCircle,
   ArrowLeft,
+  Keyboard,
+  ChevronDown,
   SlidersHorizontal,
 } from "lucide-react";
 import {
@@ -127,6 +129,75 @@ export function useAction() {
   };
   return { busy, run };
 }
+/** Keep the pointer-down action stable even when the browser blurs on tap. */
+function FormBackButton({ onBack }: { onBack: () => void }) {
+  const [editor, setEditor] = useState<HTMLElement | null>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const pressedEditor = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      const focused = document.activeElement;
+      const dialog = button.current?.closest("dialog");
+      setEditor(
+        focused instanceof HTMLElement &&
+          dialog?.contains(focused) &&
+          focused.matches(
+            "input, textarea, select, [contenteditable='true']",
+          ) &&
+          !focused.matches(
+            ':disabled, [readonly], input[type="checkbox"], input[type="radio"], input[type="button"], input[type="submit"], input[type="reset"], input[type="range"], input[type="file"], input[type="color"]',
+          )
+          ? focused
+          : null,
+      );
+    };
+    const afterBlur = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(update);
+    };
+    update();
+    document.addEventListener("focusin", update);
+    document.addEventListener("focusout", afterBlur);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("focusin", update);
+      document.removeEventListener("focusout", afterBlur);
+    };
+  }, []);
+  return (
+    <button
+      ref={button}
+      type="button"
+      aria-label={editor ? "キーボードを閉じる" : "戻る"}
+      onPointerDown={(event) => {
+        pressedEditor.current = editor;
+        if (editor) event.preventDefault();
+      }}
+      onPointerCancel={() => {
+        pressedEditor.current = null;
+      }}
+      onClick={() => {
+        const target = pressedEditor.current ?? editor;
+        pressedEditor.current = null;
+        if (target) {
+          target.blur();
+          setEditor(null);
+        } else onBack();
+      }}
+    >
+      {editor ? (
+        <span className="keyboard-dismiss-icon" aria-hidden="true">
+          <Keyboard size={20} />
+          <ChevronDown size={12} />
+        </span>
+      ) : (
+        <ArrowLeft size={22} />
+      )}
+    </button>
+  );
+}
+
 export function Modal({
   title,
   children,
@@ -328,11 +399,7 @@ export function Modal({
         >
           {saveAction || dockActions ? (
             <ContextDock
-              back={
-                <button aria-label="戻る" onClick={close}>
-                  <ArrowLeft size={22} />
-                </button>
-              }
+              back={<FormBackButton onBack={close} />}
               primary={
                 saveAction ? (
                   <Button

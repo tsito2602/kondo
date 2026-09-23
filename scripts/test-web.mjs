@@ -262,6 +262,35 @@ const keyboardWhileEditing = async () => {
     assert.equal(dock.parentElement, dialog);
     assert.ok(dock.querySelector('button[type="submit"]'));
   }
+  const previousValue = field.value;
+  const dismiss = dialog.querySelector('[aria-label="キーボードを閉じる"]');
+  assert.ok(dismiss, "focused editor replaces Back with keyboard dismissal");
+  const pointerDown = new dom.window.Event("pointerdown", {
+    bubbles: true,
+    cancelable: true,
+  });
+  await act(async () => dismiss.dispatchEvent(pointerDown));
+  assert.ok(
+    pointerDown.defaultPrevented,
+    "tap does not transfer focus before its action",
+  );
+  // Even if Safari blurs before click, this gesture must never leave the form.
+  await act(async () => field.blur());
+  await tick(30);
+  await click(dismiss);
+  assert.ok(
+    dialog.isConnected && dialog.open,
+    "keyboard dismissal keeps the editor open",
+  );
+  assert.equal(
+    field.value,
+    previousValue,
+    "keyboard dismissal preserves the draft",
+  );
+  assert.ok(
+    dialog.querySelector('[aria-label="戻る"]'),
+    "Back returns after dismissal",
+  );
   panel.getBoundingClientRect = measurePanel;
   header.getBoundingClientRect = measureHeader;
   field.getBoundingClientRect = measureField;
@@ -497,7 +526,7 @@ test("legacy account cache and pending changes survive React migration; real for
     await tick(30);
     await click(byText("nav a", "行きたい場所"));
     await click(document.querySelector('[aria-label="場所を追加"]'));
-    assert.equal(document.querySelector(".place-options").open, false);
+    assert.equal(field("訪問ステータス").closest("details"), null);
     assert.equal(field("訪問ステータス").value, "want");
     assert.equal(field("予約状況").value, "not_needed");
     assert.notEqual(
@@ -507,15 +536,9 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await fill("場所の名前", "美術館");
     await fill("メモ", "見たい展示");
-    await click(document.querySelector(".place-options summary"));
     await fill("営業時間", "10:00〜18:00");
     await fill("予約状況", "needed");
-    await click(document.querySelector(".place-options summary"));
-    assert.equal(document.querySelector(".place-options").open, false);
-    assert.match(
-      document.querySelector(".place-options summary").textContent,
-      /要予約/,
-    );
+    assert.equal(field("予約状況").closest("details"), null);
     await click(byText("dialog button", "リンクを追加"));
     await fill("URL", "https://example.com/museum");
     await fill("名前", "公式サイト");
@@ -574,9 +597,9 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(document.querySelector('.context-actions [aria-label="編集"]'));
     assert.ok(document.querySelector('.context-primary button[type="submit"]'));
     assert.equal(
-      document.querySelector(".place-options").open,
-      true,
-      "existing additional information starts expanded",
+      field("予約状況").value,
+      "needed",
+      "existing reservation status remains visible",
     );
     assert.equal(field("URL").value, "https://example.com/museum");
     await click(document.querySelector('.context-back [aria-label="戻る"]'));

@@ -1703,49 +1703,7 @@ progress::-moz-progress-bar {
   width: 44px;
   height: 46px;
 }
-.place-options {
-  border-top: 1px solid var(--line);
-}
-.place-options > summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 0;
-  cursor: pointer;
-  list-style: none;
-  min-height: 56px;
-}
-.place-options > summary::-webkit-details-marker {
-  display: none;
-}
-.place-options summary strong,
-.place-options summary small {
-  display: block;
-}
-.place-options summary strong {
-  font-size: 12px;
-  font-weight: 550;
-}
-.place-options summary small {
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 11px;
-  overflow-wrap: anywhere;
-}
-.place-options summary > svg {
-  flex-shrink: 0;
-  color: var(--muted);
-  transition: transform 180ms var(--ease-flow);
-}
-.place-options[open] summary > svg {
-  transform: rotate(180deg);
-}
-.place-options-fields {
-  display: grid;
-  gap: 14px;
-  padding-bottom: 4px;
-}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4332,4 +4290,15 @@ input::-webkit-date-and-time-value {
 .members-page > .section-heading,
 .members-page > .settings-card {
   margin: 0;
+}
+
+.keyboard-dismiss-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+.keyboard-dismiss-icon svg:last-child {
+  margin-top: -3px;
 }
