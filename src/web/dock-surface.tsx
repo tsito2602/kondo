@@ -156,6 +156,16 @@ export function DockSurface({ split }: { split: boolean }) {
         inset:
           parseFloat(style.getPropertyValue("--safari-center-inset")) || 60,
       };
+      // Keep the stronger press expansion inside even a narrow phone screen.
+      parent.style.setProperty(
+        "--safari-press-scale",
+        String(
+          Math.max(
+            1,
+            Math.min(1.06, (window.innerWidth - 8) / geometry.current.width),
+          ),
+        ),
+      );
       paint();
     };
     measure();

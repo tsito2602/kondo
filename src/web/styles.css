@@ -2523,16 +2523,17 @@ input::-webkit-date-and-time-value {
     --safari-side-size: 52px;
     --safari-center-inset: 60px;
     --safari-ease: cubic-bezier(0.22, 0.82, 0.24, 1);
+    --safari-touch-ease: cubic-bezier(0.16, 1, 0.3, 1);
     position: relative;
     height: 64px;
     isolation: isolate;
     transform-origin: center bottom;
-    transition: transform 240ms var(--safari-ease);
+    transition: transform 520ms var(--safari-touch-ease);
   }
   .safari-dock[data-touching="true"],
   .safari-dock:has(.safari-side-button:active) {
-    transform: scale(1.025);
-    transition-duration: 140ms;
+    transform: scale(var(--safari-press-scale, 1.06), 1.1);
+    transition-duration: 320ms;
   }
   .safari-surface,
   .safari-glass,
@@ -2623,20 +2624,22 @@ input::-webkit-date-and-time-value {
     top: 50%;
     left: 4px;
     width: calc((100% - 8px) / 5);
-    height: 34px;
-    border-radius: 18px;
+    height: calc(
+      min(var(--safari-side-size), var(--safari-center-inset) - 4px) - 8px
+    );
+    border-radius: 28px;
     transform: translateX(calc(var(--selection-tab) * 100%)) translateY(-50%);
     background: color-mix(in srgb, var(--brand) 13%, transparent);
     pointer-events: none;
     transition:
-      transform 260ms var(--safari-ease),
+      transform 420ms var(--safari-touch-ease),
       width 480ms var(--safari-ease),
       height 480ms var(--safari-ease),
       border-radius 480ms var(--safari-ease),
-      background-color 160ms;
+      background-color 240ms var(--safari-touch-ease);
   }
   .safari-dock[data-touching="true"] .safari-selection {
-    transition-duration: 120ms, 480ms, 480ms, 480ms, 120ms;
+    transition-duration: 240ms, 480ms, 480ms, 480ms, 240ms;
     background: color-mix(in srgb, var(--brand) 20%, transparent);
   }
   .safari-tabs a.active {
@@ -2705,8 +2708,7 @@ input::-webkit-date-and-time-value {
     min-height: 44px;
   }
   .safari-dock[data-wide="true"] .safari-selection {
-    height: 48px;
-    border-radius: 24px;
+    height: 56px;
   }
   .safari-dock[data-wide="true"] .safari-tabs svg {
     transform: translateY(-9px);
