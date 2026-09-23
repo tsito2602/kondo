@@ -28,7 +28,6 @@ import {
 import {
   ArrowLeft,
   Settings,
-  MoreHorizontal,
   Users,
   Download,
   Pencil,
@@ -492,7 +491,7 @@ function TripLayout() {
   const notify = useToast();
   const location = useLocation();
   const [menu, setMenu] = useState(false);
-  const menuTrigger = useRef<HTMLButtonElement>(null);
+  const menuTrigger = useRef<HTMLDivElement>(null);
   const [editing, setEditing] = useState(false);
   const [progress, setProgress] = useState("");
   const { busy, run } = useAction();
@@ -541,17 +540,7 @@ function TripLayout() {
               {formatDate(trip.startsOn)} — {formatDate(trip.endsOn)}
             </p>
           </div>
-          <Button
-            ref={menuTrigger}
-            variant="ghost"
-            className="icon-button"
-            aria-haspopup="dialog"
-            aria-expanded={menu}
-            aria-label="旅行メニュー"
-            onClick={() => setMenu(true)}
-          >
-            <MoreHorizontal />
-          </Button>
+          <div ref={menuTrigger} className="trip-menu-anchor" />
         </div>
         {trip.role === "viewer" && (
           <div className="viewer-status">閲覧のみ</div>
@@ -584,94 +573,96 @@ function TripLayout() {
       <ThumbDock mode="browse">
         <SafariTabs tripId={trip.id} onMenu={() => setMenu(true)} />
       </ThumbDock>
-      {menu && (
-        <AnchoredMenu trigger={menuTrigger} onClose={() => setMenu(false)}>
-          {(closeMenu) => (
-            <>
-              <div className="thumb-page-tools">
-                <ThumbActions />
-              </div>
-              <div className="menu-list">
+      <AnchoredMenu
+        anchor={menuTrigger}
+        open={menu}
+        onOpen={() => setMenu(true)}
+        onClose={() => setMenu(false)}
+      >
+        {(closeMenu) => (
+          <>
+            <div className="thumb-page-tools">
+              <ThumbActions />
+            </div>
+            <div className="menu-list">
+              <button
+                onClick={() => {
+                  closeMenu(() => {
+                    navigate(`/trips/${trip.id}/members`);
+                  });
+                }}
+              >
+                <Users />
+                メンバー管理
+              </button>
+              {travel.canEdit && (
                 <button
                   onClick={() => {
                     closeMenu(() => {
-                      navigate(`/trips/${trip.id}/members`);
+                      setEditing(true);
                     });
                   }}
                 >
-                  <Users />
-                  メンバー管理
+                  <Pencil />
+                  旅行を編集
                 </button>
-                {travel.canEdit && (
-                  <button
-                    onClick={() => {
-                      closeMenu(() => {
-                        setEditing(true);
-                      });
-                    }}
-                  >
-                    <Pencil />
-                    旅行を編集
-                  </button>
-                )}
+              )}
+              <button
+                disabled={busy}
+                onClick={() =>
+                  void run(async () => {
+                    const count = await travel.saveTripOffline((done, total) =>
+                      setProgress(`${done} / ${total}件の書類を保存中`),
+                    );
+                    setProgress("");
+                    notify(`旅行と${count}件の書類をオフライン保存しました`);
+                  })
+                }
+              >
+                <Download />
+                オフライン保存
+              </button>
+              {progress && <p role="status">{progress}</p>}
+              <button
+                onClick={() =>
+                  closeMenu(() =>
+                    navigate("/settings", {
+                      state: { returnTo: location.pathname },
+                    }),
+                  )
+                }
+              >
+                <Settings />
+                設定
+              </button>
+              {trip.role === "owner" && (
                 <button
                   disabled={busy}
+                  className="danger"
                   onClick={() =>
                     void run(async () => {
-                      const count = await travel.saveTripOffline(
-                        (done, total) =>
-                          setProgress(`${done} / ${total}件の書類を保存中`),
-                      );
-                      setProgress("");
-                      notify(`旅行と${count}件の書類をオフライン保存しました`);
+                      if (
+                        confirm(
+                          `「${trip.name}」と旅行内のすべてのデータを削除しますか？この操作は取り消せません。`,
+                        )
+                      ) {
+                        await travel.deleteTrip(trip.id);
+                        navigate("/");
+                      }
                     })
                   }
                 >
-                  <Download />
-                  オフライン保存
+                  <Trash2 />
+                  旅行を削除
                 </button>
-                {progress && <p role="status">{progress}</p>}
-                <button
-                  onClick={() =>
-                    closeMenu(() =>
-                      navigate("/settings", {
-                        state: { returnTo: location.pathname },
-                      }),
-                    )
-                  }
-                >
-                  <Settings />
-                  設定
-                </button>
-                {trip.role === "owner" && (
-                  <button
-                    disabled={busy}
-                    className="danger"
-                    onClick={() =>
-                      void run(async () => {
-                        if (
-                          confirm(
-                            `「${trip.name}」と旅行内のすべてのデータを削除しますか？この操作は取り消せません。`,
-                          )
-                        ) {
-                          await travel.deleteTrip(trip.id);
-                          navigate("/");
-                        }
-                      })
-                    }
-                  >
-                    <Trash2 />
-                    旅行を削除
-                  </button>
-                )}
-              </div>
-              <div className="trip-menu-sync">
-                <SyncStatus />
-              </div>
-            </>
-          )}
-        </AnchoredMenu>
-      )}
+              )}
+            </div>
+            <div className="trip-menu-sync">
+              <SyncStatus />
+            </div>
+          </>
+        )}
+      </AnchoredMenu>
       {editing && <TripEditor trip={trip} onClose={() => setEditing(false)} />}
     </>
   );

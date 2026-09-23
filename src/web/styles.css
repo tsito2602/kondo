@@ -35,7 +35,9 @@
   --panel-tint: #ffffffed;
   --dock-glass: color-mix(in srgb, var(--paper) 18%, transparent);
   --dock-bottom-gap: 24px;
-  --dock-height: 56px;
+  --control-size: 44px;
+  --dock-height: var(--control-size);
+  --menu-glass: color-mix(in srgb, var(--paper) 68%, transparent);
   --dock-on-accent: #fff;
   --dock-max-width: 420px;
   --dock-border: #20232612;
@@ -288,8 +290,8 @@ strong {
   font-weight: 600;
 }
 .icon-button {
-  width: 44px;
-  height: 44px;
+  width: var(--control-size);
+  height: var(--control-size);
   flex-shrink: 0;
   display: inline-flex;
   justify-content: center;
@@ -674,53 +676,91 @@ strong {
   border: 1px solid var(--dock-border);
   background: var(--dock-glass);
 }
+.trip-menu-anchor,
+.trip-menu-host {
+  position: relative;
+  width: var(--control-size);
+  height: var(--control-size);
+}
 .trip-menu-popover {
   position: fixed;
   inset: auto;
   margin: 0;
   padding: 0;
-  width: min(300px, calc(100vw - 24px));
-  max-height: calc(100dvh - 24px);
+  width: var(--control-size);
+  height: var(--control-size);
+  max-width: none;
+  max-height: none;
   border: 0;
-  border-radius: 26px;
   color: var(--ink);
   background: transparent;
   overflow: visible;
 }
-.trip-menu-surface {
+.trip-menu-toggle {
   position: absolute;
-  inset: 0;
+  top: 0;
+  right: 0;
+  width: var(--control-size);
+  height: var(--control-size);
   border: 1px solid var(--dock-border);
-  border-radius: 26px;
-  background: color-mix(in srgb, var(--paper) 68%, transparent);
+  border-radius: 22px;
+  background: var(--dock-glass);
   -webkit-backdrop-filter: blur(28px) saturate(1.18);
   backdrop-filter: blur(28px) saturate(1.18);
-  box-shadow:
-    inset 0 1px 1px var(--surface-glow),
-    0 12px 40px #0003;
-  pointer-events: none;
+  transform: none;
+  transition:
+    width 320ms,
+    height 320ms;
+}
+.trip-menu-toggle svg {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  top: 11px;
+  right: 11px;
+}
+.trip-menu-toggle[data-pressed="true"] {
+  width: calc(var(--control-size) * 1.1);
+  height: calc(var(--control-size) * 1.1);
+}
+.trip-menu-toggle:disabled {
+  opacity: 1;
+}
+.trip-menu-toggle[aria-expanded="true"] {
+  transition: none;
 }
 .trip-menu-popover::backdrop {
   background: #0000000a;
 }
 .trip-menu-body {
-  position: relative;
-  padding: 8px;
-  max-height: calc(100dvh - 24px);
-  overflow: auto;
-}
-.trip-menu-close {
   position: absolute;
-  right: 8px;
-  top: 8px;
-  border-radius: 50%;
+  top: 0;
+  right: 0;
+  width: var(--menu-width);
+  padding: 8px;
+  max-height: var(--menu-height);
+  overflow: auto;
+  pointer-events: none;
+}
+.trip-menu-body > * {
+  pointer-events: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .trip-menu-toggle {
+    transition: none;
+  }
+  .trip-menu-toggle[data-pressed="true"] {
+    width: var(--control-size);
+    height: var(--control-size);
+  }
 }
 .trip-menu-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   min-height: 44px;
-  padding: 0 52px 0 10px;
+  padding: 0 36px 0 10px;
+  margin-right: 36px;
 }
 .trip-menu-heading h2 {
   font-size: 15px;
@@ -2019,7 +2059,7 @@ input::-webkit-date-and-time-value {
   }
 }
 @media (hover: hover) {
-  .icon-button:hover,
+  .icon-button:hover:not(.trip-menu-toggle),
   .menu-list button:hover {
     background: var(--soft);
   }
@@ -2503,7 +2543,7 @@ input::-webkit-date-and-time-value {
     padding: 0;
     border-radius: calc(var(--dock-height) / 2);
     background: transparent;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     white-space: nowrap;
   }
@@ -2860,15 +2900,17 @@ input::-webkit-date-and-time-value {
     color: var(--brand);
   }
   .safari-tabs svg {
+    width: 18px;
+    height: 18px;
     position: relative;
     flex-shrink: 0;
     transition: transform 480ms var(--safari-ease);
   }
   .safari-tabs a span {
     position: absolute;
-    bottom: 6px;
-    font-size: clamp(9px, 2.6vw, 10px);
-    line-height: 14px;
+    bottom: 4px;
+    font-size: 9px;
+    line-height: 11px;
     white-space: nowrap;
     opacity: 0;
     transform: translateY(4px);
@@ -2901,11 +2943,11 @@ input::-webkit-date-and-time-value {
     height: var(--dock-height);
   }
   .safari-dock[data-wide="true"] .safari-side.safari-left .safari-side-button {
-    transform: translateX(-56px);
+    transform: translateX(calc(-1 * var(--dock-height)));
     opacity: 0;
   }
   .safari-dock[data-wide="true"] .safari-side.safari-right .safari-side-button {
-    transform: translateX(56px);
+    transform: translateX(var(--dock-height));
     opacity: 0;
   }
   .safari-dock[data-wide="true"] .safari-side-button {
@@ -2919,7 +2961,7 @@ input::-webkit-date-and-time-value {
     height: calc(var(--dock-height) - 8px);
   }
   .safari-dock[data-wide="true"] .safari-tabs svg {
-    transform: translateY(-8px);
+    transform: translateY(-6px);
   }
   .safari-dock[data-wide="true"] .safari-tabs a span {
     opacity: 1;
@@ -2957,11 +2999,14 @@ input::-webkit-date-and-time-value {
   }
 }
 @media (prefers-reduced-transparency: reduce) {
+  :root {
+    --menu-glass: var(--paper);
+  }
   .fluid-dock-accent {
     background: var(--brand);
   }
   .safari-glass,
-  .trip-menu-surface,
+  .trip-menu-toggle,
   .trip-header,
   .home-header,
   .simple-header,

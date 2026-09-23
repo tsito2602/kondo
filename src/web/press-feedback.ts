@@ -36,7 +36,7 @@ export function installPressFeedback() {
         : null;
     return element &&
       !element.closest(
-        '.thumb-dock, [inert], :disabled, [aria-disabled="true"]',
+        '.thumb-dock, .trip-menu-toggle, [inert], :disabled, [aria-disabled="true"]',
       )
       ? element
       : null;

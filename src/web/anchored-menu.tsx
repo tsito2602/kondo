@@ -6,26 +6,32 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+import { createPortal } from "react-dom";
 import { MoreHorizontal } from "lucide-react";
 import { reduceMotion } from "./motion";
 
-/** A menu whose retained contour opens from, and closes into, its trigger. */
+/** Keep the same button in a stable portal, including while in the top layer. */
 export function AnchoredMenu({
-  trigger,
+  anchor,
+  open,
+  onOpen,
   onClose,
   children,
 }: {
-  trigger: RefObject<HTMLButtonElement | null>;
+  anchor: RefObject<HTMLDivElement | null>;
+  open: boolean;
+  onOpen: () => void;
   onClose: () => void;
   children: (close: (after?: () => void) => void) => ReactNode;
 }) {
+  const [host] = useState(() => document.createElement("div"));
   const dialog = useRef<HTMLDialogElement>(null);
-  const surface = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const animation = useRef<Animation | null>(null);
   const contentAnimation = useRef<Animation | null>(null);
-  const updateContour = useRef<() => void>(() => {});
   const [closing, setClosing] = useState(false);
+  const [pressed, setPressed] = useState(false);
   const pending = useRef<(() => void) | undefined>(undefined);
   const finish = useRef(onClose);
   finish.current = onClose;
@@ -36,107 +42,95 @@ export function AnchoredMenu({
     setClosing(true);
   };
   useLayoutEffect(() => {
+    host.className = "trip-menu-host";
+    anchor.current?.appendChild(host);
+    return () => {
+      host.parentNode?.removeChild(host);
+    };
+  }, [anchor, host]);
+  useLayoutEffect(() => {
+    if (!open) return;
     const node = dialog.current!;
-    const source = trigger.current;
+    const control = button.current!;
     const previousFocus = document.activeElement as HTMLElement | null;
-    node.showModal();
-    const materialStyle = window.getComputedStyle(surface.current!);
-    const material = {
-      backgroundColor: materialStyle.backgroundColor,
-      boxShadow: materialStyle.boxShadow,
+    // Read the live button size before promoting that very same element.
+    const initial = control.getBoundingClientRect();
+    const style = window.getComputedStyle(control);
+    const folded = {
+      width: `${initial.width || 44}px`,
+      height: `${initial.height || 44}px`,
+      borderRadius: style.borderRadius || "22px",
+      backgroundColor: style.backgroundColor,
+      boxShadow: style.boxShadow,
     };
-    const contour = () => {
-      const origin = source?.getBoundingClientRect();
-      const bounds = node.getBoundingClientRect();
-      const sourceStyle = source ? window.getComputedStyle(source) : null;
-      return origin && bounds.width
-        ? [
-            {
-              transform: `translate(${origin.left - bounds.left}px, ${origin.top - bounds.top}px)`,
-              width: `${origin.width}px`,
-              height: `${origin.height}px`,
-              borderRadius: `${Math.min(origin.width, origin.height) / 2}px`,
-              backgroundColor:
-                sourceStyle?.backgroundColor ?? material.backgroundColor,
-              boxShadow: sourceStyle?.boxShadow ?? "none",
-            },
-            {
-              transform: "translate(0px, 0px)",
-              width: `${bounds.width}px`,
-              height: `${bounds.height}px`,
-              borderRadius: "26px",
-              backgroundColor: material.backgroundColor,
-              boxShadow: material.boxShadow,
-            },
-          ]
-        : null;
-    };
-    const contentFrames = () => {
-      const origin = source?.getBoundingClientRect();
-      const bounds = node.getBoundingClientRect();
-      return [
-        {
-          opacity: 0,
-          offset: 0,
-          clipPath: origin
-            ? `inset(${origin.top - bounds.top}px ${bounds.right - origin.right}px ${bounds.bottom - origin.bottom}px ${origin.left - bounds.left}px round 26px)`
-            : "inset(0px round 26px)",
-        },
-        { opacity: 0, offset: 0.25 },
-        { opacity: 1, offset: 1, clipPath: "inset(0px round 26px)" },
-      ];
-    };
+    node.appendChild(host);
     const position = () => {
-      const origin = source?.getBoundingClientRect();
-      const bounds = node.getBoundingClientRect();
-      const width = bounds.width || Math.min(300, window.innerWidth - 24);
-      const height = bounds.height || 340;
-      // The persistent three-dot icon remains at the original button center.
-      node.style.left = `${Math.max(12, Math.min(window.innerWidth - width - 12, (origin?.right ?? window.innerWidth - 12) + 8 - width))}px`;
-      node.style.top = `${Math.max(12, Math.min(window.innerHeight - height - 12, (origin?.top ?? 20) - 8))}px`;
-      const frames = contour();
-      if (frames)
-        (animation.current?.effect as KeyframeEffect | null)?.setKeyframes(
-          frames,
-        );
-      (contentAnimation.current?.effect as KeyframeEffect | null)?.setKeyframes(
-        contentFrames(),
+      // The untransformed layout slot is the anchor; press motion never moves it.
+      const origin = anchor.current!.getBoundingClientRect();
+      node.style.left = `${origin.left}px`;
+      node.style.top = `${origin.top}px`;
+      host.style.setProperty(
+        "--menu-width",
+        `${Math.min(300, origin.right - 12)}px`,
+      );
+      host.style.setProperty(
+        "--menu-height",
+        `${Math.max(44, window.innerHeight - origin.top - 12)}px`,
       );
     };
     position();
-    const frames = contour();
-    if (frames && surface.current?.animate && !reduceMotion()) {
+    node.showModal();
+    const bounds = body.current!.getBoundingClientRect();
+    const expanded = {
+      width: `${bounds.width}px`,
+      height: `${bounds.height}px`,
+      borderRadius: "26px",
+      backgroundColor: window
+        .getComputedStyle(document.documentElement)
+        .getPropertyValue("--menu-glass")
+        .trim(),
+      boxShadow: "inset 0 1px 1px var(--surface-glow), 0 12px 40px #0003",
+    };
+    // The button owns the material. Its icon has fixed top/right coordinates;
+    // neither the button nor the icon is translated or replaced.
+    Object.assign(control.style, expanded);
+    if (control.animate && !reduceMotion()) {
       const timing: KeyframeAnimationOptions = {
         duration: 440,
         easing: "cubic-bezier(.22,.8,.2,1)",
         fill: "both",
       };
-      animation.current = surface.current.animate(frames, timing);
-      contentAnimation.current = body.current!.animate(contentFrames(), timing);
+      animation.current = control.animate([folded, expanded], timing);
+      contentAnimation.current = body.current!.animate(
+        [
+          {
+            opacity: 0,
+            clipPath: `inset(0px 0px ${bounds.height - 44}px ${bounds.width - 44}px round 22px)`,
+            offset: 0,
+          },
+          { opacity: 0, offset: 0.25 },
+          { opacity: 1, clipPath: "inset(0px round 26px)", offset: 1 },
+        ],
+        timing,
+      );
     }
-    // Replace the button visually with the same material and icon, instead of
-    // leaving a second button underneath an expanding overlay.
-    const previousVisibility = source?.style.visibility ?? "";
-    if (source) source.style.visibility = "hidden";
-    updateContour.current = position;
     window.addEventListener("resize", position);
-    window.addEventListener("scroll", position, true);
     return () => {
       window.removeEventListener("resize", position);
-      window.removeEventListener("scroll", position, true);
       animation.current?.cancel();
       contentAnimation.current?.cancel();
+      animation.current = contentAnimation.current = null;
+      control.removeAttribute("style");
+      anchor.current?.appendChild(host);
       node.close();
-      if (source) source.style.visibility = previousVisibility;
       if (previousFocus?.isConnected)
         previousFocus.focus({ preventScroll: true });
     };
-  }, [trigger]);
+  }, [anchor, host, open]);
   useLayoutEffect(() => {
     if (!closing) return;
     const motion = animation.current;
     if (motion && !reduceMotion()) {
-      updateContour.current();
       motion.playbackRate = -1;
       motion.play();
       if (contentAnimation.current) {
@@ -149,8 +143,11 @@ export function AnchoredMenu({
     const complete = () => {
       if (done) return;
       done = true;
+      setClosing(false);
+      setPressed(false);
       finish.current();
       pending.current?.();
+      pending.current = undefined;
     };
     if (motion && !reduceMotion())
       void motion.finished.then(complete).catch(() => undefined);
@@ -161,33 +158,61 @@ export function AnchoredMenu({
     };
   }, [closing]);
   return (
-    <dialog
-      ref={dialog}
-      className="trip-menu-popover"
-      aria-labelledby={id}
-      onCancel={(event) => {
-        event.preventDefault();
-        close();
-      }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) close();
-      }}
-    >
-      <div ref={surface} className="trip-menu-surface" aria-hidden="true" />
-      <div ref={body} className="trip-menu-body" inert={closing}>
-        <div className="trip-menu-heading">
-          <h2 id={id}>旅行メニュー</h2>
-        </div>
-        {children(close)}
-      </div>
-      <button
-        className="icon-button trip-menu-close"
-        aria-label="旅行メニューを閉じる"
-        disabled={closing}
-        onClick={() => close()}
-      >
-        <MoreHorizontal />
-      </button>
-    </dialog>
+    <>
+      {open && (
+        <dialog
+          ref={dialog}
+          className="trip-menu-popover"
+          aria-labelledby={id}
+          onCancel={(event) => {
+            event.preventDefault();
+            close();
+          }}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) close();
+          }}
+        />
+      )}
+      {createPortal(
+        <>
+          <button
+            ref={button}
+            className="icon-button trip-menu-toggle"
+            aria-haspopup="dialog"
+            aria-expanded={open}
+            aria-label={open ? "旅行メニューを閉じる" : "旅行メニュー"}
+            data-pressed={pressed && !open}
+            disabled={closing}
+            onPointerDown={() => {
+              if (!open) setPressed(true);
+            }}
+            onPointerUp={() => setPressed(false)}
+            onPointerCancel={() => setPressed(false)}
+            onPointerLeave={() => setPressed(false)}
+            onBlur={() => setPressed(false)}
+            onKeyDown={(event) => {
+              if (!open && ["Enter", " "].includes(event.key)) setPressed(true);
+            }}
+            onKeyUp={() => setPressed(false)}
+            onClick={() => {
+              setPressed(false);
+              if (open) close();
+              else onOpen();
+            }}
+          >
+            <MoreHorizontal />
+          </button>
+          {open && (
+            <div ref={body} className="trip-menu-body" inert={closing}>
+              <div className="trip-menu-heading">
+                <h2 id={id}>旅行メニュー</h2>
+              </div>
+              {children(close)}
+            </div>
+          )}
+        </>,
+        host,
+      )}
+    </>
   );
 }

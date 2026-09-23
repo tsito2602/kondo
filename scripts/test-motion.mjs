@@ -462,12 +462,11 @@ test.afterEach(() => {
   HTMLElement.prototype.animate = () => timeline();
 });
 
-test("header menu expands from its trigger and reverses before navigating, restoring focus", async () => {
+test("header menu retains the actual button and fixed icon through opening, closing and reopening", async () => {
   const root = createRoot(document.getElementById("root"));
-  const trigger = document.createElement("button");
-  document.body.append(trigger);
-  trigger.focus();
-  trigger.getBoundingClientRect = () => ({
+  const anchor = document.createElement("div");
+  document.body.append(anchor);
+  anchor.getBoundingClientRect = () => ({
     left: 926,
     top: 20,
     right: 970,
@@ -477,82 +476,104 @@ test("header menu expands from its trigger and reverses before navigating, resto
   });
   const originalBounds = HTMLElement.prototype.getBoundingClientRect;
   HTMLElement.prototype.getBoundingClientRect = function () {
-    if (this.classList.contains("trip-menu-popover"))
-      return {
-        left: 670,
-        top: 20,
-        right: 970,
-        bottom: 360,
-        width: 300,
-        height: 340,
-      };
+    if (this.classList.contains("trip-menu-body"))
+      return { width: 300, height: 340 };
+    if (this.classList.contains("trip-menu-toggle"))
+      return { width: 44, height: 44 };
     return originalBounds.call(this);
   };
   let motion,
     contentMotion,
     frames,
+    animatedButton,
     navigated = 0;
   HTMLElement.prototype.animate = function (keyframes) {
-    if (this.classList.contains("trip-menu-surface")) {
+    if (this.classList.contains("trip-menu-toggle")) {
+      animatedButton = this;
       frames = keyframes;
       return (motion = timeline());
     }
     return (contentMotion = timeline());
   };
   function Harness() {
-    const [open, setOpen] = React.useState(true);
-    return open
-      ? React.createElement(
-          AnchoredMenu,
-          { trigger: { current: trigger }, onClose: () => setOpen(false) },
-          (close) =>
-            React.createElement(
-              "button",
-              { onClick: () => close(() => navigated++) },
-              "設定",
-            ),
-        )
-      : null;
+    const [open, setOpen] = React.useState(false);
+    const anchorRef = React.useRef(anchor);
+    return React.createElement(
+      AnchoredMenu,
+      {
+        anchor: anchorRef,
+        open,
+        onOpen: () => setOpen(true),
+        onClose: () => setOpen(false),
+      },
+      (close) =>
+        React.createElement(
+          "button",
+          { onClick: () => close(() => navigated++) },
+          "設定",
+        ),
+    );
   }
   try {
     await act(async () => root.render(React.createElement(Harness)));
+    const trigger = anchor.querySelector("button");
+    const icon = trigger.querySelector("svg");
+    trigger.focus();
+    await act(async () => trigger.click());
     assert.equal(
-      trigger.style.visibility,
-      "hidden",
-      "one material replaces the original button",
+      animatedButton,
+      trigger,
+      "the original button itself is animated",
     );
+    assert.equal(trigger.querySelector("svg"), icon, "no replacement dot icon");
+    assert.equal(trigger.style.visibility, "");
     assert.equal(frames[0].width, "44px");
     assert.equal(frames[0].height, "44px");
-    assert.equal(frames[0].borderRadius, "22px");
-    assert.equal(frames[0].transform, "translate(256px, 0px)");
+    assert.equal(
+      frames[0].transform,
+      undefined,
+      "the fixed icon is never translated or scaled",
+    );
     assert.equal(frames[1].width, "300px");
     assert.equal(frames[1].height, "340px");
-    assert.equal(
-      frames[0].clipPath,
-      undefined,
-      "the border and material resize instead of revealing a separate panel",
-    );
-    assert.equal(document.querySelectorAll(".trip-menu-close").length, 1);
+    assert.equal(document.querySelectorAll(".trip-menu-toggle").length, 1);
+    const dialog = document.querySelector("dialog");
+    assert.equal(dialog.style.left, "926px");
+    assert.equal(dialog.style.top, "20px");
     motion.currentTime = 440;
     await act(async () => motion.finish());
     await act(async () =>
-      [...document.querySelectorAll("dialog button")]
+      [...dialog.querySelectorAll("button")]
         .find((node) => node.textContent === "設定")
         .click(),
     );
     assert.equal(motion.playbackRate, -1);
     assert.equal(contentMotion.playbackRate, -1);
     assert.equal(navigated, 0);
-    assert.ok(document.querySelector(".trip-menu-popover[open]"));
+    assert.equal(dialog.open, true);
     await act(async () => motion.finish());
     assert.equal(navigated, 1);
-    assert.equal(document.querySelector("dialog"), null);
-    assert.equal(document.activeElement, trigger);
-    assert.equal(trigger.style.visibility, "");
+    assert.equal(dialog.open, false);
+    assert.equal(anchor.querySelector("button"), trigger);
+    assert.equal(trigger.querySelector("svg"), icon);
+    assert.ok(
+      document.activeElement === trigger,
+      "focus restored to the same button",
+    );
+    assert.equal(trigger.style.width, "");
+    reduced = true;
+    await act(async () => trigger.click());
+    assert.equal(document.querySelector("dialog").open, true);
+    assert.equal(document.querySelector("dialog .trip-menu-toggle"), trigger);
+    await act(async () => trigger.click());
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 10)));
+    assert.equal(dialog.open, false);
+    assert.equal(anchor.querySelector("button"), trigger);
   } finally {
+    reduced = false;
     await act(async () => root.unmount());
     HTMLElement.prototype.getBoundingClientRect = originalBounds;
-    trigger.remove();
+    anchor.remove();
   }
 });
 
@@ -1535,15 +1556,15 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
   const w = 366;
   function box(element) {
     const context = element.closest(".context-dock");
-    const back = context?.querySelector(".context-back") ? 56 : 0;
-    const actions = context?.querySelector(".context-actions") ? 112 : 0;
+    const back = context?.querySelector(".context-back") ? 44 : 0;
+    const actions = context?.querySelector(".context-actions") ? 88 : 0;
     if (element.classList.contains("context-back"))
       return { left: 0, width: back };
     if (element.classList.contains("context-actions"))
       return { left: w - actions, width: actions };
     if (element.classList.contains("context-primary"))
       return {
-        left: back ? 66 : 0,
+        left: back ? 54 : 0,
         width: w - back - actions - (back ? 10 : 0) - (actions ? 10 : 0),
       };
     return { left: 0, width: w };
@@ -1561,7 +1582,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
     },
   });
   HTMLElement.prototype.getBoundingClientRect = function () {
-    return { ...box(this), top: 0, bottom: 56, height: 56 };
+    return { ...box(this), top: 0, bottom: 44, height: 44 };
   };
   globalThis.requestAnimationFrame = (callback) => {
     pending.set(++sequence, callback);
@@ -1604,7 +1625,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
     assert.ok(initial);
     assert.equal(
       material.querySelector("svg").getAttribute("viewBox"),
-      `0 0 ${w + 24} 80`,
+      `0 0 ${w + 24} 68`,
     );
     await act(async () => setMode("place"));
     assert.equal(border.getAttribute("d"), initial, "no jump on registration");
@@ -1625,7 +1646,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
     assert.equal(pending.size, 1, "only the new animation remains active");
     advance(820);
     const settings = dockSlots(w, [
-      { left: 0, width: 56, radius: 28 },
+      { left: 0, width: 44, radius: 22 },
       null,
       null,
     ]);
@@ -1636,7 +1657,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
         settings.map((island) => ({ ...island, left: island.left + 12 })),
         0,
         [],
-        40,
+        34,
       ),
     );
     assert.equal(pending.size, 0);
@@ -1661,7 +1682,7 @@ test("shared glass retargets from the rendered shape, survives layout changes, a
         settings.map((island) => ({ ...island, left: island.left + 12 })),
         0,
         [],
-        40,
+        34,
       ),
     );
     await act(async () => pointer(button, "pointerup"));
