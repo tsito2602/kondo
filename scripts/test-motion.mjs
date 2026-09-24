@@ -34,7 +34,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { PlaceCard } from './src/web/place-card'; export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset, revealModalField } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { finishBootScreen } from './src/web/boot'; export { PlaceCard } from './src/web/place-card'; export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset, revealModalField } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -52,6 +52,7 @@ new Function("require", "module", "exports", outputFiles[0].text)(
   module.exports,
 );
 const {
+  finishBootScreen,
   PlaceCard,
   DayStrip,
   TaskList,
@@ -2911,5 +2912,75 @@ test("focused modal fields remain between the sticky header and panel bottom aft
     assert.equal(panel.scrollTop, 138, "background panels do not scroll");
   } finally {
     dialog.remove();
+  }
+});
+
+
+function bootFixture() {
+  const screen = document.createElement("div");
+  screen.id = "initial-boot";
+  document.body.append(screen);
+  const root = document.getElementById("root");
+  root.setAttribute("inert", "");
+  return { screen, root };
+}
+const flushBoot = () => new Promise((resolve) => setImmediate(resolve));
+
+test("boot keeps controls inert until drawing and exit complete, then never replays", async () => {
+  const { screen, root } = bootFixture();
+  const drawing = Promise.withResolvers();
+  const exit = Promise.withResolvers();
+  screen.getAnimations = (options) => [{ finished: options?.subtree ? drawing.promise : exit.promise }];
+  finishBootScreen();
+  await flushBoot();
+  assert.equal(screen.classList.contains("boot-leaving"), false);
+  assert.ok(root.hasAttribute("inert"));
+  drawing.resolve();
+  await flushBoot();
+  assert.ok(screen.classList.contains("boot-leaving"));
+  assert.ok(screen.isConnected);
+  assert.ok(root.hasAttribute("inert"));
+  exit.resolve();
+  await flushBoot();
+  assert.equal(screen.isConnected, false);
+  assert.equal(root.hasAttribute("inert"), false);
+  assert.equal(finishBootScreen(), undefined);
+});
+
+test("boot skips completed drawing after a slow load and tolerates cancelled animations", async () => {
+  const { screen, root } = bootFixture();
+  screen.getAnimations = () => [{ finished: Promise.reject(new Error("cancelled")) }];
+  finishBootScreen();
+  await flushBoot();
+  assert.equal(screen.isConnected, false);
+  assert.equal(root.hasAttribute("inert"), false);
+});
+
+test("boot cleanup does not remove a still-needed splash; a new effect can finish it", async () => {
+  const { screen, root } = bootFixture();
+  const drawing = Promise.withResolvers();
+  screen.getAnimations = (options) => options?.subtree ? [{ finished: drawing.promise }] : [];
+  const cancel = finishBootScreen();
+  cancel();
+  drawing.resolve();
+  await flushBoot();
+  assert.ok(screen.isConnected);
+  assert.ok(root.hasAttribute("inert"));
+  finishBootScreen();
+  await flushBoot();
+  assert.equal(screen.isConnected, false);
+  assert.equal(root.hasAttribute("inert"), false);
+});
+
+test("reduced motion releases boot immediately without waiting for animations", () => {
+  const { screen, root } = bootFixture();
+  reduced = true;
+  try {
+    screen.getAnimations = () => { throw new Error("must not wait"); };
+    finishBootScreen();
+    assert.equal(screen.isConnected, false);
+    assert.equal(root.hasAttribute("inert"), false);
+  } finally {
+    reduced = false;
   }
 });
