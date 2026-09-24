@@ -6,7 +6,7 @@ const source = await readFile('assets/brand/symbol.svg', 'utf8');
 const body = source.match(/<g[\s\S]*<\/g>/)[0];
 // Keep the ticket artwork and icon surfaces identical in both themes.
 const svg = (scale = 1, monochrome = false) => {
-  const shapes = monochrome ? body.replace(/#151515|#A4A4A4|#FFFFFF/g, '#FFFFFF') : body;
+  const shapes = monochrome ? body.replace(/#171717|#D4D4D4|#FFFFFF/g, '#FFFFFF') : body;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><title>kondo</title><g transform="translate(${512 * (1 - scale)} ${512 * (1 - scale)}) scale(${scale})">${shapes}</g></svg>\n`;
 };
 await mkdir('public/icons', { recursive: true });
@@ -45,10 +45,10 @@ await webPng('public/icons/kondo-icon-maskable-512.png', svg(.72), 512);
 await webPng('public/icon-maskable.png', svg(.72), 512);
 // Keep transparent artwork for the app and the isolated device comparison.
 await webPng('public/icons/apple-touch-icon-transparent.png', source, 180);
-// iOS Home Screen needs an explicit white base; transparent pixels may render black.
+// Use a white-base fallback while comparing iOS rendering against the old blue icon.
 // Version the active URL so existing cached touch icons do not mask a new export.
 const touchSource = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="#FFFFFF"/>${body}</svg>`;
-for (const file of ['public/icons/apple-touch-icon.png', 'public/apple-touch-icon.png', 'public/apple-touch-icon-v2.png', 'public/icons/kondo-apple-touch-icon.png', 'public/icons/kondo-apple-touch-icon-v3.png', 'public/apple-touch-icon-dark.png']) {
+for (const file of ['public/icons/apple-touch-icon.png', 'public/apple-touch-icon.png', 'public/apple-touch-icon-v2.png', 'public/icons/kondo-apple-touch-icon.png', 'public/icons/kondo-apple-touch-icon-v3.png', 'public/icons/kondo-apple-touch-icon-v4.png', 'public/apple-touch-icon-dark.png']) {
   await webPng(file, touchSource, 180);
 }
 const adaptiveIcon = webLight;

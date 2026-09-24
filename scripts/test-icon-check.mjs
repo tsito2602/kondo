@@ -21,15 +21,14 @@ try {
     assert.ok(!html.includes('serviceWorker'));
     scopes.add(manifest.id);
   }
-  assert.equal(scopes.size, 4);
-  assert.deepEqual(await readFile(path.join(root, base, 'a/icon.png')), await readFile('scripts/fixtures/konogoro-touch.png'));
-  assert.deepEqual(await readFile(path.join(root, base, 'b/icon.png')), await readFile('scripts/fixtures/tabi-touch-white.png'));
-  assert.deepEqual(await readFile(path.join(root, base, 'c/icon.png')), await readFile('public/icons/apple-touch-icon-transparent.png'));
-  assert.equal((await sharp(path.join(root, base, 'c/icon.png')).stats()).isOpaque, false);
-  assert.equal((await sharp(path.join(root, base, 'd/icon.png')).stats()).isOpaque, true);
-  assert.deepEqual(await readFile(path.join(root, base, 'd/icon.png')),
-    await sharp('assets/brand/icon.svg', { density: 384 }).resize(180, 180).flatten({ background: '#FFFFFF' }).png({ compressionLevel: 9, palette: false }).toBuffer());
-  // The installed iOS icon needs a white base; an alpha channel alone is insufficient.
+  assert.equal(scopes.size, 3);
+  assert.deepEqual(await readFile(path.join(root, base, 'a/icon.png')), await readFile('scripts/fixtures/tabi-touch-transparent.png'));
+  assert.deepEqual(await readFile(path.join(root, base, 'b/icon.png')), await readFile('public/icons/apple-touch-icon-transparent.png'));
+  assert.deepEqual(await readFile(path.join(root, base, 'c/icon.png')), await readFile('public/icons/kondo-apple-touch-icon-v4.png'));
+  assert.equal((await sharp(path.join(root, base, 'a/icon.png')).stats()).isOpaque, false);
+  assert.equal((await sharp(path.join(root, base, 'b/icon.png')).stats()).isOpaque, false);
+  assert.equal((await sharp(path.join(root, base, 'c/icon.png')).stats()).isOpaque, true);
+  // Verify the fallback export; automatic Home Screen appearance still needs an iOS check.
   const indexHtml = await readFile('index.html', 'utf8');
   const touchHref = indexHtml.match(/rel="apple-touch-icon" href="([^"]+)"/)[1];
   const touchImage = sharp(path.join('public', touchHref));

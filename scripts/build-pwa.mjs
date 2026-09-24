@@ -14,7 +14,7 @@ async function walk(dir) {
 }
 const exportedFiles = await walk(root);
 // Apply the same icon set to every generated HTML page.
-const iconLinks = '<link rel="apple-touch-icon" href="/icons/kondo-apple-touch-icon-v3.png"/><link rel="icon" href="/icons/favicon.ico?v=kondo" sizes="any"/><link rel="icon" href="/icons/favicon-32x32.png?v=kondo" type="image/png" sizes="32x32"/><link rel="icon" href="/icons/favicon-16x16.png?v=kondo" type="image/png" sizes="16x16"/><link rel="icon" href="/icons/kondo-icon.svg" type="image/svg+xml" sizes="any"/>';
+const iconLinks = '<link rel="apple-touch-icon" href="/icons/kondo-apple-touch-icon-v4.png"/><link rel="icon" href="/icons/favicon.ico?v=kondo" sizes="any"/><link rel="icon" href="/icons/favicon-32x32.png?v=kondo" type="image/png" sizes="32x32"/><link rel="icon" href="/icons/favicon-16x16.png?v=kondo" type="image/png" sizes="16x16"/><link rel="icon" href="/icons/kondo-icon.svg" type="image/svg+xml" sizes="any"/>';
 for (const file of exportedFiles.filter((file) => file.endsWith('.html'))) {
   const html = await readFile(file, 'utf8');
   await writeFile(file, html.replace(/<link\b(?=[^>]*\brel="(?:icon|apple-touch-icon)")[^>]*>/g, '').replace('</head>', `${iconLinks}</head>`));
