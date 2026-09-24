@@ -21,13 +21,32 @@ try {
     assert.ok(!html.includes('serviceWorker'));
     scopes.add(manifest.id);
   }
-  assert.equal(scopes.size, 3);
+  assert.equal(scopes.size, 5);
   assert.deepEqual(await readFile(path.join(root, base, 'a/icon.png')), await readFile('scripts/fixtures/tabi-touch-transparent.png'));
   assert.deepEqual(await readFile(path.join(root, base, 'b/icon.png')), await readFile('public/icons/apple-touch-icon-transparent.png'));
   assert.deepEqual(await readFile(path.join(root, base, 'c/icon.png')), await readFile('public/icons/kondo-apple-touch-icon-v4.png'));
   assert.equal((await sharp(path.join(root, base, 'a/icon.png')).stats()).isOpaque, false);
   assert.equal((await sharp(path.join(root, base, 'b/icon.png')).stats()).isOpaque, false);
   assert.equal((await sharp(path.join(root, base, 'c/icon.png')).stats()).isOpaque, true);
+  const original = await sharp(path.join(root, base, 'b/icon.png')).raw().toBuffer();
+  for (const key of ['d', 'e']) {
+    const variant = sharp(path.join(root, base, `${key}/icon.png`));
+    const { data, info } = await variant.raw().toBuffer({ resolveWithObject: true });
+    assert.equal(info.width, 180);
+    assert.equal(info.height, 180);
+    assert.equal(info.channels, 4);
+    assert.equal((await variant.stats()).isOpaque, false);
+    // Only colour changes: geometry, transparency and placement stay identical.
+    for (let i = 3; i < data.length; i += 4) assert.equal(data[i], original[i]);
+    assert.notDeepEqual(data, original);
+    if (key === 'd') {
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3] === 255) assert.ok(data[i] <= 245);
+      }
+    } else {
+      assert.ok(data.some((value, i) => i % 4 === 0 && data[i + 3] === 255 && value !== data[i + 2]));
+    }
+  }
   // Verify the fallback export; automatic Home Screen appearance still needs an iOS check.
   const indexHtml = await readFile('index.html', 'utf8');
   const touchHref = indexHtml.match(/rel="apple-touch-icon" href="([^"]+)"/)[1];
