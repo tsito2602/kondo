@@ -22,7 +22,7 @@ try {
     assert.ok(!html.includes('serviceWorker'));
     scopes.add(manifest.id);
   }
-  assert.equal(scopes.size, 18);
+  assert.equal(scopes.size, 19);
   assert.deepEqual(await readFile(path.join(root, base, 'a/icon.png')), await readFile('scripts/fixtures/tabi-touch-transparent.png'));
   assert.deepEqual(await readFile(path.join(root, base, 'a2/icon.png')), await readFile('scripts/fixtures/tabi-touch-transparent.png'));
   assert.equal(JSON.parse(await readFile(path.join(root, base, 'a2/manifest.webmanifest'), 'utf8')).name, 'A再確認');
@@ -101,7 +101,7 @@ try {
   // The enlarged journey marker remains opaque black; empty space stays clear.
   assert.deepEqual([...data.subarray((67 * 180 + 33) * 4, (67 * 180 + 33) * 4 + 4)], [0, 0, 0, 255]);
   assert.equal(data[(90 * 180 + 90) * 4 + 3], 0);
-  assert.deepEqual(await readFile(path.join(root, base, 'q/icon.png')), await readFile(path.join('public', touchHref)));
+  assert.deepEqual(await readFile(path.join(root, base, 'r/icon.png')), await readFile(path.join('public', touchHref)));
   const iconSvg = await readFile('assets/brand/icon.svg', 'utf8');
   assert.ok(!iconSvg.includes('<mask'));
   // SVG and touch exports must render identical opaque details.

@@ -42,25 +42,25 @@ const webDark = dark;
 for (const size of [192, 512]) {
   await webPng(`public/icons/icon-light-${size}.png`, webLight, size);
   await webPng(`public/icons/kondo-icon-${size}.png`, webLight, size);
-  await webPng(`public/icons/kondo-icon-v11-${size}.png`, webLight, size);
+  await webPng(`public/icons/kondo-icon-v12-${size}.png`, webLight, size);
   await webPng(`public/icon-${size}.png`, webLight, size);
   await webPng(`public/icon-dark-${size}.png`, webDark, size);
 }
 await webPng('public/icons/icon-maskable-512.png', svg(.72), 512);
 await webPng('public/icons/kondo-icon-maskable-512.png', svg(.72), 512);
-await webPng('public/icons/kondo-icon-v11-maskable-512.png', svg(.72), 512);
+await webPng('public/icons/kondo-icon-v12-maskable-512.png', svg(.72), 512);
 await webPng('public/icon-maskable.png', svg(.72), 512);
 // Preserve canvas transparency; black details and their white edging are opaque.
 // Device-approved I remains frozen separately; this version changes its structure.
 await writeFile('public/icons/apple-touch-icon-transparent.png', await renderTouchIcon(source));
 // Previous versioned URLs remain frozen for the diagnostic controls.
-for (const file of ['public/icons/apple-touch-icon.png', 'public/apple-touch-icon.png', 'public/apple-touch-icon-v2.png', 'public/icons/kondo-apple-touch-icon.png', 'public/icons/kondo-apple-touch-icon-v11.png', 'public/apple-touch-icon-dark.png']) {
+for (const file of ['public/icons/apple-touch-icon.png', 'public/apple-touch-icon.png', 'public/apple-touch-icon-v2.png', 'public/icons/kondo-apple-touch-icon.png', 'public/icons/kondo-apple-touch-icon-v12.png', 'public/apple-touch-icon-dark.png']) {
   await writeFile(file, await renderTouchIcon(source));
 }
 const adaptiveIcon = webLight;
 await writeFile('public/icons/icon.svg', adaptiveIcon);
 await writeFile('public/icons/kondo-icon.svg', adaptiveIcon);
-await writeFile('public/icons/kondo-icon-v11.svg', adaptiveIcon);
+await writeFile('public/icons/kondo-icon-v12.svg', adaptiveIcon);
 await writeFile('public/favicon.svg', adaptiveIcon);
 const faviconImages = [];
 for (const size of [16, 32]) {
