@@ -29,6 +29,16 @@ try {
   assert.equal((await sharp(path.join(root, base, 'd/icon.png')).stats()).isOpaque, true);
   assert.deepEqual(await readFile(path.join(root, base, 'd/icon.png')),
     await sharp('assets/brand/icon.svg', { density: 384 }).resize(180, 180).flatten({ background: '#FFFFFF' }).png({ compressionLevel: 9, palette: false }).toBuffer());
+  // The installed iOS icon needs a white base; an alpha channel alone is insufficient.
+  const indexHtml = await readFile('index.html', 'utf8');
+  const touchHref = indexHtml.match(/rel="apple-touch-icon" href="([^"]+)"/)[1];
+  const touchImage = sharp(path.join('public', touchHref));
+  const { data, info } = await touchImage.raw().toBuffer({ resolveWithObject: true });
+  assert.equal(info.width, 180);
+  assert.equal(info.height, 180);
+  assert.equal((await touchImage.stats()).isOpaque, true);
+  assert.deepEqual([...data.subarray(0, 3)], [255, 255, 255]);
+  assert.equal((await sharp('assets/brand/logo.png').stats()).isOpaque, false);
   await buildIconCheck(root, false);
   assert.deepEqual(await readdir(root), []);
   console.log('Icon comparison: isolated identities, legacy controls, new kondo variants, production cleanup passed');

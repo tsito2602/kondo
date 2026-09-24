@@ -43,13 +43,14 @@ for (const size of [192, 512]) {
 await webPng('public/icons/icon-maskable-512.png', svg(.72), 512);
 await webPng('public/icons/kondo-icon-maskable-512.png', svg(.72), 512);
 await webPng('public/icon-maskable.png', svg(.72), 512);
-// Device comparison C switches Home Screen appearance. Use the exact same
-// transparent source/export; alpha presence alone with white pixels did not work.
-for (const file of ['public/icons/apple-touch-icon-transparent.png', 'public/icons/apple-touch-icon.png', 'public/apple-touch-icon.png', 'public/apple-touch-icon-v2.png']) {
-  await webPng(file, source, 180);
+// Keep transparent artwork for the app and the isolated device comparison.
+await webPng('public/icons/apple-touch-icon-transparent.png', source, 180);
+// iOS Home Screen needs an explicit white base; transparent pixels may render black.
+// Version the active URL so existing cached touch icons do not mask a new export.
+const touchSource = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="#FFFFFF"/>${body}</svg>`;
+for (const file of ['public/icons/apple-touch-icon.png', 'public/apple-touch-icon.png', 'public/apple-touch-icon-v2.png', 'public/icons/kondo-apple-touch-icon.png', 'public/icons/kondo-apple-touch-icon-v3.png', 'public/apple-touch-icon-dark.png']) {
+  await webPng(file, touchSource, 180);
 }
-await webPng('public/icons/kondo-apple-touch-icon.png', source, 180);
-await webPng('public/apple-touch-icon-dark.png', source, 180);
 const adaptiveIcon = webLight;
 await writeFile('public/icons/icon.svg', adaptiveIcon);
 await writeFile('public/icons/kondo-icon.svg', adaptiveIcon);
