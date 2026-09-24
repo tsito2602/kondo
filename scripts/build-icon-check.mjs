@@ -10,7 +10,8 @@ export async function buildIconCheck(root, enabled) {
   if (!enabled) return;
   // Device results: A switches white/black. B/D/E are solid black in Light,
   // a dark gradient in Dark. C stays white. Rebuild from the working A next.
-  const source = await readFile('assets/brand/symbol.svg', 'utf8');
+  // Freeze earlier controls as the production master evolves.
+  const source = await readFile('scripts/fixtures/kondo-outlined-source.svg', 'utf8');
   const legacySource = await readFile('scripts/fixtures/tabi-touch-source.svg', 'utf8');
   const legacy = await readFile('scripts/fixtures/tabi-touch-transparent.png');
   const rebuilt = await render(legacySource);
@@ -22,7 +23,7 @@ export async function buildIconCheck(root, enabled) {
   const neutral = fromA.replaceAll('#496B80', '#656565').replaceAll('#D7E2E8', '#E0E0E0');
   const variants = [
     { key: 'a', name: '比較A', label: '以前の青いアイコン・元データから完全再生成', image: rebuilt },
-    { key: 'b', name: '比較B', label: '新しいチケット・透過', image: await readFile('public/icons/apple-touch-icon-transparent.png') },
+    { key: 'b', name: '比較B', label: '以前の縁取りチケット・透過', image: await readFile('scripts/fixtures/kondo-outlined-touch.png') },
     { key: 'c', name: '比較C', label: '新しいチケット・白背景', image: await readFile('public/icons/kondo-apple-touch-icon-v4.png') },
     { key: 'd', name: '比較D', label: '白を少し抑えたチケット・透過', image: await render(source.replaceAll('#FFFFFF', '#F5F5F5')) },
     { key: 'e', name: '比較E', label: 'ごくわずかに色味を加えたチケット・透過', image: await render(source.replaceAll('#FFFFFF', '#FDFEFF').replaceAll('#D4D4D4', '#D3D4D5').replaceAll('#171717', '#161718')) },
@@ -30,7 +31,8 @@ export async function buildIconCheck(root, enabled) {
     { key: 'g', name: '比較G', label: 'Fをモノクロにしたチケット・透過', image: await render(neutral) },
     { key: 'a2', name: 'A再確認', label: '成功したAと画像データまで同一', image: legacy },
     { key: 'h', name: '比較H', label: '成功したAの色だけをモノクロに変更', image: await render(legacySource.replaceAll('#496B80', '#656565').replaceAll('#D7E2E8', '#E0E0E0')) },
-    { key: 'i', name: '比較I', label: 'モノクロ・模様を透過で切り抜いたチケット', image: await render(await readFile('scripts/fixtures/kondo-cutout-source.svg', 'utf8')) },
+    { key: 'i', name: '比較I', label: 'ライト／ダーク切替を実機確認済み', image: await readFile('scripts/fixtures/kondo-cutout-touch.png') },
+    { key: 'j', name: '調整版J', label: '斜めにずらした2枚・グレーの配色を調整', image: await readFile('public/icons/kondo-apple-touch-icon-v5.png') },
   ];
   const revision = createHash('sha256').update(Buffer.concat(variants.map(v => v.image))).digest('hex').slice(0, 10);
   const base = `/__icon-check/${revision}`;
@@ -38,9 +40,10 @@ export async function buildIconCheck(root, enabled) {
   const document = (title, head, content) => `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${title}</title>${head}${style}</head><body>${content}</body></html>`;
   await mkdir(output, { recursive: true });
   const card = v => `<article><img src="${base}/${v.key}/icon.png" alt=""><h2>${v.name}：${v.label}</h2><p><a href="${base}/${v.key}/">追加用ページを開く</a></p></article>`;
-  const current = variants.filter(v => ['h', 'i'].includes(v.key)).map(card).join('');
-  const previous = variants.filter(v => !['h', 'i'].includes(v.key)).map(card).join('');
-  await writeFile(path.join(output, 'index.html'), document('アイコンの比較', '', `<h1>色と透過部分の比較</h1><p>A再確認も白／黒に切り替わりました。Aを新しく追加しても成功することが確認できています。</p><p>HはAの形・透過部分をそのままに、色だけをモノクロにしたもの。IはGと同じグレーで、チケットの縁取りを外し、模様を透過で切り抜いたものです。どちらも比較用で、通常の白いチケットは変更していません。</p>${current}<details><summary>これまでの結果</summary><p>AとA再確認は白／黒に切り替わる。B・D・Eはライトで真っ黒・ダークで黒いグラデーション。F・Gもライトで黒。Cは両方白でした。</p>${previous}</details><p>追加済みのアイコンを削除する必要はありません。</p><small>比較番号 ${revision}</small>`));
+  const current = variants.filter(v => v.key === 'j').map(card).join('');
+  const baseline = variants.filter(v => v.key === 'i').map(card).join('');
+  const previous = variants.filter(v => !['i', 'j'].includes(v.key)).map(card).join('');
+  await writeFile(path.join(output, 'index.html'), document('アイコンの比較', '', `<h1>チケットの調整版</h1><p>H・Iのライト／ダーク切替は実機で確認できました。JはIの透過で模様を切り抜く構造を保ち、2枚を斜めにずらして前後のグレーを調整した版です。</p>${current}<details><summary>確認済みのIと比較する</summary>${baseline}</details><details><summary>これまでの結果</summary><p>A・A再確認・H・Iは白／黒に切り替わる。B・D・Eはライトで真っ黒・ダークで黒いグラデーション。F・Gもライトで黒。Cは両方白でした。</p>${previous}</details><p>追加済みのアイコンを削除する必要はありません。</p><small>比較番号 ${revision}</small>`));
   for (const variant of variants) {
     const scope = `${base}/${variant.key}/`;
     const dir = path.join(root, scope.slice(1));

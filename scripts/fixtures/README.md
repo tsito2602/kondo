@@ -35,3 +35,6 @@ SHA-256: `69316d0d43bd8b07f5f1a7dbed93cee9a2ac9a3c835ad291a1b2a28cc12c0bbd`。
 次のHはAの形・アルファを完全に保持し、F/Gでも使ったグレースケールの2色へ変更。
 IはGと同じ色を使用し、外周の縁取りを除き、模様をアルファの穴へ変更。`kondo-cutout-source.svg`はその診断用原本。
 Aの模様は透過の穴だが、従来のチケットの模様は不透明な描画だった。この差が原因かどうかは未確認。
+
+2026-09-24、ユーザー提供のライト／ダーク画面でH・Iとも背景が白／黒に切り替わると確認。Iの配信済みPNGを`kondo-cutout-touch.png`に固定して保存。成功手順と限界は`assets/brand/README.md`に記録。
+`kondo-outlined-source.svg`と`kondo-outlined-touch.png`は失敗した旧Bを固定した対照で、現行原本の更新から切り離す。

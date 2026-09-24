@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
 import { buildIconCheck } from './build-icon-check.mjs';
+import { renderTouchIcon } from './render-touch-icon.mjs';
 
 const root = await mkdtemp(path.join(tmpdir(), 'tabi-icon-check-'));
 try {
@@ -21,7 +22,7 @@ try {
     assert.ok(!html.includes('serviceWorker'));
     scopes.add(manifest.id);
   }
-  assert.equal(scopes.size, 10);
+  assert.equal(scopes.size, 11);
   assert.deepEqual(await readFile(path.join(root, base, 'a/icon.png')), await readFile('scripts/fixtures/tabi-touch-transparent.png'));
   assert.deepEqual(await readFile(path.join(root, base, 'a2/icon.png')), await readFile('scripts/fixtures/tabi-touch-transparent.png'));
   assert.equal(JSON.parse(await readFile(path.join(root, base, 'a2/manifest.webmanifest'), 'utf8')).name, 'A再確認');
@@ -41,7 +42,9 @@ try {
   assert.equal(i[(75 * 180 + 69) * 4 + 3], 0);
   assert.equal(g[(75 * 180 + 69) * 4 + 3], 255);
   assert.equal(i[(85 * 180 + 90) * 4 + 3], 255);
-  assert.deepEqual(await readFile(path.join(root, base, 'b/icon.png')), await readFile('public/icons/apple-touch-icon-transparent.png'));
+  assert.deepEqual(await readFile(path.join(root, base, 'b/icon.png')), await readFile('scripts/fixtures/kondo-outlined-touch.png'));
+  // Preserve the exact device-approved I image independently of future edits.
+  assert.deepEqual(await readFile(path.join(root, base, 'i/icon.png')), await renderTouchIcon(await readFile('scripts/fixtures/kondo-cutout-source.svg')));
   assert.deepEqual(await readFile(path.join(root, base, 'c/icon.png')), await readFile('public/icons/kondo-apple-touch-icon-v4.png'));
   assert.equal((await sharp(path.join(root, base, 'a/icon.png')).stats()).isOpaque, false);
   assert.equal((await sharp(path.join(root, base, 'b/icon.png')).stats()).isOpaque, false);
@@ -85,15 +88,32 @@ try {
     }
     for (const colour of palette) assert.ok(opaqueColours.has(colour));
   }
-  // Verify the fallback export; automatic Home Screen appearance still needs an iOS check.
+  // The new master uses I's cutout structure; do not flatten its transparent canvas.
   const indexHtml = await readFile('index.html', 'utf8');
   const touchHref = indexHtml.match(/rel="apple-touch-icon" href="([^"]+)"/)[1];
   const touchImage = sharp(path.join('public', touchHref));
   const { data, info } = await touchImage.raw().toBuffer({ resolveWithObject: true });
   assert.equal(info.width, 180);
   assert.equal(info.height, 180);
-  assert.equal((await touchImage.stats()).isOpaque, true);
-  assert.deepEqual([...data.subarray(0, 3)], [255, 255, 255]);
+  assert.equal(info.channels, 4);
+  assert.equal((await touchImage.stats()).isOpaque, false);
+  assert.equal(data[3], 0);
+  // The journey marker moves with the front ticket and cuts through both sheets.
+  assert.equal(data[(82 * 180 + 75) * 4 + 3], 0);
+  assert.equal(data[(91 * 180 + 98) * 4 + 3], 255);
+  assert.deepEqual(await readFile(path.join(root, base, 'j/icon.png')), await readFile(path.join('public', touchHref)));
+  const iconSvg = await readFile('assets/brand/icon.svg', 'utf8');
+  assert.ok(iconSvg.includes('<defs>') && iconSvg.includes('mask="url(#journey)"'));
+  // Generated SVGs must retain the mask; this catches accidentally extracting
+  // only <g> nodes from the master and dropping <defs> in the export pipeline.
+  const svgPixels = await renderTouchIcon(iconSvg);
+  assert.deepEqual(svgPixels, await readFile(path.join('public', touchHref)));
+  for (const file of ['assets/brand/adaptive-foreground.png', 'assets/brand/adaptive-monochrome.png']) {
+    const { data: pixels, info: size } = await sharp(file).raw().toBuffer({ resolveWithObject: true });
+    assert.equal(size.channels, 4);
+    assert.equal(pixels[(480 * size.width + 451) * 4 + 3], 0);
+    assert.equal(pixels[(516 * size.width + 545) * 4 + 3], 255);
+  }
   assert.equal((await sharp('assets/brand/logo.png').stats()).isOpaque, false);
   await buildIconCheck(root, false);
   assert.deepEqual(await readdir(root), []);

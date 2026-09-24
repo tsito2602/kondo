@@ -1,25 +1,62 @@
 # kondo アイコン
 
-`symbol.svg` が文字なしの正本。2枚の重なったチケット、旅の軌跡とピンを表す。
+`symbol.svg` が文字なしの正本。2枚のチケットを斜めにずらし、旅の軌跡とピンを透過で切り抜く。
 
-- 前面のチケット: White `#FFFFFF`
-- 輪郭・軌跡・ピン: Black `#171717`
-- 背面のチケット: Gray `#D4D4D4`
-- 背景: 透過（白い面やグラデーションを描画しない）
+## 現行デザイン
 
-`npm run icons:export` でSVG原本からPNG・SVGを再生成する。PNGの直接編集はしない。
-ライト／ダークとも同じ絵柄・配色を使う。互換用の `*-dark` ファイルも通常版と同じ内容。
-アプリ内ロゴ・汎用アイコン・ICOは背景を透過させる。iOSホーム画面用のApple Touch Iconだけは、ライト表示の下地を白で書き出す。
+- 前面: `#737373`。右下へ移動（34, 42）。
+- 背面: `#BCBCBC`。左上へ移動（-66, -70）。
+- 両方とも10度傾け、同じチケット形状を使う。
+- 外周の縁取りは描かない。キャンバス、軌跡、出発点、ピンの線は透過。
+- ライト／ダークとも同じ絵柄・配色。背景の白／黒はiOSの表示に任せる。
 
-- `icon*.png`: 1024px、背景透過
-- `adaptive-foreground.png`: Android用、セーフエリア内の透過絵柄
-- `adaptive-monochrome.png`: Androidテーマアイコン用の単色透過絵柄
-- `public/icon-*.png`: PWA用192/512pxとmaskable
-- `public/apple-touch-icon*.png`: iOS Web用180px・白背景
-- `public/icons/apple-touch-icon-transparent.png`: 透過画像の端末比較用
-- `public/favicon.svg`: テーマで配色を切り替えないブラウザアイコン
+## iPhoneで成功した方式（2026-09-24実機確認）
 
-PWAのmanifestと`apple-touch-icon`は`kondo-`付きのURLを使う。Apple Touch Iconの現行URLは`/icons/kondo-apple-touch-icon-v4.png`。旧URLの画像も互換用に残す。
-インストール済みPWAのホームアイコンの更新時期やOS独自の色付けはOS側の仕様に依存する。
+ユーザーのスクリーンショットで、比較H・Iともライトで白背景、ダークで黒いグラデーションへ切り替わることを確認した。
+比較Iは現在のチケットデザインの基準。成功したデータは変更せず保存する。
 
-線の色はアプリの`--ink`と共通。輪郭12、軌跡18、ピン14の線幅で、塗りの強さを抑える。
+- SVG: `scripts/fixtures/kondo-cutout-source.svg`
+- 配信され、実機で確認されたPNG: `scripts/fixtures/kondo-cutout-touch.png`
+- PNG SHA-256: `d6afe65c476c06d20fa0854789f711dff6bc488ca07e88adb324736c3b1771a0`
+- 成功時の配色: 前面`#656565`、背面`#E0E0E0`
+- 成功時の配置: 前面`rotate(-10 525 490)`、背面`translate(-28 44) rotate(-10 525 490)`
+
+### 再現手順
+
+1. 背景に白や黒の面を描かない。全体を透過キャンバスとする。
+2. チケット2枚を色の付いた面として描く。外周に不透明な縁取りを加えない。
+3. 軌跡やピンを不透明な色で上描きせず、SVGの輝度マスクで穴にする。マスクは2枚をまとめたグループへ適用し、背面の紙も一緒に切り抜く。
+4. マスク定義内の白い矩形はマスクを通す領域であり、表示する白背景ではない。SVGを書き出す際は`<defs>`と`mask`参照を両方残す。単色アイコンへの変換でも、マスク内部の黒／白を塗り替えない。
+5. `scripts/render-touch-icon.mjs`で、SVGをdensity 384で読み込み、180×180へ縮小。PNGはcompressionLevel 9、palette falseのRGBA。`flatten()`や`removeAlpha()`を使わない。
+6. `apple-touch-icon`でその透過PNGを指定する。比較ページではmanifestも同じ画像を指す。アプリ内のテーマ切替で別画像へ交換しない。
+7. `node scripts/test-icon-check.mjs`で、成功したIのSVGからPNGを完全再現できること、現行アイコンの背景と模様の穴が透明なことを確認する。
+
+### 確認結果と限界
+
+| 比較 | ライト | ダーク |
+| --- | --- | --- |
+| A・A再確認（以前の青い図柄） | 白 | 黒 |
+| H（Aの形・透過部分を保ったモノクロ） | 白 | 黒 |
+| I（縁取りなし・模様を透過で切り抜いたチケット） | 白 | 黒 |
+| B・D・E（不透明な縁取り・模様のチケットと微小な色違い） | 真っ黒 | 黒いグラデーション |
+| F・G（Aの配色／そのモノクロにした従来のチケット） | 黒 | 未記録 |
+| C（白背景を書き込んだチケット） | 白 | 白 |
+
+Iへの変更は縁取りの除去と模様の切り抜きを含むため、iOS内部の判定条件や唯一の原因を断定しない。
+現行の調整版JはIの構造を維持して配置・配色を変えたもの。Iの成功と、変更後のJの実機確認は区別する。Jの実機表示はまだ未確認。
+再追加だけで直る、画像URLを変えれば外観が必ず切り替わる、透過PNGなら何でも切り替わる、とは扱わない。
+
+## 生成と配信
+
+`npm run icons:export`でSVG原本からPNG・SVG・ICOを再生成する。PNGを直接編集しない。
+
+- `icon*.png`／`logo*.png`: 1024px、背景と模様が透過。
+- `adaptive-foreground.png`: Android用、セーフエリア内へ縮小。
+- `adaptive-monochrome.png`: 塗り面だけを白へ変更し、模様の透過は保つ。
+- PWA manifest: `/icons/kondo-icon-v5-192.png`、`-512.png`、`-maskable-512.png`。
+- Apple Touch Icon: `/icons/kondo-apple-touch-icon-v5.png`（180px・透過）。
+- `*-dark`は通常版と同じデータ。
+- 以前のv3/v4画像と実機確認用fixturesは上書きしない。
+
+`EXPO_PUBLIC_ENABLE_DEMO=true npm run build:web`でstaging用の比較ページを生成する。調整版Jと確認済みIを別IDで追加できる。
+通常アプリのmanifest ID・保存キーは変更しない。インストール済みアイコンの更新時期は別途端末で確認する。
