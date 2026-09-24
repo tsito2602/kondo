@@ -40,19 +40,23 @@ const webLight = svg('#FFFFFF');
 const webDark = dark;
 for (const size of [192, 512]) {
   await webPng(`public/icons/icon-light-${size}.png`, webLight, size);
+  await webPng(`public/icons/kondo-icon-${size}.png`, webLight, size);
   await webPng(`public/icon-${size}.png`, webLight, size);
   await webPng(`public/icon-dark-${size}.png`, webDark, size);
 }
 await webPng('public/icons/icon-maskable-512.png', svg('#FFFFFF', .72), 512);
+await webPng('public/icons/kondo-icon-maskable-512.png', svg('#FFFFFF', .72), 512);
 await webPng('public/icon-maskable.png', svg('#FFFFFF', .72), 512);
 // Device comparison C switches Home Screen appearance. Use the exact same
 // transparent source/export; alpha presence alone with white pixels did not work.
 for (const file of ['public/icons/apple-touch-icon-transparent.png', 'public/icons/apple-touch-icon.png', 'public/apple-touch-icon.png', 'public/apple-touch-icon-v2.png']) {
   await webPng(file, source, 180);
 }
+await webPng('public/icons/kondo-apple-touch-icon.png', source, 180);
 await webPng('public/apple-touch-icon-dark.png', webDark, 180);
 const adaptiveIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><style>.dark{display:none}@media(prefers-color-scheme:dark){.background{fill:#000000}.light{display:none}.dark{display:inline}}</style><rect class="background" width="1024" height="1024" fill="#FFFFFF"/><g class="light">${body}</g><g class="dark">${darkBody}</g></svg>\n`;
 await writeFile('public/icons/icon.svg', adaptiveIcon);
+await writeFile('public/icons/kondo-icon.svg', adaptiveIcon);
 await writeFile('public/favicon.svg', adaptiveIcon);
 const faviconImages = [];
 for (const size of [16, 32]) {

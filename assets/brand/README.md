@@ -16,4 +16,6 @@
 - `public/apple-touch-icon*.png`: iOS Web用180px
 - `public/favicon.svg`: OSの明暗に対応するブラウザアイコン
 
+PWAのmanifestと`apple-touch-icon`は`kondo-`付きのURLを使う。旧URLの画像も互換用に残す。既存インストールで新しいアイコンを検出できるよう、ブランド変更時にはアイコンURLを更新する。
+
 iOSネイティブの明暗アイコンはExpoの`ios.icon.light/dark`で設定。Androidはadaptive/monochromeを設定。インストール済みPWAのホームアイコンの更新時期・明暗切替はOSに依存するため、通常PNGを既定にしダークPNGも用意する。アプリ全体のテーマ切替とは独立したアイコン設定。
