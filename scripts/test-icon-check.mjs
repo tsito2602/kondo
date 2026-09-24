@@ -21,7 +21,7 @@ try {
     assert.ok(!html.includes('serviceWorker'));
     scopes.add(manifest.id);
   }
-  assert.equal(scopes.size, 5);
+  assert.equal(scopes.size, 7);
   assert.deepEqual(await readFile(path.join(root, base, 'a/icon.png')), await readFile('scripts/fixtures/tabi-touch-transparent.png'));
   assert.deepEqual(await readFile(path.join(root, base, 'b/icon.png')), await readFile('public/icons/apple-touch-icon-transparent.png'));
   assert.deepEqual(await readFile(path.join(root, base, 'c/icon.png')), await readFile('public/icons/kondo-apple-touch-icon-v4.png'));
@@ -46,6 +46,26 @@ try {
     } else {
       assert.ok(data.some((value, i) => i % 4 === 0 && data[i + 3] === 255 && value !== data[i + 2]));
     }
+  }
+  for (const [key, palette] of [
+    ['f', ['73,107,128', '215,226,232']],
+    ['g', ['101,101,101', '224,224,224']],
+  ]) {
+    const { data, info } = await sharp(path.join(root, base, `${key}/icon.png`)).raw().toBuffer({ resolveWithObject: true });
+    assert.equal(info.channels, 4);
+    assert.equal(data.length, original.length);
+    // Keep the geometry identical to B; only change colour. Allow intermediate
+    // colours where two opaque shapes meet through antialiasing.
+    const opaqueColours = new Set();
+    for (let i = 0; i < data.length; i += 4) {
+      assert.equal(data[i + 3], original[i + 3]);
+      if (data[i + 3] === 255) opaqueColours.add([...data.subarray(i, i + 3)].join(','));
+      if (key === 'g' && data[i + 3] === 255) {
+        assert.equal(data[i], data[i + 1]);
+        assert.equal(data[i], data[i + 2]);
+      }
+    }
+    for (const colour of palette) assert.ok(opaqueColours.has(colour));
   }
   // Verify the fallback export; automatic Home Screen appearance still needs an iOS check.
   const indexHtml = await readFile('index.html', 'utf8');

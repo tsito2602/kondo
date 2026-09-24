@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import sharp from 'sharp';
+import { renderTouchIcon } from './render-touch-icon.mjs';
 
 // All outputs come from this one transparent, wordmark-free vector master.
 const source = await readFile('assets/brand/symbol.svg', 'utf8');
@@ -44,12 +45,12 @@ await webPng('public/icons/icon-maskable-512.png', svg(.72), 512);
 await webPng('public/icons/kondo-icon-maskable-512.png', svg(.72), 512);
 await webPng('public/icon-maskable.png', svg(.72), 512);
 // Keep transparent artwork for the app and the isolated device comparison.
-await webPng('public/icons/apple-touch-icon-transparent.png', source, 180);
+await writeFile('public/icons/apple-touch-icon-transparent.png', await renderTouchIcon(source));
 // Use a white-base fallback while comparing iOS rendering against the old blue icon.
 // Version the active URL so existing cached touch icons do not mask a new export.
 const touchSource = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="#FFFFFF"/>${body}</svg>`;
 for (const file of ['public/icons/apple-touch-icon.png', 'public/apple-touch-icon.png', 'public/apple-touch-icon-v2.png', 'public/icons/kondo-apple-touch-icon.png', 'public/icons/kondo-apple-touch-icon-v3.png', 'public/icons/kondo-apple-touch-icon-v4.png', 'public/apple-touch-icon-dark.png']) {
-  await webPng(file, touchSource, 180);
+  await writeFile(file, await renderTouchIcon(touchSource));
 }
 const adaptiveIcon = webLight;
 await writeFile('public/icons/icon.svg', adaptiveIcon);
