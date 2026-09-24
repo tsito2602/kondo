@@ -74,12 +74,10 @@
         --draw-delay: 240ms;
         --draw-duration: 620ms;
         --draw-ease: cubic-bezier(0.35, 0.05, 0.55, 0.95);
-        --draw-path: path("M393 425C500 399 577 381 620 410Q651 428 639 449");
       }
       .boot-stroke-bottom {
         --draw-delay: 930ms;
         --draw-duration: 600ms;
-        --draw-path: path("M451 529C425 563 480 592 558 578Q613 569 648 553");
       }
       .boot-dot {
         transform-box: fill-box;
@@ -93,8 +91,8 @@
           var(--draw-delay) both;
       }
       .boot-pen-tip {
-        offset-path: var(--draw-path);
-        offset-anchor: center;
+        /* A zero-length round dash is a nib on the actual stroke geometry. */
+        stroke-dasharray: 0 1000;
         animation:
           boot-write var(--draw-duration) var(--draw-ease) var(--draw-delay)
             both,
@@ -148,10 +146,10 @@
       }
       @keyframes boot-write {
         from {
-          offset-distance: 0%;
+          stroke-dashoffset: 1000;
         }
         to {
-          offset-distance: 100%;
+          stroke-dashoffset: 0;
         }
       }
       @keyframes boot-contact {
@@ -162,11 +160,6 @@
         5%,
         92% {
           opacity: 1;
-        }
-      }
-      @supports not (offset-path: path("M0 0L1 1")) {
-        .boot-pen-tip {
-          display: none;
         }
       }
       @keyframes boot-pin {
@@ -304,19 +297,21 @@
               />
               <use href="#boot-lower" stroke="currentColor" stroke-width="18" />
             </g>
-            <circle
+            <path
               class="boot-pen-tip boot-stroke"
-              cx="0"
-              cy="0"
-              r="9"
-              fill="currentColor"
+              d="M393 425C500 399 577 381 620 410Q651 428 639 449"
+              pathLength="1000"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="18"
             />
-            <circle
+            <path
               class="boot-pen-tip boot-stroke boot-stroke-bottom"
-              cx="0"
-              cy="0"
-              r="9"
-              fill="currentColor"
+              d="M451 529C425 563 480 592 558 578Q613 569 648 553"
+              pathLength="1000"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="18"
             />
             <g class="boot-dot">
               <circle class="boot-edge" cx="393" cy="425" r="28" fill="white" />
