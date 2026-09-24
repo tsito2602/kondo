@@ -40,25 +40,25 @@ const webDark = dark;
 for (const size of [192, 512]) {
   await webPng(`public/icons/icon-light-${size}.png`, webLight, size);
   await webPng(`public/icons/kondo-icon-${size}.png`, webLight, size);
-  await webPng(`public/icons/kondo-icon-v8-${size}.png`, webLight, size);
+  await webPng(`public/icons/kondo-icon-v9-${size}.png`, webLight, size);
   await webPng(`public/icon-${size}.png`, webLight, size);
   await webPng(`public/icon-dark-${size}.png`, webDark, size);
 }
 await webPng('public/icons/icon-maskable-512.png', svg(.72), 512);
 await webPng('public/icons/kondo-icon-maskable-512.png', svg(.72), 512);
-await webPng('public/icons/kondo-icon-v8-maskable-512.png', svg(.72), 512);
+await webPng('public/icons/kondo-icon-v9-maskable-512.png', svg(.72), 512);
 await webPng('public/icon-maskable.png', svg(.72), 512);
 // Preserve canvas transparency; the ticket faces and black details are opaque.
 // Device-approved I remains frozen separately; this version changes its structure.
 await writeFile('public/icons/apple-touch-icon-transparent.png', await renderTouchIcon(source));
 // Previous versioned URLs remain frozen for the diagnostic controls.
-for (const file of ['public/icons/apple-touch-icon.png', 'public/apple-touch-icon.png', 'public/apple-touch-icon-v2.png', 'public/icons/kondo-apple-touch-icon.png', 'public/icons/kondo-apple-touch-icon-v8.png', 'public/apple-touch-icon-dark.png']) {
+for (const file of ['public/icons/apple-touch-icon.png', 'public/apple-touch-icon.png', 'public/apple-touch-icon-v2.png', 'public/icons/kondo-apple-touch-icon.png', 'public/icons/kondo-apple-touch-icon-v9.png', 'public/apple-touch-icon-dark.png']) {
   await writeFile(file, await renderTouchIcon(source));
 }
 const adaptiveIcon = webLight;
 await writeFile('public/icons/icon.svg', adaptiveIcon);
 await writeFile('public/icons/kondo-icon.svg', adaptiveIcon);
-await writeFile('public/icons/kondo-icon-v8.svg', adaptiveIcon);
+await writeFile('public/icons/kondo-icon-v9.svg', adaptiveIcon);
 await writeFile('public/favicon.svg', adaptiveIcon);
 const faviconImages = [];
 for (const size of [16, 32]) {
@@ -81,3 +81,16 @@ await writeFile('public/icons/favicon.ico', Buffer.concat([ico, ...faviconImages
 await writeFile('public/logo.svg', source);
 await writeFile('public/logo-dark.svg', darkSource);
 console.log('Exported fanned white kondo tickets with opaque black outlines and journey details.');
+
+// Alternate concept stays separate from the app's selected icon.
+const proposal = await readFile('assets/brand/proposals/journey-perforation.svg', 'utf8');
+await writeFile('public/icons/kondo-journey-perforation-v1.png', await renderTouchIcon(proposal));
+await png('assets/brand/proposals/journey-perforation.png', proposal, 1024);
+const inner = input => input.match(/<svg\b[^>]*>([\s\S]*)<\/svg>/)[1].replace(/<title>[\s\S]*?<\/title>/, '');
+const preview = `<svg xmlns="http://www.w3.org/2000/svg" width="720" height="404" viewBox="0 0 720 404">
+  <rect width="720" height="404" fill="#E7E8EA"/>
+  <defs><clipPath id="plate"><rect width="300" height="300" rx="66"/></clipPath></defs>
+  ${[source, proposal].map((input, i) => `<g transform="translate(${40 + i * 340} 28)"><g clip-path="url(#plate)"><rect width="300" height="300" fill="#FFFFFF"/><g transform="scale(${300 / 1024})">${inner(input)}</g></g></g>`).join('')}
+  <g fill="#171717" font-family="sans-serif" font-size="24" text-anchor="middle"><text x="190" y="376">N</text><text x="530" y="376">O</text></g>
+</svg>`;
+await sharp(Buffer.from(preview)).png().toFile('assets/brand/proposals/comparison-n-o.png');

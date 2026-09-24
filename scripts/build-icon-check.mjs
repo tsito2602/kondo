@@ -36,6 +36,8 @@ export async function buildIconCheck(root, enabled) {
     { key: 'k', name: '調整版K', label: '白背景で前面と模様が見えなくなった版', image: await readFile('public/icons/kondo-apple-touch-icon-v6.png') },
     { key: 'l', name: '調整版L', label: '白い前面と透過の模様にグレーの細い縁を追加', image: await readFile('public/icons/kondo-apple-touch-icon-v7.png') },
     { key: 'm', name: '調整版M', label: '白い前面・黒い縁取りと模様', image: await readFile('public/icons/kondo-apple-touch-icon-v8.png') },
+    { key: 'n', name: '調整版N', label: '白いチケット・ピンの線幅を元に修正', image: await readFile('public/icons/kondo-apple-touch-icon-v9.png') },
+    { key: 'o', name: '別案O', label: '模様を主役に、半券のミシン目が端で見切れる案', image: await readFile('public/icons/kondo-journey-perforation-v1.png') },
   ];
   const revision = createHash('sha256').update(Buffer.concat(variants.map(v => v.image))).digest('hex').slice(0, 10);
   const base = `/__icon-check/${revision}`;
@@ -43,10 +45,10 @@ export async function buildIconCheck(root, enabled) {
   const document = (title, head, content) => `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${title}</title>${head}${style}</head><body>${content}</body></html>`;
   await mkdir(output, { recursive: true });
   const card = v => `<article><img src="${base}/${v.key}/icon.png" alt=""><h2>${v.name}：${v.label}</h2><p><a href="${base}/${v.key}/">追加用ページを開く</a></p></article>`;
-  const current = variants.filter(v => v.key === 'm').map(card).join('');
+  const current = variants.filter(v => ['n', 'o'].includes(v.key)).map(card).join('');
   const baseline = variants.filter(v => v.key === 'i').map(card).join('');
-  const previous = variants.filter(v => !['i', 'm'].includes(v.key)).map(card).join('');
-  await writeFile(path.join(output, 'index.html'), document('アイコンの比較', '', `<h1>チケットの調整版</h1><p>Mは前面を白のまま、縁取りと模様を黒にしました。模様の透過をなくし、2枚の角度差は維持しています。ライト／ダークの切替は、この変更版では実機未確認です。</p>${current}<details><summary>確認済みのIと比較する</summary>${baseline}</details><details><summary>これまでの結果</summary><p>A・A再確認・H・Iは白／黒に切り替わる。B・D・Eはライトで真っ黒・ダークで黒いグラデーション。F・Gもライトで黒。Cは両方白でした。Kはライトで白背景になりましたが、白い前面と模様が見えなくなりました。</p>${previous}</details><p>追加済みのアイコンを削除する必要はありません。</p><small>比較番号 ${revision}</small>`));
+  const previous = variants.filter(v => !['i', 'n', 'o'].includes(v.key)).map(card).join('');
+  await writeFile(path.join(output, 'index.html'), document('アイコンの比較', '', `<h1>チケットの調整版</h1><p>Nはピンの輪郭と中央の円を元の線幅に戻した修正版。Oはチケットの外形をなくし、旅の模様を大きく、半券のミシン目だけを端に残した別案です。どちらも模様は不透明な黒です。ライト／ダークの切替は、この変更版では実機未確認です。</p>${current}<details><summary>確認済みのIと比較する</summary>${baseline}</details><details><summary>これまでの結果</summary><p>A・A再確認・H・Iは白／黒に切り替わる。B・D・Eはライトで真っ黒・ダークで黒いグラデーション。F・Gもライトで黒。Cは両方白でした。Kはライトで白背景になりましたが、白い前面と模様が見えなくなりました。</p>${previous}</details><p>追加済みのアイコンを削除する必要はありません。</p><small>比較番号 ${revision}</small>`));
   for (const variant of variants) {
     const scope = `${base}/${variant.key}/`;
     const dir = path.join(root, scope.slice(1));
