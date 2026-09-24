@@ -1136,6 +1136,24 @@ test("journeys join endpoints without moving intervening events; stays do not in
   );
   assert.match(untimed, /チェックアウト日/);
   assert.match(untimed, /時刻未定/);
+  const checkoutMarker = new JSDOM(untimed).window.document.querySelector(
+    ".timeline-marker",
+  );
+  assert.equal(checkoutMarker.dataset.endpoint, "end");
+  assert.equal(checkoutMarker.querySelectorAll("svg").length, 1);
+  const sameDayStay = renderToStaticMarkup(
+    React.createElement(StayCards, {
+      bookings: [{ ...hotel, endDay: hotel.day }],
+      day: hotel.day,
+      onOpen() {},
+    }),
+  );
+  const sameDayDocument = new JSDOM(sameDayStay).window.document;
+  const pairedMarker = sameDayDocument.querySelector(".timeline-marker");
+  assert.equal(pairedMarker.dataset.endpoint, "both");
+  assert.equal(pairedMarker.querySelectorAll("svg").length, 2);
+  assert.equal(sameDayDocument.querySelectorAll("button").length, 1);
+  assert.equal(sameDayDocument.querySelector("time").textContent, hotel.time);
 });
 
 test("booking clocks align Japan conversions in a shared row and preserve seasonal UTC offsets", async () => {
