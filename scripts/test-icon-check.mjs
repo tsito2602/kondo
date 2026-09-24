@@ -22,7 +22,7 @@ try {
     assert.ok(!html.includes('serviceWorker'));
     scopes.add(manifest.id);
   }
-  assert.equal(scopes.size, 16);
+  assert.equal(scopes.size, 17);
   assert.deepEqual(await readFile(path.join(root, base, 'a/icon.png')), await readFile('scripts/fixtures/tabi-touch-transparent.png'));
   assert.deepEqual(await readFile(path.join(root, base, 'a2/icon.png')), await readFile('scripts/fixtures/tabi-touch-transparent.png'));
   assert.equal(JSON.parse(await readFile(path.join(root, base, 'a2/manifest.webmanifest'), 'utf8')).name, 'A再確認');
@@ -98,10 +98,10 @@ try {
   assert.equal(info.channels, 4);
   assert.equal((await touchImage.stats()).isOpaque, false);
   assert.equal(data[3], 0);
-  // The journey marker moves with the front ticket and is solid black.
-  assert.deepEqual([...data.subarray((82 * 180 + 75) * 4, (82 * 180 + 75) * 4 + 4)], [0, 0, 0, 255]);
-  assert.equal(data[(91 * 180 + 98) * 4 + 3], 255);
-  assert.deepEqual(await readFile(path.join(root, base, 'n/icon.png')), await readFile(path.join('public', touchHref)));
+  // The enlarged journey marker remains opaque black; empty space stays clear.
+  assert.deepEqual([...data.subarray((67 * 180 + 33) * 4, (67 * 180 + 33) * 4 + 4)], [0, 0, 0, 255]);
+  assert.equal(data[(90 * 180 + 90) * 4 + 3], 0);
+  assert.deepEqual(await readFile(path.join(root, base, 'p/icon.png')), await readFile(path.join('public', touchHref)));
   const iconSvg = await readFile('assets/brand/icon.svg', 'utf8');
   assert.ok(!iconSvg.includes('<mask'));
   // SVG and touch exports must render identical opaque details.
@@ -110,8 +110,8 @@ try {
   for (const file of ['assets/brand/adaptive-foreground.png', 'assets/brand/adaptive-monochrome.png']) {
     const { data: pixels, info: size } = await sharp(file).raw().toBuffer({ resolveWithObject: true });
     assert.equal(size.channels, 4);
-    assert.equal(pixels[(480 * size.width + 451) * 4 + 3], 255);
-    assert.equal(pixels[(516 * size.width + 545) * 4 + 3], 255);
+    assert.equal(pixels[(417 * size.width + 280) * 4 + 3], 255);
+    assert.equal(pixels[(512 * size.width + 512) * 4 + 3], 0);
   }
   assert.equal((await sharp('assets/brand/logo.png').stats()).isOpaque, false);
   await buildIconCheck(root, false);
