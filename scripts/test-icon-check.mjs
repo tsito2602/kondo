@@ -22,7 +22,7 @@ try {
     assert.ok(!html.includes('serviceWorker'));
     scopes.add(manifest.id);
   }
-  assert.equal(scopes.size, 17);
+  assert.equal(scopes.size, 18);
   assert.deepEqual(await readFile(path.join(root, base, 'a/icon.png')), await readFile('scripts/fixtures/tabi-touch-transparent.png'));
   assert.deepEqual(await readFile(path.join(root, base, 'a2/icon.png')), await readFile('scripts/fixtures/tabi-touch-transparent.png'));
   assert.equal(JSON.parse(await readFile(path.join(root, base, 'a2/manifest.webmanifest'), 'utf8')).name, 'A再確認');
@@ -101,7 +101,7 @@ try {
   // The enlarged journey marker remains opaque black; empty space stays clear.
   assert.deepEqual([...data.subarray((67 * 180 + 33) * 4, (67 * 180 + 33) * 4 + 4)], [0, 0, 0, 255]);
   assert.equal(data[(90 * 180 + 90) * 4 + 3], 0);
-  assert.deepEqual(await readFile(path.join(root, base, 'p/icon.png')), await readFile(path.join('public', touchHref)));
+  assert.deepEqual(await readFile(path.join(root, base, 'q/icon.png')), await readFile(path.join('public', touchHref)));
   const iconSvg = await readFile('assets/brand/icon.svg', 'utf8');
   assert.ok(!iconSvg.includes('<mask'));
   // SVG and touch exports must render identical opaque details.
@@ -114,6 +114,17 @@ try {
     assert.equal(pixels[(512 * size.width + 512) * 4 + 3], 0);
   }
   assert.equal((await sharp('assets/brand/logo.png').stats()).isOpaque, false);
+  // In-app dark mode uses white strokes, while the installed icon stays identical.
+  const darkLogo = await renderTouchIcon(await readFile('public/logo-dark.svg'));
+  const darkPixels = await sharp(darkLogo).raw().toBuffer();
+  assert.ok(darkPixels.some((value, index) => index % 4 === 3 && value === 255));
+  for (let offset = 0; offset < darkPixels.length; offset += 4) {
+    if (darkPixels[offset + 3] > 0) assert.deepEqual([...darkPixels.subarray(offset, offset + 3)], [255, 255, 255]);
+  }
+  assert.equal(darkPixels[(90 * 180 + 90) * 4 + 3], 0);
+  assert.notDeepEqual(darkLogo, await renderTouchIcon(await readFile('public/logo.svg')));
+  assert.deepEqual(await readFile('public/icon-dark-192.png'), await readFile('public/icon-192.png'));
+
   await buildIconCheck(root, false);
   assert.deepEqual(await readdir(root), []);
   console.log('Icon comparison: isolated identities, legacy controls, new kondo variants, production cleanup passed');

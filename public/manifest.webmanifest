@@ -10,8 +10,8 @@
   "theme_color": "#FFFFFF",
   "description": "こんどの楽しみを、一緒に。旅の予定・予約・準備を共有できるアプリ。",
   "icons": [
-    { "src": "/icons/kondo-icon-v10-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/kondo-icon-v10-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/kondo-icon-v10-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "/icons/kondo-icon-v11-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/kondo-icon-v11-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/kondo-icon-v11-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

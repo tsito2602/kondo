@@ -1,14 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><title>kondo</title><g transform="translate(0 0) scale(1)"><g transform="translate(-596 -470) scale(2)" stroke-linecap="round" stroke-linejoin="round">
     <!-- White edging keeps the same black mark legible on dark surfaces. -->
-    <g fill="none" stroke="#FFFFFF">
+    <g data-appearance="edge" fill="none" stroke="#FFFFFF">
       <path d="M393 425C500 399 577 381 620 410Q651 428 639 449" stroke-width="26"/>
-      <path d="M451 529C425 563 480 592 558 578Q613 569 648 553" stroke-width="26"/>
+      <path d="M451 529C425 563 480 592 558 578Q613 569 648 553" stroke-dasharray="0.01 36" stroke-width="26"/>
       <path d="M705 490C686 490 672 504 672 522C672 538 686 553 705 577C724 553 738 538 738 522C738 504 724 490 705 490Z" fill="#FFFFFF" stroke-width="22"/>
+      <circle cx="393" cy="425" r="28" fill="#FFFFFF" stroke="none"/>
     </g>
-    <circle cx="393" cy="425" r="28" fill="#FFFFFF"/>
     <g fill="none" stroke="#000000">
       <path d="M393 425C500 399 577 381 620 410Q651 428 639 449" stroke-width="18"/>
-      <path d="M451 529C425 563 480 592 558 578Q613 569 648 553" stroke-width="18"/>
+      <path d="M451 529C425 563 480 592 558 578Q613 569 648 553" stroke-dasharray="0.01 36" stroke-width="18"/>
       <path d="M705 490C686 490 672 504 672 522C672 538 686 553 705 577C724 553 738 538 738 522C738 504 724 490 705 490Z" stroke-width="14"/>
       <circle cx="705" cy="522" r="10" stroke-width="12"/>
     </g>
