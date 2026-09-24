@@ -1,35 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <title>kondo — two fanned tickets</title>
-  <defs>
-    <mask id="journey" x="0" y="0" width="1024" height="1024" maskUnits="userSpaceOnUse" style="mask-type:luminance">
-      <rect width="1024" height="1024" fill="#FFFFFF"/>
-      <g transform="translate(34 42)">
-      <g fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M393 425C500 399 577 381 620 410Q651 428 639 449" stroke-width="18"/>
-        <path d="M451 529C425 563 480 592 558 578Q613 569 648 553" stroke-width="18"/>
-        <path d="M705 490C686 490 672 504 672 522C672 538 686 553 705 577C724 553 738 538 738 522C738 504 724 490 705 490Z" stroke-width="14"/>
-        <circle cx="705" cy="522" r="10" stroke-width="12"/>
-      </g>
-      <circle cx="393" cy="425" r="24" fill="#000000"/>
-      </g>
-    </mask>
-  </defs>
-  <g mask="url(#journey)">
+  <g>
     <g transform="translate(-24 -34) rotate(10 525 490)" fill="#B0B0B0">
       <path d="M254 300H796Q830 300 830 334V427C770 427 770 553 830 553V646Q830 680 796 680H254Q220 680 220 646V553C280 553 280 427 220 427V334Q220 300 254 300Z"/>
     </g>
-    <g transform="translate(34 42) rotate(-10 525 490)" fill="#FFFFFF" stroke="#656565" stroke-width="12" stroke-linejoin="round">
+    <g transform="translate(34 42) rotate(-10 525 490)" fill="#FFFFFF" stroke="#000000" stroke-width="12" stroke-linejoin="round">
       <path d="M254 300H796Q830 300 830 334V427C770 427 770 553 830 553V646Q830 680 796 680H254Q220 680 220 646V553C280 553 280 427 220 427V334Q220 300 254 300Z"/>
     </g>
-    <!-- Border the transparent journey without painting over its holes. -->
     <g transform="translate(34 42)">
-      <g fill="none" stroke="#656565" stroke-linecap="round" stroke-linejoin="round">
+      <g fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round">
         <path d="M393 425C500 399 577 381 620 410Q651 428 639 449" stroke-width="30"/>
         <path d="M451 529C425 563 480 592 558 578Q613 569 648 553" stroke-width="30"/>
         <path d="M705 490C686 490 672 504 672 522C672 538 686 553 705 577C724 553 738 538 738 522C738 504 724 490 705 490Z" stroke-width="26"/>
         <circle cx="705" cy="522" r="10" stroke-width="24"/>
       </g>
-      <circle cx="393" cy="425" r="30" fill="#656565"/>
+      <circle cx="393" cy="425" r="30" fill="#000000"/>
     </g>
   </g>
 </svg>

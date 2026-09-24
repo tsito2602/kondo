@@ -4,13 +4,12 @@ import { renderTouchIcon } from './render-touch-icon.mjs';
 
 // All outputs come from this one transparent, wordmark-free vector master.
 const source = await readFile('assets/brand/symbol.svg', 'utf8');
-// Preserve defs/masks as well as visible groups. The journey is cut through
-// both tickets using alpha, rather than painted with an opaque foreground.
+// Keep all visible groups from the transparent master. Journey details are opaque black.
 const body = source.match(/<svg\b[^>]*>([\s\S]*)<\/svg>/)[1].replace(/<title>[\s\S]*?<\/title>/, '').trim();
 // Keep the ticket artwork and icon surfaces identical in both themes.
 const svg = (scale = 1, monochrome = false) => {
-  // Do not recolour the black/white mask: doing so fills the cutouts back in.
-  const shapes = monochrome ? body.replace(/#B0B0B0|#656565/g, '#FFFFFF') : body;
+  // The monochrome platform asset uses the combined silhouette.
+  const shapes = monochrome ? body.replace(/#B0B0B0|#000000/g, '#FFFFFF') : body;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><title>kondo</title><g transform="translate(${512 * (1 - scale)} ${512 * (1 - scale)}) scale(${scale})">${shapes}</g></svg>\n`;
 };
 await mkdir('public/icons', { recursive: true });
@@ -41,25 +40,25 @@ const webDark = dark;
 for (const size of [192, 512]) {
   await webPng(`public/icons/icon-light-${size}.png`, webLight, size);
   await webPng(`public/icons/kondo-icon-${size}.png`, webLight, size);
-  await webPng(`public/icons/kondo-icon-v7-${size}.png`, webLight, size);
+  await webPng(`public/icons/kondo-icon-v8-${size}.png`, webLight, size);
   await webPng(`public/icon-${size}.png`, webLight, size);
   await webPng(`public/icon-dark-${size}.png`, webDark, size);
 }
 await webPng('public/icons/icon-maskable-512.png', svg(.72), 512);
 await webPng('public/icons/kondo-icon-maskable-512.png', svg(.72), 512);
-await webPng('public/icons/kondo-icon-v7-maskable-512.png', svg(.72), 512);
+await webPng('public/icons/kondo-icon-v8-maskable-512.png', svg(.72), 512);
 await webPng('public/icon-maskable.png', svg(.72), 512);
-// The I fixture was verified on an iPhone in light AND dark appearance.
-// Keep the canvas and journey cutouts transparent; never add a white plate.
+// Preserve canvas transparency; the ticket faces and black details are opaque.
+// Device-approved I remains frozen separately; this version changes its structure.
 await writeFile('public/icons/apple-touch-icon-transparent.png', await renderTouchIcon(source));
 // Previous versioned URLs remain frozen for the diagnostic controls.
-for (const file of ['public/icons/apple-touch-icon.png', 'public/apple-touch-icon.png', 'public/apple-touch-icon-v2.png', 'public/icons/kondo-apple-touch-icon.png', 'public/icons/kondo-apple-touch-icon-v7.png', 'public/apple-touch-icon-dark.png']) {
+for (const file of ['public/icons/apple-touch-icon.png', 'public/apple-touch-icon.png', 'public/apple-touch-icon-v2.png', 'public/icons/kondo-apple-touch-icon.png', 'public/icons/kondo-apple-touch-icon-v8.png', 'public/apple-touch-icon-dark.png']) {
   await writeFile(file, await renderTouchIcon(source));
 }
 const adaptiveIcon = webLight;
 await writeFile('public/icons/icon.svg', adaptiveIcon);
 await writeFile('public/icons/kondo-icon.svg', adaptiveIcon);
-await writeFile('public/icons/kondo-icon-v7.svg', adaptiveIcon);
+await writeFile('public/icons/kondo-icon-v8.svg', adaptiveIcon);
 await writeFile('public/favicon.svg', adaptiveIcon);
 const faviconImages = [];
 for (const size of [16, 32]) {
@@ -81,4 +80,4 @@ for (const [index, image] of faviconImages.entries()) {
 await writeFile('public/icons/favicon.ico', Buffer.concat([ico, ...faviconImages]));
 await writeFile('public/logo.svg', source);
 await writeFile('public/logo-dark.svg', darkSource);
-console.log('Exported fanned white kondo tickets with transparent journey cutouts.');
+console.log('Exported fanned white kondo tickets with opaque black outlines and journey details.');
