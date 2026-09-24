@@ -985,13 +985,19 @@ strong {
   width: 15px;
   height: 15px;
 }
-.timeline-marker::after {
+/* A rail represents a booking interval, never a link to the next appointment.
+   Ordinary events, generic bookings and intermediate hotel nights are standalone. */
+.timeline-marker:is(
+  [data-endpoint="start"],
+  [data-endpoint="end"],
+  [data-endpoint="both"]
+)::after {
   content: "";
   width: 1px;
   background: var(--line);
   position: absolute;
   top: 21px;
-  bottom: -10px;
+  bottom: 0;
   left: 50%;
 }
 .timeline-marker > span {
@@ -1000,9 +1006,6 @@ strong {
   border-radius: 50%;
   background: var(--brand);
   margin-top: 5px;
-}
-:where(.day-section > div:last-child) .timeline-marker::after {
-  bottom: 0;
 }
 /* Arrival and checkout terminate the rail; no line continues below their icon. */
 .timeline-marker[data-endpoint="end"] {
@@ -1091,9 +1094,6 @@ strong {
 }
 .stay-entry {
   padding-bottom: 0;
-}
-.stay-entry .timeline-marker::after {
-  bottom: 0;
 }
 .stay-heading {
   display: flex;
