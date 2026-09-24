@@ -13,10 +13,10 @@
     </mask>
   </defs>
   <g mask="url(#journey)">
-    <g transform="translate(-66 -70) rotate(-10 525 490)" fill="#BCBCBC">
+    <g transform="translate(-24 -34) rotate(10 525 490)" fill="#B0B0B0">
       <path d="M254 300H796Q830 300 830 334V427C770 427 770 553 830 553V646Q830 680 796 680H254Q220 680 220 646V553C280 553 280 427 220 427V334Q220 300 254 300Z"/>
     </g>
-    <g transform="translate(34 42) rotate(-10 525 490)" fill="#737373">
+    <g transform="translate(34 42) rotate(-10 525 490)" fill="#FFFFFF">
       <path d="M254 300H796Q830 300 830 334V427C770 427 770 553 830 553V646Q830 680 796 680H254Q220 680 220 646V553C280 553 280 427 220 427V334Q220 300 254 300Z"/>
     </g>
   </g></g></svg>
