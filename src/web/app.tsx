@@ -183,12 +183,6 @@ function Login() {
   const auth = useAuth();
   return (
     <main className="login">
-      <div className="login-art" aria-hidden="true">
-        <span className="login-art-label">KONDO / YOUR NEXT TRIP</span>
-        <img className="light-logo" src="/logo.svg" alt="" />
-        <img className="dark-logo" src="/logo-dark.svg" alt="" />
-        <span className="login-art-index">01 / ∞</span>
-      </div>
       <div className="login-panel">
         <div className="login-brand">
           <Logo />
@@ -199,11 +193,6 @@ function Login() {
             <br />
             一緒に。
           </h1>
-          <p>
-            行きたい場所も、予約も、旅の準備も。
-            <br />
-            一緒に旅する人と、ひとつのしおりに。
-          </p>
         </div>
         <div className="login-actions">
           <GoogleSignIn />
@@ -215,7 +204,7 @@ function Login() {
           {auth.demoEnabled && (
             <Button
               variant="ghost"
-              className="secondary"
+              className="login-demo"
               onClick={auth.startDemo}
             >
               サンプルの旅を見てみる
