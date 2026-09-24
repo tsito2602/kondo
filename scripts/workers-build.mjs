@@ -7,6 +7,9 @@ const environments = {
   staging: { branch: 'staging', worker: 'tabi-staging', database: 'tabi-staging', bucket: 'tabi-documents-staging' },
   production: { branch: 'main', worker: 'tabi', database: 'tabi', bucket: 'tabi-documents' },
 };
+// Opt-in migration: first change the URL while retaining the existing data,
+// then select the copied kondo stores after their contents have been verified.
+const profiles = new Set(['legacy', 'kondo-url', 'kondo']);
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const clientId = /^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/;
 const required = (env, key) => {
@@ -18,7 +21,15 @@ const required = (env, key) => {
 /** Fail before installation or remote writes on a wrong branch/account/config. */
 export function configuration(target, env, template, checkOnly = false) {
   if (!Object.hasOwn(environments, target)) throw new Error('Target must be staging or production');
-  const expected = environments[target];
+  const legacy = environments[target];
+  const profile = env.DEPLOYMENT_PROFILE?.trim() || 'legacy';
+  if (!profiles.has(profile)) throw new Error('DEPLOYMENT_PROFILE must be legacy, kondo-url, or kondo');
+  const expected = {
+    ...legacy,
+    worker: profile === 'legacy' ? legacy.worker : legacy.worker.replace(/^tabi/, 'kondo'),
+    database: profile === 'kondo' ? legacy.database.replace(/^tabi/, 'kondo') : legacy.database,
+    bucket: profile === 'kondo' ? legacy.bucket.replace(/^tabi/, 'kondo') : legacy.bucket,
+  };
   if (env.WORKERS_CI !== '1') throw new Error('This entry point is for Workers Builds; use npm run check in the work environment');
   const branch = required(env, 'WORKERS_CI_BRANCH');
   if (!checkOnly && branch !== expected.branch) throw new Error(`Refusing ${target} deployment from ${branch}; expected ${expected.branch}`);
@@ -45,21 +56,24 @@ export function configuration(target, env, template, checkOnly = false) {
     if (env[key] !== undefined && env[key] !== value) throw new Error(`${key} does not match ${target}`);
   }
   if (env.ALLOWED_ORIGINS !== undefined && env.ALLOWED_ORIGINS !== origin) throw new Error(`ALLOWED_ORIGINS does not match ${target}`);
-  if (template.name !== expected.worker || template.main !== 'worker/index.ts' || template.assets?.directory !== './dist'
+  if (template.name !== legacy.worker || template.main !== 'worker/index.ts' || template.assets?.directory !== './dist'
     || template.d1_databases?.length !== 1 || template.d1_databases[0].binding !== 'DB'
-    || template.d1_databases[0].database_name !== expected.database
+    || template.d1_databases[0].database_name !== legacy.database
     || template.r2_buckets?.length !== 1 || template.r2_buckets[0].binding !== 'BUCKET'
-    || template.r2_buckets[0].bucket_name !== expected.bucket || template.build?.command) {
+    || template.r2_buckets[0].bucket_name !== legacy.bucket || template.build?.command) {
     throw new Error('Wrangler template has unexpected targets or a duplicate build command');
   }
   const config = structuredClone(template);
+  config.name = expected.worker;
+  config.d1_databases[0].database_name = expected.database;
   config.d1_databases[0].database_id = databaseId;
+  config.r2_buckets[0].bucket_name = expected.bucket;
   config.vars = { ...config.vars, GOOGLE_CLIENT_IDS: audiences.join(','), ALLOWED_ORIGINS: origin };
   if (/__[A-Z0-9_]+__/.test(JSON.stringify(config))) throw new Error('Unresolved Wrangler template placeholder');
   const childEnv = { ...env, ...publicEnv, GOOGLE_CLIENT_IDS: audiences.join(','), ALLOWED_ORIGINS: origin, CI: 'true', EXPO_NO_DOTENV: '1' };
   // React tests need development React; Vite build selects production itself.
   delete childEnv.NODE_ENV;
-  return { ...expected, target, origin, account, databaseId, commit, config, env: childEnv, checkOnly };
+  return { ...expected, target, profile, origin, account, databaseId, commit, config, env: childEnv, checkOnly };
 }
 
 function command(program, args, env, timeout) {

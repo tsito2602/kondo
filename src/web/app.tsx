@@ -188,11 +188,7 @@ function Login() {
           <Logo />
         </div>
         <div className="login-copy">
-          <h1>
-            こんどの楽しみを、
-            <br />
-            一緒に。
-          </h1>
+          <h1>こんど、どこ行こうか。</h1>
         </div>
         <div className="login-actions">
           <GoogleSignIn />
