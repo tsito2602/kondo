@@ -29,6 +29,8 @@ export async function buildIconCheck(root, enabled) {
     { key: 'f', name: '比較F', label: 'Aの配色を使ったチケット・透過', image: await render(fromA) },
     { key: 'g', name: '比較G', label: 'Fをモノクロにしたチケット・透過', image: await render(neutral) },
     { key: 'a2', name: 'A再確認', label: '成功したAと画像データまで同一', image: legacy },
+    { key: 'h', name: '比較H', label: '成功したAの色だけをモノクロに変更', image: await render(legacySource.replaceAll('#496B80', '#656565').replaceAll('#D7E2E8', '#E0E0E0')) },
+    { key: 'i', name: '比較I', label: 'モノクロ・模様を透過で切り抜いたチケット', image: await render(await readFile('scripts/fixtures/kondo-cutout-source.svg', 'utf8')) },
   ];
   const revision = createHash('sha256').update(Buffer.concat(variants.map(v => v.image))).digest('hex').slice(0, 10);
   const base = `/__icon-check/${revision}`;
@@ -36,9 +38,9 @@ export async function buildIconCheck(root, enabled) {
   const document = (title, head, content) => `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${title}</title>${head}${style}</head><body>${content}</body></html>`;
   await mkdir(output, { recursive: true });
   const card = v => `<article><img src="${base}/${v.key}/icon.png" alt=""><h2>${v.name}：${v.label}</h2><p><a href="${base}/${v.key}/">追加用ページを開く</a></p></article>`;
-  const current = variants.filter(v => v.key === 'a2').map(card).join('');
-  const previous = variants.filter(v => v.key !== 'a2').map(card).join('');
-  await writeFile(path.join(output, 'index.html'), document('アイコンの比較', '', `<h1>成功したAの再確認</h1><p>F・Gもライトでは黒背景になりました。新しい絵柄の比較はいったん止め、成功したAと全く同じ画像を新しく追加した場合の表示を確認します。</p>${current}<p>ホーム画面のアイコン表示をライトにした状態で「A再確認」を追加してください。以前の「比較A」を残し、隣に並べると比較できます。</p><details><summary>これまでのA〜G</summary><p>Aはライトで白・ダークで黒。B・D・Eはライトで真っ黒・ダークで黒いグラデーション。F・Gもライトで黒。Cは両方白でした。</p>${previous}</details><p>通常のkondoや、追加済みのアイコンを削除する必要はありません。</p><small>比較番号 ${revision}</small>`));
+  const current = variants.filter(v => ['h', 'i'].includes(v.key)).map(card).join('');
+  const previous = variants.filter(v => !['h', 'i'].includes(v.key)).map(card).join('');
+  await writeFile(path.join(output, 'index.html'), document('アイコンの比較', '', `<h1>色と透過部分の比較</h1><p>A再確認も白／黒に切り替わりました。Aを新しく追加しても成功することが確認できています。</p><p>HはAの形・透過部分をそのままに、色だけをモノクロにしたもの。IはGと同じグレーで、チケットの縁取りを外し、模様を透過で切り抜いたものです。どちらも比較用で、通常の白いチケットは変更していません。</p>${current}<details><summary>これまでの結果</summary><p>AとA再確認は白／黒に切り替わる。B・D・Eはライトで真っ黒・ダークで黒いグラデーション。F・Gもライトで黒。Cは両方白でした。</p>${previous}</details><p>追加済みのアイコンを削除する必要はありません。</p><small>比較番号 ${revision}</small>`));
   for (const variant of variants) {
     const scope = `${base}/${variant.key}/`;
     const dir = path.join(root, scope.slice(1));

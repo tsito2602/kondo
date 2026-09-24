@@ -21,10 +21,26 @@ try {
     assert.ok(!html.includes('serviceWorker'));
     scopes.add(manifest.id);
   }
-  assert.equal(scopes.size, 8);
+  assert.equal(scopes.size, 10);
   assert.deepEqual(await readFile(path.join(root, base, 'a/icon.png')), await readFile('scripts/fixtures/tabi-touch-transparent.png'));
   assert.deepEqual(await readFile(path.join(root, base, 'a2/icon.png')), await readFile('scripts/fixtures/tabi-touch-transparent.png'));
   assert.equal(JSON.parse(await readFile(path.join(root, base, 'a2/manifest.webmanifest'), 'utf8')).name, 'A再確認');
+  const a = await sharp(path.join(root, base, 'a/icon.png')).raw().toBuffer();
+  const h = await sharp(path.join(root, base, 'h/icon.png')).raw().toBuffer();
+  assert.equal(a.length, h.length);
+  for (let p = 0; p < a.length; p += 4) {
+    assert.equal(h[p + 3], a[p + 3]);
+    if (h[p + 3] === 255) {
+      assert.equal(h[p], h[p + 1]);
+      assert.equal(h[p], h[p + 2]);
+    }
+  }
+  const i = await sharp(path.join(root, base, 'i/icon.png')).raw().toBuffer();
+  const g = await sharp(path.join(root, base, 'g/icon.png')).raw().toBuffer();
+  // The start marker is a true hole through both tickets, not opaque paint.
+  assert.equal(i[(75 * 180 + 69) * 4 + 3], 0);
+  assert.equal(g[(75 * 180 + 69) * 4 + 3], 255);
+  assert.equal(i[(85 * 180 + 90) * 4 + 3], 255);
   assert.deepEqual(await readFile(path.join(root, base, 'b/icon.png')), await readFile('public/icons/apple-touch-icon-transparent.png'));
   assert.deepEqual(await readFile(path.join(root, base, 'c/icon.png')), await readFile('public/icons/kondo-apple-touch-icon-v4.png'));
   assert.equal((await sharp(path.join(root, base, 'a/icon.png')).stats()).isOpaque, false);
