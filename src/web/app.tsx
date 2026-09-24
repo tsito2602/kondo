@@ -41,7 +41,6 @@ import {
   Trash2,
   RefreshCw,
   LogOut,
-  Plane,
   ChevronRight,
   Copy,
   BookOpen,
@@ -185,33 +184,46 @@ function Login() {
   return (
     <main className="login">
       <div className="login-art" aria-hidden="true">
-        <Plane />
-        <div className="orbit" />
+        <span className="login-art-label">KONDO / YOUR NEXT TRIP</span>
+        <img className="light-logo" src="/logo.svg" alt="" />
+        <img className="dark-logo" src="/logo-dark.svg" alt="" />
+        <span className="login-art-index">01 / ∞</span>
       </div>
       <div className="login-panel">
-        <Logo />
-        <h1>
-          こんどの楽しみを、
-          <br />
-          一緒に。
-        </h1>
-        <p className="muted">予定・予約・持ち物を、一緒に旅する人と。</p>
-        <GoogleSignIn />
-        {auth.error && (
-          <p className="error" role="alert">
-            {auth.error}
+        <div className="login-brand">
+          <Logo />
+        </div>
+        <div className="login-copy">
+          <span className="login-kicker">旅の予定を、ひとつに。</span>
+          <h1>
+            こんどの楽しみを、
+            <br />
+            一緒に。
+          </h1>
+          <p>
+            行きたい場所も、予約も、旅の準備も。
+            <br />
+            一緒に旅する人と、ひとつのしおりに。
           </p>
-        )}
-        {auth.demoEnabled && (
-          <Button
-            variant="ghost"
-            className="secondary"
-            onClick={auth.startDemo}
-          >
-            サンプルの旅を見てみる
-            <ChevronRight size={18} />
-          </Button>
-        )}
+        </div>
+        <div className="login-actions">
+          <GoogleSignIn />
+          {auth.error && (
+            <p className="error" role="alert">
+              {auth.error}
+            </p>
+          )}
+          {auth.demoEnabled && (
+            <Button
+              variant="ghost"
+              className="secondary"
+              onClick={auth.startDemo}
+            >
+              サンプルの旅を見てみる
+              <ChevronRight size={18} />
+            </Button>
+          )}
+        </div>
       </div>
     </main>
   );
@@ -969,7 +981,6 @@ function SettingsScreen() {
         <Card className="settings-card">
           <h2>アプリ</h2>
           <PwaControls />
-          <p className="muted small">kondo {import.meta.env.VITE_APP_VERSION}</p>
         </Card>
         <Button
           variant="ghost"
@@ -990,6 +1001,14 @@ function SettingsScreen() {
           <LogOut />
           {auth.isDemo ? "サンプルを終了" : "ログアウト"}
         </Button>
+        <section className="settings-app-info" aria-label="アプリ情報">
+          <span className="settings-app-mark" aria-hidden="true">
+            <img className="light-logo" src="/logo.svg" alt="" />
+            <img className="dark-logo" src="/logo-dark.svg" alt="" />
+          </span>
+          <strong>kondo</strong>
+          <small>バージョン {import.meta.env.VITE_APP_VERSION}</small>
+        </section>
       </div>
     </Modal>
   );

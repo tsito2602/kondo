@@ -291,7 +291,7 @@ export function GoogleSignIn() {
           size: "large",
           shape: "pill",
           locale: "ja",
-          width: 280,
+          width: Math.round(ref.current.getBoundingClientRect().width),
         });
       })
       .catch((cause: Error) => {
@@ -302,8 +302,8 @@ export function GoogleSignIn() {
     };
   }, [configured, authenticate]);
   return (
-    <div aria-busy={signingIn}>
-      <div ref={ref} />
+    <div className="google-sign-in" aria-busy={signingIn}>
+      <div className="google-sign-in-button" ref={ref} />
       {signingIn && <p role="status">ログインしています…</p>}
       {error && <p role="alert">{error}</p>}
       {!configured && <p>Googleログインは現在設定されていません。</p>}
