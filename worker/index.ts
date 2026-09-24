@@ -4,6 +4,7 @@ import { validDate } from '../src/utils/dates';
 import { itineraryCategories, transportModes, itineraryDetailsError } from '../src/data/itinerary';
 import type { ItineraryDetails } from '../src/data/types';
 import { mapUrl, referenceUrl } from '../src/data/places';
+import { validNoteContent, notePlainText, NOTE_TITLE_LIMIT, NOTE_BODY_LIMIT } from '../src/data/notes';
 
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { connectionBetween, createsFlightConnectionCycle, type FlightConnectionInput } from '../src/data/flight-connections';
@@ -270,8 +271,9 @@ async function notesRoute(request: Request, env: Env, user: User, tripId: string
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
   if (request.method === 'GET' && !noteId) {
-    const rows = await env.DB.prepare('SELECT id, body, pinned, updated_at AS updatedAt FROM travel_notes WHERE trip_id=? ORDER BY pinned DESC, updated_at DESC, id').bind(tripId).all();
-    return json({ notes: rows.results.map((row) => ({ ...row, pinned: Boolean(row.pinned) })) });
+    const rows = await env.DB.prepare(`SELECT n.id, n.body, n.updated_at AS updatedAt, COALESCE(d.title, '') AS title, d.content
+      FROM travel_notes n LEFT JOIN note_details d ON d.note_id=n.id WHERE n.trip_id=? ORDER BY n.updated_at DESC, n.id`).bind(tripId).all();
+    return json({ notes: rows.results.map(({ content, ...row }) => ({ ...row, pinned: false, content: content ? JSON.parse(String(content)) : null })) });
   }
   if (request.method === 'DELETE' && noteId) {
     await env.DB.prepare('DELETE FROM travel_notes WHERE id=? AND trip_id=?').bind(noteId, tripId).run();
@@ -279,10 +281,21 @@ async function notesRoute(request: Request, env: Env, user: User, tripId: string
   }
   if (request.method === 'POST' && !noteId) {
     const body = await request.json().catch(() => null);
-    if (!isObject(body) || !idField(body.id) || typeof body.body !== 'string' || body.body.length > 50000 || typeof body.pinned !== 'boolean') return json({ error: 'メモは50,000文字以内で入力してください' }, 400);
-    const result = await env.DB.prepare(`INSERT INTO travel_notes (id,trip_id,body,pinned,updated_by) VALUES (?,?,?,?,?)
-      ON CONFLICT(id) DO UPDATE SET body=excluded.body,pinned=excluded.pinned,updated_by=excluded.updated_by,updated_at=unixepoch()
-      WHERE travel_notes.trip_id=excluded.trip_id`).bind(body.id, tripId, body.body, Number(body.pinned), user.id).run();
+    if (!isObject(body) || !idField(body.id) || typeof body.body !== 'string' || body.body.length > NOTE_BODY_LIMIT) return json({ error: 'メモは50,000文字以内で入力してください' }, 400);
+    if (body.title !== undefined && (typeof body.title !== 'string' || body.title.length > NOTE_TITLE_LIMIT)) return json({ error: 'タイトルは120文字以内で入力してください' }, 400);
+    if (body.content != null && !validNoteContent(body.content)) return json({ error: 'メモの書式を確認してください' }, 400);
+    const plain = body.content == null ? body.body : notePlainText(body.content);
+    if (plain.length > NOTE_BODY_LIMIT) return json({ error: 'メモは50,000文字以内で入力してください' }, 400);
+    const content = body.content == null ? null : JSON.stringify(body.content);
+    const [result] = await env.DB.batch([
+      env.DB.prepare(`INSERT INTO travel_notes (id,trip_id,body,pinned,updated_by) VALUES (?,?,?,0,?)
+        ON CONFLICT(id) DO UPDATE SET body=excluded.body,pinned=0,updated_by=excluded.updated_by,updated_at=unixepoch()
+        WHERE travel_notes.trip_id=excluded.trip_id`).bind(body.id, tripId, plain, user.id),
+      env.DB.prepare(`INSERT INTO note_details (note_id,title,content)
+        SELECT ?,COALESCE(?,''),? WHERE EXISTS (SELECT 1 FROM travel_notes WHERE id=? AND trip_id=?)
+        ON CONFLICT(note_id) DO UPDATE SET title=COALESCE(?,note_details.title),content=excluded.content
+      `).bind(body.id, body.title ?? null, content, body.id, tripId, body.title ?? null),
+    ]);
     if (!result.meta.changes) return json({ error: 'メモのIDが競合しました' }, 409);
     return json({ id: body.id }, 201);
   }

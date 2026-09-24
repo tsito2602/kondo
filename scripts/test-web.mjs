@@ -18,6 +18,8 @@ Object.assign(globalThis, {
   localStorage: dom.window.localStorage,
   sessionStorage: dom.window.sessionStorage,
   Element: dom.window.Element,
+  Node: dom.window.Node,
+  MutationObserver: dom.window.MutationObserver,
   HTMLElement: dom.window.HTMLElement,
   HTMLInputElement: dom.window.HTMLInputElement,
   getComputedStyle: dom.window.getComputedStyle.bind(dom.window),
@@ -54,6 +56,16 @@ Object.defineProperty(window, "visualViewport", {
   configurable: true,
 });
 window.scrollTo = () => {};
+dom.window.Range.prototype.getClientRects = () => [];
+dom.window.Range.prototype.getBoundingClientRect = () => ({
+  top: 0,
+  bottom: 0,
+  left: 0,
+  right: 0,
+  width: 0,
+  height: 0,
+});
+document.elementFromPoint = () => document.body;
 HTMLElement.prototype.scrollIntoView = () => {};
 dom.window.HTMLDialogElement.prototype.showModal = function () {
   this.open = true;
@@ -883,22 +895,113 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await click(byText("nav a", "メモ"));
     await click(document.querySelector('[aria-label="メモを書く"]'));
+    await tick(550);
+    assert.equal(
+      db.prepare("SELECT COUNT(*) AS n FROM travel_notes").get().n,
+      0,
+      "opening an empty note does not save it",
+    );
+    await click(byText(".context-primary button", "完了"));
+    await click(document.querySelector('[aria-label="メモを書く"]'));
     assert.equal(document.activeElement, document.querySelector("dialog h2"));
-    const textarea = document.querySelector('[aria-label="メモ本文"]');
+    assert.equal(document.querySelector('[aria-label="ピン留め"]'), null);
+    const title = document.querySelector('[aria-label="メモのタイトル"]');
     await act(async () => {
       Object.getOwnPropertyDescriptor(
-        dom.window.HTMLTextAreaElement.prototype,
+        dom.window.HTMLInputElement.prototype,
         "value",
-      ).set.call(textarea, "旅のメモ\n- [ ] お土産");
-      textarea.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+      ).set.call(title, "旅先の買い物");
+      title.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
     });
+    const rich = document.querySelector('[aria-label="メモ本文"]');
+    // Exercise the actual ProseMirror input transaction, then the visible toolbar.
+    await act(async () => {
+      rich.editor.commands.insertContent("お土産");
+      rich.editor.commands.selectAll();
+    });
+    await click(document.querySelector('[aria-label="太字"]'));
+    assert.equal(
+      document
+        .querySelector('[aria-label="太字"]')
+        .getAttribute("aria-pressed"),
+      "true",
+    );
+    assert.equal(rich.querySelector("strong").textContent, "お土産");
+    for (const [label, tag] of [
+      ["斜体", "em"],
+      ["下線", "u"],
+      ["取り消し線", "s"],
+      ["見出し", "h2"],
+    ]) {
+      await click(document.querySelector(`[aria-label="${label}"]`));
+      assert.equal(rich.querySelector(tag).textContent, "お土産");
+    }
+    await click(document.querySelector('[aria-label="箇条書き"]'));
+    assert.ok(rich.querySelector("ul li"));
+    await click(document.querySelector('[aria-label="番号付きリスト"]'));
+    assert.ok(rich.querySelector("ol li"));
+    const beforeUndo = rich.editor.getJSON();
+    await click(document.querySelector('[aria-label="元に戻す"]'));
+    assert.notDeepEqual(rich.editor.getJSON(), beforeUndo);
+    await click(document.querySelector('[aria-label="やり直す"]'));
+    assert.deepEqual(rich.editor.getJSON(), beforeUndo);
+    await click(document.querySelector('[aria-label="チェックリスト"]'));
+    await click(rich.querySelector('input[type="checkbox"]'));
     await tick(550);
     assert.equal(
       db.prepare("SELECT COUNT(*) AS n FROM travel_notes").get().n,
       1,
     );
-    await click(byText(".context-primary button", "保存する"));
+    assert.equal(
+      db.prepare("SELECT title FROM note_details").get().title,
+      "旅先の買い物",
+    );
+    const savedContent = JSON.parse(
+      db.prepare("SELECT content FROM note_details").get().content,
+    );
+    assert.equal(savedContent.content[0].type, "taskList");
+    assert.equal(savedContent.content[0].content[0].attrs.checked, true);
+    assert.equal(
+      db.prepare("SELECT body FROM travel_notes").get().body.trim(),
+      "- [x] お土産",
+    );
+    await click(byText(".context-primary button", "完了"));
     await tick();
+    assert.match(
+      document.querySelector(".note-card").textContent,
+      /旅先の買い物/,
+    );
+    await click(document.querySelector(".note-card"));
+    assert.equal(
+      document.querySelector(".note-rich-text strong").textContent,
+      "お土産",
+    );
+    assert.equal(
+      document.querySelector('.note-rich-text input[type="checkbox"]').checked,
+      true,
+    );
+    await click(byText(".context-primary button", "完了"));
+    await tick();
+    await click(document.querySelector('[aria-label="メモを書く"]'));
+    const temporaryTitle = document.querySelector(
+      '[aria-label="メモのタイトル"]',
+    );
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        dom.window.HTMLInputElement.prototype,
+        "value",
+      ).set.call(temporaryTitle, "削除するメモ");
+      temporaryTitle.dispatchEvent(
+        new dom.window.Event("input", { bubbles: true }),
+      );
+    });
+    await click(document.querySelector('[aria-label="メモを削除"]'));
+    await tick(550);
+    assert.equal(
+      db.prepare("SELECT COUNT(*) AS n FROM travel_notes").get().n,
+      1,
+      "deleting a pending draft cancels its autosave",
+    );
     assert.deepEqual(
       failures,
       [],

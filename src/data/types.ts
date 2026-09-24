@@ -111,8 +111,8 @@ export type Place = {
 };
 export type PlaceInput = Omit<Place, 'id' | 'updatedAt'>;
 
-export type TravelNote = { id: string; body: string; pinned: boolean; updatedAt: number };
-export type NoteInput = Pick<TravelNote, 'body' | 'pinned'>;
+export type TravelNote = { id: string; title?: string; body: string; content?: import('@tiptap/core').JSONContent | null; pinned?: boolean; updatedAt: number };
+export type NoteInput = Pick<TravelNote, 'title' | 'body' | 'content'>;
 
 export type PendingMutation = {
   id: string;

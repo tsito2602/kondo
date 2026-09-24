@@ -28,6 +28,54 @@ async function fixture() {
   return { db, call, trip, removed };
 }
 const place = { title: '美術館', note: '展示', openingHours: '10:00–18:00', reservationStatus: 'needed', location: 'https://maps.app.goo.gl/abc', status: 'want' };
+test('titled rich notes round-trip, preserve legacy text and enforce schema, roles and trip isolation', async () => {
+  const { db, call, trip } = await fixture();
+  try {
+    const base = `/trips/${trip.id}/notes`, id = randomUUID();
+    const read = async () => (await (await call(base)).json()).notes.find(note => note.id === id);
+    const legacy = { id, body: '旅のメモ\n- [ ] お土産', pinned: true };
+    assert.equal((await call(base, 'POST', legacy)).status, 201);
+    assert.equal((await read()).body, legacy.body);
+    assert.equal((await read()).pinned, false);
+    const content = { type: 'doc', content: [
+      { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: '買い物' }] },
+      { type: 'taskList', content: [{ type: 'taskItem', attrs: { checked: true }, content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'チョコ', marks: [{ type: 'bold' }, { type: 'underline' }] }] },
+      ] }] },
+    ] };
+    const rich = { id, title: 'ウィーンのお土産', body: '買い物\n- [x] チョコ', content };
+    assert.equal((await call(base, 'POST', rich, 'editor')).status, 201);
+    assert.deepEqual((await read()).content, content);
+    assert.equal((await read()).body, rich.body);
+    db.exec(await readFile('worker/schema.sql', 'utf8'));
+    assert.equal((await read()).title, rich.title);
+    assert.deepEqual((await read()).content, content);
+    for (const patch of [
+      { title: 'x'.repeat(121) }, { body: 'x'.repeat(50001) },
+      { content: { type: 'doc', content: [{ type: 'image', attrs: { src: 'javascript:alert(1)' } }] } },
+      { content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'x', marks: [{ type: 'link', attrs: { href: 'javascript:alert(1)' } }] }] }] } },
+      { content: { type: 'doc', content: [{ type: 'listItem' }] } },
+      { content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'x'.repeat(50001) }] }] } },
+    ]) assert.equal((await call(base, 'POST', { ...rich, ...patch })).status, 400);
+    assert.equal((await call(base, 'POST', rich, 'outsider')).status, 403);
+    assert.equal((await call(base, 'GET', undefined, 'outsider')).status, 403);
+    await call(`/trips/${trip.id}/members/editor`, 'PATCH', { role: 'viewer' });
+    assert.equal((await call(base, 'GET', undefined, 'editor')).status, 200);
+    assert.equal((await call(base, 'POST', rich, 'editor')).status, 403);
+    assert.equal((await call(`${base}/${id}`, 'DELETE', undefined, 'editor')).status, 403);
+    const other = { ...trip, id: randomUUID() };
+    await call('/trips', 'POST', other);
+    assert.equal((await call(`/trips/${other.id}/notes`, 'POST', { ...rich, title: '別の旅行' })).status, 409);
+    assert.equal((await read()).title, rich.title);
+    // Older offline edits preserve the explicit title; their changed plain text wins over stale formatting.
+    assert.equal((await call(base, 'POST', { ...legacy, body: '旧端末で追記' })).status, 201);
+    assert.equal((await read()).title, rich.title);
+    assert.equal((await read()).body, '旧端末で追記');
+    assert.equal((await read()).content, null);
+    assert.equal((await call(`${base}/${id}`, 'DELETE')).status, 204);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM note_details').get().n, 0);
+  } finally { db.close(); }
+});
 test('packing assignment and shared status survive old clients, membership changes and schema reruns', async () => {
   const { db, call, trip } = await fixture();
   try {
@@ -340,7 +388,7 @@ test('travel notes preserve text, replay safely and enforce trip permissions', a
     const read = async () => (await (await call(base)).json()).notes;
     assert.equal((await read()).length, 1);
     assert.equal((await read())[0].body, note.body);
-    assert.equal((await read())[0].pinned, true);
+    assert.equal((await read())[0].pinned, false);
     assert.equal((await call(base, 'POST', { ...note, body: 'a'.repeat(50001) })).status, 400);
     assert.equal((await call(base, 'GET', undefined, 'outsider')).status, 403);
     assert.equal((await call(base, 'POST', note, 'outsider')).status, 403);

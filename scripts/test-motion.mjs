@@ -2855,6 +2855,46 @@ test("card contact scales the whole surface, keeps actions independent and relea
   }
 });
 
+test("a long rich note reveals the caret below its toolbar when the keyboard resizes", () => {
+  const dialog = document.createElement("dialog");
+  dialog.open = true;
+  dialog.innerHTML =
+    '<div class="modal-inner"><header class="modal-header"></header><div class="note-toolbar"></div><div contenteditable="true">長いメモ</div></div>';
+  document.body.append(dialog);
+  const panel = dialog.firstElementChild;
+  const input = panel.lastElementChild;
+  Object.defineProperty(input, "isContentEditable", { value: true });
+  panel.getBoundingClientRect = () => ({ top: 50, bottom: 400 });
+  panel.firstElementChild.getBoundingClientRect = () => ({ bottom: 106 });
+  panel.querySelector(".note-toolbar").getBoundingClientRect = () => ({
+    bottom: 200,
+  });
+  input.getBoundingClientRect = () => ({ top: -100, bottom: 1200 });
+  const oldRect = window.Range.prototype.getBoundingClientRect;
+  window.Range.prototype.getBoundingClientRect = () => ({
+    top: 460 - panel.scrollTop,
+    bottom: 480 - panel.scrollTop,
+    height: 20,
+  });
+  const selection = window.getSelection();
+  selection.collapse(input.firstChild, 2);
+  try {
+    revealModalField(input);
+    assert.equal(
+      panel.scrollTop,
+      92,
+      "caret clears the keyboard instead of jumping to the top of the note",
+    );
+    revealModalField(input);
+    assert.equal(panel.scrollTop, 92, "visible caret stays still");
+  } finally {
+    selection.removeAllRanges();
+    if (oldRect) window.Range.prototype.getBoundingClientRect = oldRect;
+    else delete window.Range.prototype.getBoundingClientRect;
+    dialog.remove();
+  }
+});
+
 test("focused modal fields remain between the sticky header and panel bottom after keyboard resize", () => {
   const dialog = document.createElement("dialog");
   dialog.open = true;
@@ -2914,7 +2954,6 @@ test("focused modal fields remain between the sticky header and panel bottom aft
     dialog.remove();
   }
 });
-
 
 function bootFixture() {
   const screen = document.createElement("div");

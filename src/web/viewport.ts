@@ -30,10 +30,32 @@ export function revealModalField(focused: Element | null) {
 
   const bounds = panel.getBoundingClientRect();
   const header = panel.querySelector(".modal-header")?.getBoundingClientRect();
-  const top = Math.max(bounds.top, header?.bottom ?? bounds.top) + 12;
+  const toolbar = focused.isContentEditable
+    ? panel.querySelector(".note-toolbar")?.getBoundingClientRect()
+    : undefined;
+  const top =
+    Math.max(
+      bounds.top,
+      header?.bottom ?? bounds.top,
+      toolbar?.bottom ?? bounds.top,
+    ) + 12;
   const bottom = bounds.bottom - 12;
   if (bottom <= top) return;
-  const input = focused.getBoundingClientRect();
+  let input = focused.getBoundingClientRect();
+  // A rich note can be much taller than the viewport. Reveal its caret, not
+  // the top of the whole document, when the software keyboard opens.
+  const selection = window.getSelection();
+  if (
+    focused.isContentEditable &&
+    selection?.focusNode &&
+    focused.contains(selection.focusNode)
+  ) {
+    const caret = document.createRange();
+    caret.setStart(selection.focusNode, selection.focusOffset);
+    caret.collapse(true);
+    const rect = caret.getBoundingClientRect();
+    if (rect.height) input = rect;
+  }
   // Include the label when it fits, but keep a tall textarea's top visible.
   const field = focused.closest(".field")?.getBoundingClientRect();
   const start =

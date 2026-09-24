@@ -988,10 +988,10 @@ strong {
 /* A rail represents a booking interval, never a link to the next appointment.
    Ordinary events, generic bookings and intermediate hotel nights are standalone. */
 .timeline-marker:is(
-  [data-endpoint="start"],
-  [data-endpoint="end"],
-  [data-endpoint="both"]
-)::after {
+    [data-endpoint="start"],
+    [data-endpoint="end"],
+    [data-endpoint="both"]
+  )::after {
   content: "";
   width: 1px;
   background: var(--line);
@@ -1587,41 +1587,132 @@ progress::-moz-progress-bar {
   color: var(--muted);
   margin-top: auto;
 }
-.note-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 15px;
-  gap: 8px;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 12px;
+.note-compose {
+  min-width: 0;
 }
-.note-toolbar .selected {
-  background: var(--soft);
-  color: var(--brand);
-}
-.note-editor {
+.note-title {
   width: 100%;
+  min-height: 52px;
+  padding: 4px 0 16px;
   border: 0;
   border-radius: 0;
-  resize: none;
   background: transparent;
   color: var(--ink);
-  min-height: 50dvh;
-  font-size: 16px;
-  line-height: 1.9;
-  padding: 12px 0;
+  font-size: 22px;
+  font-weight: 650;
   box-shadow: none;
 }
-.note-editor:focus-visible {
+.note-title:focus-visible {
   outline: none;
   box-shadow: none;
 }
-.note-checklist {
-  background: var(--soft);
-  border-radius: 10px;
-  padding: 12px;
-  margin-bottom: 14px;
+.note-toolbar {
+  position: sticky;
+  top: 57px;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 2px;
+  padding: 6px 0;
+  margin-bottom: 12px;
+  border-block: 1px solid var(--line);
+  background: var(--paper);
+}
+.note-toolbar .icon-button {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border-radius: 9px;
+}
+.note-toolbar .selected {
+  background: var(--ink);
+  color: var(--paper);
+}
+.note-toolbar button:disabled {
+  opacity: 0.3;
+}
+.note-rich-text {
+  min-height: 35dvh;
+  padding: 8px 0 24px;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  outline: none;
+}
+.note-rich-text p {
+  margin: 0 0 8px;
+}
+.note-rich-text h2 {
+  font-size: 21px;
+  font-weight: 700;
+  margin: 16px 0 8px;
+}
+.note-rich-text strong {
+  font-weight: 750;
+}
+.note-rich-text em {
+  font-style: italic;
+}
+.note-rich-text ul,
+.note-rich-text ol {
+  padding-left: 26px;
+  margin: 8px 0;
+}
+.note-rich-text ul {
+  list-style: disc;
+}
+.note-rich-text ol {
+  list-style: decimal;
+}
+.note-rich-text ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+.note-rich-text li[data-type="taskItem"] {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.note-rich-text li[data-type="taskItem"] > label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  margin-top: -7px;
+}
+.note-rich-text input[type="checkbox"] {
+  width: 19px;
+  height: 19px;
+  accent-color: var(--ink);
+  cursor: pointer;
+}
+.note-rich-text li[data-type="taskItem"] > div {
+  flex: 1;
+  min-width: 0;
+}
+.note-rich-text li[data-checked="true"] > div > p {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.note-rich-text[contenteditable="true"]
+  > p:only-child:has(> br.ProseMirror-trailingBreak:only-child)::before {
+  content: "思いついたことを、自由に。";
+  color: var(--muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+.note-card p {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+@media (min-width: 640px) {
+  .note-toolbar {
+    grid-template-columns: repeat(11, minmax(0, 1fr));
+  }
 }
 .check-line {
   display: flex;
