@@ -31,6 +31,8 @@
     <!-- Inline so the first paint, including an offline launch, is the animation. -->
     <style>
       #initial-boot {
+        --boot-ink: #000;
+        --boot-edge-opacity: 1;
         position: fixed;
         inset: 0;
         z-index: 10000;
@@ -41,11 +43,15 @@
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
       :root[data-theme="dark"] #initial-boot {
+        --boot-ink: #fff;
+        --boot-edge-opacity: 0;
         background: #000;
         color: #f3f3f3;
       }
       @media (prefers-color-scheme: dark) {
         :root:not([data-theme]) #initial-boot {
+          --boot-ink: #fff;
+          --boot-edge-opacity: 0;
           background: #000;
           color: #f3f3f3;
         }
@@ -56,9 +62,24 @@
         gap: 22px;
       }
       .boot-symbol {
+        color: var(--boot-ink);
         width: 176px;
         height: 104px;
         overflow: visible;
+      }
+      .boot-edge {
+        opacity: var(--boot-edge-opacity);
+      }
+      .boot-stroke {
+        --draw-delay: 240ms;
+        --draw-duration: 620ms;
+        --draw-ease: cubic-bezier(0.35, 0.05, 0.55, 0.95);
+        --draw-path: path("M393 425C500 399 577 381 620 410Q651 428 639 449");
+      }
+      .boot-stroke-bottom {
+        --draw-delay: 930ms;
+        --draw-duration: 600ms;
+        --draw-path: path("M451 529C425 563 480 592 558 578Q613 569 648 553");
       }
       .boot-dot {
         transform-box: fill-box;
@@ -67,16 +88,22 @@
       }
       .boot-trace {
         stroke-linecap: round;
-        stroke-dasharray: 1;
-        animation: boot-draw 460ms cubic-bezier(0.35, 0, 0.25, 1) 180ms both;
+        stroke-dasharray: 1000;
+        animation: boot-draw var(--draw-duration) var(--draw-ease)
+          var(--draw-delay) both;
       }
-      .boot-trace-bottom {
-        animation-delay: 620ms;
+      .boot-pen-tip {
+        offset-path: var(--draw-path);
+        offset-anchor: center;
+        animation:
+          boot-write var(--draw-duration) var(--draw-ease) var(--draw-delay)
+            both,
+          boot-contact var(--draw-duration) linear var(--draw-delay) both;
       }
       .boot-pin {
         transform-box: fill-box;
         transform-origin: 50% 100%;
-        animation: boot-pin 680ms 1080ms both;
+        animation: boot-pin 680ms 1600ms both;
       }
       .boot-name {
         display: flex;
@@ -87,7 +114,7 @@
       }
       .boot-name span {
         animation: boot-letter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
-        animation-delay: calc(1440ms + var(--letter) * 60ms);
+        animation-delay: calc(1800ms + var(--letter) * 60ms);
       }
       #initial-boot.boot-leaving {
         animation: boot-leave 240ms ease-out both;
@@ -109,7 +136,7 @@
       @keyframes boot-draw {
         0% {
           opacity: 0;
-          stroke-dashoffset: 1;
+          stroke-dashoffset: 1000;
         }
         1% {
           opacity: 1;
@@ -117,6 +144,29 @@
         100% {
           opacity: 1;
           stroke-dashoffset: 0;
+        }
+      }
+      @keyframes boot-write {
+        from {
+          offset-distance: 0%;
+        }
+        to {
+          offset-distance: 100%;
+        }
+      }
+      @keyframes boot-contact {
+        0%,
+        100% {
+          opacity: 0;
+        }
+        5%,
+        92% {
+          opacity: 1;
+        }
+      }
+      @supports not (offset-path: path("M0 0L1 1")) {
+        .boot-pen-tip {
+          display: none;
         }
       }
       @keyframes boot-pin {
@@ -159,6 +209,9 @@
         }
       }
       @media (prefers-reduced-motion: reduce) {
+        .boot-pen-tip {
+          display: none;
+        }
         #initial-boot,
         #initial-boot * {
           animation: none !important;
@@ -169,7 +222,8 @@
   <body>
     <div id="initial-boot" role="status" aria-label="kondoを読み込み中">
       <div class="boot-brand" aria-hidden="true">
-        <!-- Same paths/edging as assets/brand/icon.svg; masks preserve the lower dotted stroke. -->
+        <!-- Same geometry and theme treatment as public/logo.svg and logo-dark.svg.
+             The ink tip and reveal mask follow the same curve and animation clock. -->
         <svg
           class="boot-symbol"
           xmlns="http://www.w3.org/2000/svg"
@@ -197,9 +251,9 @@
               height="130"
             >
               <path
-                class="boot-trace"
+                class="boot-trace boot-stroke"
                 d="M393 425C500 399 577 381 620 410Q651 428 639 449"
-                pathLength="1"
+                pathLength="1000"
                 fill="none"
                 stroke="white"
                 stroke-width="32"
@@ -214,9 +268,9 @@
               height="110"
             >
               <path
-                class="boot-trace boot-trace-bottom"
+                class="boot-trace boot-stroke boot-stroke-bottom"
                 d="M451 529C425 563 480 592 558 578Q613 569 648 553"
-                pathLength="1"
+                pathLength="1000"
                 fill="none"
                 stroke="white"
                 stroke-width="32"
@@ -229,23 +283,48 @@
             stroke-linejoin="round"
           >
             <g mask="url(#boot-upper-mask)" fill="none">
-              <use href="#boot-upper" stroke="white" stroke-width="26" />
-              <use href="#boot-upper" stroke="black" stroke-width="18" />
+              <use
+                class="boot-edge"
+                href="#boot-upper"
+                stroke="white"
+                stroke-width="26"
+              />
+              <use href="#boot-upper" stroke="currentColor" stroke-width="18" />
             </g>
             <g
               mask="url(#boot-lower-mask)"
               fill="none"
               stroke-dasharray="10 32"
             >
-              <use href="#boot-lower" stroke="white" stroke-width="26" />
-              <use href="#boot-lower" stroke="black" stroke-width="18" />
+              <use
+                class="boot-edge"
+                href="#boot-lower"
+                stroke="white"
+                stroke-width="26"
+              />
+              <use href="#boot-lower" stroke="currentColor" stroke-width="18" />
             </g>
+            <circle
+              class="boot-pen-tip boot-stroke"
+              cx="0"
+              cy="0"
+              r="9"
+              fill="currentColor"
+            />
+            <circle
+              class="boot-pen-tip boot-stroke boot-stroke-bottom"
+              cx="0"
+              cy="0"
+              r="9"
+              fill="currentColor"
+            />
             <g class="boot-dot">
-              <circle cx="393" cy="425" r="28" fill="white" />
-              <circle cx="393" cy="425" r="24" fill="black" />
+              <circle class="boot-edge" cx="393" cy="425" r="28" fill="white" />
+              <circle cx="393" cy="425" r="24" fill="currentColor" />
             </g>
             <g class="boot-pin">
               <use
+                class="boot-edge"
                 href="#boot-marker"
                 fill="white"
                 stroke="white"
@@ -254,7 +333,7 @@
               <use
                 href="#boot-marker"
                 fill="none"
-                stroke="black"
+                stroke="currentColor"
                 stroke-width="14"
               />
               <circle
@@ -262,7 +341,7 @@
                 cy="522"
                 r="10"
                 fill="none"
-                stroke="black"
+                stroke="currentColor"
                 stroke-width="12"
               />
             </g>
