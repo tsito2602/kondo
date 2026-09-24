@@ -1,7 +1,21 @@
 # kondoへのURL・データ保存先の移行
 
-状態（2026-09-24）: **stagingのURL・D1・R2移行完了。本番は未変更。**
+状態（2026-09-24）: **staging・本番ともURL・D1・R2移行完了。**
 WorkのCloudflare接続から操作した。Wranglerのローカル認証は使用していない。
+
+## 本番の移行記録
+
+- 本番URL: `https://kondo.tsito-apps.workers.dev`。PR #183を承認後にmainへ統合（`cc619d5327fc179d01bf4ec06724e3ee495b2eb5`）。
+- D1: `kondo` / `44ff39a5-26d1-420b-b2d8-15134db96935`。R2: `kondo-documents`。旧保存先に合わせてENAM・jurisdiction制約なし、R2 Standardで作成。
+- 新しいWorkerの本番用Google Client ID・originを設定し、最初は`kondo-url`で旧本番データへ接続して公開。その後、旧・新両Workerのworkers.devとPreview URLsを停止してコピーした。
+- D1はCloudflare API内で直接コピー。本番SQLをWorkへダウンロードする方法は自動承認レビューで拒否されたため使用せず、ローカルの本番SQLファイルは残していない。スキーマ作成後、外部キーの親テーブルから順にバインド変数で値を移した。カバー画像もSQL本文へ埋め込まず移行。
+- 全24テーブル・124行の全列と34件のスキーマ定義を移行元と比較して一致。外部キー違反0件。旅行1件、メンバー2件、予約8件、持ち物17件、行きたい場所13件、予約添付参照8件を含む。
+- R2はPDF8件・2,847,612バイトを同一キーでコピー。SHA-256・サイズ・HTTP/custom metadataを照合済み。一時的な認証付きコピーWorkerは削除した。
+- `kondo`と`tabi`の両Workerを新D1・R2へ接続し、既存の全バインディング名・種類と各originを維持。両URLを再開し、HTML 200・未ログインAPI 401 JSON・Service Worker 200・manifest 200を確認。新manifestのアプリ名は`kondo`。
+- 本番のWorkers Builds triggerは`2f444a66-9d85-4f9c-b34a-606a886be9f4`、branchは`main`、deploy commandは`node scripts/workers-build.mjs production`、`DEPLOYMENT_PROFILE=kondo`、D1 UUIDは上記。キャッシュ有効、ドキュメントのみの変更はビルド対象外。
+- 新保存先へ切り替えた後の本番ビルド`61ebf2e3-2d25-4aa9-8dab-e999519b53c1`は成功。全チェックとデプロイ後のHTTP検証を通過。
+- 旧`tabi`のGitビルド連携（trigger `05872bc3-90e9-4882-bfc8-e85f296bad22`）は解除。旧URLは現在のコード・PWAを維持し、新保存先へ同期できる。旧PWAの未同期データを捨てず、新URLへの移行確認後にホーム画面へ追加し直す。
+- 旧D1 `99151a02-20ca-44cc-9f3d-1807b4e58de7`と旧R2 `tabi-documents`は削除せず保持。現在の更新先は新保存先なので、旧側へ単純に戻さない。
 
 ## stagingの移行記録
 
