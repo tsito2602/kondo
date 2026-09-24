@@ -40,7 +40,8 @@ export async function buildIconCheck(root, enabled) {
     { key: 'o', name: '別案O', label: '模様を主役に、半券のミシン目が端で見切れる案', image: await readFile('public/icons/kondo-journey-perforation-v1.png') },
     { key: 'p', name: '調整版P', label: '模様のみ・黒背景でも見える白い細縁', image: await readFile('public/icons/kondo-apple-touch-icon-v10.png') },
     { key: 'q', name: 'kondo採用案', label: '上は実線・下は丸い点線', image: await readFile('public/icons/kondo-apple-touch-icon-v11.png') },
-    { key: 'r', name: 'kondo採用版', label: '下の線を少し伸ばした丸端の破線', image: await readFile('public/icons/kondo-apple-touch-icon-v12.png') },
+    { key: 'r', name: '旧採用版R', label: '下の線を少し伸ばした丸端の破線', image: await readFile('public/icons/kondo-apple-touch-icon-v12.png') },
+    { key: 's', name: 'kondo採用版S', label: 'B案・こ の筆運びを感じる太い軌跡と塗りつぶしピン', image: await readFile('public/icons/kondo-apple-touch-icon-v13.png') },
   ];
   const revision = createHash('sha256').update(Buffer.concat(variants.map(v => v.image))).digest('hex').slice(0, 10);
   const base = `/__icon-check/${revision}`;
@@ -48,10 +49,10 @@ export async function buildIconCheck(root, enabled) {
   const document = (title, head, content) => `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${title}</title>${head}${style}</head><body>${content}</body></html>`;
   await mkdir(output, { recursive: true });
   const card = v => `<article><img src="${base}/${v.key}/icon.png" alt=""><h2>${v.name}：${v.label}</h2><p><a href="${base}/${v.key}/">追加用ページを開く</a></p></article>`;
-  const current = variants.filter(v => v.key === 'r').map(card).join('');
+  const current = variants.filter(v => v.key === 's').map(card).join('');
   const baseline = variants.filter(v => v.key === 'i').map(card).join('');
-  const previous = variants.filter(v => !['i', 'r'].includes(v.key)).map(card).join('');
-  await writeFile(path.join(output, 'index.html'), document('アイコンの比較', '', `<h1>チケットの調整版</h1><p>採用案は上の実線を「これまでの旅」、下の丸端の破線を「こんど向かう旅」として描いています。丸い点をカーブに沿って少し伸ばし、線の流れが感じられる形にしました。ホーム画面では黒い模様と白い細縁を使い、アプリ内のダークモードでは模様を白に切り替えます。iPhoneでの背景の自動切替は、この版では実機未確認です。</p>${current}<details><summary>確認済みのIと比較する</summary>${baseline}</details><details><summary>これまでの結果</summary><p>A・A再確認・H・Iは白／黒に切り替わる。B・D・Eはライトで真っ黒・ダークで黒いグラデーション。F・Gもライトで黒。Cは両方白でした。Kはライトで白背景になりましたが、白い前面と模様が見えなくなりました。</p>${previous}</details><p>追加済みのアイコンを削除する必要はありません。</p><small>比較番号 ${revision}</small>`));
+  const previous = variants.filter(v => !['i', 's'].includes(v.key)).map(card).join('');
+  await writeFile(path.join(output, 'index.html'), document('アイコンの比較', '', `<h1>アイコンの比較</h1><p>採用案は上の実線を「これまでの旅」、下の丸端の破線を「こんど向かう旅」として描いています。B案を採用し、上の線の右端を左下へ返し、その筆運びを下の破線が受ける「こ」の形にしました。太い描線と塗りつぶしのピンを使い、二画の間の余白を保っています。ホーム画面では黒い模様と白い細縁を使い、アプリ内のダークモードでは模様を白に切り替えます。iPhoneでの背景の自動切替は、この版では実機未確認です。</p>${current}<details><summary>確認済みのIと比較する</summary>${baseline}</details><details><summary>これまでの結果</summary><p>A・A再確認・H・Iは白／黒に切り替わる。B・D・Eはライトで真っ黒・ダークで黒いグラデーション。F・Gもライトで黒。Cは両方白でした。Kはライトで白背景になりましたが、白い前面と模様が見えなくなりました。</p>${previous}</details><p>追加済みのアイコンを削除する必要はありません。</p><small>比較番号 ${revision}</small>`));
   for (const variant of variants) {
     const scope = `${base}/${variant.key}/`;
     const dir = path.join(root, scope.slice(1));

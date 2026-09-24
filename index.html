@@ -16,7 +16,7 @@
     />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icons/kondo-icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/icons/kondo-apple-touch-icon-v12.png" />
+    <link rel="apple-touch-icon" href="/icons/kondo-apple-touch-icon-v13.png" />
     <title>kondo — こんど、どこ行こうか。</title>
     <script>
       try {
@@ -64,7 +64,7 @@
       .boot-symbol {
         color: var(--boot-ink);
         width: 176px;
-        height: 104px;
+        height: 142px;
         overflow: visible;
       }
       .boot-edge {
@@ -220,53 +220,53 @@
         <svg
           class="boot-symbol"
           xmlns="http://www.w3.org/2000/svg"
-          viewBox="96 274 812 480"
+          viewBox="96 210 832 672"
         >
           <defs>
             <path
               id="boot-upper"
-              d="M393 425C500 399 577 381 620 410Q651 428 639 449"
+              d="M393 395C478 385 555 366 618 374C664 380 654 416 615 447"
             />
             <path
               id="boot-lower"
-              d="M451 529C425 563 480 592 558 578Q613 569 648 553"
+              d="M445 553C417 577 408 598 423 616C449 653 548 647 640 616"
             />
             <path
               id="boot-marker"
-              d="M705 490C686 490 672 504 672 522C672 538 686 553 705 577C724 553 738 538 738 522C738 504 724 490 705 490Z"
+              d="M705 528C682 528 665 545 665 567C665 588 683 612 705 637C727 612 745 588 745 567C745 545 728 528 705 528Z"
             />
             <mask
               id="boot-upper-mask"
               maskUnits="userSpaceOnUse"
-              x="360"
-              y="350"
-              width="310"
-              height="130"
+              x="350"
+              y="330"
+              width="330"
+              height="150"
             >
               <path
                 class="boot-trace boot-stroke"
-                d="M393 425C500 399 577 381 620 410Q651 428 639 449"
+                d="M393 395C478 385 555 366 618 374C664 380 654 416 615 447"
                 pathLength="1000"
                 fill="none"
                 stroke="white"
-                stroke-width="32"
+                stroke-width="48"
               />
             </mask>
             <mask
               id="boot-lower-mask"
               maskUnits="userSpaceOnUse"
-              x="410"
+              x="390"
               y="500"
-              width="270"
-              height="110"
+              width="280"
+              height="175"
             >
               <path
                 class="boot-trace boot-stroke boot-stroke-bottom"
-                d="M451 529C425 563 480 592 558 578Q613 569 648 553"
+                d="M445 553C417 577 408 598 423 616C449 653 548 647 640 616"
                 pathLength="1000"
                 fill="none"
                 stroke="white"
-                stroke-width="32"
+                stroke-width="48"
               />
             </mask>
           </defs>
@@ -275,70 +275,53 @@
             stroke-linecap="round"
             stroke-linejoin="round"
           >
+            <g class="boot-dot">
+              <circle class="boot-edge" cx="393" cy="395" r="36" fill="white" />
+            </g>
             <g mask="url(#boot-upper-mask)" fill="none">
               <use
                 class="boot-edge"
                 href="#boot-upper"
                 stroke="white"
-                stroke-width="26"
+                stroke-width="42"
               />
-              <use href="#boot-upper" stroke="currentColor" stroke-width="18" />
+              <use href="#boot-upper" stroke="currentColor" stroke-width="34" />
             </g>
             <g
               mask="url(#boot-lower-mask)"
               fill="none"
-              stroke-dasharray="10 32"
+              stroke-dasharray="27.1676 41.5061"
             >
               <use
                 class="boot-edge"
                 href="#boot-lower"
                 stroke="white"
-                stroke-width="26"
+                stroke-width="34"
               />
-              <use href="#boot-lower" stroke="currentColor" stroke-width="18" />
+              <use href="#boot-lower" stroke="currentColor" stroke-width="26" />
             </g>
             <path
               class="boot-pen-tip boot-stroke"
-              d="M393 425C500 399 577 381 620 410Q651 428 639 449"
+              d="M393 395C478 385 555 366 618 374C664 380 654 416 615 447"
               pathLength="1000"
               fill="none"
               stroke="currentColor"
-              stroke-width="18"
+              stroke-width="34"
             />
             <path
               class="boot-pen-tip boot-stroke boot-stroke-bottom"
-              d="M451 529C425 563 480 592 558 578Q613 569 648 553"
+              d="M445 553C417 577 408 598 423 616C449 653 548 647 640 616"
               pathLength="1000"
               fill="none"
               stroke="currentColor"
-              stroke-width="18"
+              stroke-width="26"
             />
             <g class="boot-dot">
-              <circle class="boot-edge" cx="393" cy="425" r="28" fill="white" />
-              <circle cx="393" cy="425" r="24" fill="currentColor" />
+              <circle cx="393" cy="395" r="32" fill="currentColor" />
             </g>
             <g class="boot-pin">
-              <use
-                class="boot-edge"
-                href="#boot-marker"
-                fill="white"
-                stroke="white"
-                stroke-width="22"
-              />
-              <use
-                href="#boot-marker"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="14"
-              />
-              <circle
-                cx="705"
-                cy="522"
-                r="10"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="12"
-              />
+              <use class="boot-edge" href="#boot-marker" fill="white" stroke="white" stroke-width="8" />
+              <path d="M705 528C682 528 665 545 665 567C665 588 683 612 705 637C727 612 745 588 745 567C745 545 728 528 705 528ZM719 567A14 14 0 1 0 691 567A14 14 0 1 0 719 567Z" fill="currentColor" fill-rule="evenodd" />
             </g>
           </g>
         </svg>
