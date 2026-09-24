@@ -913,40 +913,16 @@ test("legacy account cache and pending changes survive React migration; real for
       ).set.call(title, "旅先の買い物");
       title.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
     });
-    const rich = document.querySelector('[aria-label="メモ本文"]');
-    // Exercise the actual ProseMirror input transaction, then the visible toolbar.
+    const textarea = document.querySelector('textarea[aria-label="メモ本文"]');
+    assert.equal(textarea.placeholder, "メモを入力...");
+    assert.equal(document.querySelector('[aria-label="本文の書式"]'), null);
     await act(async () => {
-      rich.editor.commands.insertContent("お土産");
-      rich.editor.commands.selectAll();
+      Object.getOwnPropertyDescriptor(
+        dom.window.HTMLTextAreaElement.prototype,
+        "value",
+      ).set.call(textarea, "お土産\n待ち合わせ場所");
+      textarea.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
     });
-    await click(document.querySelector('[aria-label="太字"]'));
-    assert.equal(
-      document
-        .querySelector('[aria-label="太字"]')
-        .getAttribute("aria-pressed"),
-      "true",
-    );
-    assert.equal(rich.querySelector("strong").textContent, "お土産");
-    for (const [label, tag] of [
-      ["斜体", "em"],
-      ["下線", "u"],
-      ["取り消し線", "s"],
-      ["見出し", "h2"],
-    ]) {
-      await click(document.querySelector(`[aria-label="${label}"]`));
-      assert.equal(rich.querySelector(tag).textContent, "お土産");
-    }
-    await click(document.querySelector('[aria-label="箇条書き"]'));
-    assert.ok(rich.querySelector("ul li"));
-    await click(document.querySelector('[aria-label="番号付きリスト"]'));
-    assert.ok(rich.querySelector("ol li"));
-    const beforeUndo = rich.editor.getJSON();
-    await click(document.querySelector('[aria-label="元に戻す"]'));
-    assert.notDeepEqual(rich.editor.getJSON(), beforeUndo);
-    await click(document.querySelector('[aria-label="やり直す"]'));
-    assert.deepEqual(rich.editor.getJSON(), beforeUndo);
-    await click(document.querySelector('[aria-label="チェックリスト"]'));
-    await click(rich.querySelector('input[type="checkbox"]'));
     await tick(550);
     assert.equal(
       db.prepare("SELECT COUNT(*) AS n FROM travel_notes").get().n,
@@ -956,14 +932,13 @@ test("legacy account cache and pending changes survive React migration; real for
       db.prepare("SELECT title FROM note_details").get().title,
       "旅先の買い物",
     );
-    const savedContent = JSON.parse(
-      db.prepare("SELECT content FROM note_details").get().content,
-    );
-    assert.equal(savedContent.content[0].type, "taskList");
-    assert.equal(savedContent.content[0].content[0].attrs.checked, true);
     assert.equal(
-      db.prepare("SELECT body FROM travel_notes").get().body.trim(),
-      "- [x] お土産",
+      db.prepare("SELECT content FROM note_details").get().content,
+      null,
+    );
+    assert.equal(
+      db.prepare("SELECT body FROM travel_notes").get().body,
+      "お土産\n待ち合わせ場所",
     );
     await click(byText(".context-primary button", "完了"));
     await tick();
@@ -973,12 +948,8 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await click(document.querySelector(".note-card"));
     assert.equal(
-      document.querySelector(".note-rich-text strong").textContent,
-      "お土産",
-    );
-    assert.equal(
-      document.querySelector('.note-rich-text input[type="checkbox"]').checked,
-      true,
+      document.querySelector('textarea[aria-label="メモ本文"]').value,
+      "お土産\n待ち合わせ場所",
     );
     await click(byText(".context-primary button", "完了"));
     await tick();

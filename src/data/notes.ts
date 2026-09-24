@@ -1,4 +1,11 @@
-import type { JSONContent } from "@tiptap/core";
+/** Legacy structured notes remain readable by the API during client updates. */
+export type NoteContent = {
+  type?: string;
+  text?: string;
+  attrs?: Record<string, unknown>;
+  marks?: { type: string }[];
+  content?: NoteContent[];
+};
 
 export const NOTE_TITLE_LIMIT = 120;
 export const NOTE_BODY_LIMIT = 50000;
@@ -15,7 +22,7 @@ const object = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** A small, shared allowlist. No raw HTML, links, embeds or arbitrary attributes. */
-export function validNoteContent(value: unknown): value is JSONContent {
+export function validNoteContent(value: unknown): value is NoteContent {
   let count = 0;
   const visit = (node: unknown, allowed: string[], depth: number): boolean => {
     if (
@@ -101,7 +108,7 @@ export function validNoteContent(value: unknown): value is JSONContent {
 }
 
 /** Plain text remains readable by older clients and powers search/previews. */
-export function notePlainText(node: JSONContent): string {
+export function notePlainText(node: NoteContent): string {
   if (node.type === "text") return node.text ?? "";
   if (node.type === "hardBreak") return "\n";
   const children = node.content ?? [];
@@ -124,30 +131,4 @@ export function notePlainText(node: JSONContent): string {
   return children
     .map(notePlainText)
     .join(["paragraph", "heading"].includes(node.type ?? "") ? "" : "\n");
-}
-
-/** Keep every old line; interpret only the checklist syntax the old editor created. */
-export function legacyNoteContent(body: string): JSONContent {
-  const content: JSONContent[] = [];
-  for (const line of body.split("\n")) {
-    const task = /^- \[([ x])\] ?(.*)$/i.exec(line);
-    const text = task ? task[2] : line;
-    const paragraph: JSONContent = {
-      type: "paragraph",
-      ...(text ? { content: [{ type: "text", text }] } : {}),
-    };
-    if (task) {
-      let list = content.at(-1);
-      if (list?.type !== "taskList") {
-        list = { type: "taskList", content: [] };
-        content.push(list);
-      }
-      list.content!.push({
-        type: "taskItem",
-        attrs: { checked: task[1].toLowerCase() === "x" },
-        content: [paragraph],
-      });
-    } else content.push(paragraph);
-  }
-  return { type: "doc", content };
 }

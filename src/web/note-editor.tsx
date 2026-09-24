@@ -1,36 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { EditorContent, useEditor } from "@tiptap/react";
-import { Extension } from "@tiptap/core";
-import { Plugin } from "@tiptap/pm/state";
-import { StarterKit } from "@tiptap/starter-kit";
-import { TaskItem, TaskList } from "@tiptap/extension-list";
-import {
-  Bold,
-  Italic,
-  Underline,
-  Strikethrough,
-  Heading2,
-  List,
-  ListOrdered,
-  ListChecks,
-  RemoveFormatting,
-  Undo2,
-  Redo2,
-  Check,
-  Trash2,
-} from "lucide-react";
+import { Check, Trash2 } from "lucide-react";
 import { useTravel } from "@/data/travel-provider";
 import type { TravelNote } from "@/data/types";
-import {
-  legacyNoteContent,
-  notePlainText,
-  validNoteContent,
-  NOTE_TITLE_LIMIT,
-  NOTE_BODY_LIMIT,
-} from "@/data/notes";
+import { NOTE_TITLE_LIMIT, NOTE_BODY_LIMIT } from "@/data/notes";
 import { Modal } from "./ui";
 import { dismissModal } from "./motion";
 import { Input } from "./obsidian/input";
+import { Textarea } from "./obsidian/textarea";
 
 export function NoteEditor({
   initial,
@@ -69,8 +45,8 @@ export function NoteEditor({
       return;
     }
     try {
-      const { title = "", body, content } = latest.current;
-      saveNote(initial.id, { title, body, content }, tripId.current);
+      const { title = "", body } = latest.current;
+      saveNote(initial.id, { title, body, content: null }, tripId.current);
       dirty.current = false;
       exists.current = true;
       setWaiting(false);
@@ -104,143 +80,10 @@ export function NoteEditor({
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => flushRef.current(), 500);
   };
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [2] },
-        link: false,
-        code: false,
-        codeBlock: false,
-        blockquote: false,
-        horizontalRule: false,
-        trailingNode: false,
-      }),
-      TaskList,
-      TaskItem.configure({
-        nested: true,
-        a11y: {
-          checkboxLabel: (node) => `${node.textContent || "項目"}を完了`,
-        },
-      }),
-      Extension.create({
-        name: "noteLimit",
-        addProseMirrorPlugins: () => [
-          new Plugin({
-            filterTransaction(transaction) {
-              if (!transaction.docChanged) return true;
-              const content = transaction.doc.toJSON();
-              if (
-                !validNoteContent(content) ||
-                notePlainText(content).length > NOTE_BODY_LIMIT
-              ) {
-                setSaveError(
-                  "メモの文字数・書式の上限に達しました。内容を短くしてお試しください。",
-                );
-                return false;
-              }
-              return true;
-            },
-          }),
-        ],
-      }),
-    ],
-    content: validNoteContent(initial.content)
-      ? initial.content
-      : legacyNoteContent(initial.body),
-    editable: canEdit,
-    autofocus: false,
-    shouldRerenderOnTransaction: true,
-    editorProps: {
-      scrollThreshold: { top: 170, bottom: 24, left: 0, right: 0 },
-      scrollMargin: { top: 170, bottom: 24, left: 0, right: 0 },
-      attributes: {
-        class: "note-rich-text",
-        role: "textbox",
-        "aria-label": "メモ本文",
-        "aria-multiline": "true",
-      },
-    },
-    onUpdate: ({ editor }) => {
-      const content = editor.getJSON();
-      change({ content, body: notePlainText(content) });
-    },
-  });
-  useEffect(() => {
-    editor?.setEditable(canEdit, false);
-  }, [editor, canEdit]);
   const close = () => {
     flush();
     onClose();
   };
-  const controls = editor
-    ? [
-        {
-          label: "太字",
-          icon: Bold,
-          active: editor.isActive("bold"),
-          run: () => editor.chain().focus().toggleBold().run(),
-        },
-        {
-          label: "斜体",
-          icon: Italic,
-          active: editor.isActive("italic"),
-          run: () => editor.chain().focus().toggleItalic().run(),
-        },
-        {
-          label: "下線",
-          icon: Underline,
-          active: editor.isActive("underline"),
-          run: () => editor.chain().focus().toggleUnderline().run(),
-        },
-        {
-          label: "取り消し線",
-          icon: Strikethrough,
-          active: editor.isActive("strike"),
-          run: () => editor.chain().focus().toggleStrike().run(),
-        },
-        {
-          label: "見出し",
-          icon: Heading2,
-          active: editor.isActive("heading", { level: 2 }),
-          run: () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
-        },
-        {
-          label: "書式を解除",
-          icon: RemoveFormatting,
-          run: () => editor.chain().focus().clearNodes().unsetAllMarks().run(),
-        },
-        {
-          label: "箇条書き",
-          icon: List,
-          active: editor.isActive("bulletList"),
-          run: () => editor.chain().focus().toggleBulletList().run(),
-        },
-        {
-          label: "番号付きリスト",
-          icon: ListOrdered,
-          active: editor.isActive("orderedList"),
-          run: () => editor.chain().focus().toggleOrderedList().run(),
-        },
-        {
-          label: "チェックリスト",
-          icon: ListChecks,
-          active: editor.isActive("taskList"),
-          run: () => editor.chain().focus().toggleTaskList().run(),
-        },
-        {
-          label: "元に戻す",
-          icon: Undo2,
-          disabled: !editor.can().undo(),
-          run: () => editor.chain().focus().undo().run(),
-        },
-        {
-          label: "やり直す",
-          icon: Redo2,
-          disabled: !editor.can().redo(),
-          run: () => editor.chain().focus().redo().run(),
-        },
-      ]
-    : [];
   return (
     <Modal
       title="メモ"
@@ -284,26 +127,17 @@ export function NoteEditor({
           readOnly={!canEdit}
           onChange={(event) => change({ title: event.target.value })}
         />
-        {canEdit && (
-          <div className="note-toolbar" role="group" aria-label="本文の書式">
-            {controls.map(({ label, icon: Icon, active, disabled, run }) => (
-              <button
-                key={label}
-                type="button"
-                className={`icon-button ${active ? "selected" : ""}`}
-                aria-label={label}
-                title={label}
-                aria-pressed={active}
-                disabled={disabled}
-                onPointerDown={(event) => event.preventDefault()}
-                onClick={run}
-              >
-                <Icon size={19} aria-hidden="true" />
-              </button>
-            ))}
-          </div>
-        )}
-        <EditorContent editor={editor} />
+        <Textarea
+          className="note-editor"
+          aria-label="メモ本文"
+          placeholder="メモを入力..."
+          value={draft.body}
+          maxLength={NOTE_BODY_LIMIT}
+          readOnly={!canEdit}
+          onChange={(event) =>
+            change({ body: event.target.value, content: null })
+          }
+        />
         {canEdit && (
           <p
             className={`small ${saveError || syncError ? "danger" : "muted"}`}
