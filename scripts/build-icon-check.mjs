@@ -13,7 +13,7 @@ export async function buildIconCheck(root, enabled) {
     { key: 'a', name: '検証A', label: 'konogoro', image: await readFile('scripts/fixtures/konogoro-touch.png') },
     { key: 'b', name: '検証B', label: 'tabi・白背景', image: await readFile('scripts/fixtures/tabi-touch-white.png') },
     { key: 'c', name: '検証C', label: 'kondo・透明背景', image: await sharp(source, { density: 384 }).resize(180, 180).png({ compressionLevel: 9, palette: false }).toBuffer() },
-    { key: 'd', name: '検証D', label: 'kondo・白背景', image: await sharp('assets/brand/icon.svg', { density: 384 }).resize(180, 180).png({ compressionLevel: 9, palette: false }).toBuffer() },
+    { key: 'd', name: '検証D', label: 'kondo・白背景', image: await sharp('assets/brand/icon.svg', { density: 384 }).resize(180, 180).flatten({ background: '#FFFFFF' }).png({ compressionLevel: 9, palette: false }).toBuffer() },
   ];
   const revision = createHash('sha256').update(Buffer.concat(variants.map(v => v.image))).digest('hex').slice(0, 10);
   const base = `/__icon-check/${revision}`;

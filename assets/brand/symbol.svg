@@ -5,13 +5,13 @@
       <path d="M254 300H796Q830 300 830 334V427C770 427 770 553 830 553V646Q830 680 796 680H254Q220 680 220 646V553C280 553 280 427 220 427V334Q220 300 254 300Z"/>
     </g>
     <g transform="rotate(-14 525 490)">
-      <path fill="#202020" d="M254 300H796Q830 300 830 334V427C770 427 770 553 830 553V646Q830 680 796 680H254Q220 680 220 646V553C280 553 280 427 220 427V334Q220 300 254 300Z"/>
+      <path fill="#FFFFFF" stroke="#151515" stroke-width="16" stroke-linejoin="round" d="M254 300H796Q830 300 830 334V427C770 427 770 553 830 553V646Q830 680 796 680H254Q220 680 220 646V553C280 553 280 427 220 427V334Q220 300 254 300Z"/>
     </g>
-    <g fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+    <g fill="none" stroke="#151515" stroke-linecap="round" stroke-linejoin="round">
       <path d="M393 425C500 399 577 381 620 410Q651 428 639 449" stroke-width="22"/>
       <path d="M451 529C425 563 480 592 558 578Q613 569 648 553" stroke-width="22"/>
     </g>
-    <circle cx="393" cy="425" r="33" fill="#FFFFFF"/>
-    <path fill="#FFFFFF" fill-rule="evenodd" d="M705 480C684 480 666 497 666 519C666 537 677 550 705 585C733 550 744 537 744 519C744 497 726 480 705 480ZM705 503A16 16 0 1 0 705 535A16 16 0 0 0 705 503Z"/>
+    <circle cx="393" cy="425" r="33" fill="#151515"/>
+    <path fill="#151515" fill-rule="evenodd" d="M705 480C684 480 666 497 666 519C666 537 677 550 705 585C733 550 744 537 744 519C744 497 726 480 705 480ZM705 503A16 16 0 1 0 705 535A16 16 0 0 0 705 503Z"/>
   </g>
 </svg>

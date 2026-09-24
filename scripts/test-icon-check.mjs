@@ -28,7 +28,7 @@ try {
   assert.equal((await sharp(path.join(root, base, 'c/icon.png')).stats()).isOpaque, false);
   assert.equal((await sharp(path.join(root, base, 'd/icon.png')).stats()).isOpaque, true);
   assert.deepEqual(await readFile(path.join(root, base, 'd/icon.png')),
-    await sharp('assets/brand/icon.svg', { density: 384 }).resize(180, 180).png({ compressionLevel: 9, palette: false }).toBuffer());
+    await sharp('assets/brand/icon.svg', { density: 384 }).resize(180, 180).flatten({ background: '#FFFFFF' }).png({ compressionLevel: 9, palette: false }).toBuffer());
   await buildIconCheck(root, false);
   assert.deepEqual(await readdir(root), []);
   console.log('Icon comparison: isolated identities, legacy controls, new kondo variants, production cleanup passed');
