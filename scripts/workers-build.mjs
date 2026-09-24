@@ -32,7 +32,9 @@ export function configuration(target, env, template, checkOnly = false) {
   };
   if (env.WORKERS_CI !== '1') throw new Error('This entry point is for Workers Builds; use npm run check in the work environment');
   const branch = required(env, 'WORKERS_CI_BRANCH');
-  if (!checkOnly && branch !== expected.branch) throw new Error(`Refusing ${target} deployment from ${branch}; expected ${expected.branch}`);
+  if (!checkOnly && branch !== expected.branch) {
+    throw new Error(`Refusing ${target} deployment from ${branch}; expected ${expected.branch}. Set the Cloudflare Worker's Settings > Builds > Production branch to ${expected.branch}, then start a new build from ${expected.branch}. Retrying this ${branch} build will not switch branches.`);
+  }
   if (!['1', 'true'].includes(env.SKIP_DEPENDENCY_INSTALL)) throw new Error('Set SKIP_DEPENDENCY_INSTALL=1 to avoid installing dependencies twice');
   const commit = required(env, 'WORKERS_CI_COMMIT_SHA');
   if (!/^[0-9a-f]{40}$/i.test(commit)) throw new Error('Invalid WORKERS_CI_COMMIT_SHA');

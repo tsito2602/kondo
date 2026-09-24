@@ -17,7 +17,7 @@ kondoへのURL・保存先の変更は[移行手順](KONDO_MIGRATION.md)を参�
 
 | 項目 | staging | production |
 | --- | --- | --- |
-| Git repository | `tsito2602/tabi` | 同左 |
+| Git repository | `tsito2602/kondo` | 同左 |
 | Production branch（Cloudflareの項目名） | `staging` | `main` |
 | Builds for non-production branches | **OFF** | **OFF** |
 | Build command | **空欄** | **空欄** |

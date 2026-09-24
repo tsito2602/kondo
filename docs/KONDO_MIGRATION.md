@@ -11,7 +11,7 @@
 | production | `kondo` / `https://kondo.tsito-apps.workers.dev` | `kondo` | `kondo-documents` |
 
 旧Worker/D1は`tabi-staging`・`tabi`、旧R2は`tabi-documents-staging`・`tabi-documents`。
-本番とstagingのデータを混ぜない。GitHubリポジトリ`tsito2602/tabi`の改名はこの作業に含めない。
+本番とstagingのデータを混ぜない。GitHubリポジトリは`tsito2602/kondo`へ改名済み（同じリポジトリIDであることを確認）。Git連携・remoteには新しい名前を使う。
 
 ## コード側の切替
 
@@ -38,6 +38,13 @@ Workers Buildsの変数`DEPLOYMENT_PROFILE`で、生成するWrangler設定とAP
 6. **内容を比較する。** D1は各テーブルの行数・ID・関連データ・予約書類の参照キー、R2はキー一覧・件数・サイズ・必要なメタデータを照合。複数ファイルの取得も確認する。移行中に更新が入った場合はその差分を解消するまで接続先を替えない。
 7. **保存先を切り替える。** `DEPLOYMENT_PROFILE=kondo`と新しい`D1_DATABASE_ID`を設定して1回配信。旧URLをしばらく動かす場合、そのWorkerも同じ新しい保存先へ接続するよう別途調整する。旧・新DBへ書き込みが分岐した状態で再開しない。新URLのログイン・旅行編集・添付追加/取得を確認して再開する。
 8. **本番はstaging確認後に実施する。** 同じ手順を本番データで行う。本番コードへの反映も必要で、stagingへの反映だけを本番移行完了としない。
+
+## 初回ビルドのブランチを間違えた場合
+
+`Refusing staging deployment from main; expected staging` は配信前の停止で、DBやWorkerへの変更は行われていない。
+`kondo-staging`のSettings → BuildsでProduction branchを`staging`に保存し、その後の`staging`へのコード更新をpushして初回ビルドを起動する。
+失敗した`main`の履歴をRetryしても、対象コミット・ブランチが`staging`へ変わるとは扱わない。
+新しい履歴のBranchが`staging`であることを確認する。以後、その`staging`ビルドの失敗を設定修正後に再試行する場合は同じ履歴からRetryできる。
 
 ## PWAと戻し方
 
