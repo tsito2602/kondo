@@ -4,7 +4,7 @@
   --color-brand: var(--brand);
   --color-background: var(--canvas);
   --color-foreground: var(--ink);
-  --color-card: var(--paper);
+  --color-card: var(--content-card);
   --color-card-foreground: var(--ink);
   --color-primary: var(--brand);
   --color-primary-foreground: var(--dock-on-accent);
@@ -35,8 +35,11 @@
   --panel-tint: #ffffffa3;
   --panel-header-tint: #ffffffe0;
   --field-tint: #ffffff66;
+  /* Separate reading cards from the white canvas; paper stays white for controls. */
   --content-card: #f3f3f3;
-  --panel-card-tint: #ffffff8f;
+  --ticket-stub: var(--selected);
+  --panel-card-tint: #ececece6;
+  --panel-card-edge: #1717170a;
   --radius-panel: 28px;
   --radius-card: 22px;
   --radius-control: 999px;
@@ -80,7 +83,9 @@
   --panel-header-tint: #202020e0;
   --field-tint: #ffffff08;
   --content-card: #1c1c1c;
+  --ticket-stub: var(--soft);
   --panel-card-tint: #ffffff0f;
+  --panel-card-edge: transparent;
   --dock-glass: #18181859;
   --menu-glass: #242424a3;
   --dock-border: #ffffff18;
@@ -505,7 +510,7 @@ strong {
   grid-template-columns: minmax(0, 1fr) var(--ticket-stub-width);
   border-radius: 12px;
   overflow: hidden;
-  background: var(--paper);
+  background: var(--content-card);
   box-shadow: inset 0 0 0 1px var(--line);
   transition:
     transform 180ms var(--ease-flow),
@@ -946,7 +951,7 @@ strong {
   color: var(--muted);
   font-size: 12px;
   padding: 22px;
-  background: var(--paper);
+  background: var(--content-card);
   border: 1px dashed var(--line);
   border-radius: 10px;
 }
@@ -1064,7 +1069,7 @@ strong {
   padding: 16px 18px;
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
-  background: var(--paper);
+  background: var(--content-card);
   text-align: left;
 }
 .stay-heading {
@@ -1435,7 +1440,7 @@ progress::-moz-progress-bar {
   border-radius: 4px;
 }
 .check-list {
-  background: var(--paper);
+  background: var(--content-card);
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
@@ -1910,7 +1915,7 @@ input::-webkit-date-and-time-value {
   max-width: 760px;
 }
 .settings-card {
-  background: var(--paper);
+  background: var(--content-card);
   padding: 24px;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -2138,7 +2143,7 @@ input::-webkit-date-and-time-value {
 }
 .trip-stub,
 .ticket-stub {
-  background: var(--soft);
+  background: var(--ticket-stub);
 }
 .modal:not(.full) {
   background: var(--panel-tint);
@@ -3771,8 +3776,7 @@ input::-webkit-date-and-time-value {
 .modal .member-row select,
 .modal .date-trigger,
 .modal .calendar-month select,
-.modal .calendar-time input,
-.modal .settings-card {
+.modal .calendar-time input {
   background: var(--field-tint);
 }
 .modal select option {
@@ -3908,6 +3912,7 @@ input::-webkit-date-and-time-value {
 .modal .calendar-summary button,
 .modal .cover-upload,
 .modal .check-list,
+.modal .settings-card,
 .modal [data-slot="card"] {
   background: var(--panel-card-tint);
 }
@@ -3999,7 +4004,9 @@ input::-webkit-date-and-time-value {
   border: 0;
   border-radius: var(--radius-card);
   background: var(--panel-card-tint);
-  box-shadow: inset 0 1px 0 var(--surface-glow);
+  box-shadow:
+    inset 0 0 0 1px var(--panel-card-edge),
+    inset 0 1px 0 var(--surface-glow);
 }
 .detail-primary > .booking-schedule {
   padding: 0;
