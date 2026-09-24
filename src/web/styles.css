@@ -2094,6 +2094,8 @@ input::-webkit-date-and-time-value {
   display: grid;
   grid-template-rows: auto 1fr auto;
   align-items: start;
+  justify-items: center;
+  text-align: center;
   width: 100%;
 }
 .login-panel h1 {
@@ -2105,11 +2107,6 @@ input::-webkit-date-and-time-value {
 .login-copy {
   align-self: center;
 }
-.login-kicker {
-  color: var(--muted);
-  font-size: 12px;
-  letter-spacing: 0.08em;
-}
 .login-copy p {
   color: var(--muted);
   font-size: 14px;
@@ -2118,7 +2115,8 @@ input::-webkit-date-and-time-value {
 .login-actions {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  width: 100%;
   gap: 18px;
 }
 .google-sign-in {

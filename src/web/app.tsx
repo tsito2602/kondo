@@ -194,7 +194,6 @@ function Login() {
           <Logo />
         </div>
         <div className="login-copy">
-          <span className="login-kicker">旅の予定を、ひとつに。</span>
           <h1>
             こんどの楽しみを、
             <br />
