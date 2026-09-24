@@ -3,6 +3,7 @@ import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
+import { JSDOM } from 'jsdom';
 import { buildIconCheck } from './build-icon-check.mjs';
 import { renderTouchIcon } from './render-touch-icon.mjs';
 
@@ -22,7 +23,7 @@ try {
     assert.ok(!html.includes('serviceWorker'));
     scopes.add(manifest.id);
   }
-  assert.equal(scopes.size, 19);
+  assert.equal(scopes.size, 20);
   assert.deepEqual(await readFile(path.join(root, base, 'a/icon.png')), await readFile('scripts/fixtures/tabi-touch-transparent.png'));
   assert.deepEqual(await readFile(path.join(root, base, 'a2/icon.png')), await readFile('scripts/fixtures/tabi-touch-transparent.png'));
   assert.equal(JSON.parse(await readFile(path.join(root, base, 'a2/manifest.webmanifest'), 'utf8')).name, 'A再確認');
@@ -99,9 +100,9 @@ try {
   assert.equal((await touchImage.stats()).isOpaque, false);
   assert.equal(data[3], 0);
   // The enlarged journey marker remains opaque black; empty space stays clear.
-  assert.deepEqual([...data.subarray((67 * 180 + 33) * 4, (67 * 180 + 33) * 4 + 4)], [0, 0, 0, 255]);
+  assert.deepEqual([...data.subarray((56 * 180 + 33) * 4, (56 * 180 + 33) * 4 + 4)], [0, 0, 0, 255]);
   assert.equal(data[(90 * 180 + 90) * 4 + 3], 0);
-  assert.deepEqual(await readFile(path.join(root, base, 'r/icon.png')), await readFile(path.join('public', touchHref)));
+  assert.deepEqual(await readFile(path.join(root, base, 's/icon.png')), await readFile(path.join('public', touchHref)));
   const iconSvg = await readFile('assets/brand/icon.svg', 'utf8');
   assert.ok(!iconSvg.includes('<mask'));
   // SVG and touch exports must render identical opaque details.
@@ -110,7 +111,7 @@ try {
   for (const file of ['assets/brand/adaptive-foreground.png', 'assets/brand/adaptive-monochrome.png']) {
     const { data: pixels, info: size } = await sharp(file).raw().toBuffer({ resolveWithObject: true });
     assert.equal(size.channels, 4);
-    assert.equal(pixels[(417 * size.width + 280) * 4 + 3], 255);
+    assert.equal(pixels[(374 * size.width + 280) * 4 + 3], 255);
     assert.equal(pixels[(512 * size.width + 512) * 4 + 3], 0);
   }
   assert.equal((await sharp('assets/brand/logo.png').stats()).isOpaque, false);
@@ -122,6 +123,47 @@ try {
     if (darkPixels[offset + 3] > 0) assert.deepEqual([...darkPixels.subarray(offset, offset + 3)], [255, 255, 255]);
   }
   assert.equal(darkPixels[(90 * 180 + 90) * 4 + 3], 0);
+  // The solid destination pin keeps its circular cutout in dark mode.
+  assert.equal(darkPixels[(117 * 180 + 143) * 4 + 3], 0);
+  // Count visible islands: the joined start/upper stroke, five separated dashes,
+  // and the pin. This also catches renderers ignoring pathLength on dash arrays.
+  const seen = new Set();
+  let islands = 0;
+  for (let pixel = 0; pixel < 180 * 180; pixel++) {
+    if (seen.has(pixel) || darkPixels[pixel * 4 + 3] < 128) continue;
+    islands++;
+    const queue = [pixel];
+    seen.add(pixel);
+    while (queue.length) {
+      const current = queue.pop();
+      const x = current % 180;
+      const y = Math.floor(current / 180);
+      for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+        if (nx < 0 || nx >= 180 || ny < 0 || ny >= 180) continue;
+        const next = ny * 180 + nx;
+        if (!seen.has(next) && darkPixels[next * 4 + 3] >= 128) {
+          seen.add(next);
+          queue.push(next);
+        }
+      }
+    }
+  }
+  assert.equal(islands, 7, 'all five dashes must remain distinct at touch-icon size');
+  // Compare the settled boot symbol with the actual shipped logos in both themes.
+  // Reveal masks are fully open and the temporary ink tips are gone at this point.
+  for (const theme of ['light', 'dark']) {
+    const dom = new JSDOM(indexHtml);
+    const symbol = dom.window.document.querySelector('.boot-symbol');
+    symbol.setAttribute('viewBox', '0 0 1024 1024');
+    symbol.setAttribute('color', theme === 'dark' ? '#FFFFFF' : '#000000');
+    symbol.querySelectorAll('.boot-pen-tip').forEach(node => node.remove());
+    symbol.querySelectorAll('[mask]').forEach(node => node.removeAttribute('mask'));
+    if (theme === 'dark') symbol.querySelectorAll('.boot-edge').forEach(node => node.remove());
+    const animated = await sharp(await renderTouchIcon(symbol.outerHTML)).raw().toBuffer();
+    const shipped = await sharp(await renderTouchIcon(await readFile(`public/logo${theme === 'dark' ? '-dark' : ''}.svg`))).raw().toBuffer();
+    assert.deepEqual(animated, shipped, `${theme} boot symbol must finish on the shipped logo`);
+    dom.window.close();
+  }
   assert.notDeepEqual(darkLogo, await renderTouchIcon(await readFile('public/logo.svg')));
   assert.deepEqual(await readFile('public/icon-dark-192.png'), await readFile('public/icon-192.png'));
 

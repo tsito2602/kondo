@@ -1,4 +1,5 @@
 import { startTripTransition } from "./trip-transition";
+import { finishBootScreen } from "./boot";
 import { TripCover } from "./trip-cover";
 import { ticketDate } from "./ticket-content";
 import {
@@ -79,6 +80,9 @@ import {
 
 export function App() {
   const auth = useAuth();
+  useEffect(() => {
+    if (!auth.loading) return finishBootScreen();
+  }, [auth.loading]);
   useEffect(installPressFeedback, []);
   useEffect(() => {
     const root = document.documentElement;
