@@ -21,8 +21,10 @@ try {
     assert.ok(!html.includes('serviceWorker'));
     scopes.add(manifest.id);
   }
-  assert.equal(scopes.size, 7);
+  assert.equal(scopes.size, 8);
   assert.deepEqual(await readFile(path.join(root, base, 'a/icon.png')), await readFile('scripts/fixtures/tabi-touch-transparent.png'));
+  assert.deepEqual(await readFile(path.join(root, base, 'a2/icon.png')), await readFile('scripts/fixtures/tabi-touch-transparent.png'));
+  assert.equal(JSON.parse(await readFile(path.join(root, base, 'a2/manifest.webmanifest'), 'utf8')).name, 'A再確認');
   assert.deepEqual(await readFile(path.join(root, base, 'b/icon.png')), await readFile('public/icons/apple-touch-icon-transparent.png'));
   assert.deepEqual(await readFile(path.join(root, base, 'c/icon.png')), await readFile('public/icons/kondo-apple-touch-icon-v4.png'));
   assert.equal((await sharp(path.join(root, base, 'a/icon.png')).stats()).isOpaque, false);

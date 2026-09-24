@@ -28,6 +28,7 @@ export async function buildIconCheck(root, enabled) {
     { key: 'e', name: '比較E', label: 'ごくわずかに色味を加えたチケット・透過', image: await render(source.replaceAll('#FFFFFF', '#FDFEFF').replaceAll('#D4D4D4', '#D3D4D5').replaceAll('#171717', '#161718')) },
     { key: 'f', name: '比較F', label: 'Aの配色を使ったチケット・透過', image: await render(fromA) },
     { key: 'g', name: '比較G', label: 'Fをモノクロにしたチケット・透過', image: await render(neutral) },
+    { key: 'a2', name: 'A再確認', label: '成功したAと画像データまで同一', image: legacy },
   ];
   const revision = createHash('sha256').update(Buffer.concat(variants.map(v => v.image))).digest('hex').slice(0, 10);
   const base = `/__icon-check/${revision}`;
@@ -35,9 +36,9 @@ export async function buildIconCheck(root, enabled) {
   const document = (title, head, content) => `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${title}</title>${head}${style}</head><body>${content}</body></html>`;
   await mkdir(output, { recursive: true });
   const card = v => `<article><img src="${base}/${v.key}/icon.png" alt=""><h2>${v.name}：${v.label}</h2><p><a href="${base}/${v.key}/">追加用ページを開く</a></p></article>`;
-  const current = variants.filter(v => ['f', 'g'].includes(v.key)).map(card).join('');
-  const previous = variants.filter(v => !['f', 'g'].includes(v.key)).map(card).join('');
-  await writeFile(path.join(output, 'index.html'), document('アイコンの比較', '', `<h1>Aから作ったチケット</h1><p>Aを元データから完全に再生成できました。同じ書き出し処理で、チケットの形に置き換えています。</p><p>FはAと同じ青と淡いグレー、Gはそれをモノクロにした比較用です。白いチケットの正式デザインは変更していません。</p>${current}<details><summary>確認済みのA〜E</summary><p>Aはライトで白・ダークで黒。B・D・Eはライトで真っ黒・ダークで黒いグラデーション。Cは両方白でした。</p>${previous}</details><p>追加済みのアイコンを削除する必要はありません。</p><small>比較番号 ${revision}</small>`));
+  const current = variants.filter(v => v.key === 'a2').map(card).join('');
+  const previous = variants.filter(v => v.key !== 'a2').map(card).join('');
+  await writeFile(path.join(output, 'index.html'), document('アイコンの比較', '', `<h1>成功したAの再確認</h1><p>F・Gもライトでは黒背景になりました。新しい絵柄の比較はいったん止め、成功したAと全く同じ画像を新しく追加した場合の表示を確認します。</p>${current}<p>ホーム画面のアイコン表示をライトにした状態で「A再確認」を追加してください。以前の「比較A」を残し、隣に並べると比較できます。</p><details><summary>これまでのA〜G</summary><p>Aはライトで白・ダークで黒。B・D・Eはライトで真っ黒・ダークで黒いグラデーション。F・Gもライトで黒。Cは両方白でした。</p>${previous}</details><p>通常のkondoや、追加済みのアイコンを削除する必要はありません。</p><small>比較番号 ${revision}</small>`));
   for (const variant of variants) {
     const scope = `${base}/${variant.key}/`;
     const dir = path.join(root, scope.slice(1));
@@ -50,7 +51,10 @@ export async function buildIconCheck(root, enabled) {
       icons: [{ src: `${scope}icon.png`, sizes: '180x180', type: 'image/png', purpose: 'any' }],
     }));
     const head = `<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="${variant.name}"><link rel="apple-touch-icon" href="${scope}icon.png"><link rel="icon" type="image/png" href="${scope}icon.png"><link rel="manifest" href="${scope}manifest.webmanifest">`;
-    await writeFile(path.join(dir, 'index.html'), document(variant.name, head, `<h1>${variant.name}：${variant.label}</h1><article><img src="${scope}icon.png" alt="${variant.label}"><p>Safariの共有メニューから「ホーム画面に追加」してください。</p></article><p>ホーム画面のカスタマイズで、ライト／ダークを切り替えてアイコンの背景を確認します。</p><p><a href="/__icon-check/">比較一覧へ戻る</a></p><small>比較番号 ${revision}</small>`));
+    const guidance = variant.key === 'a2'
+      ? '<p>ホーム画面のアイコン表示をライトにしてから、Safariの共有メニューで「ホーム画面に追加」してください。名前は「A再確認」です。</p><p>以前の「比較A」は残し、隣に並べて背景を比較してください。この画像は以前のAから一切変更していません。</p>'
+      : '<p>Safariの共有メニューから「ホーム画面に追加」してください。</p><p>ホーム画面のカスタマイズで、ライト／ダークを切り替えてアイコンの背景を確認します。</p>';
+    await writeFile(path.join(dir, 'index.html'), document(variant.name, head, `<h1>${variant.name}：${variant.label}</h1><article><img src="${scope}icon.png" alt="${variant.label}">${guidance}</article><p><a href="/__icon-check/">比較一覧へ戻る</a></p><small>比較番号 ${revision}</small>`));
   }
   return { base, variants: variants.map(({ key, name }) => ({ key, name })) };
 }
