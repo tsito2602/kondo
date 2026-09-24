@@ -988,10 +988,10 @@ strong {
 /* A rail represents a booking interval, never a link to the next appointment.
    Ordinary events, generic bookings and intermediate hotel nights are standalone. */
 .timeline-marker:is(
-  [data-endpoint="start"],
-  [data-endpoint="end"],
-  [data-endpoint="both"]
-)::after {
+    [data-endpoint="start"],
+    [data-endpoint="end"],
+    [data-endpoint="both"]
+  )::after {
   content: "";
   width: 1px;
   background: var(--line);
@@ -1587,41 +1587,45 @@ progress::-moz-progress-bar {
   color: var(--muted);
   margin-top: auto;
 }
-.note-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 15px;
-  gap: 8px;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 12px;
+.note-compose {
+  min-width: 0;
 }
-.note-toolbar .selected {
-  background: var(--soft);
-  color: var(--brand);
+.note-title {
+  width: 100%;
+  min-height: 52px;
+  padding: 4px 0 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 650;
+  box-shadow: none;
+}
+.note-title:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 .note-editor {
   width: 100%;
+  min-height: 45dvh;
+  padding: 12px 0 24px;
   border: 0;
   border-radius: 0;
-  resize: none;
   background: transparent;
   color: var(--ink);
-  min-height: 50dvh;
   font-size: 16px;
-  line-height: 1.9;
-  padding: 12px 0;
+  line-height: 1.8;
+  resize: vertical;
   box-shadow: none;
 }
 .note-editor:focus-visible {
   outline: none;
   box-shadow: none;
 }
-.note-checklist {
-  background: var(--soft);
-  border-radius: 10px;
-  padding: 12px;
-  margin-bottom: 14px;
+.note-card p {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 .check-line {
   display: flex;

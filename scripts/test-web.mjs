@@ -18,6 +18,8 @@ Object.assign(globalThis, {
   localStorage: dom.window.localStorage,
   sessionStorage: dom.window.sessionStorage,
   Element: dom.window.Element,
+  Node: dom.window.Node,
+  MutationObserver: dom.window.MutationObserver,
   HTMLElement: dom.window.HTMLElement,
   HTMLInputElement: dom.window.HTMLInputElement,
   getComputedStyle: dom.window.getComputedStyle.bind(dom.window),
@@ -54,6 +56,16 @@ Object.defineProperty(window, "visualViewport", {
   configurable: true,
 });
 window.scrollTo = () => {};
+dom.window.Range.prototype.getClientRects = () => [];
+dom.window.Range.prototype.getBoundingClientRect = () => ({
+  top: 0,
+  bottom: 0,
+  left: 0,
+  right: 0,
+  width: 0,
+  height: 0,
+});
+document.elementFromPoint = () => document.body;
 HTMLElement.prototype.scrollIntoView = () => {};
 dom.window.HTMLDialogElement.prototype.showModal = function () {
   this.open = true;
@@ -883,13 +895,32 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await click(byText("nav a", "メモ"));
     await click(document.querySelector('[aria-label="メモを書く"]'));
+    await tick(550);
+    assert.equal(
+      db.prepare("SELECT COUNT(*) AS n FROM travel_notes").get().n,
+      0,
+      "opening an empty note does not save it",
+    );
+    await click(byText(".context-primary button", "完了"));
+    await click(document.querySelector('[aria-label="メモを書く"]'));
     assert.equal(document.activeElement, document.querySelector("dialog h2"));
-    const textarea = document.querySelector('[aria-label="メモ本文"]');
+    assert.equal(document.querySelector('[aria-label="ピン留め"]'), null);
+    const title = document.querySelector('[aria-label="メモのタイトル"]');
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        dom.window.HTMLInputElement.prototype,
+        "value",
+      ).set.call(title, "旅先の買い物");
+      title.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    });
+    const textarea = document.querySelector('textarea[aria-label="メモ本文"]');
+    assert.equal(textarea.placeholder, "メモを入力...");
+    assert.equal(document.querySelector('[aria-label="本文の書式"]'), null);
     await act(async () => {
       Object.getOwnPropertyDescriptor(
         dom.window.HTMLTextAreaElement.prototype,
         "value",
-      ).set.call(textarea, "旅のメモ\n- [ ] お土産");
+      ).set.call(textarea, "お土産\n待ち合わせ場所");
       textarea.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
     });
     await tick(550);
@@ -897,8 +928,51 @@ test("legacy account cache and pending changes survive React migration; real for
       db.prepare("SELECT COUNT(*) AS n FROM travel_notes").get().n,
       1,
     );
-    await click(byText(".context-primary button", "保存する"));
+    assert.equal(
+      db.prepare("SELECT title FROM note_details").get().title,
+      "旅先の買い物",
+    );
+    assert.equal(
+      db.prepare("SELECT content FROM note_details").get().content,
+      null,
+    );
+    assert.equal(
+      db.prepare("SELECT body FROM travel_notes").get().body,
+      "お土産\n待ち合わせ場所",
+    );
+    await click(byText(".context-primary button", "完了"));
     await tick();
+    assert.match(
+      document.querySelector(".note-card").textContent,
+      /旅先の買い物/,
+    );
+    await click(document.querySelector(".note-card"));
+    assert.equal(
+      document.querySelector('textarea[aria-label="メモ本文"]').value,
+      "お土産\n待ち合わせ場所",
+    );
+    await click(byText(".context-primary button", "完了"));
+    await tick();
+    await click(document.querySelector('[aria-label="メモを書く"]'));
+    const temporaryTitle = document.querySelector(
+      '[aria-label="メモのタイトル"]',
+    );
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        dom.window.HTMLInputElement.prototype,
+        "value",
+      ).set.call(temporaryTitle, "削除するメモ");
+      temporaryTitle.dispatchEvent(
+        new dom.window.Event("input", { bubbles: true }),
+      );
+    });
+    await click(document.querySelector('[aria-label="メモを削除"]'));
+    await tick(550);
+    assert.equal(
+      db.prepare("SELECT COUNT(*) AS n FROM travel_notes").get().n,
+      1,
+      "deleting a pending draft cancels its autosave",
+    );
     assert.deepEqual(
       failures,
       [],

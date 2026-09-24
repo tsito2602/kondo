@@ -299,11 +299,13 @@ test('notes persist offline, reopen and delete without affecting another trip', 
   const f = await fixture({ isDemo: true });
   try {
     const id = randomUUID();
-    f.api.saveNote(id, { body: '旅のメモ\n☐ 切符', pinned: false });
-    f.api.saveNote(id, { body: '旅のメモ\n☑ 切符', pinned: true });
+    const content = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '切符', marks: [{ type: 'bold' }] }] }] };
+    f.api.saveNote(id, { title: '旅のメモ', body: '切符', content });
+    f.api.saveNote(id, { title: '旅の買い物', body: '切符', content });
     assert.equal(f.render().notes.length, 1);
-    assert.equal(f.render().notes[0].pinned, true);
-    assert.equal(f.writes.at(-1).notesByTrip.trip[0].body, '旅のメモ\n☑ 切符');
+    assert.equal(f.render().notes[0].title, '旅の買い物');
+    assert.deepEqual(f.writes.at(-1).notesByTrip.trip[0].content, content);
+    assert.equal(f.writes.at(-1).notesByTrip.trip[0].body, '切符');
     const next = f.api.createTrip({ name: '別の旅', destination: '', startsOn: '2026-12-01', endsOn: '2026-12-02' });
     assert.equal(f.render().notes.length, 0);
     f.api.selectTrip('trip');
@@ -311,6 +313,42 @@ test('notes persist offline, reopen and delete without affecting another trip', 
     f.api.deleteNote(id);
     assert.equal(f.render().notes.length, 0);
     assert.ok(next);
+  } finally { f.close(); }
+});
+
+test('rich notes keep title and formatting through an offline restart and queued replay', async () => {
+  const server = new Map();
+  let offline = false;
+  const transport = async (path, init) => {
+    if (!path.endsWith('/notes')) return;
+    if (offline) throw new Error('offline');
+    if (init.method === 'POST') {
+      const note = JSON.parse(init.body);
+      server.set(note.id, note);
+      return {};
+    }
+    return { notes: [...server.values()] };
+  };
+  const f = await fixture({ transport });
+  try {
+    offline = true;
+    const id = randomUUID();
+    const input = { title: 'チケット', body: '予約済み', content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '予約済み', marks: [{ type: 'underline' }] }] }] } };
+    f.api.saveNote(id, input);
+    await tick();
+    const stored = f.writes.at(-1);
+    assert.equal(stored.pending.length, 1);
+    assert.deepEqual(stored.pending[0].body.content, input.content);
+    assert.equal(stored.notesByTrip.trip[0].title, input.title);
+    offline = false;
+    const restored = await fixture({ stored, transport });
+    try {
+      await restored.api.sync();
+      assert.deepEqual(restored.render().notes[0].content, input.content);
+      assert.equal(restored.render().notes[0].title, input.title);
+      assert.equal(restored.writes.at(-1).pending.length, 0);
+      assert.equal(server.size, 1);
+    } finally { restored.close(); }
   } finally { f.close(); }
 });
 

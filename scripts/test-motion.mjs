@@ -2915,7 +2915,6 @@ test("focused modal fields remain between the sticky header and panel bottom aft
   }
 });
 
-
 function bootFixture() {
   const screen = document.createElement("div");
   screen.id = "initial-boot";

@@ -223,6 +223,13 @@ CREATE TABLE IF NOT EXISTS travel_notes (
 );
 CREATE INDEX IF NOT EXISTS travel_notes_trip ON travel_notes(trip_id, pinned, updated_at);
 
+-- Additive and repeatable: existing notes and older offline clients keep working.
+CREATE TABLE IF NOT EXISTS note_details (
+  note_id TEXT PRIMARY KEY REFERENCES travel_notes(id) ON DELETE CASCADE,
+  title TEXT NOT NULL DEFAULT '',
+  content TEXT
+);
+
 -- Optional packing ownership preserves existing rows and repeatable deployment.
 CREATE TABLE IF NOT EXISTS packing_details (
   item_id TEXT PRIMARY KEY REFERENCES packing_items(id) ON DELETE CASCADE,
