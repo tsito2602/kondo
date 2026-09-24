@@ -20,6 +20,9 @@ import { Textarea } from "./obsidian/textarea";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import {
+  Camera,
+  ShoppingBag,
+  type LucideIcon,
   BookOpen,
   Plus,
   Check,
@@ -67,6 +70,7 @@ import type {
   Booking,
   Place,
   ItineraryItem,
+  ItineraryCategory,
   PackingItem,
   TravelTask,
   TravelNote,
@@ -109,6 +113,13 @@ const bookingIcons = {
   ticket: Ticket,
   other: BookOpen,
 };
+const itineraryIcons = {
+  sightseeing: Camera,
+  meal: Utensils,
+  transport: RouteIcon,
+  shopping: ShoppingBag,
+  other: CalendarDays,
+} satisfies Record<ItineraryCategory, LucideIcon>;
 export function timelineEntries(
   items: ItineraryItem[],
   bookings: Booking[],
@@ -275,6 +286,9 @@ export function ItineraryScreen() {
                 </button>
               )}
               {dayEntries.map((entry) => {
+                const ItemIcon = entry.item
+                  ? itineraryIcons[itemCategory(entry.item).value]
+                  : CalendarDays;
                 const BookingIcon = entry.booking
                   ? entry.booking.kind === "flight"
                     ? entry.endpoint === "end"
@@ -318,8 +332,8 @@ export function ItineraryScreen() {
                         }
                         aria-hidden="true"
                       >
-                        {transport ? (
-                          <RouteIcon size={17} />
+                        {entry.item ? (
+                          <ItemIcon size={17} />
                         ) : entry.booking ? (
                           <BookingIcon size={17} />
                         ) : (
