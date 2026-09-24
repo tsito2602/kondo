@@ -1,5 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><title>tabi</title><rect width="1024" height="1024" fill="#FFFFFF"/><g transform="translate(0 0) scale(1)"><g transform="translate(-66 39) scale(.9)">
-    <path fill="#496B80" fill-rule="evenodd" d="M270 234H694Q726 234 729 266L752 406Q756 438 724 438H270Q234 438 234 402V270Q234 234 270 234Z M690 257C681 258 676 265 678 275L680 284C682 294 688 299 697 297C706 296 710 289 708 279L706 270C704 260 699 256 690 257Z M698 318C689 319 684 326 686 336L688 345C690 355 696 360 705 358C714 357 718 350 716 340L714 331C712 321 707 317 698 318Z M705 379C696 380 692 387 694 397L696 406C698 416 704 421 713 419C722 418 726 411 724 401L722 392C720 382 714 378 705 379Z"/>
-    <rect x="468" y="458" width="221" height="414" rx="30" fill="#496B80"/>
-    <path transform="rotate(-9 902 306)" fill="#D7E2E8" d="M790 194H1014Q1038 194 1038 218V261A45 45 0 0 0 1038 351V394Q1038 418 1014 418H790Q766 418 766 394V218Q766 194 790 194Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><title>kondo</title><defs><linearGradient id="surface" x2="0" y2="1"><stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#F2F2F2"/></linearGradient></defs><rect width="1024" height="1024" fill="#FFFFFF"/><rect x="42" y="42" width="940" height="940" rx="154" fill="url(#surface)"/><g transform="translate(0 0) scale(1)"><g>
+    <g transform="translate(-38 55) rotate(-14 525 490)" fill="#A4A4A4">
+      <path d="M254 300H796Q830 300 830 334V427C770 427 770 553 830 553V646Q830 680 796 680H254Q220 680 220 646V553C280 553 280 427 220 427V334Q220 300 254 300Z"/>
+    </g>
+    <g transform="rotate(-14 525 490)">
+      <path fill="#202020" d="M254 300H796Q830 300 830 334V427C770 427 770 553 830 553V646Q830 680 796 680H254Q220 680 220 646V553C280 553 280 427 220 427V334Q220 300 254 300Z"/>
+    </g>
+    <g fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M393 425C500 399 577 381 620 410Q651 428 639 449" stroke-width="22"/>
+      <path d="M451 529C425 563 480 592 558 578Q613 569 648 553" stroke-width="22"/>
+    </g>
+    <circle cx="393" cy="425" r="33" fill="#FFFFFF"/>
+    <path fill="#FFFFFF" fill-rule="evenodd" d="M705 480C684 480 666 497 666 519C666 537 677 550 705 585C733 550 744 537 744 519C744 497 726 480 705 480ZM705 503A16 16 0 1 0 705 535A16 16 0 0 0 705 503Z"/>
   </g></g></svg>

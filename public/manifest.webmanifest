@@ -1,14 +1,14 @@
 {
   "id": "/",
-  "name": "tabi — 旅のしおり",
-  "short_name": "tabi",
+  "name": "kondo",
+  "short_name": "kondo",
   "lang": "ja",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#FFFFFF",
   "theme_color": "#FFFFFF",
-  "description": "しおり、予約、行きたい場所、旅の準備をまとめて持ち歩く。",
+  "description": "こんどの楽しみを、一緒に。旅の予定・予約・準備を共有できるアプリ。",
   "icons": [
     { "src": "/icons/icon-light-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-light-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },

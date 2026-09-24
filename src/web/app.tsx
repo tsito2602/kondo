@@ -174,8 +174,9 @@ export function App() {
 function Logo() {
   return (
     <span className="brand">
-      <img className="logo light-logo" src="/logo.svg" alt="tabi" />
-      <img className="logo dark-logo" src="/logo-dark.svg" alt="tabi" />
+      <img className="logo light-logo" src="/logo.svg" alt="" />
+      <img className="logo dark-logo" src="/logo-dark.svg" alt="" />
+      <span>kondo</span>
     </span>
   );
 }
@@ -190,9 +191,9 @@ function Login() {
       <div className="login-panel">
         <Logo />
         <h1>
-          旅のしおりを、
+          こんどの楽しみを、
           <br />
-          ひとつに。
+          一緒に。
         </h1>
         <p className="muted">予定・予約・持ち物を、一緒に旅する人と。</p>
         <GoogleSignIn />
@@ -968,7 +969,7 @@ function SettingsScreen() {
         <Card className="settings-card">
           <h2>アプリ</h2>
           <PwaControls />
-          <p className="muted small">tabi {import.meta.env.VITE_APP_VERSION}</p>
+          <p className="muted small">kondo {import.meta.env.VITE_APP_VERSION}</p>
         </Card>
         <Button
           variant="ghost"

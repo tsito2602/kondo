@@ -1,13 +1,13 @@
-# tabi アイコン
+# kondo アイコン
 
-`symbol.svg` が文字なしの正本。横棒のチケットと縦棒を分離したT、3つの透過ミシン目、持ち上がった半券を表す。主券の左側には切り欠きを置かない。
+`symbol.svg` が文字なしの正本。2枚の重なったチケット、白い旅の軌跡とピンを表す。
 
-- 本体: Blue `#496B80`
-- 半券: Light Gray `#D7E2E8`
+- 本体: Charcoal `#202020`
+- 背面のチケット: Gray `#A4A4A4`
 - 通常背景: White `#FFFFFF`
 - ダーク背景: Black `#000000`
 
-`npm run icons:export` でSVG原本からPNG・SVGを再生成する。PNGの直接編集はしない。通常・ダークで絵柄の色は共通。`logo*.png` と `symbol*.svg` は背景もミシン目も透過。
+`npm run icons:export` でSVG原本からPNG・SVGを再生成する。PNGの直接編集はしない。ダーク版はチケットと軌跡を反転する。`logo*.png` と `symbol*.svg` は背景が透過。
 
 - `icon*.png`: iOS用1024px、通常・ダーク背景あり
 - `adaptive-foreground.png`: Android用、セーフエリア内の透過絵柄
