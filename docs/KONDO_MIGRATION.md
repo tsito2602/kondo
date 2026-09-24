@@ -1,7 +1,22 @@
 # kondoへのURL・データ保存先の移行
 
-状態: コードの切替準備のみ。Cloudflare上のWorker・D1・R2はまだ変更していない。
-2026-09-24にWork環境のWranglerは未認証と確認。接続後のCloudflareプラグインは有効だが、この会話にはアカウント操作ツールが公開されていない。
+状態（2026-09-24）: **stagingのURL・D1・R2移行完了。本番は未変更。**
+WorkのCloudflare接続から操作した。Wranglerのローカル認証は使用していない。
+
+## stagingの移行記録
+
+- D1: `kondo-staging` / `cd2e6056-9e7a-488a-8b1a-8a3964661cd6`。
+- R2: `kondo-documents-staging`。新しい保存先はいずれもAPAC、旧保存先はWNAM。jurisdictionの制約は同じ。
+- `kondo-staging`と`tabi-staging`の両Workerを同じ新D1・R2へ接続。旧URLから届く未同期操作も新保存先へ入る。
+- `kondo-staging`のWorkers Buildsは`DEPLOYMENT_PROFILE=kondo`、`D1_DATABASE_ID`は上記UUID。以後も新保存先を使用する。
+- 旧`tabi-staging`のGitビルド連携（trigger `0fb9b752-0593-4334-9098-714ea8ba7d18`）は解除。旧Workerは現在の配信を維持し、新旧の二重ビルドと旧保存先への巻き戻りを防ぐ。旧Workerを通常のlegacy設定で再配信しない。
+- コピー中は両Workerのworkers.devとPreview URLsを無効化し、APIの404を確認してから移行。作業後に元の有効状態へ戻した。カスタムドメインはなし。
+- D1: 全25テーブル・68行の全列を移行元と照合して一致、外部キー違反0件。旅行1件、予約7件、カバー画像1件、予約添付参照1件を含む。
+- 通常のSQL importはカバー画像の長いINSERTがD1の文長上限に当たりロールバックされた。全テーブル定義を先に作成し、画像以外を外部キー検査延期付きの一括クエリで取り込み、`trip_covers`は値をSQLに埋め込まずバインド変数で挿入した。大きな画像を含む本番移行でも同じ制約に注意する。
+- R2: 1件・84,397バイトを同一キーでコピー。HTTP/custom metadata・サイズ・SHA-256の一致を確認。一時的な認証付きコピーWorkerは作業後に削除。
+- Worker設定のPATCHで`inherit`を使うと、既存バインディングが保持されなかった。新Workerは全バインディングを明示して復元。旧Workerは直前の配信バージョンから同じコードを再アップロードし、`keep_bindings: ["secret_text"]`と`keep_assets: true`で既存秘密情報・静的ファイルを維持して切り替えた。既存バインディングの名前と種類を再確認済み。
+- 両URLでHTML 200、未ログインAPI 401 JSON、Service Worker 200 JavaScriptを確認。利用者のGoogleログイン・編集・添付表示の最終確認は別途行う。
+- 旧D1 `d9bf66f2-23d7-4b9f-a0ac-64a5fce78cbd`と旧R2は削除せず保持。切替後の更新は新保存先に入るため、旧保存先へ単純に戻してはいけない。
 
 ## 変更先
 
