@@ -9,13 +9,15 @@ Web/PWAと共有APIは **Cloudflare Workers Builds** で検証・配信する。
 | staging | `staging` | `tabi-staging` | `tabi-documents-staging` |
 | production | `main` | `tabi` | `tabi-documents` |
 
+kondoへのURL・保存先の変更は[移行手順](KONDO_MIGRATION.md)を参照。`DEPLOYMENT_PROFILE`未設定では上記の従来構成を維持する。
+
 ## 利用枠を浪費しない標準設定
 
 各Workerの **Settings → Builds（Build）** に設定する。既存Workerを使い、新しいWorkerやD1/R2を作り直さない。
 
 | 項目 | staging | production |
 | --- | --- | --- |
-| Git repository | `tsito2602/tabi` | 同左 |
+| Git repository | `tsito2602/kondo` | 同左 |
 | Production branch（Cloudflareの項目名） | `staging` | `main` |
 | Builds for non-production branches | **OFF** | **OFF** |
 | Build command | **空欄** | **空欄** |

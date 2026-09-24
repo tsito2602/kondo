@@ -40,6 +40,7 @@ test('configuration errors fail before dependency installation', () => {
     assert.throws(() => settings({ [key]: '' }), new RegExp(key));
   }
   for (const overrides of [
+    { DEPLOYMENT_PROFILE: 'unknown' },
     { WORKERS_CI: '0' }, { WORKERS_CI_BRANCH: 'main' }, { WORKERS_CI_BRANCH: 'feat/change' },
     { WORKERS_CI_COMMIT_SHA: 'bad' }, { CLOUDFLARE_ACCOUNT_ID: 'bad' }, { D1_DATABASE_ID: 'bad' },
     { SKIP_DEPENDENCY_INSTALL: 'false' }, { EXPO_PUBLIC_ENABLE_DEMO: 'false' },
@@ -51,6 +52,30 @@ test('configuration errors fail before dependency installation', () => {
   assert.throws(() => configuration('staging', base, { ...templates.staging, build: { command: 'npm run build:web' } }));
   assert.throws(() => configuration('staging', base, { ...templates.staging, account_id: '__UNRESOLVED__' }));
   assert.equal(settings({ NODE_ENV: 'production' }).env.NODE_ENV, undefined);
+});
+
+test('kondo migration separates URL adoption from verified storage migration', async () => {
+  for (const target of ['staging', 'production']) {
+    const suffix = target === 'staging' ? '-staging' : '';
+    const env = { ...base, WORKERS_CI_BRANCH: target === 'staging' ? 'staging' : 'main' };
+    for (const profile of ['kondo-url', 'kondo']) {
+      const s = configuration(target, { ...env, DEPLOYMENT_PROFILE: profile }, templates[target]);
+      const storagePrefix = profile === 'kondo-url' ? 'tabi' : 'kondo';
+      assert.equal(s.config.name, `kondo${suffix}`);
+      assert.equal(s.origin, `https://kondo${suffix}.tsito-apps.workers.dev`);
+      assert.equal(s.env.EXPO_PUBLIC_API_URL, s.origin);
+      assert.equal(s.config.vars.ALLOWED_ORIGINS, s.origin);
+      assert.equal(s.config.d1_databases[0].database_name, `${storagePrefix}${suffix}`);
+      assert.equal(s.config.r2_buckets[0].bucket_name, `${storagePrefix}-documents${suffix}`);
+      assert.equal(s.config.d1_databases[0].database_id, base.D1_DATABASE_ID);
+      await verifyDatabase(s, async () => Response.json({ success: true, result: { name: `${storagePrefix}${suffix}` } }));
+      const wrongPrefix = storagePrefix === 'tabi' ? 'kondo' : 'tabi';
+      await assert.rejects(verifyDatabase(s, async () => Response.json({ success: true, result: { name: `${wrongPrefix}${suffix}` } })), /selected environment/);
+    }
+  }
+  assert.throws(() => settings({ DEPLOYMENT_PROFILE: 'kondo-url', EXPO_PUBLIC_API_URL: 'https://tabi-staging.tsito-apps.workers.dev' }), /EXPO_PUBLIC_API_URL/);
+  assert.throws(() => settings({ DEPLOYMENT_PROFILE: 'kondo-url', ALLOWED_ORIGINS: 'https://tabi-staging.tsito-apps.workers.dev' }), /ALLOWED_ORIGINS/);
+  assert.equal(templates.staging.name, 'tabi-staging');
 });
 
 test('exactly one install, complete check and deploy, with checks before writes', async () => {

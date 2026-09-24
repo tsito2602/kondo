@@ -919,6 +919,9 @@ test("legacy account cache and pending changes survive React migration; real for
     const settingsBackground = document.querySelector("#main-content");
     assert.equal(document.querySelector("dialog h2").textContent, "設定");
     assert.ok(document.querySelector("dialog.full .settings-page"));
+    const appInfo = document.querySelector("dialog .settings-app-info");
+    assert.match(appInfo.textContent, /kondo\s*バージョン 2\.0\.0/);
+    assert.equal(appInfo.querySelectorAll("img").length, 2);
     let updateFails = false;
     Object.defineProperty(navigator, "serviceWorker", {
       configurable: true,
