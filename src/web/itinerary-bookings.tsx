@@ -127,6 +127,18 @@ export function StayCards({
   return (
     <div className="day-stays" aria-label="この日の宿泊">
       {stays.map((booking) => {
+        const endpoint =
+          day === booking.day
+            ? "start"
+            : day === booking.endDay
+              ? "end"
+              : undefined;
+        const time =
+          endpoint === "start"
+            ? booking.time
+            : endpoint === "end"
+              ? booking.endTime
+              : "";
         const label =
           day === booking.day
             ? "チェックイン"
@@ -141,29 +153,38 @@ export function StayCards({
               : BedDouble;
         return (
           <button
-            className="stay-card"
-            data-press-card
+            className="timeline-entry stay-entry"
             key={booking.id}
             onClick={() => onOpen(booking.id)}
           >
-            <div className="stay-heading">
-              <StayIcon size={16} aria-hidden="true" />
-              <span>{label}</span>
-            </div>
-            <h3>{booking.title}</h3>
-            <div className="stay-range">
-              <div>
-                <span>チェックイン</span>
-                <strong>{shortDate(booking.day)}</strong>
-                <span>{booking.time ? `${booking.time}〜` : "時刻未定"}</span>
+            <time>{endpoint ? time || "未定" : ""}</time>
+            <span
+              className="timeline-marker"
+              data-endpoint={booking.day === booking.endDay ? "both" : endpoint}
+              aria-hidden="true"
+            >
+              <StayIcon size={16} />
+              {booking.day === booking.endDay && <LogOut size={16} />}
+            </span>
+            <div className="stay-card" data-press-card>
+              <div className="stay-heading">
+                <span>{label}</span>
               </div>
-              <ArrowRight size={15} aria-hidden="true" />
-              <div>
-                <span>チェックアウト</span>
-                <strong>{shortDate(booking.endDay)}</strong>
-                <span>
-                  {booking.endTime ? `〜${booking.endTime}` : "時刻未定"}
-                </span>
+              <h3>{booking.title}</h3>
+              <div className="stay-range">
+                <div>
+                  <span>チェックイン</span>
+                  <strong>{shortDate(booking.day)}</strong>
+                  <span>{booking.time ? `${booking.time}〜` : "時刻未定"}</span>
+                </div>
+                <ArrowRight size={15} aria-hidden="true" />
+                <div>
+                  <span>チェックアウト</span>
+                  <strong>{shortDate(booking.endDay)}</strong>
+                  <span>
+                    {booking.endTime ? `〜${booking.endTime}` : "時刻未定"}
+                  </span>
+                </div>
               </div>
             </div>
           </button>

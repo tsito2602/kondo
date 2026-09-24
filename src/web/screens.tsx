@@ -307,7 +307,17 @@ export function ItineraryScreen() {
                       }
                     >
                       <time>{entry.time || "未定"}</time>
-                      <span className="timeline-marker">
+                      <span
+                        className="timeline-marker"
+                        data-endpoint={
+                          entry.joinedArrival
+                            ? "both"
+                            : isJourney(entry.booking)
+                              ? entry.endpoint
+                              : undefined
+                        }
+                        aria-hidden="true"
+                      >
                         {transport ? (
                           <RouteIcon size={17} />
                         ) : entry.booking ? (
@@ -315,6 +325,12 @@ export function ItineraryScreen() {
                         ) : (
                           <span />
                         )}
+                        {entry.joinedArrival &&
+                          (entry.booking?.kind === "flight" ? (
+                            <PlaneLanding size={17} />
+                          ) : (
+                            <MapPin size={17} />
+                          ))}
                       </span>
                       <div data-press-card>
                         <small>

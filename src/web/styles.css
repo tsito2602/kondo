@@ -970,13 +970,14 @@ strong {
 .timeline-entry time {
   font-size: 11px;
   color: var(--muted);
-  padding-top: 17px;
+  padding-top: 0;
+  line-height: 15px;
   font-variant-numeric: tabular-nums;
 }
 .timeline-marker {
   display: flex;
   justify-content: center;
-  padding-top: 17px;
+  padding-top: 0;
   color: var(--brand);
   position: relative;
 }
@@ -989,7 +990,7 @@ strong {
   width: 1px;
   background: var(--line);
   position: absolute;
-  top: 37px;
+  top: 21px;
   bottom: -10px;
   left: 50%;
 }
@@ -1000,8 +1001,25 @@ strong {
   background: var(--brand);
   margin-top: 5px;
 }
-.day-section > div:last-child .timeline-marker::after {
+:where(.day-section > div:last-child) .timeline-marker::after {
   bottom: 0;
+}
+/* Arrival and checkout terminate the rail; no line continues below their icon. */
+.timeline-marker[data-endpoint="end"] {
+  align-items: flex-end;
+}
+.timeline-entry .timeline-marker[data-endpoint="end"]::after {
+  top: 0;
+  bottom: 21px;
+}
+.timeline-marker[data-endpoint="both"] {
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+}
+.timeline-entry .timeline-marker[data-endpoint="both"]::after {
+  top: 21px;
+  bottom: 21px;
 }
 .timeline-entry > div {
   background: var(--paper);
@@ -1061,9 +1079,8 @@ strong {
   display: grid;
   gap: 10px;
   margin-bottom: 20px;
-  margin-left: var(--timeline-card-inset);
 }
-.stay-card {
+.timeline-entry > .stay-card {
   width: 100%;
   min-width: 0;
   padding: 16px 18px;
@@ -1071,6 +1088,12 @@ strong {
   border-radius: var(--radius-card);
   background: var(--content-card);
   text-align: left;
+}
+.stay-entry {
+  padding-bottom: 0;
+}
+.stay-entry .timeline-marker::after {
+  bottom: 0;
 }
 .stay-heading {
   display: flex;
