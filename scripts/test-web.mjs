@@ -1117,7 +1117,7 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.equal(savedFlight.confirmation_code, "JM6EQC");
     await click(
       [...document.querySelectorAll(".booking-ticket")].find((entry) =>
-        entry.textContent.includes("JM6EQC"),
+        entry.textContent.includes("NRT → KIX"),
       ),
     );
     await click(document.querySelector('.context-actions [aria-label="編集"]'));
@@ -1479,7 +1479,7 @@ test("booking details use kind-specific labels and keep single-date reservations
   );
 });
 
-test("reservation tickets prioritize readable places and retain both dates and reference numbers", async () => {
+test("compact reservation tickets retain airport names and both dates", async () => {
   const { BookingTicketContent } = await bundle(
     "export { BookingTicketContent } from './src/web/booking-ticket';",
   );
@@ -1516,10 +1516,8 @@ test("reservation tickets prioritize readable places and retain both dates and r
     ),
     ["成田国際空港", "関西国際空港"],
   );
-  assert.match(
-    flight.querySelector(".ticket-meta").textContent,
-    /GK211.*予約番号.*JM6EQC/,
-  );
+  assert.equal(flight.querySelector(".ticket-service").textContent, "GK211");
+  assert.equal(flight.querySelector(".ticket-meta"), null);
   assert.match(
     flight.querySelector(".ticket-schedule").textContent,
     /12\/31.*19:00.*2027\/1\/1.*01:00/,

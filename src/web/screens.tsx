@@ -457,16 +457,14 @@ export function BookingsScreen() {
                   onClick={() => setId(booking.id)}
                 >
                   <div className="ticket-main">
-                    <div className="ticket-category">
-                      <span>
-                        {
-                          bookingKinds.find(
-                            (entry) => entry.value === booking.kind,
-                          )?.label
-                        }
-                      </span>
-                    </div>
-                    <BookingTicketContent booking={booking} />
+                    <BookingTicketContent
+                      booking={booking}
+                      category={
+                        bookingKinds.find(
+                          (entry) => entry.value === booking.kind,
+                        )?.label
+                      }
+                    />
                   </div>
                   <div className="ticket-stub">
                     <BookingIcon

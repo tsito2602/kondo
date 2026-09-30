@@ -4563,14 +4563,15 @@ input::-webkit-date-and-time-value {
   font-size: 12px;
 }
 
-/* Reservation hierarchy: place → dates and times → reference numbers. */
+/* Compact tickets: service header, route, then aligned date/time columns. */
 .booking-ticket {
-  --ticket-stub-width: 48px;
+  --ticket-stub-width: 44px;
+  min-height: 0;
 }
 .ticket-main .ticket-title {
   display: block;
-  margin: 10px 0 16px;
-  font-size: 24px;
+  margin: 7px 0 9px;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1.35;
   letter-spacing: -0.025em;
@@ -4578,17 +4579,19 @@ input::-webkit-date-and-time-value {
 .ticket-route {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
   gap: 10px;
-  margin: 12px 0 18px;
+  margin: 8px 0 9px;
 }
 .ticket-route > svg {
   color: var(--muted);
+  align-self: start;
+  margin-top: 10px;
 }
 .ticket-place {
   min-width: 0;
   display: grid;
-  gap: 5px;
+  gap: 2px;
 }
 .ticket-place strong {
   font-size: 21px;
@@ -4604,7 +4607,7 @@ input::-webkit-date-and-time-value {
   overflow-wrap: anywhere;
 }
 .ticket-place .ticket-place-code {
-  font-size: 36px;
+  font-size: 32px;
   font-weight: 600;
   line-height: 1.1;
   letter-spacing: -0.025em;
@@ -4621,7 +4624,7 @@ input::-webkit-date-and-time-value {
 .ticket-schedule > div {
   display: grid;
   align-content: start;
-  gap: 3px;
+  gap: 1px;
   min-width: 0;
   font-variant-numeric: tabular-nums;
 }
@@ -4630,26 +4633,41 @@ input::-webkit-date-and-time-value {
   color: var(--muted);
 }
 .ticket-schedule span {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
 }
 .ticket-schedule time {
   font-size: 16px;
   font-weight: 600;
 }
-.ticket-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  margin-top: 14px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 11px;
-  overflow-wrap: anywhere;
+/* Match the destination's left edge with the route column above it. */
+.ticket-schedule.with-route {
+  grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr);
+  gap: 10px;
 }
-.ticket-meta b {
-  font-weight: 500;
+.ticket-schedule.with-route > div:last-child {
+  grid-column: 3;
+}
+.booking-ticket .ticket-main {
+  padding: 12px 15px;
+}
+.booking-ticket .ticket-category {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.ticket-category > span:first-child {
+  flex-shrink: 0;
+}
+.ticket-service {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+.booking-grid {
+  gap: 12px;
 }
 @media (max-width: 380px) {
   .booking-ticket {
@@ -4664,7 +4682,8 @@ input::-webkit-date-and-time-value {
   .ticket-main .ticket-title {
     font-size: 22px;
   }
-  .ticket-route {
+  .ticket-route,
+  .ticket-schedule.with-route {
     gap: 7px;
   }
 }

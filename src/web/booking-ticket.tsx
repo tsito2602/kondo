@@ -27,7 +27,13 @@ function RoutePlace({
   );
 }
 
-export function BookingTicketContent({ booking }: { booking: Booking }) {
+export function BookingTicketContent({
+  booking,
+  category,
+}: {
+  booking: Booking;
+  category?: string;
+}) {
   const route = ["flight", "train", "car"].includes(booking.kind);
   const hasRoute =
     route &&
@@ -46,6 +52,10 @@ export function BookingTicketContent({ booking }: { booking: Booking }) {
         : ["出発", "到着"];
   return (
     <>
+      <div className="ticket-category">
+        <span>{category}</span>
+        {hasRoute && <span className="ticket-service">{booking.title}</span>}
+      </div>
       {hasRoute ? (
         <div className="ticket-route" aria-label="出発地から到着地">
           <RoutePlace
@@ -63,7 +73,9 @@ export function BookingTicketContent({ booking }: { booking: Booking }) {
       ) : (
         <h2 className="ticket-title">{booking.title}</h2>
       )}
-      <div className={`ticket-schedule${range ? "" : " single"}`}>
+      <div
+        className={`ticket-schedule${range ? "" : " single"}${hasRoute ? " with-route" : ""}`}
+      >
         {[
           {
             label: range ? endpointLabels[0] : "利用日時",
@@ -80,8 +92,10 @@ export function BookingTicketContent({ booking }: { booking: Booking }) {
               ]
             : []),
         ].map((point) => (
-          <div key={point.label}>
-            <small>{point.label}</small>
+          <div key={point.label} aria-label={point.label}>
+            {(!hasRoute || booking.kind === "car") && (
+              <small>{point.label}</small>
+            )}
             <span>{ticketDate(point.day, booking.day)}</span>
             <time>
               {point.time || "時刻未定"}
@@ -94,16 +108,6 @@ export function BookingTicketContent({ booking }: { booking: Booking }) {
           </div>
         ))}
       </div>
-      {(hasRoute || booking.confirmationCode) && (
-        <div className="ticket-meta">
-          {hasRoute && <span>{booking.title}</span>}
-          {booking.confirmationCode && (
-            <span>
-              予約番号 <b>{booking.confirmationCode}</b>
-            </span>
-          )}
-        </div>
-      )}
     </>
   );
 }
