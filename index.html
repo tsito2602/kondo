@@ -105,14 +105,26 @@
       }
       .boot-name {
         display: flex;
-        font-size: 28px;
-        font-weight: 650;
-        letter-spacing: 0.045em;
+        gap: 3px;
         line-height: 1;
+        color: var(--boot-ink);
       }
       .boot-name span {
+        display: block;
+        width: 29px;
+        height: 40px;
         animation: boot-letter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
         animation-delay: calc(1280ms + var(--letter) * 60ms);
+      }
+      .boot-name svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 18;
+        stroke-linecap: round;
+        stroke-linejoin: round;
       }
       #initial-boot.boot-leaving {
         animation: boot-leave 240ms ease-out both;
@@ -325,11 +337,14 @@
             </g>
           </g>
         </svg>
-        <strong class="boot-name"
-          ><span style="--letter: 0">k</span><span style="--letter: 1">o</span
-          ><span style="--letter: 2">n</span><span style="--letter: 3">d</span
-          ><span style="--letter: 4">o</span></strong
-        >
+        <!-- Custom rounded wordmark, inline for a font-independent offline first paint. -->
+        <strong class="boot-name" aria-label="kondo">
+          <span style="--letter: 0"><svg viewBox="0 0 74 102" aria-hidden="true"><path d="M12 12V90M58 38L12 70M29 59L60 90" /></svg></span>
+          <span style="--letter: 1"><svg viewBox="0 0 74 102" aria-hidden="true"><circle cx="37" cy="64" r="26" /></svg></span>
+          <span style="--letter: 2"><svg viewBox="0 0 74 102" aria-hidden="true"><path d="M12 90V64A25 25 0 0 1 62 64V90" /></svg></span>
+          <span style="--letter: 3"><svg viewBox="0 0 74 102" aria-hidden="true"><circle cx="37" cy="64" r="26" /><path d="M63 12V64" /></svg></span>
+          <span style="--letter: 4"><svg viewBox="0 0 74 102" aria-hidden="true"><circle cx="37" cy="64" r="26" /></svg></span>
+        </strong>
       </div>
     </div>
     <div id="root" inert></div>
