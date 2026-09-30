@@ -1,7 +1,20 @@
-import { ArrowRight, Plane, TrainFront } from "lucide-react";
+import { ArrowRight, Plane, createLucideIcon } from "lucide-react";
 import { findAirportByCode } from "@/data/airports";
 import type { Booking } from "@/data/types";
 import { ticketDate } from "./ticket-content";
+
+const TrainSide = createLucideIcon("TrainSide", [
+  [
+    "path",
+    {
+      d: "M3 5h10a8 8 0 0 1 8 8v3H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z",
+      key: "body",
+    },
+  ],
+  ["path", { d: "M2 10h18M7 5v5m6-5v5", key: "windows" }],
+  ["circle", { cx: "7", cy: "18", r: "2", key: "rear-wheel" }],
+  ["circle", { cx: "17", cy: "18", r: "2", key: "front-wheel" }],
+]);
 
 function RoutePlace({
   name,
@@ -61,7 +74,7 @@ export function BookingTicketContent({ booking }: { booking: Booking }) {
             {booking.kind === "flight" ? (
               <Plane className="ticket-route-plane" size={18} />
             ) : booking.kind === "train" ? (
-              <TrainFront size={18} />
+              <TrainSide size={18} />
             ) : (
               <ArrowRight size={16} />
             )}
