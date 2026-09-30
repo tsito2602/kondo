@@ -1121,9 +1121,11 @@ test("legacy account cache and pending changes survive React migration; real for
     await submit();
     const savedFlight = await waitFor(
       () =>
-        db.prepare(
-          "SELECT b.*, d.* FROM bookings b JOIN booking_details d ON d.booking_id = b.id WHERE b.kind = 'flight'",
-        ).get(),
+        db
+          .prepare(
+            "SELECT b.*, d.* FROM bookings b JOIN booking_details d ON d.booking_id = b.id WHERE b.kind = 'flight'",
+          )
+          .get(),
       "the flight and its details reach the server after form submission",
     );
     assert.equal(
@@ -1150,8 +1152,9 @@ test("legacy account cache and pending changes survive React migration; real for
     await submit();
     await waitFor(
       () =>
-        db.prepare("SELECT title FROM bookings WHERE id = ?").get(savedFlight.id)
-          ?.title === "GK211",
+        db
+          .prepare("SELECT title FROM bookings WHERE id = ?")
+          .get(savedFlight.id)?.title === "GK211",
       "the edited flight number reaches the server",
     );
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
@@ -1538,7 +1541,10 @@ test("compact reservation tickets retain airport names and both dates", async ()
     ["成田国際空港", "関西国際空港"],
   );
   assert.equal(flight.querySelector(".ticket-service").textContent, "GK211");
-  assert.equal(flight.querySelector(".ticket-meta"), null);
+  assert.equal(
+    flight.querySelector(".ticket-reference strong").textContent,
+    "JM6EQC",
+  );
   assert.match(
     flight.querySelector(".ticket-schedule").textContent,
     /12\/31.*19:00.*2027\/1\/1.*01:00/,
@@ -1554,6 +1560,27 @@ test("compact reservation tickets retain airport names and both dates", async ()
   assert.equal(hotel.querySelector(".ticket-route"), null);
   assert.match(
     hotel.querySelector(".ticket-schedule").textContent,
-    /チェックイン.*22:30〜.*チェックアウト.*11:00まで/,
+    /チェックイン.*22:30〜.*チェックアウト.*〜11:00/,
+  );
+  assert.equal(
+    render({
+      ...booking,
+      kind: "hotel",
+      time: "",
+      endTime: "",
+      confirmationCode: "",
+    }).querySelector(".ticket-reference"),
+    null,
+  );
+  assert.deepEqual(
+    [
+      ...render({
+        ...booking,
+        kind: "hotel",
+        time: "",
+        endTime: "",
+      }).querySelectorAll("time"),
+    ].map((node) => node.textContent),
+    ["時刻未定", "時刻未定"],
   );
 });
