@@ -95,7 +95,11 @@ export function AirportField({
             >
               <span>
                 <strong>{airport.name}</strong>
-                <small>{airport.city}</small>
+                <small>
+                  {[airport.city, airport.countryName]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </small>
               </span>
               <b>{airport.code}</b>
             </li>

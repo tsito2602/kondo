@@ -10,13 +10,37 @@ import { build } from 'esbuild';
 
 const dir = await mkdtemp(join(tmpdir(), 'tabi-connections-'));
 const require = createRequire(import.meta.url);
-for (const [name, entry] of [['connections', 'src/data/flight-connections.ts'], ['worker', 'worker/index.ts'], ['duration', 'src/data/booking-duration.ts']]) {
+for (const [name, entry] of [['airports', 'src/data/airports.ts'], ['connections', 'src/data/flight-connections.ts'], ['worker', 'worker/index.ts'], ['duration', 'src/data/booking-duration.ts']]) {
   await build({ entryPoints: [entry], bundle: true, platform: 'node', format: 'cjs', outfile: join(dir, `${name}.cjs`), logLevel: 'silent' });
 }
 const { findFlightConnections, connectionBetween, flightConnectionCandidates, hasLikelyFlightConnection } = require(join(dir, 'connections.cjs'));
 const worker = require(join(dir, 'worker.cjs')).default;
 const { bookingDuration, bookingDurationLabel } = require(join(dir, 'duration.cjs'));
 after(() => rm(dir, { recursive: true, force: true }));
+const { airports, findAirports, findAirportByCode } = require(join(dir, 'airports.cjs'));
+test('worldwide airport catalog includes every IATA record from its source snapshot', async () => {
+  const catalog = JSON.parse(await readFile('src/data/airports-world.json', 'utf8'));
+  assert.ok(catalog.count > 9000);
+  assert.equal(airports.length, catalog.count);
+  assert.equal(new Set(airports.map((airport) => airport.code)).size, catalog.count);
+  for (const [code] of catalog.rows) {
+    assert.match(code, /^[A-Z]{3}$/);
+    assert.equal(findAirportByCode(code)?.code, code);
+  }
+  for (const code of ['SIN', 'ICN', 'SYD', 'GRU', 'JNB', 'YVR', 'UTK']) {
+    assert.equal(findAirports(code.toLowerCase())[0]?.code, code);
+  }
+});
+test('airport search preserves Japanese names and accepts cities, accents and fullwidth codes', () => {
+  assert.equal(findAirports('成田')[0].code, 'NRT');
+  assert.equal(findAirports('ｎｒｔ')[0].code, 'NRT');
+  assert.ok(findAirports('Singapore', 20).some((airport) => airport.code === 'SIN'));
+  assert.ok(findAirports('sao paulo', 30).some((airport) => airport.code === 'GRU'));
+  assert.equal(findAirportByCode('SIN').countryName, 'シンガポール');
+  assert.equal(findAirportByCode('SIN').timeZone, 'Asia/Singapore');
+  assert.equal(findAirportByCode('XXX'), undefined);
+  assert.deepEqual(findAirports(''), []);
+});
 const flight = (id, extra = {}) => ({ id, kind: 'flight', title: id, origin: '', destination: '', detail: '', confirmationCode: '', note: '', originCode: 'NRT', destinationCode: 'DXB', day: '2026-11-21', time: '22:20', endDay: '2026-11-22', endTime: '05:30', ...extra });
 const first = flight(randomUUID());
 const second = flight(randomUUID(), { originCode: 'DXB', destinationCode: 'VIE', day: '2026-11-22', time: '08:55', endTime: '12:25' });
