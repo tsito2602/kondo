@@ -4552,9 +4552,11 @@ input::-webkit-date-and-time-value {
   font-size: 12px;
 }
 
-/* Compact tickets: service header, route, then aligned date/time columns. */
+/* Boarding-pass layout: opposed endpoints, route line and a compact reference strip. */
 .booking-ticket {
   --ticket-stub-width: 44px;
+  --ticket-route-gap: 8px;
+  --ticket-route-middle: clamp(36px, 12vw, 72px);
   min-height: 0;
 }
 .ticket-main .ticket-title {
@@ -4567,20 +4569,49 @@ input::-webkit-date-and-time-value {
 }
 .ticket-route {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) var(--ticket-route-middle) minmax(0, 1fr);
   align-items: start;
-  gap: 10px;
-  margin: 6px 0 8px;
+  gap: var(--ticket-route-gap);
+  margin: 8px 0 5px;
 }
-.ticket-route > svg {
+.ticket-route-line {
   color: var(--muted);
-  align-self: start;
-  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 29px;
+}
+.ticket-route-line > span {
+  position: relative;
+  flex: 1;
+  border-top: 1px dashed currentColor;
+}
+.ticket-route-line > span::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  width: 5px;
+  height: 5px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: var(--content-card);
+}
+.ticket-route-line > span:last-child::after {
+  right: 0;
+}
+.ticket-route-line svg {
+  flex-shrink: 0;
+}
+.ticket-route-plane {
+  transform: rotate(45deg);
 }
 .ticket-place {
   min-width: 0;
   display: grid;
   gap: 2px;
+}
+.ticket-place:last-child {
+  text-align: right;
 }
 .ticket-place strong {
   font-size: 18px;
@@ -4610,6 +4641,9 @@ input::-webkit-date-and-time-value {
 .ticket-schedule.single {
   grid-template-columns: 1fr;
 }
+.ticket-schedule:not(.single) > div:last-child {
+  text-align: right;
+}
 .ticket-schedule > div {
   display: grid;
   align-content: start;
@@ -4629,24 +4663,48 @@ input::-webkit-date-and-time-value {
   font-size: 15px;
   font-weight: 600;
 }
-/* Match the destination's left edge with the route column above it. */
+/* Dates and times sit directly below their departure/arrival columns. */
 .ticket-schedule.with-route {
-  grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) var(--ticket-route-middle) minmax(0, 1fr);
+  gap: var(--ticket-route-gap);
 }
 .ticket-schedule.with-route > div:last-child {
   grid-column: 3;
 }
 .booking-ticket .ticket-main {
-  padding: 12px 15px;
+  padding: 12px 14px;
 }
 .ticket-service {
-  color: var(--muted);
+  color: var(--ink);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.ticket-reference {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 9px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: var(--ticket-stub);
+  font-size: 10px;
+  line-height: 1.4;
+}
+.ticket-reference > span {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.ticket-reference strong {
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
 }
 .booking-grid {
   gap: 12px;
@@ -4654,6 +4712,7 @@ input::-webkit-date-and-time-value {
 @media (max-width: 380px) {
   .booking-ticket {
     --ticket-stub-width: 38px;
+    --ticket-route-gap: 6px;
   }
   .ticket-place strong {
     font-size: 17px;
@@ -4663,9 +4722,5 @@ input::-webkit-date-and-time-value {
   }
   .ticket-main .ticket-title {
     font-size: 19px;
-  }
-  .ticket-route,
-  .ticket-schedule.with-route {
-    gap: 7px;
   }
 }

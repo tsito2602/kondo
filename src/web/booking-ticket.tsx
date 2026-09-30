@@ -1,4 +1,4 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Plane } from "lucide-react";
 import { findAirportByCode } from "@/data/airports";
 import type { Booking } from "@/data/types";
 import { ticketDate } from "./ticket-content";
@@ -27,11 +27,7 @@ function RoutePlace({
   );
 }
 
-export function BookingTicketContent({
-  booking,
-}: {
-  booking: Booking;
-}) {
+export function BookingTicketContent({ booking }: { booking: Booking }) {
   const route = ["flight", "train", "car"].includes(booking.kind);
   const hasRoute =
     route &&
@@ -60,7 +56,15 @@ export function BookingTicketContent({
             code={booking.originCode}
             flight={booking.kind === "flight"}
           />
-          <ArrowRight size={16} aria-hidden="true" />
+          <div className="ticket-route-line" aria-hidden="true">
+            <span />
+            {booking.kind === "flight" ? (
+              <Plane className="ticket-route-plane" size={18} />
+            ) : (
+              <ArrowRight size={16} />
+            )}
+            <span />
+          </div>
           <RoutePlace
             name={booking.destination}
             code={booking.destinationCode}
@@ -95,16 +99,25 @@ export function BookingTicketContent({
             )}
             <span>{ticketDate(point.day, booking.day)}</span>
             <time>
+              {point.time &&
+                booking.kind === "hotel" &&
+                point.label === endpointLabels[1] &&
+                "〜"}
               {point.time || "時刻未定"}
-              {point.time && booking.kind === "hotel"
-                ? point.label === endpointLabels[0]
-                  ? "〜"
-                  : "まで"
-                : ""}
+              {point.time &&
+                booking.kind === "hotel" &&
+                point.label === endpointLabels[0] &&
+                "〜"}
             </time>
           </div>
         ))}
       </div>
+      {booking.confirmationCode && (
+        <div className="ticket-reference">
+          <span>予約番号</span>
+          <strong>{booking.confirmationCode}</strong>
+        </div>
+      )}
     </>
   );
 }
