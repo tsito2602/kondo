@@ -26,3 +26,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+# Worldwide airport data
+
+`src/data/airports-world.json` contains OurAirports public-domain data and timezone identifiers derived from mwgg/Airports (MIT, copyright 2014 mwgg). Source URLs, update procedure, matching rules, and the full MIT license are in [docs/airport-data.md](docs/airport-data.md).

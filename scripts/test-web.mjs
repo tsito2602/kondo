@@ -594,7 +594,7 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(byText("nav a", "予約"));
     await click(document.querySelector('[aria-label="予約を追加"]'));
     await fill("種類", "hotel");
-    await fill("予約名", "テストホテル");
+    await fill("宿泊施設名", "テストホテル");
     const hotelUrl =
       "https://links.h6.hilton.com/f/a/" +
       "long-link-".repeat(30) +
@@ -624,7 +624,7 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.ok(
       document.querySelector('.context-actions [aria-label="予約を削除"]'),
     );
-    await editAndReturn("予約名", "更新したホテル");
+    await editAndReturn("宿泊施設名", "更新したホテル");
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
     await click(byText("nav a", "行きたい場所"));
@@ -1064,6 +1064,78 @@ test("legacy account cache and pending changes survive React migration; real for
       "closing members restores the same page",
     );
 
+    await click(byText("nav a", "予約"));
+    await click(document.querySelector('[aria-label="予約を追加"]'));
+    assert.equal(field("予約名"), undefined);
+    assert.equal(field("出発空港（IATA）"), undefined);
+    await fill("出発地", "成田");
+    await click(document.querySelector('[role="option"]'));
+    assert.equal(field("出発地").value, "成田国際空港");
+    assert.equal(document.querySelector(".airport-code").textContent, "NRT");
+    await fill("出発地", "羽田");
+    assert.equal(
+      document.querySelector(".airport-code"),
+      null,
+      "editing clears the previously selected code",
+    );
+    await fill("出発地", "nrt");
+    await act(async () =>
+      field("出発地").dispatchEvent(
+        new dom.window.KeyboardEvent("keydown", {
+          key: "ArrowDown",
+          bubbles: true,
+        }),
+      ),
+    );
+    await act(async () =>
+      field("出発地").dispatchEvent(
+        new dom.window.KeyboardEvent("keydown", {
+          key: "Enter",
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
+    await fill("到着地", "kix");
+    await click(document.querySelector('[role="option"]'));
+    await fill("航空会社・補足（任意）", "Jetstar Japan");
+    await fill("予約番号", "JM6EQC");
+    await submit();
+    const savedFlight = db
+      .prepare(
+        "SELECT b.*, d.* FROM bookings b JOIN booking_details d ON d.booking_id = b.id WHERE b.kind = 'flight'",
+      )
+      .get();
+    assert.equal(
+      savedFlight.title,
+      "NRT → KIX",
+      "a flight saves without a separate reservation title",
+    );
+    assert.equal(savedFlight.origin, "成田国際空港");
+    assert.equal(savedFlight.origin_code, "NRT");
+    assert.equal(savedFlight.destination_code, "KIX");
+    assert.equal(savedFlight.confirmation_code, "JM6EQC");
+    await click(
+      [...document.querySelectorAll(".booking-ticket")].find((entry) =>
+        entry.textContent.includes("NRT → KIX"),
+      ),
+    );
+    await click(document.querySelector('.context-actions [aria-label="編集"]'));
+    assert.equal(
+      field("便名（任意）").value,
+      "",
+      "generated route titles do not become flight numbers on edit",
+    );
+    await fill("便名（任意）", "GK211");
+    await submit();
+    assert.equal(
+      db.prepare("SELECT title FROM bookings WHERE id = ?").get(savedFlight.id)
+        .title,
+      "GK211",
+    );
+    await click(document.querySelector('.context-back [aria-label="戻る"]'));
+    await tick(30);
+
     await click(
       document.querySelector('.trip-heading [aria-label="旅行一覧へ戻る"]'),
     );
@@ -1113,10 +1185,9 @@ test("all-day hotel checkout remains visible in itinerary without an end time", 
   );
 });
 
-test("journeys join endpoints without moving intervening events; stays do not interrupt flights", async () => {
-  const { dayTimeline, staysOnDay, JourneyPair, StayCards } = await bundle(
-    "export * from './src/web/itinerary-bookings';",
-  );
+test("journeys and hotel endpoints retain chronological order; only ongoing stays lead the day", async () => {
+  const { dayTimeline, staysOnDay, JourneyPair, StayCards, StayCard } =
+    await bundle("export * from './src/web/itinerary-bookings';");
   const day = "2026-11-22";
   const flight = {
     id: "flight",
@@ -1140,17 +1211,54 @@ test("journeys join endpoints without moving intervening events; stays do not in
   };
   const bookings = [flight, hotel];
   const joined = dayTimeline(timelineEntries([], bookings), day);
-  assert.equal(
-    joined.length,
-    1,
-    "a check-in while flying belongs in the stay band",
+  assert.deepEqual(
+    joined.map((entry) => entry.key),
+    ["booking-flight-start", "booking-hotel-start", "booking-flight-end"],
   );
-  assert.equal(joined[0].joinedArrival, true);
+  assert.equal(joined[0].joinedArrival, false);
+  const lateHotel = { ...hotel, time: "22:30" };
+  const eveningFlight = { ...flight, time: "19:00", endTime: "20:50" };
+  const evening = dayTimeline(
+    timelineEntries([], [lateHotel, eveningFlight]),
+    day,
+  );
+  assert.deepEqual(
+    evening.map((entry) => entry.key),
+    ["booking-flight-start", "booking-hotel-start"],
+  );
+  assert.equal(evening[0].joinedArrival, true);
+  const checkout = dayTimeline(
+    timelineEntries(
+      [{ id: "breakfast", day: hotel.endDay, time: "08:00", title: "朝食" }],
+      [hotel],
+    ),
+    hotel.endDay,
+  );
+  assert.deepEqual(
+    checkout.map((entry) => entry.key),
+    ["item-breakfast", "booking-hotel-end"],
+  );
+  const dayUse = dayTimeline(
+    timelineEntries(
+      [],
+      [{ ...hotel, time: "09:00", endDay: day, endTime: "17:00" }],
+    ),
+    day,
+  );
+  assert.deepEqual(
+    dayUse.map((entry) => entry.time),
+    ["09:00", "17:00"],
+  );
   const event = { id: "event", day, time: "16:00", title: "別の予定" };
   const split = dayTimeline(timelineEntries([event], bookings), day);
   assert.deepEqual(
     split.map((entry) => entry.key),
-    ["booking-flight-start", "item-event", "booking-flight-end"],
+    [
+      "booking-flight-start",
+      "booking-hotel-start",
+      "item-event",
+      "booking-flight-end",
+    ],
   );
   assert.equal(split[0].joinedArrival, false);
   const overnight = timelineEntries(
@@ -1202,32 +1310,32 @@ test("journeys join endpoints without moving intervening events; stays do not in
   assert.match(stay, /15:00〜/);
   assert.match(stay, /〜11:00/);
   const untimed = renderToStaticMarkup(
-    React.createElement(StayCards, {
-      bookings: [{ ...hotel, time: "", endTime: "" }],
-      day: "2026-11-25",
+    React.createElement(StayCard, {
+      booking: { ...hotel, time: "", endTime: "" },
+      endpoint: "end",
       onOpen() {},
     }),
   );
-  assert.match(untimed, /チェックアウト日/);
+  assert.match(untimed, /チェックアウト/);
   assert.match(untimed, /時刻未定/);
   const checkoutMarker = new JSDOM(untimed).window.document.querySelector(
     ".timeline-marker",
   );
   assert.equal(checkoutMarker.dataset.endpoint, "end");
   assert.equal(checkoutMarker.querySelectorAll("svg").length, 1);
-  const sameDayStay = renderToStaticMarkup(
-    React.createElement(StayCards, {
-      bookings: [{ ...hotel, endDay: hotel.day }],
-      day: hotel.day,
-      onOpen() {},
-    }),
-  );
-  const sameDayDocument = new JSDOM(sameDayStay).window.document;
-  const pairedMarker = sameDayDocument.querySelector(".timeline-marker");
-  assert.equal(pairedMarker.dataset.endpoint, "both");
-  assert.equal(pairedMarker.querySelectorAll("svg").length, 2);
-  assert.equal(sameDayDocument.querySelectorAll("button").length, 1);
-  assert.equal(sameDayDocument.querySelector("time").textContent, hotel.time);
+  for (const boundary of [hotel.day, hotel.endDay]) {
+    assert.equal(
+      renderToStaticMarkup(
+        React.createElement(StayCards, {
+          bookings,
+          day: boundary,
+          onOpen() {},
+        }),
+      ),
+      "",
+      "check-in/out are not duplicated in the stay band",
+    );
+  }
 });
 
 test("booking clocks align Japan conversions in a shared row and preserve seasonal UTC offsets", async () => {
@@ -1368,5 +1476,63 @@ test("booking details use kind-specific labels and keep single-date reservations
     render("ticket", { endDay: "2026-11-23" }).querySelectorAll("section")
       .length,
     2,
+  );
+});
+
+test("compact reservation tickets retain airport names and both dates", async () => {
+  const { BookingTicketContent } = await bundle(
+    "export { BookingTicketContent } from './src/web/booking-ticket';",
+  );
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const booking = {
+    kind: "flight",
+    title: "GK211",
+    origin: "",
+    originCode: "NRT",
+    destination: "",
+    destinationCode: "KIX",
+    day: "2026-12-31",
+    time: "19:00",
+    endDay: "2027-01-01",
+    endTime: "01:00",
+    confirmationCode: "JM6EQC",
+  };
+  const render = (value) =>
+    new JSDOM(
+      renderToStaticMarkup(
+        React.createElement(BookingTicketContent, { booking: value }),
+      ),
+    ).window.document;
+  const flight = render(booking);
+  assert.deepEqual(
+    [...flight.querySelectorAll(".ticket-place strong")].map(
+      (node) => node.textContent,
+    ),
+    ["NRT", "KIX"],
+  );
+  assert.deepEqual(
+    [...flight.querySelectorAll(".ticket-place span")].map(
+      (node) => node.textContent,
+    ),
+    ["成田国際空港", "関西国際空港"],
+  );
+  assert.equal(flight.querySelector(".ticket-service").textContent, "GK211");
+  assert.equal(flight.querySelector(".ticket-meta"), null);
+  assert.match(
+    flight.querySelector(".ticket-schedule").textContent,
+    /12\/31.*19:00.*2027\/1\/1.*01:00/,
+  );
+  const hotel = render({
+    ...booking,
+    kind: "hotel",
+    title: "星の宿",
+    time: "22:30",
+    endTime: "11:00",
+  });
+  assert.equal(hotel.querySelector(".ticket-title").textContent, "星の宿");
+  assert.equal(hotel.querySelector(".ticket-route"), null);
+  assert.match(
+    hotel.querySelector(".ticket-schedule").textContent,
+    /チェックイン.*22:30〜.*チェックアウト.*11:00まで/,
   );
 });
