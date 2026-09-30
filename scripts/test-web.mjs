@@ -125,6 +125,15 @@ const tick = async (ms = 5) =>
   act(async () => {
     await new Promise((resolve) => setTimeout(resolve, ms));
   });
+const waitFor = async (read, message) => {
+  const deadline = Date.now() + 2000;
+  do {
+    const result = read();
+    if (result) return result;
+    await tick(10);
+  } while (Date.now() < deadline);
+  assert.fail(message);
+};
 const byText = (tag, text) =>
   [...document.querySelectorAll(tag)].find(
     (node) => node.textContent.trim() === text,
@@ -514,6 +523,15 @@ test("legacy account cache and pending changes survive React migration; real for
   const failures = [];
   globalThis.fetch = async (url, init) => {
     const request = new Request(url, init);
+    // Flight saves are optimistic. Exercise a server response slower than the
+    // form helper's 30ms wait so database assertions cannot rely on that delay.
+    if (
+      ["POST", "PATCH"].includes(request.method) &&
+      /\/bookings(?:\/[^/]+)?$/.test(new URL(request.url).pathname) &&
+      (await request.clone().json()).kind === "flight"
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
     const response = await worker.fetch(request, { DB, BUCKET: {} });
     if (!response.ok)
       failures.push({
@@ -1101,11 +1119,13 @@ test("legacy account cache and pending changes survive React migration; real for
     await fill("航空会社・補足（任意）", "Jetstar Japan");
     await fill("予約番号", "JM6EQC");
     await submit();
-    const savedFlight = db
-      .prepare(
-        "SELECT b.*, d.* FROM bookings b JOIN booking_details d ON d.booking_id = b.id WHERE b.kind = 'flight'",
-      )
-      .get();
+    const savedFlight = await waitFor(
+      () =>
+        db.prepare(
+          "SELECT b.*, d.* FROM bookings b JOIN booking_details d ON d.booking_id = b.id WHERE b.kind = 'flight'",
+        ).get(),
+      "the flight and its details reach the server after form submission",
+    );
     assert.equal(
       savedFlight.title,
       "NRT → KIX",
@@ -1128,10 +1148,11 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await fill("便名（任意）", "GK211");
     await submit();
-    assert.equal(
-      db.prepare("SELECT title FROM bookings WHERE id = ?").get(savedFlight.id)
-        .title,
-      "GK211",
+    await waitFor(
+      () =>
+        db.prepare("SELECT title FROM bookings WHERE id = ?").get(savedFlight.id)
+          ?.title === "GK211",
+      "the edited flight number reaches the server",
     );
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
