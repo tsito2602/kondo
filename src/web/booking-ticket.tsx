@@ -13,11 +13,16 @@ function RoutePlace({
   flight: boolean;
 }) {
   const airport = flight ? findAirportByCode(code) : undefined;
-  const label = name || airport?.name || code || "未定";
+  const label = airport?.name || name || code || "未定";
+  const airportCode = flight ? airport?.code || code.trim().toUpperCase() : "";
+  const primary = airportCode || label;
+  const secondary = airportCode ? label : code;
   return (
     <div className="ticket-place">
-      <strong>{label}</strong>
-      {code && label !== code && <span>{code}</span>}
+      <strong className={airportCode ? "ticket-place-code" : undefined}>
+        {primary}
+      </strong>
+      {secondary && secondary !== primary && <span>{secondary}</span>}
     </div>
   );
 }

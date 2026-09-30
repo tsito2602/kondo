@@ -4599,8 +4599,16 @@ input::-webkit-date-and-time-value {
 .ticket-place span {
   color: var(--muted);
   font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.ticket-place .ticket-place-code {
+  font-size: 36px;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  white-space: nowrap;
 }
 .ticket-schedule {
   display: grid;
@@ -4649,6 +4657,9 @@ input::-webkit-date-and-time-value {
   }
   .ticket-place strong {
     font-size: 18px;
+  }
+  .ticket-place .ticket-place-code {
+    font-size: 30px;
   }
   .ticket-main .ticket-title {
     font-size: 22px;

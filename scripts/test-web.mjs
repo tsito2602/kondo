@@ -1508,6 +1508,12 @@ test("reservation tickets prioritize readable places and retain both dates and r
     [...flight.querySelectorAll(".ticket-place strong")].map(
       (node) => node.textContent,
     ),
+    ["NRT", "KIX"],
+  );
+  assert.deepEqual(
+    [...flight.querySelectorAll(".ticket-place span")].map(
+      (node) => node.textContent,
+    ),
     ["成田国際空港", "関西国際空港"],
   );
   assert.match(
