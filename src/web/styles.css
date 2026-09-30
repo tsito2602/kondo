@@ -4559,9 +4559,9 @@ input::-webkit-date-and-time-value {
 }
 .ticket-main .ticket-title {
   display: block;
-  margin: 7px 0 9px;
-  font-size: 22px;
-  font-weight: 700;
+  margin: 3px 0 8px;
+  font-size: 20px;
+  font-weight: 600;
   line-height: 1.35;
   letter-spacing: -0.025em;
 }
@@ -4570,12 +4570,12 @@ input::-webkit-date-and-time-value {
   grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr);
   align-items: start;
   gap: 10px;
-  margin: 8px 0 9px;
+  margin: 6px 0 8px;
 }
 .ticket-route > svg {
   color: var(--muted);
   align-self: start;
-  margin-top: 10px;
+  margin-top: 6px;
 }
 .ticket-place {
   min-width: 0;
@@ -4583,7 +4583,7 @@ input::-webkit-date-and-time-value {
   gap: 2px;
 }
 .ticket-place strong {
-  font-size: 21px;
+  font-size: 18px;
   line-height: 1.35;
   letter-spacing: -0.025em;
   overflow-wrap: anywhere;
@@ -4596,7 +4596,7 @@ input::-webkit-date-and-time-value {
   overflow-wrap: anywhere;
 }
 .ticket-place .ticket-place-code {
-  font-size: 32px;
+  font-size: 26px;
   font-weight: 600;
   line-height: 1.1;
   letter-spacing: -0.025em;
@@ -4622,11 +4622,11 @@ input::-webkit-date-and-time-value {
   color: var(--muted);
 }
 .ticket-schedule span {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
 }
 .ticket-schedule time {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
 }
 /* Match the destination's left edge with the route column above it. */
@@ -4656,13 +4656,13 @@ input::-webkit-date-and-time-value {
     --ticket-stub-width: 38px;
   }
   .ticket-place strong {
-    font-size: 18px;
+    font-size: 17px;
   }
   .ticket-place .ticket-place-code {
-    font-size: 30px;
+    font-size: 24px;
   }
   .ticket-main .ticket-title {
-    font-size: 22px;
+    font-size: 19px;
   }
   .ticket-route,
   .ticket-schedule.with-route {
