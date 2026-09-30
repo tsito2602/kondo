@@ -31,7 +31,15 @@ export function revealModalField(focused: Element | null) {
   const bounds = panel.getBoundingClientRect();
   const header = panel.querySelector(".modal-header")?.getBoundingClientRect();
   const top = Math.max(bounds.top, header?.bottom ?? bounds.top) + 12;
-  const bottom = bounds.bottom - 12;
+  const dock = dialog.querySelector<HTMLElement>(
+    ".thumb-dock-host:not([hidden])",
+  );
+  const dockBounds = dock?.getBoundingClientRect();
+  const bottom =
+    Math.min(
+      bounds.bottom,
+      dockBounds && dockBounds.height > 0 ? dockBounds.top - 16 : bounds.bottom,
+    ) - 12;
   if (bottom <= top) return;
   const input = focused.getBoundingClientRect();
   // Include the label when it fits, but keep a tall textarea's top visible.

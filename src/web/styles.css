@@ -2698,10 +2698,12 @@ input::-webkit-date-and-time-value {
   }
   dialog .thumb-dock-host:not([hidden]) {
     --dock-fade-color: var(--paper);
-    /* The dialog already follows the visual viewport, including keyboard pan.
-       Anchor inside that shell instead of lifting a layout-viewport fixed dock. */
+    /* Keep the panel full height; only its controls rise above the keyboard. */
     position: absolute;
-    bottom: calc(var(--dock-bottom-gap) + env(safe-area-inset-bottom));
+    bottom: calc(
+      var(--dock-bottom-gap) + env(safe-area-inset-bottom) +
+        var(--dock-keyboard-inset, 0px)
+    );
   }
   .thumb-dock-host:not([hidden])::before {
     content: "";
@@ -2865,10 +2867,10 @@ input::-webkit-date-and-time-value {
   /* Transparent shell separates the floating reading panel from the live dock. */
   :root:has(.thumb-dock-host) .modal,
   :root:has(.thumb-dock-host) .modal.full {
-    top: var(--modal-top, 0px);
+    top: 0;
     bottom: auto;
-    height: var(--modal-height, 100dvh);
-    max-height: var(--modal-height, 100dvh);
+    height: var(--modal-layout-height, 100dvh);
+    max-height: var(--modal-layout-height, 100dvh);
     padding: 12px max(12px, env(safe-area-inset-right))
       calc(
         var(--dock-height) + var(--dock-bottom-gap) + 16px +
@@ -2895,7 +2897,7 @@ input::-webkit-date-and-time-value {
     border-radius: var(--radius-panel);
     overflow-y: auto;
     overscroll-behavior: contain;
-    scroll-padding-bottom: 24px;
+    scroll-padding-bottom: calc(24px + var(--dock-keyboard-inset, 0px));
     box-shadow:
       inset 0 1px 0 var(--surface-glow),
       0 12px 40px #0003;
@@ -2903,8 +2905,16 @@ input::-webkit-date-and-time-value {
   :root:has(.thumb-dock-host) .modal.full .modal-inner {
     height: 100%;
   }
+  :root:has(.thumb-dock-host) .modal:not(.full) .modal-inner {
+    height: var(--modal-panel-height, auto);
+  }
+  :root[data-keyboard-open="true"]:has(.thumb-dock-host)
+    .modal:not(.full)[open] {
+    /* Lift a compact panel into view without reducing its reading area. */
+    align-items: flex-start;
+  }
   :root:has(.thumb-dock-host) .modal .modal-body {
-    padding-bottom: 24px;
+    padding-bottom: calc(24px + var(--dock-keyboard-inset, 0px));
   }
   dialog .thumb-dock-host:not([hidden])::before {
     display: none;
@@ -4569,7 +4579,10 @@ input::-webkit-date-and-time-value {
 }
 .ticket-route {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--ticket-route-middle) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) var(--ticket-route-middle) minmax(
+      0,
+      1fr
+    );
   align-items: start;
   gap: var(--ticket-route-gap);
   margin: 8px 0 5px;
@@ -4665,7 +4678,10 @@ input::-webkit-date-and-time-value {
 }
 /* Dates and times sit directly below their departure/arrival columns. */
 .ticket-schedule.with-route {
-  grid-template-columns: minmax(0, 1fr) var(--ticket-route-middle) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) var(--ticket-route-middle) minmax(
+      0,
+      1fr
+    );
   gap: var(--ticket-route-gap);
 }
 .ticket-schedule.with-route > div:last-child {

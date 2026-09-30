@@ -2188,7 +2188,7 @@ test("the mobile add button survives page replacement and uses the current page 
   }
 });
 
-test("panel docks anchor inside the visual viewport shell without applying keyboard lift twice", async () => {
+test("panel height stays independent of the keyboard while its dock rises", async () => {
   const css = await readFile("src/web/styles.css", "utf8");
   const panelDock = css.match(
     /dialog \.thumb-dock-host:not\(\[hidden\]\)\s*\{([^}]+)\}/,
@@ -2197,12 +2197,15 @@ test("panel docks anchor inside the visual viewport shell without applying keybo
   assert.match(panelDock, /position: absolute;/);
   assert.match(
     panelDock,
-    /bottom: calc\(var\(--dock-bottom-gap\) \+ env\(safe-area-inset-bottom\)\);/,
+    /bottom: calc\([^;]*var\(--dock-keyboard-inset, 0px\)[^;]*\);/,
   );
-  assert.doesNotMatch(panelDock, /--dock-keyboard-inset/);
   assert.match(
     css,
-    /:root:has\(\.thumb-dock-host\) \.modal.full\s*\{[^}]*top: var\(--modal-top[^}]*height: var\(--modal-height/,
+    /padding-bottom: calc\(24px \+ var\(--dock-keyboard-inset, 0px\)\);/,
+  );
+  assert.match(
+    css,
+    /:root:has\(\.thumb-dock-host\) \.modal.full\s*\{[^}]*top: 0;[^}]*height: var\(--modal-layout-height/,
   );
 });
 
@@ -2855,18 +2858,21 @@ test("card contact scales the whole surface, keeps actions independent and relea
   }
 });
 
-test("focused modal fields remain between the sticky header and panel bottom after keyboard resize", () => {
+test("focused modal fields remain above the moving dock inside an unchanged panel", () => {
   const dialog = document.createElement("dialog");
   dialog.open = true;
   dialog.innerHTML =
-    '<div class="modal-inner"><header class="modal-header"></header><label class="field"><textarea></textarea></label></div>';
+    '<div class="modal-inner"><header class="modal-header"></header><label class="field"><textarea></textarea></label></div><div class="thumb-dock-host"></div>';
   document.body.append(dialog);
   const panel = dialog.firstElementChild;
   const header = panel.firstElementChild;
   const field = panel.lastElementChild;
   const input = field.firstElementChild;
   let panelTop = 64;
-  let panelBottom = 340;
+  const panelBottom = 800;
+  const dock = dialog.lastElementChild;
+  let dockTop = 356;
+  dock.getBoundingClientRect = () => ({ top: dockTop, height: 64 });
   let inputTop = 420;
   let inputHeight = 80;
   panel.getBoundingClientRect = () => ({ top: panelTop, bottom: panelBottom });
@@ -2883,11 +2889,11 @@ test("focused modal fields remain between the sticky header and panel bottom aft
     assert.equal(
       panel.scrollTop,
       172,
-      "lower field and label clear the panel bottom",
+      "lower field and label clear the floating dock",
     );
     revealModalField(input);
     assert.equal(panel.scrollTop, 172, "visible field does not move again");
-    panelBottom = 280;
+    dockTop = 296;
     revealModalField(input);
     assert.equal(panel.scrollTop, 232, "follows the keyboard's later resize");
     inputTop = 270;

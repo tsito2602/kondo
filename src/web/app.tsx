@@ -129,6 +129,27 @@ export function App() {
     const viewport = window.visualViewport;
     let revealFrame = 0;
     const update = () => {
+      const inset = dockKeyboardInset(
+        window.innerHeight,
+        viewport,
+        document.activeElement,
+      );
+      // Compact panels also retain their pre-keyboard height when scroll space
+      // is added underneath their content.
+      for (const panel of document.querySelectorAll<HTMLElement>(
+        "dialog[open]:not(.full) .modal-inner",
+      )) {
+        if (!inset) panel.style.removeProperty("--modal-panel-height");
+        else if (!panel.style.getPropertyValue("--modal-panel-height"))
+          panel.style.setProperty(
+            "--modal-panel-height",
+            `${panel.getBoundingClientRect().height}px`,
+          );
+      }
+      document.documentElement.style.setProperty(
+        "--modal-layout-height",
+        `${window.innerHeight}px`,
+      );
       document.documentElement.style.setProperty(
         "--modal-height",
         `${viewport?.height ?? window.innerHeight}px`,
@@ -139,10 +160,11 @@ export function App() {
       );
       document.documentElement.style.setProperty(
         "--dock-keyboard-inset",
-        `${dockKeyboardInset(window.innerHeight, viewport, document.activeElement)}px`,
+        `${inset}px`,
       );
-      // Safari's native focus scroll runs before our panel has shrunk. Measure
-      // after the viewport styles apply, including keyboard animation/panning.
+      document.documentElement.dataset.keyboardOpen = String(inset > 0);
+      // The panel keeps its layout height. Reveal the field after the dock has
+      // moved above the keyboard, including Safari's viewport panning.
       cancelAnimationFrame(revealFrame);
       revealFrame = requestAnimationFrame(() => {
         if (!viewport || Math.abs(viewport.scale - 1) <= 0.01)
