@@ -1,4 +1,4 @@
-import { ArrowRight, Plane } from "lucide-react";
+import { ArrowRight, Plane, TrainFront } from "lucide-react";
 import { findAirportByCode } from "@/data/airports";
 import type { Booking } from "@/data/types";
 import { ticketDate } from "./ticket-content";
@@ -60,6 +60,8 @@ export function BookingTicketContent({ booking }: { booking: Booking }) {
             <span />
             {booking.kind === "flight" ? (
               <Plane className="ticket-route-plane" size={18} />
+            ) : booking.kind === "train" ? (
+              <TrainFront size={18} />
             ) : (
               <ArrowRight size={16} />
             )}

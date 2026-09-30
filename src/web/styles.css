@@ -4556,7 +4556,7 @@ input::-webkit-date-and-time-value {
 .booking-ticket {
   --ticket-stub-width: 44px;
   --ticket-route-gap: 8px;
-  --ticket-route-middle: clamp(36px, 12vw, 72px);
+  --ticket-route-middle: clamp(54px, 18vw, 108px);
   min-height: 0;
 }
 .ticket-main .ticket-title {
