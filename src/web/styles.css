@@ -1092,7 +1092,7 @@ strong {
   background: var(--content-card);
   text-align: left;
 }
-.stay-entry {
+.day-stays .stay-entry {
   padding-bottom: 0;
 }
 .stay-heading {
@@ -4505,5 +4505,155 @@ input::-webkit-date-and-time-value {
     height: 100%;
     border-radius: 999px;
     font-size: 14px;
+  }
+}
+
+.airport-fields {
+  display: grid;
+  gap: 16px;
+}
+.airport-field {
+  position: relative;
+  min-width: 0;
+}
+.airport-code {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.airport-options {
+  list-style: none;
+  padding: 4px;
+  margin: 6px 0 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-field);
+  background: var(--content-card);
+}
+.airport-options li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 10px;
+  border-radius: var(--radius-field);
+  cursor: pointer;
+}
+.airport-options li[aria-selected="true"],
+.airport-options li:hover {
+  background: var(--surface-hover, var(--line));
+}
+.airport-options li span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.airport-options strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.airport-options small,
+.airport-options b {
+  color: var(--muted);
+  font-size: 12px;
+}
+.form-hint {
+  margin: -8px 0 0;
+  font-size: 12px;
+}
+
+/* Reservation hierarchy: place → dates and times → reference numbers. */
+.booking-ticket {
+  --ticket-stub-width: 48px;
+}
+.ticket-main .ticket-title {
+  display: block;
+  margin: 10px 0 16px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.025em;
+}
+.ticket-route {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 18px;
+}
+.ticket-route > svg {
+  color: var(--muted);
+}
+.ticket-place {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+.ticket-place strong {
+  font-size: 21px;
+  line-height: 1.35;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+.ticket-place span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+.ticket-schedule {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+.ticket-schedule.single {
+  grid-template-columns: 1fr;
+}
+.ticket-schedule > div {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+.ticket-schedule small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.ticket-schedule span {
+  font-size: 13px;
+  font-weight: 500;
+}
+.ticket-schedule time {
+  font-size: 16px;
+  font-weight: 600;
+}
+.ticket-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.ticket-meta b {
+  font-weight: 500;
+}
+@media (max-width: 380px) {
+  .booking-ticket {
+    --ticket-stub-width: 38px;
+  }
+  .ticket-place strong {
+    font-size: 18px;
+  }
+  .ticket-main .ticket-title {
+    font-size: 22px;
+  }
+  .ticket-route {
+    gap: 7px;
   }
 }

@@ -13,9 +13,7 @@ export const isJourney = (booking?: Booking) =>
   booking?.kind === "flight" || booking?.kind === "train";
 
 export function dayTimeline(entries: Entry[], day: string) {
-  const timed = entries.filter(
-    (entry) => entry.day === day && entry.booking?.kind !== "hotel",
-  );
+  const timed = entries.filter((entry) => entry.day === day);
   // Only join neighbours. Other appointments keep their chronological position.
   return timed.flatMap((entry, index) => {
     const previous = timed[index - 1];
@@ -122,74 +120,74 @@ export function StayCards({
   day: string;
   onOpen: (id: string) => void;
 }) {
-  const stays = staysOnDay(bookings, day);
+  const stays = staysOnDay(bookings, day).filter(
+    (booking) => booking.day < day && day < booking.endDay,
+  );
   if (!stays.length) return null;
   return (
-    <div className="day-stays" aria-label="この日の宿泊">
-      {stays.map((booking) => {
-        const endpoint =
-          day === booking.day
-            ? "start"
-            : day === booking.endDay
-              ? "end"
-              : undefined;
-        const time =
-          endpoint === "start"
-            ? booking.time
-            : endpoint === "end"
-              ? booking.endTime
-              : "";
-        const label =
-          day === booking.day
-            ? "チェックイン"
-            : day === booking.endDay
-              ? "チェックアウト日"
-              : "連泊";
-        const StayIcon =
-          day === booking.day
-            ? LogIn
-            : day === booking.endDay
-              ? LogOut
-              : BedDouble;
-        return (
-          <button
-            className="timeline-entry stay-entry"
-            key={booking.id}
-            onClick={() => onOpen(booking.id)}
-          >
-            <time>{endpoint ? time || "未定" : ""}</time>
-            <span
-              className="timeline-marker"
-              data-endpoint={booking.day === booking.endDay ? "both" : endpoint}
-              aria-hidden="true"
-            >
-              <StayIcon size={16} />
-              {booking.day === booking.endDay && <LogOut size={16} />}
-            </span>
-            <div className="stay-card" data-press-card>
-              <div className="stay-heading">
-                <span>{label}</span>
-              </div>
-              <h3>{booking.title}</h3>
-              <div className="stay-range">
-                <div>
-                  <span>チェックイン</span>
-                  <strong>{shortDate(booking.day)}</strong>
-                  <span>{booking.time ? `${booking.time}〜` : "時刻未定"}</span>
-                </div>
-                <ArrowRight size={15} aria-hidden="true" />
-                <div>
-                  <span>チェックアウト</span>
-                  <strong>{shortDate(booking.endDay)}</strong>
-                  <span>
-                    {booking.endTime ? `〜${booking.endTime}` : "時刻未定"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </button>
-        );
-      })}
+    <div className="day-stays" aria-label="この日の連泊">
+      {stays.map((booking) => (
+        <StayCard key={booking.id} booking={booking} onOpen={onOpen} />
+      ))}
     </div>
+  );
+}
+
+export function StayCard({
+  booking,
+  endpoint,
+  onOpen,
+}: {
+  booking: Booking;
+  endpoint?: "start" | "end";
+  onOpen: (id: string) => void;
+}) {
+  const time =
+    endpoint === "start"
+      ? booking.time
+      : endpoint === "end"
+        ? booking.endTime
+        : "";
+  const label =
+    endpoint === "start"
+      ? "チェックイン"
+      : endpoint === "end"
+        ? "チェックアウト"
+        : "連泊";
+  const StayIcon =
+    endpoint === "start" ? LogIn : endpoint === "end" ? LogOut : BedDouble;
+  return (
+    <button
+      className="timeline-entry stay-entry"
+      onClick={() => onOpen(booking.id)}
+    >
+      <time>{endpoint ? time || "未定" : ""}</time>
+      <span
+        className="timeline-marker"
+        data-endpoint={endpoint}
+        aria-hidden="true"
+      >
+        <StayIcon size={16} />
+      </span>
+      <div className="stay-card" data-press-card>
+        <div className="stay-heading">
+          <span>{label}</span>
+        </div>
+        <h3>{booking.title}</h3>
+        <div className="stay-range">
+          <div>
+            <span>チェックイン</span>
+            <strong>{shortDate(booking.day)}</strong>
+            <span>{booking.time ? `${booking.time}〜` : "時刻未定"}</span>
+          </div>
+          <ArrowRight size={15} aria-hidden="true" />
+          <div>
+            <span>チェックアウト</span>
+            <strong>{shortDate(booking.endDay || booking.day)}</strong>
+            <span>{booking.endTime ? `〜${booking.endTime}` : "時刻未定"}</span>
+          </div>
+        </div>
+      </div>
+    </button>
   );
 }

@@ -1,11 +1,12 @@
 import { PlaceStatusLabel } from "./place-status";
 import { DayStrip } from "./day-strip";
-import { ticketDate } from "./ticket-content";
+import { BookingTicketContent } from "./booking-ticket";
 import {
   dayTimeline,
   isJourney,
   JourneyPair,
   StayCards,
+  StayCard,
 } from "./itinerary-bookings";
 import { PlaceCard } from "./place-card";
 import { TaskList } from "./task-list";
@@ -282,6 +283,15 @@ export function ItineraryScreen() {
                 </button>
               )}
               {dayEntries.map((entry) => {
+                if (entry.booking?.kind === "hotel")
+                  return (
+                    <StayCard
+                      key={entry.key}
+                      booking={entry.booking}
+                      endpoint={entry.endpoint}
+                      onOpen={(id) => setDetail({ type: "booking", id })}
+                    />
+                  );
                 const ItemIcon = entry.item
                   ? itineraryIcons[itemCategory(entry.item).value]
                   : CalendarDays;
@@ -456,34 +466,7 @@ export function BookingsScreen() {
                         }
                       </span>
                     </div>
-                    <h2>{booking.title}</h2>
-                    {["flight", "train", "car"].includes(booking.kind) &&
-                      (booking.originCode ||
-                        booking.origin ||
-                        booking.destinationCode ||
-                        booking.destination) && (
-                        <p className="ticket-route-summary">
-                          {booking.originCode || booking.origin || "未定"} →{" "}
-                          {booking.destinationCode ||
-                            booking.destination ||
-                            "未定"}
-                        </p>
-                      )}
-                    <p className="ticket-date-summary">
-                      <span>
-                        {ticketDate(booking.day)}
-                        {booking.kind === "hotel" &&
-                        booking.endDay &&
-                        booking.endDay !== booking.day
-                          ? ` 〜 ${ticketDate(booking.endDay, booking.day)}`
-                          : ""}
-                      </span>
-                      <span className="ticket-start-time">
-                        {booking.time
-                          ? `${booking.time}${booking.kind === "hotel" ? "〜" : ""}`
-                          : "時刻未定"}
-                      </span>
-                    </p>
+                    <BookingTicketContent booking={booking} />
                   </div>
                   <div className="ticket-stub">
                     <BookingIcon

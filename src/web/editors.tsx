@@ -5,7 +5,8 @@ import { Input } from "./obsidian/input";
 import { Textarea } from "./obsidian/textarea";
 import { type FormEvent, useRef, useState } from "react";
 import { Trash2, Plus } from "lucide-react";
-import { findAirports } from "@/data/airports";
+import { AirportField } from "./airport-field";
+import { findAirportByCode } from "@/data/airports";
 import { findMatchingItineraryItem } from "@/data/booking-match";
 import { useTravel } from "@/data/travel-provider";
 import {
@@ -421,6 +422,21 @@ export function ItemEditor({
     </Modal>
   );
 }
+function flightTitle(
+  booking: Pick<
+    Booking,
+    "origin" | "originCode" | "destination" | "destinationCode"
+  >,
+) {
+  return (
+    [
+      booking.originCode || booking.origin,
+      booking.destinationCode || booking.destination,
+    ]
+      .filter(Boolean)
+      .join(" → ") || "フライト"
+  ).slice(0, 160);
+}
 export function BookingEditor({
   booking,
   onClose,
@@ -431,12 +447,23 @@ export function BookingEditor({
   const travel = useTravel();
   const [draft, setDraft] = useState({
     kind: booking?.kind ?? ("flight" as BookingKind),
-    title: booking?.title ?? "",
+    title:
+      booking?.kind === "flight" && booking.title === flightTitle(booking)
+        ? ""
+        : (booking?.title ?? ""),
     detail: booking?.detail ?? "",
     location: booking?.location ?? "",
-    origin: booking?.origin ?? "",
+    origin:
+      booking?.origin ||
+      findAirportByCode(booking?.originCode ?? "")?.name ||
+      booking?.originCode ||
+      "",
     originCode: booking?.originCode ?? "",
-    destination: booking?.destination ?? "",
+    destination:
+      booking?.destination ||
+      findAirportByCode(booking?.destinationCode ?? "")?.name ||
+      booking?.destinationCode ||
+      "",
     destinationCode: booking?.destinationCode ?? "",
     day: booking?.day ?? travel.selectedTrip?.startsOn ?? localDate(),
     time: booking?.time ?? "",
@@ -446,16 +473,27 @@ export function BookingEditor({
     confirmationCode: booking?.confirmationCode ?? "",
     note: booking?.note ?? "",
   });
+  const titleLabel = {
+    flight: "便名（任意）",
+    hotel: "宿泊施設名",
+    train: "列車名・路線名",
+    car: "レンタカー会社・車名",
+    restaurant: "お店の名前",
+    ticket: "施設・イベント名",
+    other: "予約のタイトル",
+  }[draft.kind];
+  const displayTitle =
+    draft.title.trim() || (draft.kind === "flight" ? flightTitle(draft) : "");
   const [mergeId, setMergeId] = useState<string | null>(null);
   const candidate = !booking
-    ? findMatchingItineraryItem(travel.items, draft)
+    ? findMatchingItineraryItem(travel.items, { ...draft, title: displayTitle })
     : null;
   const merged = candidate?.item.id === mergeId ? candidate.item : null;
   const { error, busy, submit } = useSubmit(
     () => {
       const input = {
         ...draft,
-        title: draft.title.trim(),
+        title: displayTitle,
         endDay: draft.endDay || draft.day,
         note: [
           draft.note,
@@ -471,8 +509,8 @@ export function BookingEditor({
       if (merged) travel.deleteItem(merged.id);
     },
     () =>
-      !draft.title.trim()
-        ? "予約名を入力してください"
+      !displayTitle
+        ? `${titleLabel}を入力してください`
         : dateError(draft.day) ||
           (draft.endDay && !validDate(draft.endDay)
             ? "正しい終了日を入力してください"
@@ -491,20 +529,13 @@ export function BookingEditor({
       | "detail"
       | "location"
       | "origin"
-      | "originCode"
       | "destination"
-      | "destinationCode"
       | "confirmationCode",
     label: string,
     required = false,
   ) => (
     <Field label={label}>
       <Input
-        list={
-          key === "originCode" || key === "destinationCode"
-            ? `airports-${key}`
-            : undefined
-        }
         required={required}
         value={draft[key]}
         maxLength={
@@ -514,29 +545,15 @@ export function BookingEditor({
               ? 500
               : key === "confirmationCode"
                 ? 120
-                : key.endsWith("Code")
-                  ? 8
-                  : 160
+                : 160
         }
         onChange={(event) =>
           setDraft({
             ...draft,
-            [key]:
-              key.endsWith("Code") && key !== "confirmationCode"
-                ? event.target.value.toUpperCase()
-                : event.target.value,
+            [key]: event.target.value,
           })
         }
       />
-      {(key === "originCode" || key === "destinationCode") && (
-        <datalist id={`airports-${key}`}>
-          {findAirports(draft[key]).map((airport) => (
-            <option key={airport.code} value={airport.code}>
-              {airport.name}
-            </option>
-          ))}
-        </datalist>
-      )}
     </Field>
   );
   const route = ["flight", "train", "car"].includes(draft.kind);
@@ -567,38 +584,53 @@ export function BookingEditor({
             ))}
           </select>
         </Field>
-        {field("title", "予約名", true)}
+        {field("title", titleLabel, draft.kind !== "flight")}
+        {draft.kind === "flight" && (
+          <p className="muted form-hint">
+            例：GK211。空欄の場合は出発地・到着地を表示します。
+          </p>
+        )}
         {field(
           "detail",
-          draft.kind === "flight" ? "便名・航空会社" : "予約内容",
+          draft.kind === "flight" ? "航空会社・補足（任意）" : "予約内容",
         )}
         {route && (
-          <>
-            <div className="form-grid">
-              {field(
-                "origin",
-                draft.kind === "car"
-                  ? "受取場所"
-                  : draft.kind === "train"
-                    ? "出発駅"
-                    : "出発地",
-              )}
-              {field(
-                "destination",
-                draft.kind === "car"
-                  ? "返却場所"
-                  : draft.kind === "train"
-                    ? "到着駅"
-                    : "到着地",
-              )}
-            </div>
-            {draft.kind === "flight" && (
-              <div className="form-grid">
-                {field("originCode", "出発空港（IATA）")}
-                {field("destinationCode", "到着空港（IATA）")}
-              </div>
+          <div
+            className={draft.kind === "flight" ? "airport-fields" : "form-grid"}
+          >
+            {draft.kind === "flight" ? (
+              <>
+                <AirportField
+                  label="出発地"
+                  value={draft.origin}
+                  code={draft.originCode}
+                  onChange={(origin, originCode) =>
+                    setDraft((current) => ({ ...current, origin, originCode }))
+                  }
+                />
+                <AirportField
+                  label="到着地"
+                  value={draft.destination}
+                  code={draft.destinationCode}
+                  onChange={(destination, destinationCode) =>
+                    setDraft((current) => ({
+                      ...current,
+                      destination,
+                      destinationCode,
+                    }))
+                  }
+                />
+              </>
+            ) : (
+              <>
+                {field("origin", draft.kind === "car" ? "受取場所" : "出発駅")}
+                {field(
+                  "destination",
+                  draft.kind === "car" ? "返却場所" : "到着駅",
+                )}
+              </>
             )}
-          </>
+          </div>
         )}
         {!route && field("location", "住所・Google MapsのURL")}
         <DatePicker
