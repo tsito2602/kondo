@@ -29,10 +29,8 @@ function RoutePlace({
 
 export function BookingTicketContent({
   booking,
-  category,
 }: {
   booking: Booking;
-  category?: string;
 }) {
   const route = ["flight", "train", "car"].includes(booking.kind);
   const hasRoute =
@@ -52,10 +50,9 @@ export function BookingTicketContent({
         : ["出発", "到着"];
   return (
     <>
-      <div className="ticket-category">
-        <span>{category}</span>
-        {hasRoute && <span className="ticket-service">{booking.title}</span>}
-      </div>
+      {hasRoute && booking.title && (
+        <div className="ticket-service">{booking.title}</div>
+      )}
       {hasRoute ? (
         <div className="ticket-route" aria-label="出発地から到着地">
           <RoutePlace

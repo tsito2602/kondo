@@ -583,19 +583,8 @@ strong {
   overflow-wrap: anywhere;
   margin-bottom: 10px;
 }
-.ticket-category {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 500;
-}
-.ticket-category svg,
 .trip-destination svg {
   flex-shrink: 0;
-}
-.ticket-category {
-  color: var(--muted);
 }
 .trip-ticket-period {
   margin-top: auto;
@@ -4651,20 +4640,13 @@ input::-webkit-date-and-time-value {
 .booking-ticket .ticket-main {
   padding: 12px 15px;
 }
-.booking-ticket .ticket-category {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
-}
-.ticket-category > span:first-child {
-  flex-shrink: 0;
-}
 .ticket-service {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-align: right;
 }
 .booking-grid {
   gap: 12px;

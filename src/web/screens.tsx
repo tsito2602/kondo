@@ -457,20 +457,18 @@ export function BookingsScreen() {
                   onClick={() => setId(booking.id)}
                 >
                   <div className="ticket-main">
-                    <BookingTicketContent
-                      booking={booking}
-                      category={
-                        bookingKinds.find(
-                          (entry) => entry.value === booking.kind,
-                        )?.label
-                      }
-                    />
+                    <BookingTicketContent booking={booking} />
                   </div>
                   <div className="ticket-stub">
                     <BookingIcon
                       size={24}
                       strokeWidth={1.5}
-                      aria-hidden="true"
+                      role="img"
+                      aria-label={
+                        bookingKinds.find(
+                          (entry) => entry.value === booking.kind,
+                        )?.label
+                      }
                     />
                   </div>
                 </button>
