@@ -235,7 +235,7 @@ const submit = async () => {
   await tick(30);
 };
 
-// Panels retain the layout viewport while the dock follows the keyboard.
+// Panels and dock retain the layout viewport when the keyboard opens.
 // Exercise focus, keyboard resizing/panning and dismissal in each real editor.
 const keyboardWhileEditing = async () => {
   const dialog = [...document.querySelectorAll("dialog[open]")].at(-1);
@@ -248,7 +248,7 @@ const keyboardWhileEditing = async () => {
   const measureField = field.getBoundingClientRect;
   const measureDock = dock.getBoundingClientRect;
   dock.getBoundingClientRect = () => ({
-    top: visualViewport.offsetTop + visualViewport.height - 84,
+    top: window.innerHeight - 84,
     height: 64,
   });
   panel.getBoundingClientRect = () => ({
@@ -290,8 +290,8 @@ const keyboardWhileEditing = async () => {
       );
     assert.equal(
       panel.scrollTop,
-      198 - offsetTop,
-      "only panel content scrolls to reveal the focused field above the dock",
+      Math.max(0, 98 - offsetTop),
+      "only panel content scrolls to reveal the focused field above the keyboard",
     );
     assert.equal(dock.parentElement, dialog);
     assert.ok(dock.querySelector('button[type="submit"]'));
@@ -336,7 +336,7 @@ const keyboardWhileEditing = async () => {
     visualViewport.dispatchEvent(new dom.window.Event("resize"));
   });
   assert.equal(
-    document.documentElement.style.getPropertyValue("--dock-keyboard-inset"),
+    document.documentElement.style.getPropertyValue("--panel-keyboard-inset"),
     "0px",
   );
   assert.equal(document.documentElement.dataset.keyboardOpen, "false");

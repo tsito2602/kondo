@@ -34,7 +34,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export { finishBootScreen } from './src/web/boot'; export { PlaceCard } from './src/web/place-card'; export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { dockKeyboardInset, revealModalField } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { finishBootScreen } from './src/web/boot'; export { PlaceCard } from './src/web/place-card'; export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { keyboardInset, revealModalField } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -78,7 +78,7 @@ const {
   morphDock,
   ContextDock,
   animateDockPress,
-  dockKeyboardInset,
+  keyboardInset,
   revealModalField,
   SaveButton,
   dismissModal,
@@ -1440,54 +1440,54 @@ test("dock contour pinches continuously and separates into three surfaces at mob
   }
 });
 
-test("dock ignores top-edge rubber banding and only lifts for a focused software keyboard", () => {
+test("keyboard occlusion ignores rubber banding and non-editable focus", () => {
   const input = document.createElement("input");
   const viewport = { height: 800, offsetTop: 0, scale: 1 };
   for (const offsetTop of [-240, -120, -20, 0, 80]) {
     assert.equal(
-      dockKeyboardInset(800, { ...viewport, offsetTop }, document.body),
+      keyboardInset(800, { ...viewport, offsetTop }, document.body),
       0,
     );
-    assert.equal(dockKeyboardInset(800, { ...viewport, offsetTop }, input), 0);
+    assert.equal(keyboardInset(800, { ...viewport, offsetTop }, input), 0);
   }
   assert.equal(
-    dockKeyboardInset(800, { ...viewport, height: 740 }, input),
+    keyboardInset(800, { ...viewport, height: 740 }, input),
     0,
     "browser chrome does not open a keyboard",
   );
   assert.equal(
-    dockKeyboardInset(800, { ...viewport, height: 480 }, document.body),
+    keyboardInset(800, { ...viewport, height: 480 }, document.body),
     0,
     "no focused editor means no keyboard lift",
   );
   assert.equal(
-    dockKeyboardInset(800, { ...viewport, height: 480 }, input),
+    keyboardInset(800, { ...viewport, height: 480 }, input),
     320,
   );
   assert.equal(
-    dockKeyboardInset(800, { ...viewport, height: 480, offsetTop: 50 }, input),
+    keyboardInset(800, { ...viewport, height: 480, offsetTop: 50 }, input),
     270,
   );
   assert.equal(
-    dockKeyboardInset(800, { ...viewport, height: 480, offsetTop: -30 }, input),
+    keyboardInset(800, { ...viewport, height: 480, offsetTop: -30 }, input),
     320,
     "negative overscroll never adds extra lift",
   );
   assert.equal(
-    dockKeyboardInset(800, { ...viewport, height: 400, scale: 2 }, input),
+    keyboardInset(800, { ...viewport, height: 400, scale: 2 }, input),
     0,
     "pinch zoom is not a keyboard",
   );
   input.readOnly = true;
-  assert.equal(dockKeyboardInset(800, { ...viewport, height: 480 }, input), 0);
+  assert.equal(keyboardInset(800, { ...viewport, height: 480 }, input), 0);
   input.readOnly = false;
   input.type = "checkbox";
   assert.equal(
-    dockKeyboardInset(800, { ...viewport, height: 480 }, input),
+    keyboardInset(800, { ...viewport, height: 480 }, input),
     0,
     "checkbox focus does not require a keyboard",
   );
-  assert.equal(dockKeyboardInset(800, null, input), 0);
+  assert.equal(keyboardInset(800, null, input), 0);
 });
 
 test("all dock layouts morph through a shared contour with real necks and clean separated endpoints", async () => {
@@ -2188,20 +2188,19 @@ test("the mobile add button survives page replacement and uses the current page 
   }
 });
 
-test("panel height stays independent of the keyboard while its dock rises", async () => {
+test("panel and dock geometry stays independent of the keyboard", async () => {
   const css = await readFile("src/web/styles.css", "utf8");
   const panelDock = css.match(
     /dialog \.thumb-dock-host:not\(\[hidden\]\)\s*\{([^}]+)\}/,
   )?.[1];
   assert.ok(panelDock);
   assert.match(panelDock, /position: absolute;/);
-  assert.match(
-    panelDock,
-    /bottom: calc\([^;]*var\(--dock-keyboard-inset, 0px\)[^;]*\);/,
-  );
+  assert.doesNotMatch(panelDock, /--panel-keyboard-inset/);
+  assert.match(panelDock, /bottom: calc\(var\(--dock-bottom-gap\) \+ env\(safe-area-inset-bottom\)\);/);
+  assert.doesNotMatch(css, /\n\s+bottom:[^;]*--panel-keyboard-inset/);
   assert.match(
     css,
-    /padding-bottom: calc\(24px \+ var\(--dock-keyboard-inset, 0px\)\);/,
+    /padding-bottom: calc\(24px \+ var\(--panel-keyboard-inset, 0px\)\);/,
   );
   assert.match(
     css,

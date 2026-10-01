@@ -1,5 +1,5 @@
 /** Rubber-band scrolling and browser chrome are not keyboard occlusion. */
-export function dockKeyboardInset(
+export function keyboardInset(
   layoutHeight: number,
   viewport: Pick<VisualViewport, "height" | "offsetTop" | "scale"> | null,
   focused: Element | null,
@@ -35,9 +35,15 @@ export function revealModalField(focused: Element | null) {
     ".thumb-dock-host:not([hidden])",
   );
   const dockBounds = dock?.getBoundingClientRect();
+  const inset = keyboardInset(
+    window.innerHeight,
+    window.visualViewport,
+    focused,
+  );
   const bottom =
     Math.min(
       bounds.bottom,
+      inset > 0 ? window.innerHeight - inset : bounds.bottom,
       dockBounds && dockBounds.height > 0 ? dockBounds.top - 16 : bounds.bottom,
     ) - 12;
   if (bottom <= top) return;
