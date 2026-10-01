@@ -13,6 +13,7 @@ import {
 import { createPortal } from "react-dom";
 import { referenceUrl, registeredGoogleMapsUrl } from "@/data/places";
 import { menuDepth } from "./menu-depth";
+import { lockModalPage } from "./modal-scroll-lock";
 import {
   animateDialog,
   dismissModal,
@@ -238,8 +239,7 @@ export function Modal({
   useLayoutEffect(() => {
     const dialog = ref.current!;
     const focus = document.activeElement as HTMLElement | null;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const releasePage = lockModalPage();
     origin.current = motionOrigin();
     const opener = origin.current ?? focus;
     dialog.showModal();
@@ -276,7 +276,7 @@ export function Modal({
       animation.current?.cancel();
       backdropAnimation.current?.cancel();
       dialog.close();
-      document.body.style.overflow = previous;
+      releasePage();
       if (document.documentElement.dataset.inputModality === "pointer") {
         // Native dialog.close() may restore a stale tab panel on touch Safari.
         // Clear that restoration without stealing focus from a newer dialog.

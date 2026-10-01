@@ -58,7 +58,7 @@ import { TripEditor } from "./editors";
 import { SafariTabs, tripTabs } from "./safari-tabs";
 import { AnchoredMenu } from "./anchored-menu";
 import { installPressFeedback } from "./press-feedback";
-import { dockKeyboardInset, revealModalField } from "./viewport";
+import { keyboardInset, revealModalField } from "./viewport";
 import { ThumbDock, ThumbDockProvider, ContextDock } from "./thumb-dock";
 import {
   BookingsScreen,
@@ -128,7 +128,45 @@ export function App() {
   useEffect(() => {
     const viewport = window.visualViewport;
     let revealFrame = 0;
+    let blurFrame = 0;
+    let lastHeight = 0;
+    let lastLayoutHeight = 0;
+    let lastFocused: Element | null = null;
     const update = () => {
+      // Pinch zoom and Safari's viewport pan must not trigger a second scroll
+      // of the field. Only a focus change or resized keyboard needs revealing.
+      if (viewport && Math.abs(viewport.scale - 1) > 0.01) return;
+      cancelAnimationFrame(blurFrame);
+      const height = viewport?.height ?? window.innerHeight;
+      const focused = document.activeElement;
+      const reveal =
+        focused !== lastFocused ||
+        Math.abs(height - lastHeight) > 1 ||
+        Math.abs(window.innerHeight - lastLayoutHeight) > 1;
+      lastHeight = height;
+      lastLayoutHeight = window.innerHeight;
+      lastFocused = focused;
+      const inset = keyboardInset(
+        window.innerHeight,
+        viewport,
+        document.activeElement,
+      );
+      // Compact panels also retain their pre-keyboard height when scroll space
+      // is added underneath their content.
+      for (const panel of document.querySelectorAll<HTMLElement>(
+        "dialog[open]:not(.full) .modal-inner",
+      )) {
+        if (!inset) panel.style.removeProperty("--modal-panel-height");
+        else if (!panel.style.getPropertyValue("--modal-panel-height"))
+          panel.style.setProperty(
+            "--modal-panel-height",
+            `${panel.getBoundingClientRect().height}px`,
+          );
+      }
+      document.documentElement.style.setProperty(
+        "--modal-layout-height",
+        `${window.innerHeight}px`,
+      );
       document.documentElement.style.setProperty(
         "--modal-height",
         `${viewport?.height ?? window.innerHeight}px`,
@@ -138,30 +176,39 @@ export function App() {
         `${Math.max(0, viewport?.offsetTop ?? 0)}px`,
       );
       document.documentElement.style.setProperty(
-        "--dock-keyboard-inset",
-        `${dockKeyboardInset(window.innerHeight, viewport, document.activeElement)}px`,
+        "--panel-keyboard-inset",
+        `${inset}px`,
       );
-      // Safari's native focus scroll runs before our panel has shrunk. Measure
-      // after the viewport styles apply, including keyboard animation/panning.
-      cancelAnimationFrame(revealFrame);
-      revealFrame = requestAnimationFrame(() => {
-        if (!viewport || Math.abs(viewport.scale - 1) <= 0.01)
-          revealModalField(document.activeElement);
-      });
+      document.documentElement.dataset.keyboardOpen = String(inset > 0);
+      // Keep the panel and dock in place. Only scroll its content to reveal
+      // the field above the keyboard, including Safari's viewport panning.
+      if (reveal) {
+        cancelAnimationFrame(revealFrame);
+        revealFrame = requestAnimationFrame(() =>
+          revealModalField(document.activeElement),
+        );
+      }
+    };
+    // Switching between fields briefly focuses body. Keep keyboard padding and
+    // panel scroll stable until the destination field receives focus.
+    const afterBlur = () => {
+      cancelAnimationFrame(blurFrame);
+      blurFrame = requestAnimationFrame(update);
     };
     update();
     viewport?.addEventListener("resize", update);
     viewport?.addEventListener("scroll", update);
     window.addEventListener("resize", update);
     document.addEventListener("focusin", update);
-    document.addEventListener("focusout", update);
+    document.addEventListener("focusout", afterBlur);
     return () => {
       cancelAnimationFrame(revealFrame);
+      cancelAnimationFrame(blurFrame);
       viewport?.removeEventListener("resize", update);
       viewport?.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
       document.removeEventListener("focusin", update);
-      document.removeEventListener("focusout", update);
+      document.removeEventListener("focusout", afterBlur);
     };
   }, []);
   if (auth.loading) return <Loading />;

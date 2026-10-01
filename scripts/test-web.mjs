@@ -235,8 +235,8 @@ const submit = async () => {
   await tick(30);
 };
 
-// Safari can pan its visual viewport while the keyboard resizes it. Every
-// editor uses the same viewport-sized dialog; its dock must stay inside it.
+// Panels and dock retain the layout viewport when the keyboard opens.
+// Exercise focus, keyboard resizing/panning and dismissal in each real editor.
 const keyboardWhileEditing = async () => {
   const dialog = [...document.querySelectorAll("dialog[open]")].at(-1);
   const dock = document.querySelector(".thumb-dock-host");
@@ -246,20 +246,26 @@ const keyboardWhileEditing = async () => {
   const measurePanel = panel.getBoundingClientRect;
   const measureHeader = header.getBoundingClientRect;
   const measureField = field.getBoundingClientRect;
+  const measureDock = dock.getBoundingClientRect;
+  dock.getBoundingClientRect = () => ({
+    top: window.innerHeight - 84,
+    height: 64,
+  });
   panel.getBoundingClientRect = () => ({
-    top: visualViewport.offsetTop,
-    bottom: visualViewport.offsetTop + visualViewport.height - 100,
+    top: 0,
+    bottom: window.innerHeight - 100,
+    height: window.innerHeight - 100,
   });
   header.getBoundingClientRect = () => ({
-    bottom: visualViewport.offsetTop + 56,
+    bottom: 56,
   });
   field.getBoundingClientRect = () => ({
-    top: visualViewport.offsetTop + 380 - panel.scrollTop,
-    bottom: visualViewport.offsetTop + 426 - panel.scrollTop,
+    top: 380 - panel.scrollTop,
+    bottom: 426 - panel.scrollTop,
   });
   await act(async () => field.focus());
+  panel.scrollTop = 0;
   for (const offsetTop of [0, 64, 112]) {
-    panel.scrollTop = 0;
     await act(async () => {
       visualViewport.height = 340;
       visualViewport.offsetTop = offsetTop;
@@ -267,22 +273,41 @@ const keyboardWhileEditing = async () => {
       visualViewport.dispatchEvent(new dom.window.Event("scroll"));
     });
     assert.equal(
-      document.documentElement.style.getPropertyValue("--modal-height"),
-      "340px",
+      document.documentElement.style.getPropertyValue("--modal-layout-height"),
+      window.innerHeight + "px",
     );
     assert.equal(
       document.documentElement.style.getPropertyValue("--modal-top"),
       offsetTop + "px",
     );
     await tick(30);
+    assert.equal(document.documentElement.dataset.keyboardOpen, "true");
+    if (!dialog.classList.contains("full"))
+      assert.equal(
+        panel.style.getPropertyValue("--modal-panel-height"),
+        `${window.innerHeight - 100}px`,
+        "compact panels preserve their height too",
+      );
     assert.equal(
       panel.scrollTop,
-      198,
-      "viewport resize reveals the focused field above the dock",
+      98,
+      "reveal once on keyboard resize, not repeatedly during native viewport pan",
     );
     assert.equal(dock.parentElement, dialog);
     assert.ok(dock.querySelector('button[type="submit"]'));
   }
+  const keyboardPadding = document.documentElement.style.getPropertyValue(
+    "--panel-keyboard-inset",
+  );
+  await act(async () => {
+    field.blur();
+    assert.equal(
+      document.documentElement.style.getPropertyValue("--panel-keyboard-inset"),
+      keyboardPadding,
+      "transient body focus between editors must not remove keyboard scroll space",
+    );
+    field.focus();
+  });
   const previousValue = field.value;
   const dismiss = dialog.querySelector('[aria-label="キーボードを閉じる"]');
   assert.ok(dismiss, "focused editor replaces Back with keyboard dismissal");
@@ -315,6 +340,7 @@ const keyboardWhileEditing = async () => {
   panel.getBoundingClientRect = measurePanel;
   header.getBoundingClientRect = measureHeader;
   field.getBoundingClientRect = measureField;
+  dock.getBoundingClientRect = measureDock;
   await act(async () => {
     field.blur();
     visualViewport.height = window.innerHeight;
@@ -322,9 +348,11 @@ const keyboardWhileEditing = async () => {
     visualViewport.dispatchEvent(new dom.window.Event("resize"));
   });
   assert.equal(
-    document.documentElement.style.getPropertyValue("--dock-keyboard-inset"),
+    document.documentElement.style.getPropertyValue("--panel-keyboard-inset"),
     "0px",
   );
+  assert.equal(document.documentElement.dataset.keyboardOpen, "false");
+  assert.equal(panel.style.getPropertyValue("--modal-panel-height"), "");
 };
 
 // Exercise real details/editors: a fresh dialog would replay its entrance and
