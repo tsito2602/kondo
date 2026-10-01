@@ -264,8 +264,8 @@ const keyboardWhileEditing = async () => {
     bottom: 426 - panel.scrollTop,
   });
   await act(async () => field.focus());
+  panel.scrollTop = 0;
   for (const offsetTop of [0, 64, 112]) {
-    panel.scrollTop = 0;
     await act(async () => {
       visualViewport.height = 340;
       visualViewport.offsetTop = offsetTop;
@@ -290,12 +290,24 @@ const keyboardWhileEditing = async () => {
       );
     assert.equal(
       panel.scrollTop,
-      Math.max(0, 98 - offsetTop),
-      "only panel content scrolls to reveal the focused field above the keyboard",
+      98,
+      "reveal once on keyboard resize, not repeatedly during native viewport pan",
     );
     assert.equal(dock.parentElement, dialog);
     assert.ok(dock.querySelector('button[type="submit"]'));
   }
+  const keyboardPadding = document.documentElement.style.getPropertyValue(
+    "--panel-keyboard-inset",
+  );
+  await act(async () => {
+    field.blur();
+    assert.equal(
+      document.documentElement.style.getPropertyValue("--panel-keyboard-inset"),
+      keyboardPadding,
+      "transient body focus between editors must not remove keyboard scroll space",
+    );
+    field.focus();
+  });
   const previousValue = field.value;
   const dismiss = dialog.querySelector('[aria-label="キーボードを閉じる"]');
   assert.ok(dismiss, "focused editor replaces Back with keyboard dismissal");

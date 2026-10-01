@@ -34,6 +34,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
+      "export { guardModalKeyboardFocus } from './src/web/modal-keyboard'; export { lockModalPage } from './src/web/modal-scroll-lock'; " +
       "export { finishBootScreen } from './src/web/boot'; export { PlaceCard } from './src/web/place-card'; export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { keyboardInset, revealModalField } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
@@ -52,6 +53,8 @@ new Function("require", "module", "exports", outputFiles[0].text)(
   module.exports,
 );
 const {
+  guardModalKeyboardFocus,
+  lockModalPage,
   finishBootScreen,
   PlaceCard,
   DayStrip,
@@ -1460,13 +1463,10 @@ test("keyboard occlusion ignores rubber banding and non-editable focus", () => {
     0,
     "no focused editor means no keyboard lift",
   );
-  assert.equal(
-    keyboardInset(800, { ...viewport, height: 480 }, input),
-    320,
-  );
+  assert.equal(keyboardInset(800, { ...viewport, height: 480 }, input), 320);
   assert.equal(
     keyboardInset(800, { ...viewport, height: 480, offsetTop: 50 }, input),
-    270,
+    320,
   );
   assert.equal(
     keyboardInset(800, { ...viewport, height: 480, offsetTop: -30 }, input),
@@ -2196,7 +2196,10 @@ test("panel and dock geometry stays independent of the keyboard", async () => {
   assert.ok(panelDock);
   assert.match(panelDock, /position: absolute;/);
   assert.doesNotMatch(panelDock, /--panel-keyboard-inset/);
-  assert.match(panelDock, /bottom: calc\(var\(--dock-bottom-gap\) \+ env\(safe-area-inset-bottom\)\);/);
+  assert.match(
+    panelDock,
+    /bottom: calc\(var\(--dock-bottom-gap\) \+ env\(safe-area-inset-bottom\)\);/,
+  );
   assert.doesNotMatch(css, /\n\s+bottom:[^;]*--panel-keyboard-inset/);
   assert.match(
     css,
@@ -2920,6 +2923,235 @@ test("focused modal fields remain above the moving dock inside an unchanged pane
   }
 });
 
+test("iOS focus guard keeps touch and accessory focus local while preserving caret, picker and swipe behavior", async () => {
+  const ua = Object.getOwnPropertyDescriptor(window.navigator, "userAgent");
+  Object.defineProperty(window.navigator, "userAgent", {
+    configurable: true,
+    value: "iPhone",
+  });
+  const dialog = document.createElement("dialog");
+  dialog.open = true;
+  dialog.innerHTML =
+    '<div class="modal-inner"><label>上<input id="top"></label><input id="middle"><textarea id="bottom">draft</textarea><input type="date"><input type="checkbox"><input readonly><select><option>A</option></select></div>';
+  document.body.append(dialog);
+  const [first, middle] = dialog.querySelectorAll("input:not([type])");
+  const last = dialog.querySelector("textarea");
+  const touch = (target, type, points, changed = points, stamp) => {
+    const event = new dom.window.Event(type, {
+      bubbles: true,
+      cancelable: true,
+    });
+    Object.defineProperties(event, {
+      touches: { value: points },
+      changedTouches: { value: changed },
+    });
+    if (stamp !== undefined)
+      Object.defineProperty(event, "timeStamp", { value: stamp });
+    target.dispatchEvent(event);
+    return event;
+  };
+  const point = { identifier: 1, clientX: 50, clientY: 100 };
+  const tap = (target) => {
+    touch(target, "touchstart", [point]);
+    return touch(target, "touchend", [], [point]);
+  };
+  const release = guardModalKeyboardFocus(document);
+  try {
+    first.style.setProperty("transform", "translateX(2px)", "important");
+    first.style.transition = "color 1s";
+    for (const field of [first, middle, last]) {
+      const event = tap(field === first ? first.closest("label") : field);
+      assert.equal(event.defaultPrevented, true);
+      assert.equal(
+        document.activeElement,
+        field,
+        "focus is synchronous so the keyboard still opens",
+      );
+      assert.equal(field.style.transform, "translateY(-10000px)");
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      assert.equal(
+        field.style.transform,
+        field === first ? "translateX(2px)" : "",
+      );
+    }
+    assert.equal(first.style.getPropertyPriority("transform"), "important");
+    assert.equal(first.style.transition, "color 1s");
+    last.setSelectionRange(2, 2);
+    assert.equal(
+      tap(last).defaultPrevented,
+      false,
+      "active editor retains native caret placement",
+    );
+    assert.equal(last.selectionStart, 2);
+    assert.equal(last.value, "draft");
+    first.focus();
+    assert.equal(
+      first.style.transform,
+      "translateY(-10000px)",
+      "accessory next/previous also guarded",
+    );
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    for (const field of dialog.querySelectorAll(
+      "input[type],input[readonly],select",
+    ))
+      assert.equal(
+        tap(field).defaultPrevented,
+        false,
+        "native pickers and non-editors stay native",
+      );
+    touch(last, "touchstart", [point]);
+    touch(last, "touchmove", [{ ...point, clientY: 160 }]);
+    assert.equal(
+      touch(last, "touchend", [], [{ ...point, clientY: 160 }])
+        .defaultPrevented,
+      false,
+      "swiping does not focus",
+    );
+    touch(last, "touchstart", [point, { ...point, identifier: 2 }]);
+    assert.equal(
+      touch(last, "touchend", [], [point]).defaultPrevented,
+      false,
+      "pinch is not a tap",
+    );
+    touch(last, "touchstart", [point], [point], 0);
+    assert.equal(
+      touch(last, "touchend", [], [point], 600).defaultPrevented,
+      false,
+      "long press retains selection",
+    );
+    const nested = document.createElement("dialog");
+    nested.open = true;
+    document.body.append(nested);
+    assert.equal(
+      tap(last).defaultPrevented,
+      false,
+      "background dialogs are not focus targets",
+    );
+    nested.remove();
+    last.focus();
+    release();
+    assert.equal(
+      last.style.transform,
+      "",
+      "cleanup restores a pending focus transform immediately",
+    );
+    first.focus();
+    assert.equal(
+      first.style.transform,
+      "translateX(2px)",
+      "no focus interception remains after cleanup",
+    );
+  } finally {
+    release();
+    dialog.remove();
+    if (ua) Object.defineProperty(window.navigator, "userAgent", ua);
+    else delete window.navigator.userAgent;
+  }
+});
+
+test("modal page lock survives nested replacement and restores the original scroll and inline styles", () => {
+  const ua = Object.getOwnPropertyDescriptor(window.navigator, "userAgent");
+  Object.defineProperty(window.navigator, "userAgent", {
+    configurable: true,
+    value: "iPhone",
+  });
+  const originalScroll = window.scrollTo,
+    originalY = window.scrollY;
+  const bodyStyle = document.body.getAttribute("style"),
+    rootStyle = document.documentElement.getAttribute("style");
+  window.scrollY = 320;
+  window.scrollTo = ({ top }) => {
+    window.scrollY = top;
+  };
+  document.body.style.setProperty("overflow", "auto", "important");
+  document.body.style.position = "relative";
+  const releaseFirst = lockModalPage(),
+    releaseNested = lockModalPage();
+  try {
+    assert.equal(document.body.style.position, "fixed");
+    assert.equal(document.body.style.top, "-320px");
+    assert.equal(
+      window.scrollY,
+      0,
+      "focus begins with an anchored layout viewport",
+    );
+    window.scrollY = 180;
+    window.dispatchEvent(new dom.window.Event("scroll"));
+    assert.equal(window.scrollY, 0, "native page pan cannot move the panel");
+    releaseFirst();
+    releaseFirst();
+    assert.equal(
+      document.body.style.position,
+      "fixed",
+      "an outgoing dialog cannot unlock its replacement",
+    );
+    releaseNested();
+    assert.equal(window.scrollY, 320);
+    assert.equal(document.body.style.position, "relative");
+    assert.equal(
+      document.body.style.getPropertyPriority("overflow"),
+      "important",
+    );
+    window.scrollY = 180;
+    window.dispatchEvent(new dom.window.Event("scroll"));
+    assert.equal(
+      window.scrollY,
+      180,
+      "normal page scrolling returns after the last close",
+    );
+  } finally {
+    releaseFirst();
+    releaseNested();
+    window.scrollTo = originalScroll;
+    window.scrollY = originalY;
+    if (bodyStyle === null) document.body.removeAttribute("style");
+    else document.body.setAttribute("style", bodyStyle);
+    if (rootStyle === null) document.documentElement.removeAttribute("style");
+    else document.documentElement.setAttribute("style", rootStyle);
+    if (ua) Object.defineProperty(window.navigator, "userAgent", ua);
+    else delete window.navigator.userAgent;
+  }
+});
+
+test("top, middle, last and tall textarea editors stay visible without moving the panel or dock", () => {
+  const previousViewport = Object.getOwnPropertyDescriptor(window, "visualViewport");
+  const viewport = { height: 400, offsetTop: 0, scale: 1 };
+  Object.defineProperty(window, "visualViewport", { configurable: true, value: viewport });
+  const dialog = document.createElement("dialog");
+  dialog.open = true;
+  dialog.innerHTML = '<div class="modal-inner"><header class="modal-header"></header><label class="field"><textarea>keep draft</textarea></label></div><div class="thumb-dock-host"></div>';
+  document.body.append(dialog);
+  const panel = dialog.firstElementChild, field = panel.lastElementChild, input = field.firstElementChild;
+  const geometry = { top: 12, bottom: 684, height: 672 };
+  panel.getBoundingClientRect = () => geometry;
+  panel.firstElementChild.getBoundingClientRect = () => ({ bottom: 68 });
+  dialog.lastElementChild.getBoundingClientRect = () => ({ top: 700, height: 64 });
+  let inputTop = 120, inputHeight = 44;
+  input.getBoundingClientRect = () => ({ top: inputTop - panel.scrollTop, bottom: inputTop + inputHeight - panel.scrollTop });
+  field.getBoundingClientRect = () => ({ top: inputTop - 24 - panel.scrollTop });
+  try {
+    for (const [top, height] of [[120,44],[420,44],[840,44],[120,44],[1000,500]]) {
+      inputTop = top; inputHeight = height;
+      revealModalField(input);
+      const bounds = input.getBoundingClientRect();
+      assert.ok(bounds.top >= 80 && bounds.top < 388);
+      if (height < 308) assert.ok(bounds.bottom <= 388, "deep fields rise above the keyboard");
+      assert.deepEqual(panel.getBoundingClientRect(), geometry);
+      assert.equal(dialog.lastElementChild.getBoundingClientRect().top, 700);
+      assert.equal(input.value, "keep draft");
+      const scroll = panel.scrollTop;
+      revealModalField(input);
+      assert.equal(panel.scrollTop, scroll, "settled focus never oscillates");
+    }
+    viewport.offsetTop = 400;
+    assert.equal(keyboardInset(window.innerHeight, viewport, input), window.innerHeight - 400, "native panning cannot erase keyboard scroll space");
+  } finally {
+    dialog.remove();
+    if (previousViewport) Object.defineProperty(window, "visualViewport", previousViewport);
+    else delete window.visualViewport;
+  }
+});
+
 function bootFixture() {
   const screen = document.createElement("div");
   screen.id = "initial-boot";
@@ -2934,7 +3166,9 @@ test("boot keeps controls inert until drawing and exit complete, then never repl
   const { screen, root } = bootFixture();
   const drawing = Promise.withResolvers();
   const exit = Promise.withResolvers();
-  screen.getAnimations = (options) => [{ finished: options?.subtree ? drawing.promise : exit.promise }];
+  screen.getAnimations = (options) => [
+    { finished: options?.subtree ? drawing.promise : exit.promise },
+  ];
   finishBootScreen();
   await flushBoot();
   assert.equal(screen.classList.contains("boot-leaving"), false);
@@ -2953,7 +3187,9 @@ test("boot keeps controls inert until drawing and exit complete, then never repl
 
 test("boot skips completed drawing after a slow load and tolerates cancelled animations", async () => {
   const { screen, root } = bootFixture();
-  screen.getAnimations = () => [{ finished: Promise.reject(new Error("cancelled")) }];
+  screen.getAnimations = () => [
+    { finished: Promise.reject(new Error("cancelled")) },
+  ];
   finishBootScreen();
   await flushBoot();
   assert.equal(screen.isConnected, false);
@@ -2963,7 +3199,8 @@ test("boot skips completed drawing after a slow load and tolerates cancelled ani
 test("boot cleanup does not remove a still-needed splash; a new effect can finish it", async () => {
   const { screen, root } = bootFixture();
   const drawing = Promise.withResolvers();
-  screen.getAnimations = (options) => options?.subtree ? [{ finished: drawing.promise }] : [];
+  screen.getAnimations = (options) =>
+    options?.subtree ? [{ finished: drawing.promise }] : [];
   const cancel = finishBootScreen();
   cancel();
   drawing.resolve();
@@ -2980,7 +3217,9 @@ test("reduced motion releases boot immediately without waiting for animations", 
   const { screen, root } = bootFixture();
   reduced = true;
   try {
-    screen.getAnimations = () => { throw new Error("must not wait"); };
+    screen.getAnimations = () => {
+      throw new Error("must not wait");
+    };
     finishBootScreen();
     assert.equal(screen.isConnected, false);
     assert.equal(root.hasAttribute("inert"), false);
