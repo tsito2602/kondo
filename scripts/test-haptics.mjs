@@ -40,35 +40,36 @@ async function load(userAgent) {
   return { dom, vibrations, ...module.exports };
 }
 
-test("iPhone controls carry one invisible switch that hands the tap back", async () => {
-  const { dom, installHaptics, isHapticTouch } = await load(
+test("iPhone ticks through a hidden label only after a real click, never covering controls", async () => {
+  const { dom, installHaptics } = await load(
     "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
   );
   const document = dom.window.document;
   document.body.innerHTML =
-    '<button id="a">A</button><input id="field"><div data-no-haptic><button id="b">B</button></div>';
+    '<button id="a">A</button><button id="off" disabled>Off</button><div data-no-haptic><button id="b">B</button></div>';
   installHaptics();
-  const button = document.getElementById("a");
-  const input = button.querySelector(":scope > input.haptic-touch");
-  assert.ok(input, "tappable control is equipped");
-  assert.equal(input.getAttribute("switch"), "");
-  assert.equal(input.getAttribute("aria-hidden"), "true");
-  assert.equal(input.tabIndex, -1);
-  assert.ok(isHapticTouch(input));
-  assert.equal(document.querySelectorAll("#b .haptic-touch").length, 0);
+  assert.equal(
+    document.querySelectorAll("button .haptic-touch").length,
+    0,
+    "nothing is laid over a control, so touches on it can scroll",
+  );
+  const tap = (element) => element.click();
+  let toggles = 0;
   let clicks = 0;
-  let bubbled = 0;
-  button.addEventListener("click", (event) => {
-    if (event.target === button) clicks++;
-  });
-  document.body.addEventListener("click", () => bubbled++);
-  input.click();
-  assert.equal(clicks, 1, "the control receives exactly one click");
-  assert.equal(bubbled, 1, "only the handed-back click bubbles");
-  const late = document.createElement("button");
-  document.body.appendChild(late);
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(late.querySelectorAll(".haptic-touch").length, 1);
+  document.getElementById("a").addEventListener("click", () => clicks++);
+  tap(document.getElementById("a"));
+  const label = document.querySelector("label.haptic-touch");
+  const input = label.querySelector("input");
+  assert.equal(input.getAttribute("switch"), "");
+  assert.equal(label.getAttribute("aria-hidden"), "true");
+  assert.equal(input.checked, true, "the label toggled the switch");
+  assert.equal(clicks, 1, "the control still receives exactly one click");
+  input.addEventListener("change", () => toggles++);
+  tap(document.getElementById("a"));
+  assert.equal(toggles, 1, "one shared switch is reused");
+  tap(document.getElementById("b"));
+  tap(document.getElementById("off"));
+  assert.equal(toggles, 1, "disabled and opted-out controls stay silent");
 });
 
 test("Android vibrates only for confirmed actions", async () => {

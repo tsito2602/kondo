@@ -9,6 +9,7 @@ export const reduceMotion = () =>
 let lastOrigin: { element: HTMLElement; time: number } | null = null;
 
 export function captureMotionOrigin(event: MouseEvent) {
+  if (isHapticTouch(event.target)) return;
   const target = event.target instanceof Element ? event.target : null;
   const element = target?.closest<HTMLElement>("button, a, [role=button]");
   lastOrigin = element ? { element, time: performance.now() } : null;
@@ -156,7 +157,7 @@ export function useMotionNavigation() {
     let active: ViewTransition | undefined;
     const interrupt = () => active?.skipTransition();
     const click = (event: MouseEvent) => {
-      // The iPhone haptic switch hands its press back as a click on the link.
+      // The iPhone haptic label's own click is not a navigation.
       if (isHapticTouch(event.target)) return;
       const link =
         event.target instanceof Element
