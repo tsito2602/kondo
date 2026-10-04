@@ -4812,6 +4812,14 @@ label.haptic-touch > input.haptic-touch {
   opacity: 0;
   pointer-events: none;
 }
+.safari-tabs > label.safari-tabs-haptic {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: block;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
 :disabled > label.haptic-touch {
   display: none;
 }

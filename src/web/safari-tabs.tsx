@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { reduceMotion, startRouteTransition } from "./motion";
+import { ios } from "./haptics";
 import { animateDockPress, DockSurface } from "./dock-surface";
 import { DockNavigationContext, SharedDockSurfaceContext } from "./thumb-dock";
 
@@ -59,6 +60,8 @@ export function SafariTabs({
     dragged: boolean;
   } | null>(null);
   const suppressClick = useRef(false);
+  const tapTab = useRef(-1);
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [holding, setHolding] = useState(false);
   const [preview, setPreview] = useState(-1);
   const [touching, setTouching] = useState(false);
@@ -143,8 +146,15 @@ export function SafariTabs({
       navigate(to);
     }
   };
+  const commitTap = () => {
+    clearTimeout(tapTimer.current);
+    const index = tapTab.current;
+    tapTab.current = -1;
+    if (index >= 0) selectTab(index);
+  };
   useEffect(
     () => () => {
+      clearTimeout(tapTimer.current);
       clearTimeout(holdTimer.current);
       if (frame.current !== undefined) cancelAnimationFrame(frame.current);
       transition.current?.skipTransition();
@@ -237,6 +247,7 @@ export function SafariTabs({
             aria-label="旅行のページ"
             data-dock-hold={holding}
             data-scrubbing={preview >= 0}
+            data-no-haptic={ios || undefined}
             onPointerDown={(event) => {
               if (
                 event.button !== 0 ||
@@ -264,7 +275,10 @@ export function SafariTabs({
               setTouching(true);
               pressDock(true);
               setPreview(hitTab(event.clientX, event.clientY));
-              nav.current?.setPointerCapture?.(event.pointerId);
+              // On iPhone a touch stays implicitly captured by the haptic
+              // label, so a tap's click lands on it and toggles its switch.
+              if (!(ios && event.pointerType === "touch"))
+                nav.current?.setPointerCapture?.(event.pointerId);
               followPointer();
               if (expanded) return;
               holdTimer.current = setTimeout(() => {
@@ -293,12 +307,26 @@ export function SafariTabs({
               const gesture = pointer.current;
               if (!gesture || gesture.id !== event.pointerId) return;
               event.preventDefault();
-              blockReleaseClick();
               const selected = hitTab(event.clientX, event.clientY);
               const dragged = gesture.dragged;
               const commit = !gesture.held || dragged;
+              // An iPhone tap's click must reach the haptic label (that is
+              // what ticks), so the tab is chosen after it; every other
+              // release click is swallowed.
+              const tap =
+                ios &&
+                event.pointerType === "touch" &&
+                !gesture.held &&
+                !dragged;
+              if (!tap) blockReleaseClick();
               stopGesture();
               if (commit || selected < 0) collapse();
+              if (tap && selected >= 0) {
+                tapTab.current = selected;
+                clearTimeout(tapTimer.current);
+                tapTimer.current = setTimeout(commitTap, 350);
+                return;
+              }
               if (commit && selected >= 0) selectTab(selected);
             }}
             onPointerCancel={(event) => {
@@ -346,6 +374,7 @@ export function SafariTabs({
             }
           >
             <span className="safari-selection" aria-hidden="true" />
+            {ios && <TabHaptic onToggle={commitTap} />}
             {tripTabs.map((tab, index) => (
               <NavLink
                 key={tab.path}
@@ -377,5 +406,26 @@ export function SafariTabs({
         </div>
       </div>
     </>
+  );
+}
+
+/** iPhone ticks only when a real tap toggles a native switch. One transparent
+    label covers the tabs; the tab itself was chosen by the pointer gesture and
+    is committed once the switch has toggled. */
+function TabHaptic({ onToggle }: { onToggle: () => void }) {
+  return (
+    <label
+      className="haptic-touch safari-tabs-haptic"
+      aria-hidden="true"
+      onClick={(event) => event.stopPropagation()}
+    >
+      <input
+        type="checkbox"
+        {...{ switch: "" }}
+        className="haptic-touch"
+        tabIndex={-1}
+        onChange={onToggle}
+      />
+    </label>
   );
 }
