@@ -322,6 +322,9 @@ export function SafariTabs({
               stopGesture();
               if (commit || selected < 0) collapse();
               if (tap && selected >= 0) {
+                // Keep the selection on the tapped tab while waiting for the
+                // click; falling back to the current tab for a frame flickers.
+                setPending(selected);
                 tapTab.current = selected;
                 clearTimeout(tapTimer.current);
                 tapTimer.current = setTimeout(commitTap, 350);
