@@ -4,6 +4,9 @@ import { AuthProvider } from "@/auth/auth-provider";
 import { App } from "./app";
 import { ThemeProvider, ToastProvider } from "./ui";
 import "./styles.css";
+import { installHaptics } from "./haptics";
+
+installHaptics();
 createRoot(document.getElementById("root")!).render(
   <AppRouter>
     <ThemeProvider>

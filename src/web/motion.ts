@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { useNavigate } from "react-router";
+import { isHapticTouch } from "./haptics";
 
 export const motionEase = "cubic-bezier(.22, 1, .36, 1)";
 export const reduceMotion = () =>
@@ -8,6 +9,7 @@ export const reduceMotion = () =>
 let lastOrigin: { element: HTMLElement; time: number } | null = null;
 
 export function captureMotionOrigin(event: MouseEvent) {
+  if (isHapticTouch(event.target)) return;
   const target = event.target instanceof Element ? event.target : null;
   const element = target?.closest<HTMLElement>("button, a, [role=button]");
   lastOrigin = element ? { element, time: performance.now() } : null;
@@ -92,6 +94,24 @@ export function dismissModal(
 
 const tabOrder = ["itinerary", "places", "packing", "bookings", "notes"];
 
+let enterTimer = 0;
+
+// The incoming snapshot is live, so the page's pieces rise in a short stagger
+// inside it (CSS). Drop the class once that is over, so rows added later are
+// never delayed.
+function markPageEnter() {
+  const page = document.getElementById("main-content");
+  if (!page) return;
+  page.classList.remove("route-page-enter");
+  void page.offsetWidth;
+  page.classList.add("route-page-enter");
+  window.clearTimeout(enterTimer);
+  enterTimer = window.setTimeout(
+    () => page.classList.remove("route-page-enter"),
+    1100,
+  );
+}
+
 // Pin each snapshot to its own viewport coordinates. The browser's default
 // group animation otherwise interpolates a scrolled, tall page into the next
 // page's top/height, visibly pulling the outgoing content back to the top.
@@ -119,6 +139,7 @@ export function startRouteTransition(update: () => void) {
   capture("old");
   const transition = document.startViewTransition(() => {
     flushSync(update);
+    markPageEnter();
     capture("new");
   });
   void transition.ready.catch(() => undefined);
@@ -136,6 +157,8 @@ export function useMotionNavigation() {
     let active: ViewTransition | undefined;
     const interrupt = () => active?.skipTransition();
     const click = (event: MouseEvent) => {
+      // The iPhone haptic label's own click is not a navigation.
+      if (isHapticTouch(event.target)) return;
       const link =
         event.target instanceof Element
           ? event.target.closest<HTMLAnchorElement>("a[href]")

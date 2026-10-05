@@ -1,3 +1,4 @@
+import { SegmentSelection } from "./segment-selection";
 import { startTripTransition } from "./trip-transition";
 import { finishBootScreen } from "./boot";
 import { TripCover } from "./trip-cover";
@@ -992,7 +993,10 @@ function SettingsScreen() {
         </Card>
         <Card className="settings-card">
           <h2>外観</h2>
-          <div className="segmented appearance-control" aria-label="表示モード">
+          <div
+            className="segmented appearance-control has-selection"
+            aria-label="表示モード"
+          >
             {(
               [
                 { value: "system", label: "端末に合わせる", icon: Monitor },
@@ -1011,6 +1015,9 @@ function SettingsScreen() {
                 {entry.value === "system" ? "自動" : entry.label}
               </button>
             ))}
+            <SegmentSelection
+              index={["system", "light", "dark"].indexOf(theme.preference)}
+            />
           </div>
         </Card>
         <Card className="settings-card">

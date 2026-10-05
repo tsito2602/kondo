@@ -2269,7 +2269,7 @@ input::-webkit-date-and-time-value {
   left: var(--route-old-left);
   width: var(--route-old-width);
   height: var(--route-old-height);
-  animation: route-out 240ms var(--ease-flow) both;
+  animation: route-out 170ms cubic-bezier(0.33, 1, 0.68, 1) both;
   mix-blend-mode: normal;
 }
 ::view-transition-new(route-content) {
@@ -2277,7 +2277,7 @@ input::-webkit-date-and-time-value {
   left: var(--route-new-left);
   width: var(--route-new-width);
   height: var(--route-new-height);
-  animation: route-in 240ms var(--ease-flow) both;
+  animation: route-in 170ms cubic-bezier(0.33, 1, 0.68, 1) both;
   mix-blend-mode: normal;
 }
 ::view-transition {
@@ -2295,17 +2295,58 @@ input::-webkit-date-and-time-value {
 @keyframes route-out {
   to {
     opacity: 0;
-    transform: translateX(calc(-12px * var(--route-direction)));
+    transform: translateY(-6px);
   }
 }
 @keyframes route-in {
   from {
     opacity: 0;
-    transform: translateX(calc(16px * var(--route-direction)));
   }
-  to {
-    opacity: 1;
-    transform: translateX(0);
+}
+/* The old page only lifts and fades, quickly, so it never reads as a second
+   moving heading. The new page's pieces then rise in a short stagger. */
+@keyframes page-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+.route-page-enter .page > :not(:has(.floating-add, .trip-menu-host)),
+.route-page-enter.page > :not(:has(.floating-add, .trip-menu-host)) {
+  animation: page-rise 640ms cubic-bezier(0.22, 0.72, 0.18, 1) both;
+  animation-delay: 140ms;
+}
+.route-page-enter .page > :nth-child(1),
+.route-page-enter.page > :nth-child(1) {
+  animation-delay: 50ms;
+}
+.route-page-enter .page > :nth-child(2),
+.route-page-enter.page > :nth-child(2) {
+  animation-delay: 100ms;
+}
+.route-page-enter .page > :nth-child(3),
+.route-page-enter.page > :nth-child(3) {
+  animation-delay: 150ms;
+}
+.route-page-enter .page > :nth-child(4),
+.route-page-enter.page > :nth-child(4) {
+  animation-delay: 200ms;
+}
+.route-page-enter .page > :nth-child(5),
+.route-page-enter.page > :nth-child(5) {
+  animation-delay: 245ms;
+}
+.route-page-enter .page > :nth-child(6),
+.route-page-enter.page > :nth-child(6) {
+  animation-delay: 290ms;
+}
+.route-page-enter .page > :nth-child(n + 7),
+.route-page-enter.page > :nth-child(n + 7) {
+  animation-delay: 330ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-page-enter * {
+    animation: none !important;
   }
 }
 @media (prefers-reduced-transparency: reduce) {
@@ -3019,11 +3060,15 @@ input::-webkit-date-and-time-value {
     width: calc(100% + 24px);
     height: calc(var(--dock-height) + 24px);
   }
+  /* The contour paths carry the colour; the glass layer only blurs. */
+  .thumb-dock-material > .safari-glass {
+    background: transparent;
+  }
+  .fluid-dock-fill {
+    fill: var(--dock-glass);
+  }
   .fluid-dock-accent {
-    position: absolute;
-    inset: 0;
-    background: var(--dock-accent);
-    opacity: 0;
+    fill: var(--dock-accent);
   }
   .safari-left {
     left: 0;
@@ -3234,7 +3279,10 @@ input::-webkit-date-and-time-value {
     --dock-accent: var(--brand);
   }
   .fluid-dock-accent {
-    background: var(--brand);
+    fill: var(--brand);
+  }
+  .fluid-dock-fill {
+    fill: var(--paper);
   }
   .safari-glass,
   .trip-menu-toggle,
@@ -4733,4 +4781,74 @@ input::-webkit-date-and-time-value {
   .ticket-main .ticket-title {
     font-size: 19px;
   }
+}
+
+/* iPhone haptics: a transparent label over each tappable surface toggles a
+   hidden switch the finger never touches, so touches on it can still scroll. */
+:where([data-haptic-host]) {
+  position: relative;
+}
+[data-haptic-host] > label.haptic-touch {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: block;
+  margin: 0;
+  padding: 0;
+  border-radius: inherit;
+  background: none;
+  cursor: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+label.haptic-touch > input.haptic-touch {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  min-width: 0;
+  height: 1px;
+  min-height: 0;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.safari-tabs > label.safari-tabs-haptic {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: block;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+:disabled > label.haptic-touch {
+  display: none;
+}
+
+/* Segmented controls: one selected face that stretches to its next option. */
+.segmented.has-selection .selected,
+.segmented.has-selection [data-state="active"] {
+  background: transparent;
+  box-shadow: none;
+}
+.segmented.has-selection[data-active-tab]::before {
+  content: none;
+}
+.segment-selection {
+  position: absolute;
+  z-index: -1;
+  top: 4px;
+  bottom: 4px;
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow:
+    inset 0 1px 0 var(--surface-glow),
+    0 2px 6px #0000000d;
+  pointer-events: none;
+  transition: background 240ms;
+}
+.segmented[data-active-tab] > .segment-selection {
+  border-radius: 999px;
+}
+.appearance-control > .segment-selection {
+  border-radius: var(--radius-field);
 }

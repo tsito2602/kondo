@@ -1,3 +1,4 @@
+import { SegmentSelection } from "./segment-selection";
 import { PlaceStatusLabel } from "./place-status";
 import { DayStrip } from "./day-strip";
 import { BookingTicketContent } from "./booking-ticket";
@@ -604,7 +605,7 @@ export function PackingScreen() {
     >
       <ThumbTools title="準備の表示" label="表示">
         <div className="form">
-          <div className="segmented preparation-tabs">
+          <div className="segmented preparation-tabs has-selection">
             {(["task", "packing"] as const).map((value) => (
               <button
                 key={value}
@@ -618,6 +619,7 @@ export function PackingScreen() {
                 {value === "task" ? "やること" : "持ち物"}
               </button>
             ))}
+            <SegmentSelection index={tab === "task" ? 0 : 1} />
           </div>
           <Field label="担当者">
             <select
@@ -645,7 +647,7 @@ export function PackingScreen() {
         )}
       </div>
       <TabsList
-        className="segmented preparation-tabs"
+        className="segmented preparation-tabs has-selection"
         data-active-tab={tab}
         aria-label="旅の準備"
       >
@@ -655,6 +657,7 @@ export function PackingScreen() {
         <TabsTrigger value="packing" aria-label="持ち物">
           持ち物<span className="tab-count">{travel.packingItems.length}</span>
         </TabsTrigger>
+        <SegmentSelection index={tab === "task" ? 0 : 1} />
       </TabsList>
       <TabsContent
         key={tab}

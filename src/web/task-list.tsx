@@ -90,6 +90,7 @@ export function TaskList({
             aria-label={`${item.title}を${item.done ? "未完了" : "完了"}にする`}
             disabled={!canEdit}
             className="task-toggle"
+            data-haptic
             onClick={() => onToggle(item.id, !item.done)}
           >
             <span className="task-check" aria-hidden="true">

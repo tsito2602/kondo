@@ -37,7 +37,7 @@ export function dockSlots(
   const present = slots.filter((slot): slot is DockIsland => Boolean(slot));
   return slots.map((slot, index) => {
     if (slot) return slot;
-    const anchor = (width * index) / 2;
+    const anchor = (width * index) / Math.max(1, slots.length - 1);
     const points = present.map(({ left, width: w, radius: r }) =>
       Math.max(left + r, Math.min(left + w - r, anchor)),
     );
@@ -342,7 +342,8 @@ export function FluidDockSurface({
   ref: Ref<FluidDockHandle>;
 }) {
   const glass = useRef<HTMLDivElement>(null);
-  const accent = useRef<HTMLDivElement>(null);
+  const material = useRef<SVGPathElement>(null);
+  const accent = useRef<SVGPathElement>(null);
   const outline = useRef<SVGPathElement>(null);
   const shadow = useRef<SVGPathElement>(null);
   const svg = useRef<SVGSVGElement>(null);
@@ -389,6 +390,7 @@ export function FluidDockSurface({
     const d = dockContour(w, islands, shape.current.tension, scales, center);
     if (d !== lastPath.current) {
       glass.current.style.clipPath = `path("${d}")`;
+      material.current!.setAttribute("d", d);
       outline.current!.setAttribute("d", d);
       shadow.current!.setAttribute("d", d);
       lastPath.current = d;
@@ -405,7 +407,7 @@ export function FluidDockSurface({
     );
     if (accent.current) {
       if (a !== lastAccentPath.current) {
-        accent.current.style.clipPath = a ? `path("${a}")` : "inset(50%)";
+        accent.current.setAttribute("d", a);
         lastAccentPath.current = a;
       }
       accent.current.style.opacity = String(
@@ -651,9 +653,7 @@ export function FluidDockSurface({
   }, []);
   return (
     <div className="thumb-dock-material safari-surface" aria-hidden="true">
-      <div ref={glass} className="safari-glass">
-        <div ref={accent} className="fluid-dock-accent" />
-      </div>
+      <div ref={glass} className="safari-glass" />
       <svg ref={svg} width="100%" height="80" preserveAspectRatio="none">
         <defs>
           <filter
@@ -678,6 +678,10 @@ export function FluidDockSurface({
           opacity="0.18"
           filter={`url(#${id}-shadow)`}
         />
+        {/* Paint colour with the contour itself, never a clipped rectangle:
+            WebKit can rebuild backdrop layers while it snapshots a page. */}
+        <path ref={material} className="fluid-dock-fill" />
+        <path ref={accent} className="fluid-dock-accent" opacity="0" />
         <path
           ref={outline}
           fill="none"

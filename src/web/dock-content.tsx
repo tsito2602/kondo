@@ -9,6 +9,7 @@ export class DockContent extends Component<Props> {
   outgoing?: HTMLElement;
   entrance?: Animation;
   exit?: Animation;
+  recovery?: ReturnType<typeof setTimeout>;
 
   getSnapshotBeforeUpdate(previous: Props) {
     if (previous.identity === this.props.identity || reduceMotion())
@@ -39,7 +40,10 @@ export class DockContent extends Component<Props> {
     this.outgoing = copy;
     node.parentElement!.appendChild(copy);
     this.exit = copy.animate(
-      [{ opacity: copy.style.opacity || "1" }, { opacity: 0 }],
+      [
+        { opacity: copy.style.opacity || "1", filter: "blur(0px)" },
+        { opacity: 0, filter: "blur(4px)" },
+      ],
       {
         duration: 140,
         easing: "ease-out",
@@ -51,13 +55,24 @@ export class DockContent extends Component<Props> {
       () => copy.remove(),
     );
     node.inert = true;
-    this.entrance = node.animate([{ opacity: 0 }, { opacity: 1 }], {
-      delay: 180,
-      duration: 240,
-      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-      fill: "backwards",
-    });
+    this.entrance = node.animate(
+      [
+        { opacity: 0, filter: "blur(4px)" },
+        { opacity: 1, filter: "blur(0px)" },
+      ],
+      {
+        delay: 180,
+        duration: 240,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        fill: "backwards",
+      },
+    );
     const entrance = this.entrance;
+    // WebKit can drop a pending animation's promise when the page is hidden
+    // mid-transition; never leave the live controls inert because of it.
+    this.recovery = setTimeout(() => {
+      if (this.entrance === entrance) this.clear();
+    }, 580);
     void entrance.finished.then(
       () => {
         if (this.entrance === entrance) node.inert = false;
@@ -67,6 +82,7 @@ export class DockContent extends Component<Props> {
   }
 
   clear() {
+    clearTimeout(this.recovery);
     if (this.node.current) this.node.current.inert = false;
     this.entrance?.cancel();
     this.exit?.cancel();

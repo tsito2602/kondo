@@ -285,6 +285,10 @@ test("real router commits the new page inside the snapshot update, retaining the
       );
       assert.equal(style.getPropertyValue("--route-new-top"), "72px");
       assert.equal(style.getPropertyValue("--route-new-height"), "500px");
+      assert.ok(
+        document.querySelector("main").classList.contains("route-page-enter"),
+        "the live incoming page staggers its pieces in",
+      );
     });
     assert.equal(style.getPropertyValue("--route-old-top"), "-1200px");
     assert.equal(style.getPropertyValue("--route-old-height"), "3000px");
