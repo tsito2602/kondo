@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./theme.css";
 @import "./styles/prep.css";
 @import "./styles/home.css";
 @import "./styles/settings.css";
@@ -28,76 +29,50 @@
 }
 :root {
   color-scheme: light;
-  --canvas: #fff;
-  --paper: #fff;
-  --ink: #171717;
-  --muted: #707070;
-  --line: #e5e5e5;
-  --soft: #f2f2f2;
-  --selected: #e8e8e8;
-  --brand: #171717;
-  --danger: #b42318;
+  /* The app's names for the mocks' material (theme.css), so every screen and
+     shared control follows the same light/dark values. */
+  --canvas: var(--p-paper);
+  --paper: var(--p-paper);
+  --ink: var(--p-ink);
+  --muted: var(--p-mute);
+  --line: var(--p-line);
+  --soft: var(--p-soft);
+  --selected: var(--p-select);
+  --brand: var(--p-ink);
+  --danger: var(--p-danger);
   --shadow: 0 1px 2px #182a3806, 0 6px 20px #182a3808;
   --surface-glow: #ffffffbd;
-  --panel-tint: #ffffffa3;
-  --panel-header-tint: #ffffffe0;
-  --field-tint: #ffffff66;
-  /* Separate reading cards from the white canvas; paper stays white for controls. */
-  --content-card: #f3f3f3;
-  --ticket-stub: var(--selected);
-  --panel-card-tint: #ececece6;
-  --panel-card-edge: #1717170a;
-  --radius-panel: 28px;
-  --radius-card: 22px;
+  --panel-tint: var(--p-paper);
+  --panel-header-tint: var(--p-paper);
+  --field-tint: var(--p-soft);
+  --content-card: var(--p-soft);
+  --ticket-stub: var(--p-pale);
+  --panel-card-tint: var(--p-soft);
+  --panel-card-edge: transparent;
+  --radius-panel: var(--r-sheet);
+  --radius-card: var(--r-card);
   --radius-control: 999px;
   --radius-field: 16px;
-  --dock-glass: #ffffff52;
-  --dock-bottom-gap: 32px;
+  --dock-bottom-gap: 30px;
   --control-size: 44px;
-  --dock-height: 56px;
-  --menu-glass: #ffffffa3;
-  --dock-accent: var(--brand);
-  --dock-on-accent: #fff;
-  --dock-max-width: 420px;
-  --dock-border: #20232612;
-  --dock-border-top: #2023261a;
-  --dock-border-bottom: #2023260b;
+  --dock-height: 62px;
+  --menu-glass: var(--p-paper);
+  --dock-accent: var(--p-ink);
+  --dock-on-accent: var(--p-paper);
+  --dock-max-width: 430px;
   --ease-flow: cubic-bezier(0.22, 1, 0.36, 1);
   --route-direction: 1;
   --trip-header-height: 132px;
   --nav-height: 0px;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif;
+  font-family: var(--f-body);
   font-synthesis: none;
   color: var(--ink);
   background: var(--canvas);
 }
 :root[data-theme="dark"] {
-  --dock-on-accent: #171717;
   color-scheme: dark;
-  --canvas: #000;
-  --paper: #1c1c1c;
-  --ink: #f3f3f3;
-  --muted: #aaa;
-  --line: #333;
-  --soft: #262626;
-  --selected: #383838;
-  --brand: #fff;
-  --danger: #ffa69d;
   --shadow: 0 1px 2px #0003, 0 8px 24px #0002;
   --surface-glow: #ffffff0e;
-  --panel-tint: #1c1c1ca3;
-  --panel-header-tint: #202020e0;
-  --field-tint: #ffffff08;
-  --content-card: #1c1c1c;
-  --ticket-stub: var(--soft);
-  --panel-card-tint: #ffffff0f;
-  --panel-card-edge: transparent;
-  --dock-glass: #18181859;
-  --menu-glass: #242424a3;
-  --dock-border: #ffffff18;
-  --dock-border-top: #ffffff26;
-  --dock-border-bottom: #ffffff10;
 }
 * {
   box-sizing: border-box;
@@ -105,11 +80,18 @@
 html {
   scroll-padding-top: 0;
 }
+/* The mocks' base type: body 15px / 1.7 with proportional kana (palt). */
 body {
   margin: 0;
   min-width: 0;
   min-height: 100dvh;
   background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.7;
+  font-feature-settings: "palt";
+  -webkit-font-smoothing: antialiased;
 }
 #root {
   min-height: 100dvh;

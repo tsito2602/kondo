@@ -61,7 +61,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
       document.documentElement.dataset.theme = theme;
       document
         .querySelector('meta[name="theme-color"]')
-        ?.setAttribute("content", theme === "dark" ? "#000000" : "#FFFFFF");
+        ?.setAttribute("content", theme === "dark" ? "#141312" : "#FFFFFF");
     };
     localStorage.setItem(THEME_KEY, preference);
     update();
