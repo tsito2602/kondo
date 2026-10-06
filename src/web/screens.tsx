@@ -17,6 +17,7 @@ import {
   useState,
 } from "react";
 import { PlusIcon } from "./booking-icons";
+import { PageTop } from "./page-top";
 import { bookingSink } from "./booking-motion";
 import { useJellyScroll } from "./jelly-scroll";
 import { useSearchParams } from "react-router";
@@ -115,28 +116,28 @@ export function BookingsScreen() {
     return index >= 1 ? `${index}日目` : "";
   };
   return (
-    <div className="page bookings-page" ref={page}>
-      <div className="bk-top">
-        <div>
-          <small>
-            {tripDay(now.slice(0, 10)) &&
-            now.slice(0, 10) <= (selectedTrip?.endsOn ?? "")
-              ? `旅の${tripDay(now.slice(0, 10))} · ${monthDay(now.slice(0, 10))} ${now.slice(11)}`
-              : `${selectedTrip?.name ? `${selectedTrip.name} · ` : ""}${bookings.length}件`}
-          </small>
-          <h2>予約</h2>
-        </div>
-        {canEdit && (
-          <button
-            type="button"
-            className="bk-plus"
-            aria-label="予約を追加"
-            onClick={() => setAdding(true)}
-          >
-            <PlusIcon size={20} />
-          </button>
-        )}
-      </div>
+    <div className="page page-scroll bookings-page" ref={page}>
+      <PageTop
+        sub={
+          tripDay(now.slice(0, 10)) &&
+          now.slice(0, 10) <= (selectedTrip?.endsOn ?? "")
+            ? `旅の${tripDay(now.slice(0, 10))} · ${monthDay(now.slice(0, 10))} ${now.slice(11)}`
+            : `${selectedTrip?.name ? `${selectedTrip.name} · ` : ""}${bookings.length}件`
+        }
+        title="予約"
+        actions={
+          canEdit && (
+            <button
+              type="button"
+              className="page-plus"
+              aria-label="予約を追加"
+              onClick={() => setAdding(true)}
+            >
+              <PlusIcon size={20} />
+            </button>
+          )
+        }
+      />
       {!bookings.length ? (
         <Empty>
           <BookOpen />

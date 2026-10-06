@@ -325,6 +325,9 @@ export function BookingCard({
         <div className="bk-hd">
           <Icon size={20} strokeWidth={1.9} aria-hidden="true" />
           <b>{booking.title}</b>
+          {!used && isStaying(booking, now) && (
+            <span className="bk-chip">滞在中</span>
+          )}
           {showDate && booking.kind !== "hotel" && booking.day && (
             <span>{dayLabel(booking.day)}</span>
           )}
