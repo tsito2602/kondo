@@ -20,9 +20,9 @@ export const VIENNA = {
 };
 
 /**
- * The places map: the しおり's plans with a place come first (numbered by
- * place-numbers.ts in day and time order), then the venues of the trip's
- * bookings and the spots we may still fit in.
+ * The places map: the しおり's plans and the venues linked to the trip's
+ * bookings are numbered together by place-numbers.ts in day and time order,
+ * then come the spots we may still fit in.
  */
 export function demoPlaces(): Place[] {
   const place = (id: string, title: string, location: string, note: string, itineraryItemId: string | null, extra: Partial<Place> = {}): Place => ({
@@ -34,7 +34,7 @@ export function demoPlaces(): Place[] {
     place('sample-place-central', 'カフェ・ツェントラル', VIENNA.central, 'メランジェとアプフェルシュトゥルーデル。朝は並ばずに入れる。', 'sample-cafe'),
     place('sample-place-museum', '美術史美術館', VIENNA.khm, 'ブリューゲルの部屋から回る。2階のカフェのドームも見る。', 'sample-museum', { openingHours: '10:00〜18:00（木曜は21:00まで）', reservationStatus: 'needed' }),
     place('sample-place-schoenbrunn', 'シェーンブルン宮殿', VIENNA.schoenbrunn, '宮殿の中を見たあと、グロリエッテまで丘を登る。U4で約20分。', 'sample-schoenbrunn', { reservationStatus: 'needed' }),
-    // Venues of the bookings (their times are in 予約).
+    // Venues of the bookings (linked by placeId; their times come from 予約).
     place('sample-place-belvedere', 'ベルヴェデーレ宮殿 上宮', VIENNA.belvedere, '時間指定券（9:00）は予約済み。クリムト「接吻」を見る。', null, { openingHours: '9:00〜18:00', reservationStatus: 'confirmed', status: 'planned' }),
     place('sample-place-figl', 'フィグルミュラー', VIENNA.figl, '着いた日の夕食、17:30に予約済み。シュニッツェルはお皿からはみ出す大きさ。', null, { reservationStatus: 'confirmed', status: 'planned' }),
     place('sample-place-musikverein', '楽友協会', VIENNA.musikverein, '着いた日の夜、黄金のホールでモーツァルト。チケットは予約済み。', null, { reservationStatus: 'confirmed', status: 'planned' }),

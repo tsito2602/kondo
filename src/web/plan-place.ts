@@ -13,7 +13,7 @@ const placeInput = ({ id: _id, updatedAt: _at, ...input }: Place): PlaceInput =>
 export function previewPlace(
   text: string,
   title: string,
-  travel: Pick<Travel, "places" | "items">,
+  travel: Pick<Travel, "places" | "items"> & Partial<Pick<Travel, "bookings">>,
   draft: { day: string; time: string },
   current?: Place,
 ) {
@@ -43,7 +43,7 @@ export function previewPlace(
   return {
     link,
     name: name || "マップの場所",
-    number: placeNumbers(places, items).get(probe.id),
+    number: placeNumbers(places, items, travel.bookings).get(probe.id),
     located: Boolean(coordsFromLink(link)),
   };
 }

@@ -149,8 +149,8 @@ export function ItineraryScreen() {
   );
   const today = timeline.find((day) => day.today)?.day ?? null;
   const numbers = useMemo(
-    () => placeNumbers(travel.places, travel.items),
-    [travel.places, travel.items],
+    () => placeNumbers(travel.places, travel.items, travel.bookings),
+    [travel.places, travel.items, travel.bookings],
   );
   const { selectedDay, selectDay } = useItineraryScroll(
     days,

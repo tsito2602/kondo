@@ -9,6 +9,8 @@ import { bookingIcons, spring } from "./booking-card";
 import { AirportField } from "./airport-field";
 import { findAirportByCode } from "@/data/airports";
 import { findMatchingItineraryItem } from "@/data/booking-match";
+import { linkBookingPlace } from "@/data/booking-place";
+import { planPlace } from "@/data/plan-timeline";
 import { useTravel } from "@/data/travel-provider";
 import {
   itineraryCategories,
@@ -465,6 +467,13 @@ export function BookingForm({
   const travel = useTravel();
   const existing = booking && "id" in booking ? booking : undefined;
   const [files, setFiles] = useState<File[]>([]);
+  // A venue linked by name (no map link of its own) shows the place's name.
+  const [initialLocation] = useState(
+    () =>
+      booking?.location ||
+      travel.places.find((place) => place.id === booking?.placeId)?.title ||
+      "",
+  );
   const [draft, setDraft] = useState({
     kind: (pickKind ? null : (booking?.kind ?? "flight")) as BookingKind | null,
     title:
@@ -472,7 +481,7 @@ export function BookingForm({
         ? ""
         : (booking?.title ?? ""),
     detail: booking?.detail ?? "",
-    location: booking?.location ?? "",
+    location: initialLocation,
     origin:
       booking?.origin ||
       findAirportByCode(booking?.originCode ?? "")?.name ||
@@ -532,9 +541,29 @@ export function BookingForm({
       if (input.note.length > 4000)
         throw new Error("メモは4,000文字以内にしてください");
       if (onDraft) return onDraft(input);
-      if (existing) travel.updateBooking(existing.id, input);
+      // 場所: a place of the trip by name, or a map link (linked, or added as a place).
+      const keep =
+        existing &&
+        existing.placeId !== undefined &&
+        draft.location === initialLocation &&
+        draft.kind === existing.kind;
+      let linked = keep
+        ? {
+            ...input,
+            location:
+              input.location === initialLocation && !existing.location
+                ? ""
+                : input.location,
+            placeId: existing.placeId ?? null,
+          }
+        : linkBookingPlace(travel, input);
+      // The plan this booking replaces hands its place over to the booking.
+      const mergedPlace = merged && planPlace(merged, travel.places);
+      if (mergedPlace && !linked.placeId && kind !== "hotel")
+        linked = { ...linked, placeId: mergedPlace.id };
+      if (existing) travel.updateBooking(existing.id, linked);
       else {
-        const id = travel.createBooking(input);
+        const id = travel.createBooking(linked);
         onSaved?.(id, files);
       }
       if (merged) travel.deleteItem(merged.id);
@@ -566,10 +595,12 @@ export function BookingForm({
       | "confirmationCode",
     label: string,
     required = false,
+    list?: string,
   ) => (
     <Field label={label}>
       <Input
         required={required}
+        list={list}
         value={draft[key]}
         maxLength={
           key === "location"
@@ -674,7 +705,22 @@ export function BookingForm({
               )}
             </div>
           )}
-          {!route && field("location", "住所・Google MapsのURL")}
+          {!route &&
+            field(
+              "location",
+              "住所・Google MapsのURL",
+              false,
+              kind === "hotel" || !travel.places.length
+                ? undefined
+                : "booking-places",
+            )}
+          {!route && kind !== "hotel" && travel.places.length > 0 && (
+            <datalist id="booking-places">
+              {travel.places.map((place) => (
+                <option key={place.id} value={place.title} />
+              ))}
+            </datalist>
+          )}
           <DatePicker
             label={dateLabels.label}
             startLabel={dateLabels.start}

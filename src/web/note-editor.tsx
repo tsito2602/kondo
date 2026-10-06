@@ -313,7 +313,7 @@ export function NoteEditor({
   };
 
   // The mock offers the trip's planned places: a day and a place.
-  const planned = places.filter((entry) => entry.plan);
+  const planned = places.filter((entry) => entry.day);
   const linked = places.find((entry) => entry.place.id === draft.placeId);
   const live = notes.find((note) => note.id === initial.id);
   const meta: TravelNote = live ?? {
@@ -443,7 +443,7 @@ export function NoteEditor({
                   </span>
                   <em>{entry.place.title}</em>
                 </span>
-                <small>{entry.plan && planDayLabel(entry.plan.day)}</small>
+                <small>{entry.day && planDayLabel(entry.day)}</small>
               </button>
             ))}
             {linked && (

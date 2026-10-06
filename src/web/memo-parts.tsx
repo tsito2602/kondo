@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useAuth } from "@/auth/auth-provider";
 import { memberAssignee } from "@/data/assignee";
-import { placeNumbers } from "@/data/place-numbers";
+import { placeNumbers, placeVisits } from "@/data/place-numbers";
 import { ordinaryPlans } from "@/data/itinerary";
 import { useTravel } from "@/data/travel-provider";
 import type { ItineraryItem, Place, TravelNote } from "@/data/types";
@@ -129,6 +129,8 @@ export type NotePlace = {
   place: Place;
   number: number;
   plan?: ItineraryItem;
+  /** The day it is scheduled: its plan's, or its linked booking's. */
+  day?: string;
 };
 /** Every place with its map number, scheduled ones first. */
 export function useNotePlaces(): NotePlace[] {
@@ -136,12 +138,14 @@ export function useNotePlaces(): NotePlace[] {
   const { places } = travel;
   // Hotel in/out records are not plans a note can point to.
   const items = ordinaryPlans(travel.items);
-  const numbers = placeNumbers(places, items);
+  const numbers = placeNumbers(places, items, travel.bookings);
+  const visits = placeVisits(places, items, travel.bookings);
   return places
     .map((place) => ({
       place,
       number: numbers.get(place.id) ?? 0,
       plan: items.find((item) => item.id === place.itineraryItemId),
+      day: visits.get(place.id)?.day,
     }))
     .sort((a, b) => a.number - b.number);
 }
@@ -155,7 +159,7 @@ export function PlaceChip({ link }: { link: NotePlace }) {
       </span>
       <em>
         {link.place.title}
-        {link.plan ? ` · ${planDayLabel(link.plan.day)}` : ""}
+        {link.day ? ` · ${planDayLabel(link.day)}` : ""}
       </em>
     </span>
   );

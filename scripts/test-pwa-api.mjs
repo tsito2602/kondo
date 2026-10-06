@@ -537,6 +537,42 @@ test('notes link to a place of the same trip, survive old clients and schema rer
   } finally { db.close(); }
 });
 
+test('bookings link to a place of the same trip, survive old clients and schema reruns, and unlink when the place goes', async () => {
+  const { db, call, trip } = await fixture();
+  try {
+    const base = `/trips/${trip.id}/bookings`;
+    const placeId = randomUUID(), id = randomUUID(), legacy = randomUUID();
+    assert.equal((await call(`/trips/${trip.id}/places`, 'POST', { id: placeId, ...place, location: 'https://www.google.com/maps/@48.2,16.37,17z' })).status, 201);
+    const other = { ...trip, id: randomUUID() };
+    assert.equal((await call('/trips', 'POST', other)).status, 201);
+    const otherPlace = randomUUID();
+    assert.equal((await call(`/trips/${other.id}/places`, 'POST', { id: otherPlace, ...place, location: '' })).status, 201);
+    const read = async (bookingId) => (await (await call(base)).json()).bookings.find((entry) => entry.id === bookingId);
+    const booking = { kind: 'ticket', title: '魔笛', detail: 'ウィーン国立歌劇場', day: '2026-11-23', time: '19:00', confirmationCode: '', note: '' };
+    // Old rows and old clients: no link, read back as null.
+    assert.equal((await call(base, 'POST', { id: legacy, ...booking })).status, 201);
+    assert.equal((await read(legacy)).placeId, null);
+    const created = await call(base, 'POST', { id, ...booking, placeId });
+    assert.equal(created.status, 201);
+    assert.equal((await created.json()).booking.placeId, placeId);
+    assert.equal((await read(id)).placeId, placeId);
+    // An old client's edit omits placeId and keeps the link; a rerun schema keeps it too.
+    assert.equal((await call(`${base}/${id}`, 'PATCH', { ...booking, title: '魔笛（再演）' })).status, 200);
+    db.exec(await readFile('worker/schema.sql', 'utf8'));
+    assert.equal((await read(id)).placeId, placeId);
+    // Another trip's place links nothing; a malformed id is rejected; null unlinks.
+    assert.equal((await call(`${base}/${id}`, 'PATCH', { ...booking, placeId: otherPlace })).status, 200);
+    assert.equal((await read(id)).placeId, null);
+    assert.equal((await call(`${base}/${id}`, 'PATCH', { ...booking, placeId: 'not an id' })).status, 400);
+    assert.equal((await call(`${base}/${id}`, 'PATCH', { ...booking, placeId })).status, 200);
+    assert.equal((await read(id)).placeId, placeId);
+    assert.equal((await call(`/trips/${trip.id}/places/${placeId}`, 'DELETE')).status, 204);
+    assert.equal((await read(id)).placeId, null);
+    assert.equal((await call(`${base}/${id}`, 'DELETE')).status, 204);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM booking_places').get().n, 0);
+  } finally { db.close(); }
+});
+
 test('plan categories and transport metadata survive sync, old clients and schema reruns', async () => {
   const { db, call, trip } = await fixture();
   try {

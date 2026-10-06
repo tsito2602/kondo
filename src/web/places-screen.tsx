@@ -13,7 +13,11 @@ import {
 } from "react";
 import { MapPin, Plus } from "lucide-react";
 import { useTravel } from "@/data/travel-provider";
-import { placeNumbers } from "@/data/place-numbers";
+import {
+  placeNumbers,
+  placeVisits,
+  type PlaceVisit,
+} from "@/data/place-numbers";
 import { ordinaryPlans } from "@/data/itinerary";
 import {
   mapCoordinates,
@@ -48,6 +52,8 @@ type Mark = {
   place?: Place;
   item?: ItineraryItem;
   booking?: Booking;
+  /** When a numbered place is scheduled: its plan, or its linked booking. */
+  when?: PlaceVisit;
 };
 type View = { cx: number; cy: number; k: number };
 
@@ -60,8 +66,8 @@ const shortDate = (day: string) =>
   `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))}`;
 const dayNumber = (start: string, day: string) =>
   Math.round((Date.parse(day) - Date.parse(start)) / 86400000) + 1;
-const timeKey = (item: ItineraryItem) =>
-  `${item.day} ${item.time || "99:99"} ${item.id}`;
+const timeKey = (when: PlaceVisit) =>
+  `${when.day} ${when.time || "99:99"} ${when.key}`;
 
 function usePlacesModel() {
   const travel = useTravel();
@@ -69,21 +75,21 @@ function usePlacesModel() {
   return useMemo(() => {
     // Hotel in/out records are the しおり's own; the map shows plans only.
     const schedule = ordinaryPlans(travel.items);
-    const numbers = placeNumbers(travel.places, schedule);
-    const itemById = new Map(schedule.map((item) => [item.id, item]));
+    // A place linked to a booking is scheduled at the booking's time.
+    const numbers = placeNumbers(travel.places, schedule, travel.bookings);
+    const visits = placeVisits(travel.places, schedule, travel.bookings);
     const marks: Mark[] = travel.places
       .map((place) => {
-        const item = place.itineraryItemId
-          ? itemById.get(place.itineraryItemId)
-          : undefined;
+        const when = visits.get(place.id);
         return {
           key: `place:${place.id}`,
           name: place.title,
-          type: item ? ("plan" as const) : ("cand" as const),
+          type: when ? ("plan" as const) : ("cand" as const),
           point: placeCoordinates(place),
           number: numbers.get(place.id),
           place,
-          item,
+          item: when?.item,
+          when,
         };
       })
       .sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
@@ -99,9 +105,9 @@ function usePlacesModel() {
       .filter((hotel) => hotel.point)
       .sort((a, b) => a.booking!.day.localeCompare(b.booking!.day));
     const plans = marks
-      .filter((mark) => mark.item)
-      .sort((a, b) => timeKey(a.item!).localeCompare(timeKey(b.item!)));
-    const days = [...new Set(plans.map((mark) => mark.item!.day))].sort();
+      .filter((mark) => mark.when)
+      .sort((a, b) => timeKey(a.when!).localeCompare(timeKey(b.when!)));
+    const days = [...new Set(plans.map((mark) => mark.when!.day))].sort();
     /** The stay the day starts from: the night before, else the check-in. */
     const hotelFor = (day: string) =>
       hotels.find(
@@ -129,10 +135,10 @@ type Model = ReturnType<typeof usePlacesModel>;
 
 /** The stop before a plan on its day: the previous plan, else the stay. */
 function previousStop(model: Model, mark: Mark) {
-  const day = mark.item!.day;
+  const day = mark.when!.day;
   const index = model.plans.findIndex((plan) => plan.key === mark.key);
   const before = model.plans[index - 1];
-  return before && before.item!.day === day ? before : model.hotelFor(day);
+  return before && before.when!.day === day ? before : model.hotelFor(day);
 }
 
 /* ---------- screen ---------- */
@@ -311,7 +317,7 @@ function PlacesMap({
   // Places on the map for this view: the day's plans and stay, plus every candidate.
   const shown = useMemo(() => {
     const plans = model.plans.filter(
-      (mark) => mark.point && (day === "all" || mark.item!.day === day),
+      (mark) => mark.point && (day === "all" || mark.when!.day === day),
     );
     const hotels =
       day === "all"
@@ -735,7 +741,7 @@ function PlacesMap({
               visibility: inside ? undefined : "hidden",
               "--pl-tone":
                 day === "all" && mark.type === "plan"
-                  ? model.tone(mark.item!.day)
+                  ? model.tone(mark.when!.day)
                   : undefined,
             } as CSSProperties
           }
@@ -901,7 +907,7 @@ function PlacesList({
     <div className="places-list" ref={listEl}>
       {days.map((entry) => {
         const hotel = model.hotelFor(entry);
-        const plans = model.plans.filter((mark) => mark.item!.day === entry);
+        const plans = model.plans.filter((mark) => mark.when!.day === entry);
         return (
           <section key={entry} aria-label={shortDate(entry)}>
             <h3>
@@ -914,7 +920,7 @@ function PlacesList({
                 mark,
                 mark.number,
                 "",
-                mark.item!.time || "時間未定",
+                mark.when!.time || "時間未定",
                 leg(index ? plans[index - 1] : hotel, mark),
               ),
             )}
@@ -971,14 +977,14 @@ function PlaceSheetFor({
   const hotel =
     mark.type === "hotel"
       ? null
-      : mark.item
-        ? model.hotelFor(mark.item.day)
+      : mark.when
+        ? model.hotelFor(mark.when.day)
         : day === "all"
           ? model.hotels[0]
           : model.hotelFor(day);
   const fromHotel =
     hotel?.point && point ? distanceMeters(hotel.point, point) : null;
-  const previous = mark.item ? previousStop(model, mark) : null;
+  const previous = mark.when ? previousStop(model, mark) : null;
   const fromPrevious =
     previous && previous.type !== "hotel" && previous.point && point
       ? distanceMeters(previous.point, point)
@@ -996,11 +1002,11 @@ function PlaceSheetFor({
     );
     tag = <span className="places-tag is-plan">宿</span>;
     note = `チェックイン ${shortDate(booking.day)} ${booking.time}${nights ? ` · ${nights}泊` : ""}`;
-  } else if (mark.item) {
+  } else if (mark.when) {
     tag = (
       <span className="places-tag is-plan">
-        DAY {dayNumber(model.start, mark.item.day)} · {shortDate(mark.item.day)}{" "}
-        {mark.item.time || "時間未定"}
+        DAY {dayNumber(model.start, mark.when.day)} · {shortDate(mark.when.day)}{" "}
+        {mark.when.time || "時間未定"}
       </span>
     );
     note = mark.place!.note;
