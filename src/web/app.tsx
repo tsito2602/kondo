@@ -1,8 +1,11 @@
 import { SegmentSelection } from "./segment-selection";
 import { startTripTransition } from "./trip-transition";
 import { finishBootScreen } from "./boot";
-import { TripCover } from "./trip-cover";
-import { ticketDate } from "./ticket-content";
+import {
+  PastTripCard,
+  UpcomingTripCard,
+  useTripListEntrance,
+} from "./home-trips";
 import {
   captureMotionOrigin,
   dismissModal,
@@ -47,13 +50,12 @@ import {
   Copy,
   BookOpen,
   Plus,
-  MapPin,
   Check,
 } from "lucide-react";
 import { Card } from "./obsidian/card";
 import { GoogleSignIn, useAuth } from "@/auth/auth-provider";
 import { TravelProvider, useTravel } from "@/data/travel-provider";
-import type { TripMember } from "@/data/types";
+import type { Trip, TripMember } from "@/data/types";
 import { formatDate, localDate } from "@/utils/dates";
 import { TripEditor } from "./editors";
 import { SafariTabs, tripTabs } from "./safari-tabs";
@@ -386,19 +388,25 @@ function Home() {
   const [invite, setInvite] = useState(params.get("invite") ?? "");
   const { busy, run } = useAction();
   const today = localDate();
-  const future = travel.trips.filter((trip) => trip.endsOn >= today);
-  const past = travel.trips.filter((trip) => trip.endsOn < today);
+  const future = travel.trips
+    .filter((trip) => trip.endsOn >= today)
+    .sort((a, b) => a.startsOn.localeCompare(b.startsOn));
+  const past = travel.trips
+    .filter((trip) => trip.endsOn < today)
+    .sort((a, b) => b.startsOn.localeCompare(a.startsOn));
+  const list = useRef<HTMLElement>(null);
+  useTripListEntrance(list);
+  const open = (trip: Trip) =>
+    startTripTransition(() => {
+      travel.selectTrip(trip.id);
+      navigate(`/trips/${trip.id}/itinerary`);
+    }, trip.id);
   return (
     <>
+      {/* Settings on the left, create on the right: both only here on phones. */}
       <ThumbDock mode="context">
         <ContextDock
-          primary={
-            <button onClick={() => setEditing(true)}>
-              <Plus size={18} aria-hidden="true" />
-              旅行を作成
-            </button>
-          }
-          actions={
+          back={
             <Link
               to="/settings"
               state={{ background: location }}
@@ -407,11 +415,18 @@ function Home() {
               <Settings size={22} />
             </Link>
           }
+          actions={
+            <button className="home-create" onClick={() => setEditing(true)}>
+              <Plus size={22} strokeWidth={2.6} aria-hidden="true" />
+              旅行を作成
+            </button>
+          }
         />
       </ThumbDock>
-      <main id="main-content" className="page home-page">
+      <main id="main-content" className="page home-page" ref={list}>
         <div className="home-toolbar">
           <h1>旅行</h1>
+          {/* Wide screens have no dock, so the same two controls live here. */}
           <Link
             className="icon-button home-settings"
             to="/settings"
@@ -441,89 +456,40 @@ function Home() {
             <p>旅行を作成するか、招待リンクから参加できます。</p>
           </Empty>
         )}
-        {[
-          { label: "これからの旅", trips: future },
-          { label: "これまでの旅", trips: past },
-        ].map(
-          (group) =>
-            group.trips.length > 0 && (
-              <section className="trip-group" key={group.label}>
-                <div className="section-heading">
-                  <h2>{group.label}</h2>
-                  <span className="muted">{group.trips.length}</span>
-                </div>
-                <div className="trip-grid">
-                  {group.trips.map((trip) => (
-                    <Link
-                      className="trip-ticket"
-                      data-press-card
-                      data-trip-surface={trip.id}
-                      data-motion-managed
-                      onClick={(event) => {
-                        if (
-                          event.button !== 0 ||
-                          event.metaKey ||
-                          event.ctrlKey ||
-                          event.shiftKey ||
-                          event.altKey
-                        )
-                          return;
-                        event.preventDefault();
-                        startTripTransition(() => {
-                          travel.selectTrip(trip.id);
-                          navigate(`/trips/${trip.id}/itinerary`);
-                        }, trip.id);
-                      }}
-                      key={trip.id}
-                      to={`/trips/${trip.id}/itinerary`}
-                    >
-                      <div className="trip-photo">
-                        <TripCover id={trip.id} src={trip.coverImage ?? ""} />
-                        <div className="trip-photo-content">
-                          <h2>{trip.name}</h2>
-                          {trip.destination && (
-                            <span className="trip-destination">
-                              <MapPin size={13} />
-                              {trip.destination}
-                            </span>
-                          )}
-                          <div className="trip-ticket-period">
-                            <p>
-                              {ticketDate(trip.startsOn)}
-                              <span className="ticket-range-end">
-                                〜 {ticketDate(trip.endsOn, trip.startsOn)}
-                              </span>
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="trip-stub">
-                        <strong>
-                          {Math.round(
-                            (Date.parse(trip.endsOn) -
-                              Date.parse(trip.startsOn)) /
-                              86400000,
-                          ) + 1}
-                          <small>日間</small>
-                        </strong>
-                        <span>
-                          <Users size={14} />
-                          {trip.memberCount}人
-                        </span>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            ),
+        {future.length > 0 && (
+          <section className="home-group" aria-labelledby="home-upcoming">
+            <h2 className="home-group-heading" id="home-upcoming">
+              これからの旅<span>{future.length}</span>
+            </h2>
+            <div className="home-trip-list">
+              {future.map((trip, index) => (
+                <UpcomingTripCard
+                  key={trip.id}
+                  trip={trip}
+                  members={travel.membersOf(trip.id)}
+                  today={today}
+                  nearest={index === 0}
+                  onOpen={open}
+                />
+              ))}
+            </div>
+          </section>
         )}
-        <Button
-          variant="ghost"
-          className="subtle invite-entry"
-          onClick={() => setInvite(" ")}
-        >
+        {past.length > 0 && (
+          <section className="home-group" aria-labelledby="home-past">
+            <h2 className="home-group-heading" id="home-past">
+              これまでの旅<span>{past.length}</span>
+            </h2>
+            <div className="home-trip-shelf">
+              {past.map((trip) => (
+                <PastTripCard key={trip.id} trip={trip} onOpen={open} />
+              ))}
+            </div>
+          </section>
+        )}
+        <button className="home-join" onClick={() => setInvite(" ")}>
           招待リンクから参加
-        </Button>
+        </button>
         {editing && (
           <TripEditor
             onClose={() => setEditing(false)}
