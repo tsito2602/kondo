@@ -942,10 +942,10 @@ test("legacy account cache and pending changes survive React migration; real for
       [...document.querySelectorAll(".context-secondary button")].map((node) =>
         node.getAttribute("aria-label"),
       ),
-      ["しおりへ追加"],
+      ["しおりに追加"],
     );
     await click(
-      byText("dialog .detail-itinerary-action button", "しおりへ追加"),
+      byText("dialog .detail-itinerary-action button", "しおりに追加"),
     );
     assert.equal(document.querySelectorAll("dialog[open]").length, 2);
     await fill("日時", "16:00");

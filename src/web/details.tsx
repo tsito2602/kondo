@@ -119,7 +119,7 @@ export function PlaceDetail({
   ) : travel.canEdit ? (
     <button className="primary" onClick={() => setMode("schedule")}>
       <Plus size={18} aria-hidden="true" />
-      しおりへ追加
+      しおりに追加
     </button>
   ) : null;
   // On a phone the dock carries it, on its own island (Tsubasa 2026-10-06).
@@ -139,8 +139,8 @@ export function PlaceDetail({
     />
   ) : travel.canEdit ? (
     <DockFunction
-      label="しおりへ追加"
-      short="追加"
+      label="しおりに追加"
+      short="しおりに追加"
       icon={<BookPlus aria-hidden="true" />}
       onClick={() => setMode("schedule")}
     />

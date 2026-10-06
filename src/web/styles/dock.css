@@ -321,7 +321,7 @@
 }
 
 /* A function the dock carries on a phone (its m island) is not repeated in
-   the panel: しおりで見る / しおりを見る / しおりへ追加. */
+   the panel: しおりで見る / しおりを見る / しおりに追加. */
 @media (max-width: 759px) {
   :root:has(.thumb-dock-host:not([hidden])) .bk-kv-dock-twin,
   :root:has(.thumb-dock-host:not([hidden])) .detail-itinerary-action {
