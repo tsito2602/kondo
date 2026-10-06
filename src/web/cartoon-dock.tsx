@@ -16,7 +16,7 @@ import {
 // move. Islands part and join through a neck rather than one pill sliding
 // over another, and an island that is no longer needed melts into its
 // neighbour instead of shrinking into a separate blob. The cartoon touches
-// stay: the undo toast lands with a bump, the launch logo inflates the dock,
+// stay: the launch logo inflates the dock,
 // and pressing anywhere on an island squishes the whole island (2-v, v).
 //
 // What sits on the islands is plain markup in groups ([data-slot]): l (back),
@@ -335,21 +335,16 @@ export class CartoonDock extends Component<Props> {
       this.paint();
       return;
     }
-    const bump = t.merged && !wasMerged;
+    // Back to one full-width island: no bump or landing squish after it
+    // settles (Tsubasa 2026-10-06: 「全幅に戻ったあとの一プルンはいらない」).
+    const full = t.merged && !wasMerged;
     // crouch, spring up as the material stretches, land with a squish
     void this.J.to(0.92, { k: 700, d: 26 });
     const up = setTimeout(() => void this.J.to(1, { k: 420, d: 11 }, 3), 70);
     void this.morphTo(to).then((landed) => {
       clearTimeout(up);
       if (!landed) return;
-      void this.J.to(1, { k: 420, d: 12 }, -4);
-      // the islands run into each other and become one, with a bump
-      if (bump)
-        spring(
-          this.goo.current!,
-          [{ transform: "scale(1.05,.82)" }, { transform: "none" }],
-          "boing",
-        );
+      void this.J.to(1, { k: 420, d: 12 }, full ? 0 : -4);
     });
   }
 
