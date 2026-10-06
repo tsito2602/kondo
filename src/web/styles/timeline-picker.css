@@ -387,3 +387,53 @@
 .tlp-me.is-point > span {
   flex: none;
 }
+
+/* The trip's timeline: each midnight is the next day's title. */
+.tlp-hr.is-day {
+  height: 2px;
+  background: var(--p-ink);
+  opacity: 0.55;
+}
+.tlp-hl.is-day {
+  z-index: 4;
+  left: 4px;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: var(--p-ink);
+  color: var(--p-paper);
+  font-family: var(--f-body);
+  font-size: 10.5px;
+  font-weight: 900;
+}
+.tlp-hl.is-day small {
+  margin-left: 2px;
+  font-size: 9px;
+  opacity: 0.75;
+}
+/* The form's 日時 button: the day, then the times. */
+.tlp-trigger-day {
+  margin-right: 4px;
+  font-size: 14px;
+  font-weight: 700;
+}
+/* Which day the view is on, pinned to the stage's top-right corner. */
+.tlp-viewday {
+  position: sticky;
+  z-index: 3;
+  top: 0;
+  height: 0;
+}
+.tlp-viewday span {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  padding: 3px 9px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--p-paper) 82%, transparent);
+  color: var(--p-mute);
+  font-size: 11px;
+  font-weight: 900;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
+}

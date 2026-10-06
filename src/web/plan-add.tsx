@@ -14,11 +14,6 @@ import { previewPlace, savePlanPlace } from "./plan-place";
 import { shiftDay, TimelinePicker, TimeRangeButton } from "./timeline-picker";
 import { coordsFromLink } from "@/data/geo";
 
-const weekday = (day: string) =>
-  new Intl.DateTimeFormat("ja-JP", { weekday: "short" }).format(
-    new Date(`${day}T12:00:00`),
-  );
-
 /**
  * A1: the + swells into this sheet right above the dock; 「追加する」 waits in the
  * dock. The day being looked at is preselected. Bookings are added in 予約.
@@ -108,22 +103,6 @@ export function PlanAddSheet({
     >
       <form id={formId} className="plan-add" onSubmit={submit}>
         <div className="field">
-          <span>日にち</span>
-          <div className="it-chips" role="group" aria-label="日にち">
-            {days.map((value) => (
-              <button
-                type="button"
-                key={value}
-                aria-pressed={selectedDay === value}
-                onClick={() => setDay(value)}
-              >
-                {Number(value.slice(5, 7))}/{Number(value.slice(8, 10))}
-                <small>{weekday(value)}</small>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="field">
           <span>種類</span>
           <div className="it-chips" role="group" aria-label="種類">
             {itineraryCategories.map((entry) => (
@@ -158,9 +137,10 @@ export function PlanAddSheet({
             <span className="it-sr">時刻</span>
             <TimeRangeButton
               className="it-inp"
+              day={selectedDay}
               time={time}
               endTime={endTime}
-              nextDay={endDayOffset === 1}
+              endDayOffset={endDayOffset}
               onOpen={() => setPicking(true)}
             />
           </div>
@@ -187,7 +167,8 @@ export function PlanAddSheet({
           </p>
         )}
         <p className="it-hint">
-          時刻を空けると「未定」でその日の最後に入ります。場所は Google
+          日付と時刻は、タイムラインで予定を動かして決めます。時刻を空けると「未定」でその日の最後に入ります。場所は
+          Google
           マップの「共有」でコピーしたリンクを貼ると、地図に番号付きで載ります。
         </p>
         <ErrorText message={error} />
@@ -196,12 +177,14 @@ export function PlanAddSheet({
         <TimelinePicker
           title={title.trim() || "新しい予定"}
           day={selectedDay}
+          days={days}
           time={time}
           endTime={endTime}
           endDayOffset={endDayOffset}
           self={category === "transport" ? null : coordsFromLink(place)}
           allowClear
           onSave={(picked) => {
+            setDay(picked.day);
             setTime(picked.time);
             setEndTime(picked.endTime);
             setEndDayOffset(picked.endDayOffset);

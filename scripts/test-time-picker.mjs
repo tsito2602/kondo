@@ -50,6 +50,7 @@ const {
   resizeStart,
   resizeEnd,
   keySpan,
+  daysBounds,
   typedStart,
   typedEnd,
   walkFlags,
@@ -79,6 +80,19 @@ test("dragging snaps to 5 minutes and moves start and end together", () => {
   assert.ok(late.end <= DAY_END);
   assert.equal(late.end - late.start, 60, "moving keeps the length");
   assert.equal(moveSpan(plan, -200).start, 0);
+});
+
+test("on the trip's timeline a plan moves into the next day and can run overnight", () => {
+  const trip = daysBounds(3);
+  const dinner = { start: 20 * 60, end: 22 * 60 };
+  // Dragged 26 hours down: the next day's 22:00–24:00.
+  assert.deepEqual(moveSpan(dinner, 46 * 60, 5, trip), { start: 46 * 60, end: 48 * 60 });
+  // A night bus stretched to 07:30 the next morning.
+  assert.equal(resizeEnd(dinner, 31 * 60 + 30, trip).end, 31 * 60 + 30);
+  // The last day's plan may end at 翌02:00, no later.
+  assert.equal(resizeEnd({ start: 2 * 1440 + 20 * 60, end: 2 * 1440 + 21 * 60 }, 4 * 1440, trip).end, 3 * 1440 + 120);
+  // One day alone still stops at 翌02:00.
+  assert.equal(resizeEnd(dinner, 40 * 60).end, 26 * 60);
 });
 
 test("the grips resize one end, never shorter than 15 minutes", () => {
