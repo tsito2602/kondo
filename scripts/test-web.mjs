@@ -1580,7 +1580,7 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.match(
       notice.textContent,
-      /アップデートされました\s*kondo 2026\.10\.7\.1432\s*新しくする/,
+      /アップデートされました\s*kondo 2026\.10\.7\.1432\s*更新する/,
     );
     assert.equal(document.documentElement.dataset.appUpdate, "waiting");
     assert.match(versionRow.textContent, /2026\.10\.7\.1432 が届いています/);

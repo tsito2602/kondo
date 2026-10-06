@@ -190,7 +190,7 @@ export function UpdateNotice() {
       type="button"
       ref={pill}
       className="update-notice"
-      aria-label={`アップデートされました。kondo ${label}。新しくする`}
+      aria-label={`アップデートされました。kondo ${label}。更新する`}
       onClick={async (event) => {
         if (pendingChanges) {
           notify("未同期の変更を送信してから新しくできます");
@@ -236,7 +236,7 @@ export function UpdateNotice() {
         <small>kondo {label}</small>
       </span>
       <span className="update-notice-action" aria-hidden="true">
-        新しくする
+        更新する
       </span>
     </button>
   );
