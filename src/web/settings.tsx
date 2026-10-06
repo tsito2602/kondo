@@ -7,6 +7,7 @@ import { localDate } from "@/utils/dates";
 import { appVersion, updateLabel, useAppUpdate } from "./app-update";
 import { RM, spring } from "./cartoon";
 import { jellyScroll } from "./jelly-scroll";
+import { Glyph } from "./itinerary-icons";
 import { KindColorRows } from "./kind-settings";
 import { Modal, useAction, useTheme, useToast } from "./ui";
 
@@ -156,27 +157,36 @@ function Passport() {
         <label className="passport-key" htmlFor={nameId}>
           NAME / 表示名
         </label>
-        <input
-          id={nameId}
-          className="passport-name"
-          value={name}
-          maxLength={100}
-          autoComplete="nickname"
-          enterKeyHint="done"
-          onChange={(event) => {
-            setName(event.target.value);
-            pending.current = event.target.value;
-            clearTimeout(timer.current);
-            timer.current = setTimeout(save, 700);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") event.currentTarget.blur();
-          }}
-          onBlur={() => {
-            save();
-            if (!name.trim()) setName(saved.current);
-          }}
-        />
+        <span className="passport-name-field">
+          <input
+            id={nameId}
+            className="passport-name"
+            value={name}
+            maxLength={100}
+            autoComplete="nickname"
+            enterKeyHint="done"
+            onChange={(event) => {
+              setName(event.target.value);
+              pending.current = event.target.value;
+              clearTimeout(timer.current);
+              timer.current = setTimeout(save, 700);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.currentTarget.blur();
+            }}
+            onBlur={() => {
+              save();
+              if (!name.trim()) setName(saved.current);
+            }}
+          />
+          <label
+            htmlFor={nameId}
+            className="passport-name-edit"
+            aria-label="表示名を変更"
+          >
+            <Glyph name="edit" />
+          </label>
+        </span>
         <span className="passport-key">ACCOUNT</span>
         <span className="passport-email">
           {auth.user?.email || "サンプルアカウント"}
@@ -467,7 +477,7 @@ export function SettingsScreen() {
         <Passport />
         <h3 className="settings-label">外観</h3>
         <Appearance />
-        <h3 className="settings-label">種類の色</h3>
+        <h3 className="settings-label">カテゴリの色</h3>
         <KindColorRows />
         <h3 className="settings-label">アプリ</h3>
         <AppRows />

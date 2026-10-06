@@ -14,7 +14,7 @@ import { Modal, SaveButton, useToast } from "./ui";
 
 const dark = () => document.documentElement.dataset.theme === "dark";
 
-/** 設定 › 種類の色: one row per kind, its glyph in its colour (uchiwake's 費目). */
+/** 設定 › カテゴリの色: one row per kind, its glyph in its colour (uchiwake's 費目). */
 export function KindColorRows() {
   const colors = useKindColors();
   const [editing, setEditing] = useState<KindKey | null>(null);
@@ -88,7 +88,7 @@ function KindColorPanel({
     onClose();
   };
   return (
-    <Modal title="種類の色" addPanel onClose={onClose}>
+    <Modal title="カテゴリの色" addPanel onClose={onClose}>
       <form id={formId} className="form kind-panel" onSubmit={submit}>
         <div
           className="kind-panel-head"

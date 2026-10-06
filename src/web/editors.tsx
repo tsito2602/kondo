@@ -606,7 +606,7 @@ export function BookingForm({
     },
     () =>
       !draft.kind
-        ? "先に種類を選んでください"
+        ? "先にカテゴリを選んでください"
         : !displayTitle
           ? `${titleLabel}を入力してください`
           : dateError(draft.day) ||
@@ -669,7 +669,7 @@ export function BookingForm({
   }[kind];
   return (
     <form className="form" onSubmit={submit}>
-      <div className="bk-kinds" role="group" aria-label="種類">
+      <div className="bk-kinds" role="group" aria-label="カテゴリ">
         {bookingKinds.map((entry) => {
           const Icon = bookingIcons[entry.value];
           return (

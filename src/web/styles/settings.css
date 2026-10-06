@@ -86,7 +86,7 @@
 .passport {
   position: relative;
   display: grid;
-  grid-template-columns: 86px 1fr;
+  grid-template-columns: 72px 1fr;
   gap: 14px;
   align-items: start;
   padding: 16px;
@@ -94,10 +94,12 @@
   background: var(--p-soft);
   overflow: hidden;
 }
+/* The Google account's own round icon, as it is (Tsubasa 2026-10-06). */
 .passport-photo {
-  width: 86px;
-  height: 104px;
-  border-radius: 14px;
+  width: 72px;
+  height: 72px;
+  margin-top: 6px;
+  border-radius: 50%;
   overflow: hidden;
   background: #e9b872;
 }
@@ -136,6 +138,43 @@
   font-weight: 900;
   color: var(--p-ink);
   outline: none;
+}
+/* The name reads as a field you can change: an underline and a pencil. */
+.passport-name-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 1px 0 8px;
+  border-bottom: 1.5px solid var(--p-pale);
+  transition: border-color 0.2s;
+}
+.passport-name-field:focus-within {
+  border-bottom-color: var(--p-ink);
+}
+.passport .passport-name-field .passport-name {
+  flex: 1;
+  min-width: 0;
+  margin: 0 0 2px;
+}
+.passport-name-edit {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-right: -6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--p-mute);
+  cursor: pointer;
+}
+.passport-name-edit svg {
+  width: 18px;
+  height: 18px;
+}
+.passport-name-field:focus-within .passport-name-edit {
+  visibility: hidden;
 }
 .passport-email {
   display: block;

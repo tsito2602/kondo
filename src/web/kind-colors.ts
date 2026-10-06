@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { BookingKind, ItineraryCategory } from "@/data/types";
 
-// 種類の色 (Tsubasa 2026-10-06): the screens stay black and white, and only
+// カテゴリの色 (Tsubasa 2026-10-06; first called 種類の色): the screens stay black and white, and only
 // what a plan or booking is (a meal, a sight, a journey…) carries a colour, the
 // way uchiwake colours its 費目. The colours, their names, the 6 × 4 picker and
 // the light/dark display pairs (styles/palette.css) are uchiwake's.

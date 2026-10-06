@@ -613,7 +613,7 @@ export function AddBookingSheet({
     );
   };
   const saveManual = () => {
-    if (!form.kind) return notify("先に種類を選んでください");
+    if (!form.kind) return notify("先にカテゴリを選んでください");
     const year = Number(
       (travel.selectedTrip?.startsOn || new Date().toISOString()).slice(0, 4),
     );
@@ -800,7 +800,7 @@ export function AddBookingSheet({
               <ClipIcon size={16} />
               スクショ・PDFから取り込むに戻る
             </button>
-            <div className="bk-kinds" role="group" aria-label="種類">
+            <div className="bk-kinds" role="group" aria-label="カテゴリ">
               {bookingKinds.map((entry) => {
                 const Icon = bookingIcons[entry.value];
                 return (

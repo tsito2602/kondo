@@ -103,8 +103,8 @@ export function PlanAddSheet({
     >
       <form id={formId} className="plan-add" onSubmit={submit}>
         <div className="field">
-          <span>種類</span>
-          <div className="it-chips" role="group" aria-label="種類">
+          <span>カテゴリ</span>
+          <div className="it-chips" role="group" aria-label="カテゴリ">
             {itineraryCategories.map((entry) => (
               <button
                 type="button"
