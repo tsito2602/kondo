@@ -1,6 +1,7 @@
 import { SettingsScreen } from "./settings";
 import { startUpdateChecks, useUpdateGuard } from "./app-update";
 import { startTripTransition } from "./trip-transition";
+import { HomePull } from "./home-pull";
 import { finishBootScreen } from "./boot";
 import {
   PastTripCard,
@@ -358,6 +359,7 @@ function Home() {
         />
       </ThumbDock>
       <main id="main-content" className="page home-page" ref={list}>
+        <HomePull content={list} onSync={travel.sync} />
         <div className="home-toolbar">
           <h1>旅行</h1>
           {/* Wide screens have no dock, so the same two controls live here. */}

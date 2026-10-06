@@ -273,3 +273,50 @@
     color: var(--p-ink);
   }
 }
+
+/* Pull to sync (kondo-cartoon §8): the logo waits above the list. */
+.home-pull {
+  position: relative;
+  height: 0;
+}
+.home-pull[hidden] {
+  display: none;
+}
+.home-pull-logo {
+  position: absolute;
+  left: 50%;
+  top: -92px;
+  width: 64px;
+  height: 50px;
+  margin-left: -32px;
+  overflow: visible;
+  transform-origin: 50% 0;
+}
+.home-pull-logo .lg {
+  fill: var(--p-ink);
+}
+.home-pull-logo .ls {
+  fill: none;
+  stroke: var(--p-ink);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.home-pull-logo .pop {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.home-pull-logo .pin {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.home-pull small {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -34px;
+  text-align: center;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  color: var(--p-mute);
+  opacity: 0;
+}
