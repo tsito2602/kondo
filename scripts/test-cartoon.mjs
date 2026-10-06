@@ -42,7 +42,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export * from './src/web/cartoon'; export { CartoonDock, DockGroup } from './src/web/cartoon-dock'; export { TripDock, tripTabs, moveEdges } from './src/web/trip-dock'; export { ThumbDockProvider, ThumbDock, ContextDock, DockToast } from './src/web/thumb-dock'; export { jellyScroll } from './src/web/jelly-scroll'; export { installPressFeedback } from './src/web/press-feedback';",
+      "export * from './src/web/cartoon'; export { CartoonDock, DockGroup } from './src/web/cartoon-dock'; export { TripDock, tripTabs, moveEdges } from './src/web/trip-dock'; export { ThumbDockProvider, ThumbDock, ContextDock, DockToast } from './src/web/thumb-dock'; export { jellyScroll } from './src/web/jelly-scroll'; export { openFromCard, closeToCard, sheetIn, sheetOut, cardOrigin } from './src/web/transitions'; export { installPressFeedback } from './src/web/press-feedback';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -729,4 +729,74 @@ test("reduced motion places the islands at once and animates nothing", async () 
     await act(async () => dock.root.unmount());
     reduced = false;
   }
+});
+
+test("a sheet opens out of its card, closes back onto it and sheets rise and drop on the mock's curves", async () => {
+  stubAnimate();
+  const card = document.createElement("div");
+  card.dataset.pressCard = "";
+  card.getBoundingClientRect = () => ({
+    left: 20,
+    top: 500,
+    width: 340,
+    height: 70,
+  });
+  const sheet = document.createElement("div");
+  sheet.getBoundingClientRect = () => ({
+    left: 10,
+    top: 60,
+    width: 370,
+    height: 674,
+  });
+  const parts = [1, 2, 3].map(() =>
+    sheet.appendChild(document.createElement("p")),
+  );
+  document.body.append(card, sheet);
+  const inner = document.createElement("span");
+  card.append(inner);
+  assert.equal(M.cardOrigin(inner), card);
+  const opening = M.openFromCard(card, sheet);
+  const layer = document.querySelector(".cartoon-morph");
+  assert.equal(layer.style.top, "500px", "starts as the card");
+  assert.equal(card.style.visibility, "hidden");
+  assert.equal(sheet.style.opacity, "0");
+  await wait(60);
+  assert.ok(
+    parseFloat(layer.style.top) < 500,
+    "below the middle: the top edge leads",
+  );
+  assert.equal(parseFloat(layer.style.left), 20, "the sides wait 90 ms");
+  await wait(300);
+  assert.equal(sheet.style.opacity, "");
+  const rise = calls.filter((c) => parts.includes(c.el));
+  assert.deepEqual(
+    rise.map((c) => c.options.delay),
+    [0, 45, 90],
+  );
+  assert.equal(rise[0].frames[0].transform, "translateY(26px) scale(.9)");
+  await opening;
+  assert.equal(document.querySelector(".cartoon-morph"), null);
+  calls.length = 0;
+  await M.closeToCard(card, sheet);
+  assert.equal(calls[0].el, sheet);
+  assert.equal(calls[0].options.duration, 90);
+  assert.equal(card.style.visibility, "");
+  const land = calls.find((c) => c.el === card);
+  assert.equal(land.frames[0].transform, "scale(1.06,.9)");
+  calls.length = 0;
+  await M.sheetIn(sheet);
+  assert.equal(calls[0].options.duration, 420);
+  assert.equal(calls[0].options.easing, "cubic-bezier(.2,1.2,.4,1)");
+  assert.equal(calls[0].frames[0].transform, "translateY(100%)");
+  await M.sheetOut(sheet);
+  assert.equal(calls[1].options.duration, 260);
+  assert.equal(calls[1].frames[1].transform, "translateY(100%)");
+  reduced = true;
+  calls.length = 0;
+  await M.openFromCard(card, sheet);
+  await M.sheetIn(sheet);
+  assert.equal(calls.length, 0, "reduced motion: nothing moves");
+  reduced = false;
+  card.remove();
+  sheet.remove();
 });

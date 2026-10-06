@@ -2667,10 +2667,6 @@ input::-webkit-date-and-time-value {
   overflow: hidden;
 }
 
-/* A single thumb surface stays outside route snapshots and inside modal focus scopes. */
-.thumb-dock-host {
-  display: none;
-}
 .thumb-date-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2701,29 +2697,6 @@ input::-webkit-date-and-time-value {
   }
 }
 @media (max-width: 759px) {
-  :root:has(.thumb-dock-host:not([hidden])) {
-    --nav-height: calc(var(--dock-height) + 12px + var(--dock-bottom-gap));
-  }
-  :root:has(.thumb-dock-host:not([hidden]))::view-transition {
-    --route-clip-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom));
-  }
-  .thumb-dock-host:not([hidden]) {
-    --dock-fade-color: var(--canvas);
-    display: flex;
-    position: fixed;
-    z-index: 40;
-    left: max(12px, env(safe-area-inset-left));
-    right: max(12px, env(safe-area-inset-right));
-    bottom: calc(var(--dock-bottom-gap) + env(safe-area-inset-bottom));
-    justify-content: center;
-    pointer-events: none;
-  }
-  dialog .thumb-dock-host:not([hidden]) {
-    --dock-fade-color: var(--paper);
-    /* Keep controls at the layout bottom, underneath the software keyboard. */
-    position: absolute;
-    bottom: calc(var(--dock-bottom-gap) + env(safe-area-inset-bottom));
-  }
   .detail-inline-action {
     display: none;
   }
@@ -2745,12 +2718,15 @@ input::-webkit-date-and-time-value {
     bottom: auto;
     height: var(--modal-layout-height, 100dvh);
     max-height: var(--modal-layout-height, 100dvh);
-    padding: 12px max(12px, env(safe-area-inset-right))
+    /* kondo-cartoon §4: the sheet sits 10 px in from the sides and 10 px
+       below the status bar, its foot 18 px above the dock. */
+    padding: calc(10px + env(safe-area-inset-top))
+      max(10px, env(safe-area-inset-right))
       calc(
-        var(--dock-height) + var(--dock-bottom-gap) + 16px +
+        var(--dock-height) + var(--dock-bottom-gap) + 18px +
           env(safe-area-inset-bottom)
       )
-      max(12px, env(safe-area-inset-left));
+      max(10px, env(safe-area-inset-left));
     background: transparent;
     border: 0;
     border-radius: 0;
@@ -2765,16 +2741,19 @@ input::-webkit-date-and-time-value {
     width: 100%;
     min-height: 0;
     max-height: 100%;
-    background: var(--panel-tint);
-    -webkit-backdrop-filter: blur(32px) saturate(1.05);
-    backdrop-filter: blur(32px) saturate(1.05);
-    border-radius: var(--radius-panel);
+    background: var(--p-paper);
+    border-radius: var(--r-sheet);
     overflow-y: auto;
     overscroll-behavior: contain;
     scroll-padding-bottom: calc(24px + var(--panel-keyboard-inset, 0px));
-    box-shadow:
-      inset 0 1px 0 var(--surface-glow),
-      0 12px 40px #0003;
+    box-shadow: var(--p-sheet-shadow);
+  }
+  /* The mock's scrim: half paper, blurred 8 px, over .3 s. */
+  :root:has(.thumb-dock-host) .modal::backdrop {
+    background: var(--p-scrim);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    animation-duration: 300ms;
   }
   :root:has(.thumb-dock-host) .modal.full .modal-inner {
     height: 100%;
