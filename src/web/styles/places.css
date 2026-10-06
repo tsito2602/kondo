@@ -383,6 +383,10 @@
 .places-badge.is-hotel {
   border-radius: 8px;
 }
+.places-badge svg {
+  width: 14px;
+  height: 14px;
+}
 .places-row-main {
   min-width: 0;
 }
