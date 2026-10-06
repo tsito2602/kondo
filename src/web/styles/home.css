@@ -325,13 +325,17 @@
   opacity: 0;
 }
 
-/* 375 px phones: settings, 招待で参加 and 旅行を作成 still fit with their gaps. */
-@media (max-width: 389px) {
-  /* (outranks the dock's own word-button padding) */
-  .cdock-group[data-slot="r"] > button.home-create:not([aria-label]) {
-    padding: 0 16px 0 14px;
+/* Home dock (Tsubasa 2026-10-06): 招待で参加 and 旅行を作成 share one width and
+   the three islands keep the dock's 10 px gaps: settings 56, then the rest
+   split in half. */
+@media (max-width: 759px) {
+  .cdock-group[data-slot="m"]:has(> .home-join-dock),
+  .cdock-group[data-slot="r"]:has(> .home-create) {
+    width: calc((100% - 32px - var(--dock-height) - 20px) / 2);
   }
-  .cdock-group[data-slot="m"] > button.home-join-dock {
-    padding: 0 12px 0 10px;
+  .cdock-group[data-slot="m"] > button.home-join-dock,
+  .cdock-group[data-slot="r"] > button.home-create:not([aria-label]) {
+    width: 100%;
+    padding: 0 8px;
   }
 }
