@@ -626,28 +626,16 @@ export function Loading() {
     </div>
   );
 }
+/** The screen's add action: the one round ink ＋ at the bottom right, just
+    above the dock (FloatingAddAction in thumb-dock.tsx), on every screen. */
 export function AddButton({
   onClick,
   label,
-  floating = false,
 }: {
   onClick: () => void;
   label: string;
-  floating?: boolean;
 }) {
-  return (
-    <>
-      <FloatingAddAction label={label} onClick={onClick} />
-      <Button
-        className={`page-add ${floating ? "floating-add" : "primary add-action"}`}
-        onClick={onClick}
-        aria-label={label}
-      >
-        <Plus />
-        <span>{label}</span>
-      </Button>
-    </>
-  );
+  return <FloatingAddAction label={label} onClick={onClick} />;
 }
 export function ErrorText({ message }: { message: string }) {
   return message ? (

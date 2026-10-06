@@ -116,14 +116,8 @@ export function moveEdges(E: Edges, L: number, R: number, animate: boolean) {
   );
 }
 
-/** The trip's dock: back to the trip list, and the six tabs. */
-export function TripDock({
-  tripId,
-  onBack,
-}: {
-  tripId: string;
-  onBack: () => void;
-}) {
+/** The trip's dock: the six tabs (and a back circle under a sheet). */
+export function TripDock({ tripId }: { tripId: string }) {
   const location = useLocation();
   const navigate = useNavigate();
   const controls = useContext(DockNavigationContext);
@@ -182,20 +176,25 @@ export function TripDock({
   };
   return (
     <>
-      <DockGroup slot="l" className="context-back">
-        <button
-          type="button"
-          className="cdock-btn"
-          aria-label={controls ? "戻る" : "旅行一覧へ戻る"}
-          onClick={controls?.back ?? onBack}
-        >
-          <DockBackIcon />
-        </button>
-      </DockGroup>
+      {/* The trip header holds the way back to the trip list; the back
+          circle only shows while a sheet or detail keeps the tabs. */}
+      {controls && (
+        <DockGroup slot="l" className="context-back">
+          <button
+            type="button"
+            className="cdock-btn"
+            aria-label="戻る"
+            onClick={controls.back}
+          >
+            <DockBackIcon />
+          </button>
+        </DockGroup>
+      )}
       <div
         ref={group}
         className="cdock-group cdock-tabs"
         data-slot="tabs"
+        data-full={controls ? undefined : ""}
         role="navigation"
         aria-label="旅行のページ"
       >

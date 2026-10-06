@@ -1,12 +1,82 @@
-/* Shared page chrome from the mocks.
-   No trip mock draws a shared header: 予約, やること, 持ち物 and メモ start
-   right under the status bar with their own .page-top, and the しおり
-   title is that screen's own (with TripMenuButton). So on phones the
-   TripLayout header goes; wide layouts keep it. */
-@media (max-width: 759px) {
-  .trip-header {
-    display: none;
-  }
+/* The trip header: on every trip screen, phones and wide layouts, pinned
+   at the top while the screen scrolls under it. The way back to the trip
+   list on the left, the trip name with the mocks' mono line (kondo-itinerary
+   .trip-title: 17 px / 900 over mono 11 px) in the middle, the trip's … menu
+   on the right; both round 44 px soft circles like the mocks' .plus. */
+:root .trip-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  padding-top: env(safe-area-inset-top);
+  background: var(--p-paper);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-bottom: 0;
+  font-family: var(--f-body);
+  color: var(--p-ink);
+  --control-size: 44px;
+}
+:root .trip-header .trip-heading {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+  max-width: 1000px;
+  min-height: 0;
+  margin: 0 auto;
+  padding: 6px 16px 8px;
+}
+:root .trip-header .trip-title {
+  min-width: 0;
+  text-align: center;
+}
+:root .trip-header .trip-heading h1 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.3;
+  letter-spacing: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:root .trip-header .trip-heading p {
+  margin: 2px 0 0;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--p-mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:root .trip-header .trip-heading > .icon-button,
+:root .trip-header .trip-menu-toggle:not([aria-expanded="true"]) {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--p-soft);
+  color: var(--p-ink);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:root .trip-header .trip-heading > .icon-button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+:root .trip-header .trip-heading > .icon-button svg {
+  width: 22px;
+  height: 22px;
+}
+:root .trip-header .viewer-status {
+  padding: 0 16px 6px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--p-mute);
 }
 
 /* .page-top: a screen's opening line (kondo-prep3 / bookings / memo):
@@ -57,4 +127,51 @@
 /* A screen's scrolling body: the mocks' .scroll padding. */
 .page-scroll {
   padding: 8px 18px 150px;
+}
+
+/* The add button: one round ink ＋ on every trip screen that adds something,
+   bottom right just above the dock (kondo-itinerary's .fab: 58 px, right 20,
+   bottom 112). FloatingAddAction renders it once (thumb-dock.tsx); it pops
+   in and squishes like the dock's controls (cartoon.ts). While the update
+   notice waits above the dock, the button climbs over it. */
+:root .persistent-add:not([hidden]) {
+  position: fixed;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: calc(112px + env(safe-area-inset-bottom));
+  z-index: 24;
+  width: 58px;
+  height: 58px;
+  min-height: 58px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--p-ink);
+  color: var(--p-paper);
+  box-shadow: 0 12px 24px -10px #0006;
+  cursor: pointer;
+  view-transition-name: floating-add;
+}
+:root .persistent-add:hover {
+  background: var(--p-ink);
+}
+:root .persistent-add svg {
+  width: 26px;
+  height: 26px;
+}
+@media (min-width: 760px) {
+  :root .persistent-add:not([hidden]) {
+    right: max(24px, calc((100vw - 940px) / 2));
+    bottom: calc(32px + env(safe-area-inset-bottom));
+  }
+}
+:root[data-app-update="waiting"] .persistent-add:not([hidden]) {
+  margin-bottom: var(--update-notice-space);
+}
+/* Lists scroll clear of the button: room for it above the dock. */
+@media (max-width: 759px) {
+  :root:has(.persistent-add:not([hidden])) #main-content {
+    padding-bottom: 76px;
+  }
 }

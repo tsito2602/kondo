@@ -33,28 +33,6 @@
     pointer-events: none;
     color: var(--p-ink);
   }
-  :root:has(.thumb-dock-host:not([hidden])) .persistent-add:not([hidden]) {
-    position: fixed;
-    right: max(20px, env(safe-area-inset-right));
-    bottom: calc(112px + env(safe-area-inset-bottom));
-    z-index: 24;
-    width: 58px;
-    height: 58px;
-    min-height: 58px;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    background: var(--p-ink);
-    color: var(--p-paper);
-    box-shadow: 0 12px 24px -10px #0006;
-    view-transition-name: floating-add;
-  }
-  .persistent-add svg {
-    width: 26px;
-    height: 26px;
-  }
 }
 
 .cdock {
@@ -246,6 +224,10 @@
   right: calc(16px + env(safe-area-inset-right));
   padding: 0 4px;
   justify-content: space-around;
+}
+/* No back circle on the trip tabs (the header goes back): the full width. */
+.cdock-tabs[data-full] {
+  left: calc(16px + env(safe-area-inset-left));
 }
 .cdock-tabs > a {
   z-index: 1;
