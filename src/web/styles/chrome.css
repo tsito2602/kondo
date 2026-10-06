@@ -17,7 +17,8 @@
   --control-size: 44px;
 }
 /* Every trip screen's content fades out under the header rather than
-   being cut off; the しおり's date tabs carry their own fade. */
+   being cut off; the しおり's date tabs and the places' day chips, pinned
+   under it, carry their own fade. */
 :root .trip-header::after {
   content: "";
   position: absolute;
@@ -28,7 +29,8 @@
   background: linear-gradient(var(--p-paper), transparent);
   pointer-events: none;
 }
-:root:has(.it-top) .trip-header::after {
+:root:has(.it-top) .trip-header::after,
+:root:has(.places-head) .trip-header::after {
   display: none;
 }
 :root .trip-header .trip-heading {

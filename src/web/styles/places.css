@@ -46,6 +46,16 @@
   background: var(--pl-paper);
   text-align: center;
 }
+.places-head::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 24px;
+  background: linear-gradient(var(--pl-paper), transparent);
+  pointer-events: none;
+}
 .places-chips {
   display: flex;
   flex-wrap: wrap;
