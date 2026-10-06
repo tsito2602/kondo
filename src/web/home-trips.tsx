@@ -189,7 +189,18 @@ function TripLink({
   );
 }
 
-/** An upcoming trip as a photo card; the nearest one counts down. */
+/**
+ * A later trip's countdown, roughly (Tsubasa 2026-10-06): days under a month,
+ * then half months (「1ヶ月半」), then years.
+ */
+const roughly = (days: number): [number, string] => {
+  if (days < 30) return [days, "日"];
+  if (days >= 345) return [Math.round(days / 365), "年"];
+  const half = Math.round(days / 15.2);
+  return [Math.floor(half / 2), half % 2 ? "ヶ月半" : "ヶ月"];
+};
+
+/** An upcoming trip as a photo card; the nearest counts down by the day, later ones roughly. */
 export function UpcomingTripCard({
   trip,
   members,
@@ -217,6 +228,11 @@ export function UpcomingTripCard({
               <b>{1 - until}</b>日目
             </span>
           )
+        ) : until > 0 ? (
+          <span className="home-trip-countdown">
+            あと<b>{roughly(until)[0]}</b>
+            {roughly(until)[1]}
+          </span>
         ) : (
           <span />
         )}

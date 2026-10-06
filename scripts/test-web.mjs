@@ -2524,8 +2524,13 @@ test("home trip cards: destination lines, countdown and companion icons", async 
     during.querySelector(".home-trip-countdown").textContent,
     "2日目",
   );
-  const later = render(h(UpcomingTripCard, { ...props, trip, nearest: false }));
-  assert.equal(later.querySelector(".home-trip-countdown"), null);
+  const later = (today) =>
+    render(h(UpcomingTripCard, { ...props, trip, today, nearest: false }))
+      .querySelector(".home-trip-countdown")?.textContent;
+  assert.equal(later("2026-10-06"), "あと13日");
+  assert.equal(later("2026-09-03"), "あと1ヶ月半", "later trips count roughly");
+  assert.equal(later("2026-08-19"), "あと2ヶ月");
+  assert.equal(later("2026-10-20"), undefined);
   const photo = render(
     h(PastTripCard, {
       onOpen() {},
