@@ -10,6 +10,38 @@
   --bk-review: #f59e0b;
   --bk-review-ink: #fbbf24;
 }
+.bk-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 4px 8px;
+}
+.bk-top small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.bk-top h2 {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+.bk-plus {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--soft);
+  color: var(--ink);
+  cursor: pointer;
+}
 .bk-list {
   display: flex;
   flex-direction: column;
@@ -40,6 +72,8 @@
 /* card */
 .bk-card {
   position: relative;
+  /* keep the 済 badge's z-index inside the card, below the dock and header */
+  isolation: isolate;
   display: block;
   width: 100%;
   margin: 0 0 10px;

@@ -5,6 +5,7 @@ import {
   BookingCard,
   dayLabel,
   isUsed,
+  monthDay,
   spring,
   useClockNow,
 } from "./booking-card";
@@ -495,13 +496,25 @@ export function BookingsScreen() {
   };
   return (
     <div className="page bookings-page">
-      <div className="page-toolbar">
+      <div className="bk-top">
         <div>
+          <small>
+            {tripDay(now.slice(0, 10)) &&
+            now.slice(0, 10) <= (selectedTrip?.endsOn ?? "")
+              ? `旅の${tripDay(now.slice(0, 10))} · ${monthDay(now.slice(0, 10))} ${now.slice(11)}`
+              : `${bookings.length}件`}
+          </small>
           <h2>予約</h2>
-          <span className="muted">{bookings.length}件</span>
         </div>
         {canEdit && (
-          <AddButton label="予約を追加" onClick={() => setAdding(true)} />
+          <button
+            type="button"
+            className="bk-plus"
+            aria-label="予約を追加"
+            onClick={() => setAdding(true)}
+          >
+            <Plus size={20} aria-hidden="true" />
+          </button>
         )}
       </div>
       {!bookings.length ? (
