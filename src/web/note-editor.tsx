@@ -300,6 +300,8 @@ export function NoteEditor({
     });
   };
 
+  // The mock offers the trip's planned places: a day and a place.
+  const planned = places.filter((entry) => entry.plan);
   const linked = places.find((entry) => entry.place.id === draft.placeId);
   const live = notes.find((note) => note.id === initial.id);
   const meta: TravelNote = live ?? {
@@ -384,7 +386,7 @@ export function NoteEditor({
             lineRefs.current[0]?.focus();
           }}
         />
-        {(linked || (canEdit && places.length > 0)) && (
+        {(linked || (canEdit && planned.length > 0)) && (
           <div className="memo-link-row">
             {linked ? (
               <>
@@ -415,7 +417,7 @@ export function NoteEditor({
         )}
         {picking && (
           <div className="memo-picks" role="group" aria-label="ひもづける場所">
-            {places.map((entry) => (
+            {planned.map((entry) => (
               <button
                 type="button"
                 key={entry.place.id}
@@ -428,9 +430,7 @@ export function NoteEditor({
                   </span>
                   <em>{entry.place.title}</em>
                 </span>
-                <small>
-                  {entry.plan ? planDayLabel(entry.plan.day) : "候補"}
-                </small>
+                <small>{entry.plan && planDayLabel(entry.plan.day)}</small>
               </button>
             ))}
             {linked && (

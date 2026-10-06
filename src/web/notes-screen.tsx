@@ -5,6 +5,7 @@ import { toggleNoteCheck, visibleNoteLines } from "@/data/note-lines";
 import type { TravelNote } from "@/data/types";
 import { DockToast, ThumbDock } from "./thumb-dock";
 import { poof, sink, spring } from "./memo-motion";
+import { PageTop } from "./page-top";
 import {
   CheckBox,
   NoteMeta,
@@ -210,43 +211,41 @@ export function NotesScreen() {
   );
   return (
     <div className="page notes-page">
-      <div className="memo-top">
-        <div>
-          <small>
-            {travel.selectedTrip?.name} · {all.length}件
-          </small>
-          <h2>メモ</h2>
-        </div>
-        <div className="memo-acts">
-          <button
-            className="memo-round"
-            aria-label="メモを探す"
-            aria-pressed={query !== null}
-            onClick={() => setQuery(query === null ? "" : null)}
-          >
-            <SearchIcon />
-          </button>
-          {travel.canEdit && (
+      <PageTop
+        sub={`${travel.selectedTrip?.name ?? ""} · ${all.length}件`}
+        title="メモ"
+        actions={
+          <>
             <button
-              className="memo-round"
-              aria-label="メモを書く"
-              onClick={() =>
-                setOpen({
-                  fresh: true,
-                  note: {
-                    id: crypto.randomUUID(),
-                    body: "",
-                    title: "",
-                    updatedAt: Date.now() / 1000,
-                  },
-                })
-              }
+              className="page-plus"
+              aria-label="メモを探す"
+              aria-pressed={query !== null}
+              onClick={() => setQuery(query === null ? "" : null)}
             >
-              <PlusIcon />
+              <SearchIcon />
             </button>
-          )}
-        </div>
-      </div>
+            {travel.canEdit && (
+              <button
+                className="page-plus"
+                aria-label="メモを書く"
+                onClick={() =>
+                  setOpen({
+                    fresh: true,
+                    note: {
+                      id: crypto.randomUUID(),
+                      body: "",
+                      title: "",
+                      updatedAt: Date.now() / 1000,
+                    },
+                  })
+                }
+              >
+                <PlusIcon />
+              </button>
+            )}
+          </>
+        }
+      />
       {query !== null && (
         <label
           className="memo-search"

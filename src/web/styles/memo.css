@@ -19,46 +19,6 @@ dialog:has(.memo-editor),
   padding-top: calc(8px + env(safe-area-inset-top));
   color: var(--m-ink);
 }
-.memo-top {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 6px 4px 8px;
-}
-.memo-top small {
-  display: block;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--m-mute);
-}
-.memo-top h2 {
-  margin: 0;
-  font-size: 28px;
-  font-weight: 900;
-  line-height: 1.25;
-}
-.memo-acts {
-  display: flex;
-  gap: 8px;
-}
-.memo-round {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: var(--m-soft);
-  color: var(--m-ink);
-  cursor: pointer;
-}
-.memo-round svg {
-  width: 20px;
-  height: 20px;
-}
 .memo-search {
   display: flex;
   align-items: center;
@@ -110,7 +70,7 @@ dialog:has(.memo-editor),
   font-weight: 700;
   color: var(--m-mute);
 }
-.memo-top + .memo-tiles,
+.page-top + .memo-tiles,
 .memo-search + .memo-tiles {
   margin-top: 8px;
 }
@@ -305,7 +265,7 @@ dialog:has(.memo-editor),
   color: var(--m-ink);
   font-size: 11.5px;
   font-weight: 800;
-  line-height: 1.5;
+  line-height: 1.7;
 }
 /* The map's numbered pin: a teardrop pointing down. */
 .memo-chip-no {
@@ -524,19 +484,16 @@ dialog:has(.memo-editor),
   margin-top: 16px;
 }
 
-/* editor dock: back, then the note's tools */
-dialog:has(.memo-editor) .context-primary:empty {
-  display: none;
-}
-dialog:has(.memo-editor) .context-actions {
-  flex: 1;
+/* editor dock: back, then the note's tools (the mock's .tb) */
+dialog:has(.memo-editor):not(:has(.memo-show)) .context-actions {
   justify-content: space-around;
   padding: 0 4px;
 }
-:root dialog:has(.memo-editor) .context-actions > button {
+:root dialog:has(.memo-editor):not(:has(.memo-show)) .context-actions > button {
   flex: 1;
   min-width: 0;
-  width: auto;
+  height: 54px;
+  border-radius: 27px;
   color: var(--m-mute);
 }
 :root dialog:has(.memo-editor) .context-actions > button.on {
@@ -555,8 +512,9 @@ dialog:has(.memo-editor) .context-actions > button svg {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: calc(60px + env(safe-area-inset-top)) 26px
-    calc(130px + env(safe-area-inset-bottom));
+  /* The mock's 60 / 130 px count its status bar and home bar. */
+  padding: calc(10px + env(safe-area-inset-top)) 26px
+    calc(96px + env(safe-area-inset-bottom));
   background: var(--m-paper);
   color: var(--m-ink);
   overflow-y: auto;
@@ -581,18 +539,9 @@ dialog:has(.memo-editor) .context-actions > button svg {
 .memo-show-big span:first-child {
   font-size: 38px;
 }
+/* 見せる's dock is the one ink 「閉じる」 (the mock's .r.ink). */
 dialog:has(.memo-show) .context-back {
   display: none;
-}
-dialog:has(.memo-show) .context-primary {
-  flex: none;
-  margin-left: auto;
-}
-:root dialog:has(.memo-show) .context-primary > .memo-show-close {
-  width: auto;
-  padding: 0 24px 0 20px;
-  font-size: 15px;
-  font-weight: 700;
 }
 
 .memo-poof-dot {
