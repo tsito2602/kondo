@@ -373,7 +373,7 @@ export function TimelinePicker({
         primary: (
           <button type="button" className="tlp-save" onClick={save}>
             <CheckIcon size={20} />
-            これにする
+            保存する
           </button>
         ),
       }}

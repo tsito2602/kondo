@@ -153,7 +153,7 @@ const field = (label) =>
     .find((node) => node.querySelector("span, small")?.textContent === label)
     ?.querySelector("input,select,textarea,.date-trigger,[data-time-trigger]");
 // A plan's times: the button opens the timeline picker, whose big 開始/終了
-// readout is typed into (digits, then Enter) and saved with 「これにする」.
+// readout is typed into (digits, then Enter) and saved with 「保存する」.
 const pickTime = async (trigger, values) => {
   await click(trigger);
   const picker = [...document.querySelectorAll("dialog[open]")].at(-1);
@@ -178,7 +178,7 @@ const pickTime = async (trigger, values) => {
     });
     assert.equal(input.value, value);
   }
-  await click(byText(".context-actions button", "これにする"));
+  await click(byText(".context-actions button", "保存する"));
   await waitFor(() => !picker.isConnected || !picker.open, "the picker closes");
   await tick(30);
 };
@@ -232,8 +232,8 @@ const fill = async (label, value) => {
         time.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
       });
     }
-    assert.equal(byText(".context-actions button", "決定").disabled, false);
-    await click(byText(".context-actions button", "決定"));
+    assert.equal(byText(".context-actions button", "保存する").disabled, false);
+    await click(byText(".context-actions button", "保存する"));
     await tick(30);
     return;
   }
