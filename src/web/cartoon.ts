@@ -158,7 +158,9 @@ export class Live {
     if (!this.f) {
       let last = performance.now();
       const tick = (now: number) => {
-        const dt = Math.min(0.032, (now - last) / 1000);
+        // rAF stamps the frame start, which can precede the performance.now()
+        // taken in to(); a negative step would blow the spring up.
+        const dt = Math.max(0, Math.min(0.032, (now - last) / 1000));
         last = now;
         for (let i = 0; i < 4; i++) {
           const a = -this.s.k * (this.v - this.t) - this.s.d * this.vel;
