@@ -770,7 +770,7 @@ async function listPacking(env: Env, user: User, tripId: string) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
   const result = await env.DB.prepare(`${packingSelect}
-    WHERE p.trip_id = ? AND ${packingVisible} ORDER BY p.packed, p.category, p.name, p.id
+    WHERE p.trip_id = ? AND ${packingVisible} ORDER BY p.rowid
   `).bind(tripId, user.id).all<PackingRow>();
   return json({ items: result.results.map((item) => packingView(item, user.id)) });
 }

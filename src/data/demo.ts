@@ -27,9 +27,9 @@ import { withDemoPlaces } from './demo-places';
 import { withItineraryDemo } from './demo-itinerary';
 
 export function createDemoCache(): TravelCache {
-  const start = addDays(localDate(), 14);
+  const start = addDays(localDate(), 13);
   const next = addDays(start, 1);
-  const last = addDays(start, 3);
+  const last = addDays(start, 4);
   const today = localDate();
   const tripId = 'sample-vienna';
   const self = 'member:demo-self', misaki = 'member:demo-companion', kento = 'member:demo-friend';
@@ -42,9 +42,8 @@ export function createDemoCache(): TravelCache {
     task('sample-task-belvedere', 'ベルヴェデーレを予約する', 4, misaki),
     task('sample-task-museum', '美術館の時間指定券を取る', 6, self),
     task('sample-task-euro', 'ユーロに両替する', 10, misaki),
-    task('sample-task-1', 'eSIMを用意する', 11, self),
+    task('sample-task-1', 'eSIMを買う', 11, self),
     task('sample-task-train', '空港までの電車を調べる', 12, kento, true),
-    task('sample-task-2', '休暇を申請する', null, self, true),
   ];
   const pack = (id: string, name: string, category: string, rest: Partial<PackingItem>): PackingItem => ({ id, name, category, quantity: 1, packed: false, assignee: '', shared: false, ...rest });
   const packing = [

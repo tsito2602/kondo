@@ -591,8 +591,9 @@ export function TravelProvider({ children }: PropsWithChildren) {
     .sort((a, b) => `${a.day} ${a.time} ${a.id}`.localeCompare(`${b.day} ${b.time} ${b.id}`));
   const bookings = [...(selectedTrip ? cache.bookingsByTrip[selectedTrip.id] ?? [] : [])]
     .sort((a, b) => `${a.day} ${a.time} ${a.id}`.localeCompare(`${b.day} ${b.time} ${b.id}`));
-  const packingItems = [...(selectedTrip ? cache.packingByTrip[selectedTrip.id] ?? [] : [])]
-    .sort((a, b) => `${a.packed ? 1 : 0} ${a.category} ${a.name} ${a.id}`.localeCompare(`${b.packed ? 1 : 0} ${b.category} ${b.name} ${b.id}`));
+  // Packing keeps the order things were added in (the server lists by rowid),
+  // so ticking never moves a row (kondo-prep3).
+  const packingItems = [...(selectedTrip ? cache.packingByTrip[selectedTrip.id] ?? [] : [])];
   const tasks = [...(selectedTrip ? cache.tasksByTrip[selectedTrip.id] ?? [] : [])]
     .sort((a, b) => `${a.done ? 1 : 0} ${a.dueOn || '9999-12-31'} ${a.title} ${a.id}`.localeCompare(`${b.done ? 1 : 0} ${b.dueOn || '9999-12-31'} ${b.title} ${b.id}`));
   const membersOf = useCallback((tripId: string): TripMember[] => {

@@ -1,4 +1,7 @@
 import {
+  createContext,
+  useCallback,
+  useContext,
   useEffect,
   useId,
   useLayoutEffect,
@@ -7,29 +10,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import {
-  BatteryCharging,
-  BookOpen,
-  BookUser,
-  Camera,
-  Check,
-  Coins,
-  Droplets,
-  FileText,
-  Footprints,
-  Glasses,
-  Lock,
-  Package,
-  Pill,
-  Plug,
-  Plus,
-  Shirt,
-  Smartphone,
-  Trash2,
-  Umbrella,
-  Wallet,
-  type LucideIcon,
-} from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useAuth } from "@/auth/auth-provider";
 import { useTravel } from "@/data/travel-provider";
 import { assigneeName, memberAssignee } from "@/data/assignee";
@@ -41,64 +22,88 @@ import type {
 } from "@/data/types";
 import { localDate } from "@/utils/dates";
 import { AssigneeAvatar } from "./assignee-avatar";
-import { dismissModal, reduceMotion } from "./motion";
-import { ErrorText, Modal, useToast } from "./ui";
+import { anim, RM, spring } from "./cartoon";
+import { useJellyScroll } from "./jelly-scroll";
+import { dismissModal } from "./motion";
+import { PageTop } from "./page-top";
+import {
+  CheckIcon,
+  LockIcon,
+  Picture,
+  PlusIcon,
+  pictureFor,
+} from "./prep-pictures";
+import { ErrorText, Modal } from "./ui";
 
-/* ---------- motion: uchiwake's springs (squish k520/d20, boing k420/d14) ---------- */
+/* ---------- motion, as kondo-prep3.html plays it ---------- */
 
-const springs = { squish: { k: 520, d: 20 }, boing: { k: 420, d: 14 } };
-type SpringName = keyof typeof springs;
-const springCache = new Map<SpringName, { easing: string; ms: number }>();
-function springTiming(name: SpringName) {
-  const cached = springCache.get(name);
-  if (cached) return cached;
-  const { k, d } = springs[name];
-  const values = [0];
-  let x = 0,
-    v = 0,
-    t = 0;
-  const dt = 1 / 120;
-  while (t < 2) {
-    v += (-k * (x - 1) - d * v) * dt;
-    x += v * dt;
-    t += dt;
-    values.push(x);
-    if (Math.abs(x - 1) < 0.0008 && Math.abs(v) < 0.01) break;
-  }
-  values[values.length - 1] = 1;
-  const step = Math.max(1, Math.floor(values.length / 64));
-  let linear = false;
-  try {
-    linear = CSS.supports("transition-timing-function", "linear(0, 1)");
-  } catch {
-    linear = false;
-  }
-  const timing = {
-    easing: linear
-      ? `linear(${values
-          .filter(
-            (_, index) => index % step === 0 || index === values.length - 1,
-          )
-          .map((value) => +value.toFixed(4))
-          .join(",")})`
-      : "cubic-bezier(.34,1.56,.64,1)",
-    ms: Math.round(t * 1000),
-  };
-  springCache.set(name, timing);
-  return timing;
+/** A spring back from `from` to rest: scale pops, the ring's boing. */
+const boing = (el: Element | null | undefined, from: string) =>
+  el ? spring(el, [{ transform: from }, { transform: "none" }], "boing") : 0;
+/** The mock's own sink: lands from above, squashes (1.06 × .9), settles. */
+const SINK = (from: number): Keyframe[] => [
+  { transform: `translateY(${from}px) scale(.9,1.12)`, opacity: 0 },
+  { transform: "translateY(0) scale(.92,1.1)", opacity: 1, offset: 0.42 },
+  { transform: "translateY(0) scale(1.06,.9)", offset: 0.6 },
+  { transform: "translateY(-2px) scale(.99,1.02)", offset: 0.8 },
+  { transform: "none", opacity: 1 },
+];
+/** Opening a page: its rings, headings and lists sink in, 35 ms apart. */
+function useSinkIn(page: React.RefObject<HTMLElement | null>) {
+  useLayoutEffect(() => {
+    const parts = page.current?.querySelectorAll<HTMLElement>(
+      ".prep-ring, .prep-list, .prep-kind-heading",
+    );
+    parts?.forEach((el, i) =>
+      anim(el, SINK(-20), {
+        duration: 460,
+        delay: i * 35,
+        easing: "cubic-bezier(.4,0,.6,1)",
+        fill: "backwards",
+      }),
+    );
+  }, [page]);
 }
-function spring(
-  element: Element | null | undefined,
-  frames: Keyframe[],
-  name: SpringName = "boing",
-) {
-  if (!element || reduceMotion() || typeof element.animate !== "function")
-    return;
-  const { easing, ms } = springTiming(name);
-  element.animate(frames, { duration: ms, easing });
+
+/* ---------- the bubble over the dock (the mock's .bub) ---------- */
+
+const BubbleContext = createContext<(anchor: Element, text: string) => void>(
+  () => undefined,
+);
+function Bubble({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const show = useCallback((anchor: Element, text: string) => {
+    const bubble = ref.current;
+    if (!bubble) return;
+    bubble.textContent = text;
+    bubble.style.left = "0px";
+    const width = bubble.offsetWidth;
+    const box = anchor.getBoundingClientRect();
+    bubble.style.left = `${Math.max(12, Math.min(innerWidth - 12 - width, box.left + box.width / 2 - width / 2))}px`;
+    bubble.getAnimations?.().forEach((a) => a.cancel());
+    if (RM()) {
+      bubble.style.opacity = "1";
+      setTimeout(() => (bubble.style.opacity = ""), 2600);
+      return;
+    }
+    bubble.animate?.(
+      [
+        { opacity: 0, transform: "translateY(10px) scale(.6)" },
+        { opacity: 1, transform: "none", offset: 0.12 },
+        { opacity: 1, transform: "none", offset: 0.85 },
+        { opacity: 0 },
+      ],
+      { duration: 2600, easing: "ease-out" },
+    );
+  }, []);
+  return (
+    <BubbleContext.Provider value={show}>
+      {children}
+      <div className="prep-bubble" ref={ref} role="status" aria-live="polite" />
+    </BubbleContext.Provider>
+  );
 }
-const pop = (element: Element | null | undefined, from = 0.85) =>
-  spring(element, [{ transform: `scale(${from})` }, { transform: "none" }]);
+const useBubble = () => useContext(BubbleContext);
 
 /* ---------- shared helpers ---------- */
 
@@ -125,6 +130,7 @@ function useTravellers() {
   return { travel, self, members, label };
 }
 
+/** The page's opening line (.top): 「旅の名前 · あとN日」 over the title, ＋ at the right. */
 function PrepHeader({
   title,
   addLabel,
@@ -135,57 +141,39 @@ function PrepHeader({
   onAdd?: () => void;
 }) {
   const { selectedTrip } = useTravel();
-  const today = localDate();
-  const left = selectedTrip ? daysBetween(today, selectedTrip.startsOn) : 0;
+  const left = selectedTrip
+    ? daysBetween(localDate(), selectedTrip.startsOn)
+    : 0;
+  const sub = [selectedTrip?.name, left > 0 ? `あと${left}日` : ""]
+    .filter(Boolean)
+    .join(" · ");
   return (
-    <div className="prep-top">
-      <div>
-        {left > 0 && <small>出発まであと{left}日</small>}
-        <h2>{title}</h2>
-      </div>
-      {onAdd && (
-        <button
-          type="button"
-          className="prep-plus"
-          aria-label={addLabel}
-          onClick={onAdd}
-        >
-          <Plus size={20} aria-hidden="true" />
-        </button>
-      )}
-    </div>
+    <PageTop
+      size={30}
+      sub={sub || undefined}
+      title={title}
+      actions={
+        onAdd && (
+          <button
+            type="button"
+            className="page-plus"
+            aria-label={addLabel}
+            onClick={onAdd}
+          >
+            <PlusIcon />
+          </button>
+        )
+      }
+    />
   );
 }
 
-function CheckBox({
-  checked,
-  label,
-  disabled,
-  onToggle,
-}: {
-  checked: boolean;
-  label: string;
-  disabled?: boolean;
-  onToggle?: () => void;
-}) {
+/** The mock's .ck: a 26 px rounded box; the tick shows when done. */
+function Box() {
   return (
-    <button
-      type="button"
-      role="checkbox"
-      className="prep-check"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      data-haptic
-      onClick={(event) => {
-        onToggle?.();
-        pop(event.currentTarget.firstElementChild, checked ? 0.85 : 1.3);
-      }}
-    >
-      <span className="prep-box" aria-hidden="true">
-        <Check size={16} strokeWidth={3.2} />
-      </span>
-    </button>
+    <span className="prep-box" aria-hidden="true">
+      <CheckIcon />
+    </span>
   );
 }
 
@@ -211,11 +199,12 @@ function PrepSheet({
     <Modal
       title={title}
       onClose={onClose}
+      plain
       dockActions={{
         backLabel: "やめる",
         primary: (
           <button type="submit" className="prep-primary" form={formId}>
-            <Check size={18} aria-hidden="true" />
+            <CheckIcon />
             {primary}
           </button>
         ),
@@ -264,20 +253,18 @@ function ActivityRing({
   ring,
   selected,
   members,
-  drawn,
   onSelect,
 }: {
   ring: Ring;
   selected: boolean;
   members: TripMember[];
-  drawn: boolean;
   onSelect: () => void;
 }) {
   const done = ring.tasks.filter((task) => task.done).length;
   const total = ring.tasks.length;
   const fraction = total ? done / total : 0;
   const circumference = 2 * Math.PI * 40;
-  const closed = total > 0 && done === total;
+  const closed = fraction >= 1;
   return (
     <button
       type="button"
@@ -296,10 +283,7 @@ function ActivityRing({
             cy="50"
             r="40"
             strokeDasharray={circumference}
-            strokeDashoffset={
-              drawn ? circumference * (1 - fraction) : circumference
-            }
-            opacity={fraction ? 1 : 0}
+            strokeDashoffset={circumference * (1 - fraction)}
           />
         </svg>
         {ring.key === UNASSIGNED ? (
@@ -316,7 +300,109 @@ function ActivityRing({
   );
 }
 
+/** Press and hold a row to change it (the row itself ticks, as in the mock). */
+function useHold(onHold: () => void) {
+  const timer = useRef(0);
+  const held = useRef(false);
+  const cancel = () => clearTimeout(timer.current);
+  return {
+    held,
+    handlers: {
+      onPointerDown: () => {
+        held.current = false;
+        cancel();
+        timer.current = window.setTimeout(() => {
+          held.current = true;
+          onHold();
+        }, 550);
+      },
+      onPointerUp: cancel,
+      onPointerLeave: cancel,
+      onPointerCancel: cancel,
+      onContextMenu: (event: React.MouseEvent) => {
+        event.preventDefault();
+        cancel();
+        if (!held.current) {
+          held.current = true;
+          onHold();
+        }
+      },
+    },
+  };
+}
+
+function TaskRow({
+  task,
+  today,
+  tickable,
+  canEdit,
+  onToggle,
+  onEdit,
+}: {
+  task: TravelTask;
+  today: string;
+  tickable: boolean;
+  canEdit: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+}) {
+  const hold = useHold(() => canEdit && onEdit());
+  return (
+    <div
+      role="listitem"
+      data-task={task.id}
+      className={`prep-row${task.done ? " is-done" : ""}${tickable ? "" : " is-readonly"}`}
+    >
+      <button
+        type="button"
+        role="checkbox"
+        className="prep-row-main"
+        aria-checked={task.done}
+        aria-disabled={!tickable}
+        aria-label={
+          tickable
+            ? `${task.title}を${task.done ? "未完了" : "完了"}にする`
+            : `${task.title}（${task.done ? "済み" : "まだ"}）`
+        }
+        data-haptic={tickable ? "" : undefined}
+        {...hold.handlers}
+        onClick={() => {
+          if (hold.held.current) {
+            hold.held.current = false;
+            return;
+          }
+          if (tickable) onToggle();
+        }}
+      >
+        <span>
+          <b>{task.title}</b>
+          <small>
+            <DueText task={task} today={today} />
+          </small>
+        </span>
+        <Box />
+      </button>
+      {canEdit && (
+        <button
+          type="button"
+          className="prep-sr"
+          aria-label={`${task.title}を直す`}
+          onClick={onEdit}
+        />
+      )}
+    </div>
+  );
+}
+
 export function TasksScreen() {
+  return (
+    <Bubble>
+      <Tasks />
+    </Bubble>
+  );
+}
+
+function Tasks() {
   const { travel, self, members, label } = useTravellers();
   const today = localDate();
   const memberKeys = new Set(
@@ -344,28 +430,28 @@ export function TasksScreen() {
     rings.find((entry) => entry.key === chosen) ?? rings[0] ?? undefined;
   const [sheet, setSheet] = useState<{ task?: TravelTask } | null>(null);
   const [fresh, setFresh] = useState<string[]>([]);
-  const [drawn, setDrawn] = useState(reduceMotion());
   const page = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setDrawn(true));
-    return () => cancelAnimationFrame(frame);
-  }, []);
+  useSinkIn(page);
+  useJellyScroll(page, ".prep-rings, .prep-heading, .prep-list");
   useLayoutEffect(() => {
     if (!fresh.length) return;
     const root = page.current;
-    for (const id of fresh) {
-      const row = root?.querySelector(`[data-task="${id}"]`);
-      row?.scrollIntoView?.({ block: "center" });
-      pop(row);
-    }
+    const row = root?.querySelector(
+      fresh.map((id) => `[data-task="${id}"]`).join(","),
+    );
+    row?.scrollIntoView?.({ block: "center" });
+    void boing(row, "scale(.85)");
     for (const key of new Set(
       travel.tasks
         .filter((task) => fresh.includes(task.id))
         .map((task) => task.assignee.slice(7)),
     ))
-      pop(root?.querySelector(`[data-ring="${key}"] .prep-ring-view`), 0.86);
+      void boing(
+        root?.querySelector(`[data-ring="${key}"] .prep-ring-view`),
+        "scale(.86)",
+      );
     setFresh([]);
-  }, [fresh]);
+  }, [fresh, travel.tasks]);
   const mine = ring?.key === self;
   const tickable = (task: TravelTask) =>
     travel.canEdit &&
@@ -374,9 +460,9 @@ export function TasksScreen() {
   const toggle = (task: TravelTask) => {
     const { id, title, dueOn, assignee, done } = task;
     travel.updateTask(id, { title, dueOn, assignee, done: !done });
-    pop(
+    void boing(
       page.current?.querySelector(`[data-ring="${ring?.key}"] .prep-ring-view`),
-      1.12,
+      "scale(1.12)",
     );
   };
   return (
@@ -403,14 +489,13 @@ export function TasksScreen() {
                 ring={entry}
                 selected={entry.key === ring?.key}
                 members={travel.members}
-                drawn={drawn}
                 onSelect={() => setChosen(entry.key)}
               />
             ))}
           </div>
           {ring && (
             <>
-              <div className="prep-heading">
+              <div className="prep-heading prep-task-heading">
                 <b>
                   {mine
                     ? "あなたのやること"
@@ -418,15 +503,13 @@ export function TasksScreen() {
                       ? "担当なしのやること"
                       : `${ring.label}のやること`}
                 </b>
-                {travel.canEdit && ring.tasks.length > 0 && (
-                  <span>
-                    {mine
-                      ? "押すとリングが閉じていく"
-                      : ring.key === UNASSIGNED
-                        ? "誰でもチェックできる"
-                        : "見るだけ（チェックは本人）"}
-                  </span>
-                )}
+                <span>
+                  {mine
+                    ? "押すとリングが閉じていく"
+                    : ring.key === UNASSIGNED
+                      ? "誰でもチェックできる"
+                      : "見るだけ（チェックは本人）"}
+                </span>
               </div>
               <div
                 className="prep-list"
@@ -434,35 +517,15 @@ export function TasksScreen() {
                 aria-label={`${ring.label}のやること`}
               >
                 {[...ring.tasks].sort(byDue).map((task) => (
-                  <div
+                  <TaskRow
                     key={task.id}
-                    role="listitem"
-                    data-task={task.id}
-                    className={`prep-row${task.done ? " is-done" : ""}${tickable(task) ? "" : " is-readonly"}`}
-                  >
-                    <button
-                      type="button"
-                      className="prep-row-main"
-                      disabled={!travel.canEdit}
-                      aria-label={`${task.title}を直す`}
-                      onClick={() => setSheet({ task })}
-                    >
-                      <b>{task.title}</b>
-                      <small>
-                        <DueText task={task} today={today} />
-                      </small>
-                    </button>
-                    <CheckBox
-                      checked={task.done}
-                      disabled={!tickable(task)}
-                      label={
-                        tickable(task)
-                          ? `${task.title}を${task.done ? "未完了" : "完了"}にする`
-                          : `${task.title}（${task.done ? "済み" : "まだ"}）`
-                      }
-                      onToggle={() => toggle(task)}
-                    />
-                  </div>
+                    task={task}
+                    today={today}
+                    tickable={tickable(task)}
+                    canEdit={travel.canEdit}
+                    onToggle={() => toggle(task)}
+                    onEdit={() => setSheet({ task })}
+                  />
                 ))}
                 {!ring.tasks.length && <p className="prep-none">ありません</p>}
               </div>
@@ -559,7 +622,7 @@ function MonthCalendar({
               aria-label={`${+day.slice(5, 7)}月${offset + 1}日（${weekday(day)}）${note ? ` ${note}` : ""}${trip && !note ? " 旅行中" : ""}`}
               onClick={(event) => {
                 onChange(day);
-                pop(event.currentTarget, 0.9);
+                void boing(event.currentTarget, "scale(.9)");
               }}
             >
               {offset + 1}
@@ -608,10 +671,11 @@ function TaskSheet({
     const value = title.trim();
     if (!value) {
       setError("やることの名前を入れてください");
-      spring(name.current, [
-        { transform: "translateX(-8px)" },
-        { transform: "none" },
-      ]);
+      if (name.current)
+        void spring(name.current, [
+          { transform: "translateX(-8px)" },
+          { transform: "none" },
+        ]);
       name.current?.focus();
       return;
     }
@@ -693,7 +757,7 @@ function TaskSheet({
               aria-pressed={who === member.id}
               onClick={(event) => {
                 setWho(member.id);
-                pop(event.currentTarget, 0.9);
+                void boing(event.currentTarget, "scale(.9)");
               }}
             >
               <AssigneeAvatar
@@ -710,7 +774,7 @@ function TaskSheet({
               aria-pressed={who === "all"}
               onClick={(event) => {
                 setWho("all");
-                pop(event.currentTarget, 0.9);
+                void boing(event.currentTarget, "scale(.9)");
               }}
             >
               みんな各自
@@ -739,32 +803,6 @@ const kinds: Record<PackingKind, [string, string]> = {
 };
 const kindOf = (item: PackingItem): PackingKind => item.kind ?? "one";
 
-/** What the thing is, read from its name or category; a plain bag otherwise. */
-const pictures: [RegExp, LucideIcon][] = [
-  [/パスポート|旅券/, BookUser],
-  [/バッテリー|充電/, BatteryCharging],
-  [/プラグ|変換|アダプタ/, Plug],
-  [/薬/, Pill],
-  [/カメラ/, Camera],
-  [/服|着替え|シャツ|上着|ジャケット|下着|衣類/, Shirt],
-  [/歯ブラシ|洗面|シャンプー|化粧/, Droplets],
-  [/傘/, Umbrella],
-  [/本|ガイド/, BookOpen],
-  [/小銭|硬貨|コイン/, Coins],
-  [/財布|現金|お金|カード/, Wallet],
-  [/コンタクト|眼鏡|メガネ|サングラス/, Glasses],
-  [/スマホ|携帯|eSIM|電子機器/i, Smartphone],
-  [/靴/, Footprints],
-  [/書類|チケット|免許|保険/, FileText],
-];
-function PackingPicture({ item }: { item: PackingItem }) {
-  const Icon =
-    pictures.find(([pattern]) => pattern.test(item.name))?.[1] ??
-    pictures.find(([pattern]) => pattern.test(item.category))?.[1] ??
-    Package;
-  return <Icon size={28} strokeWidth={1.8} aria-hidden="true" />;
-}
-
 const packingInput = (item: PackingItem) => ({
   name: item.name,
   category: item.category,
@@ -776,31 +814,48 @@ const packingInput = (item: PackingItem) => ({
 });
 
 export function PackingScreen() {
+  return (
+    <Bubble>
+      <Packing />
+    </Bubble>
+  );
+}
+
+function Packing() {
   const { travel, self, members, label } = useTravellers();
-  const notify = useToast();
+  const bubble = useBubble();
   const [sheet, setSheet] = useState<{ item?: PackingItem } | null>(null);
   const [fresh, setFresh] = useState("");
   const page = useRef<HTMLDivElement>(null);
   const me = memberAssignee(self ?? "");
+  useSinkIn(page);
+  useJellyScroll(page, ".prep-heading, .prep-list");
   useLayoutEffect(() => {
     if (!fresh) return;
     const row = page.current?.querySelector(`[data-item="${fresh}"]`);
     row?.scrollIntoView?.({ block: "center" });
-    pop(row);
+    void boing(row, "scale(.85)");
     setFresh("");
   }, [fresh]);
   const others = members.filter((member) => member.id !== self);
+  const row$ = (id: string) =>
+    page.current?.querySelector(`[data-item="${id}"]`);
   // Only the one who took a 1つでいい item ticks it; an old free-text carrier is anyone's.
   const tickable = (item: PackingItem) =>
     travel.canEdit &&
     (kindOf(item) !== "one" ||
       item.assignee === me ||
       Boolean(item.assignee && !item.assignee.startsWith("member:")));
-  const toggle = (item: PackingItem) =>
+  const toggle = (item: PackingItem) => {
     travel.updatePackingItem(item.id, {
       ...packingInput(item),
       packed: !item.packed,
     });
+    if (!item.packed)
+      requestAnimationFrame(() =>
+        boing(row$(item.id)?.querySelector(".prep-box"), "scale(1.3)"),
+      );
+  };
   const take = (item: PackingItem) => {
     travel.updatePackingItem(item.id, {
       ...packingInput(item),
@@ -808,13 +863,34 @@ export function PackingScreen() {
       shared: true,
       packed: false,
     });
-    requestAnimationFrame(() =>
-      pop(page.current?.querySelector(`[data-item="${item.id}"]`), 0.9),
+    requestAnimationFrame(() => {
+      const row = row$(item.id);
+      if (!row) return;
+      void boing(row, "scale(.9)");
+      bubble(
+        row,
+        others.length
+          ? `${item.name}はあなたが持つ。${others.length}人にもそう出ます`
+          : `${item.name}はあなたが持つ`,
+      );
+    });
+  };
+  const poke = (
+    button: HTMLElement,
+    item: PackingItem,
+    member: TripMember,
+    packed: boolean,
+  ) => {
+    void spring(
+      button,
+      [{ transform: "rotate(-14deg) scale(1.15)" }, { transform: "none" }],
+      "boing",
     );
-    notify(
-      others.length
-        ? `${item.name}はあなたが持つ。${others.length}人にもそう出ます`
-        : `${item.name}はあなたが持つ`,
+    bubble(
+      button,
+      packed
+        ? `${label(member)}は入れました`
+        : `${label(member)}に「${item.name}まだ？」と知らせました`,
     );
   };
   const carrier = (item: PackingItem) =>
@@ -833,17 +909,20 @@ export function PackingScreen() {
           {others.map((member) => {
             const packed = item.packedBy?.includes(member.id) ?? false;
             return (
-              <span
+              <button
+                type="button"
                 key={member.id}
                 className={packed ? "is-on" : "is-off"}
-                role="img"
-                aria-label={`${label(member)}：${packed ? "入れた" : "まだ"}`}
+                aria-label={`${label(member)}：${packed ? "入れた" : "まだ（知らせる）"}`}
+                onClick={(event) =>
+                  poke(event.currentTarget, item, member, packed)
+                }
               >
                 <AssigneeAvatar
                   value={memberAssignee(member.id)}
                   members={travel.members}
                 />
-              </span>
+              </button>
             );
           })}
         </span>
@@ -872,7 +951,7 @@ export function PackingScreen() {
     } else
       sub = (
         <>
-          <Lock size={16} strokeWidth={2.2} aria-hidden="true" />
+          <LockIcon />
           ほかの人には見えない
         </>
       );
@@ -892,7 +971,7 @@ export function PackingScreen() {
           disabled={!edit}
           onClick={edit}
         >
-          <PackingPicture item={item} />
+          <Picture name={pictureFor(item.name, item.category)} />
         </button>
         <button
           type="button"
@@ -906,12 +985,18 @@ export function PackingScreen() {
         </button>
         {side}
         {showCheck ? (
-          <CheckBox
-            checked={item.packed}
+          <button
+            type="button"
+            role="checkbox"
+            className="prep-check"
+            aria-checked={item.packed}
+            aria-label={`${item.name}を${item.packed ? "まだにする" : "入れた"}`}
             disabled={!canTick}
-            label={`${item.name}を${item.packed ? "まだにする" : "入れた"}`}
-            onToggle={() => toggle(item)}
-          />
+            data-haptic
+            onClick={() => toggle(item)}
+          >
+            <Box />
+          </button>
         ) : (
           <span />
         )}
@@ -926,25 +1011,20 @@ export function PackingScreen() {
         onAdd={travel.canEdit ? () => setSheet({}) : undefined}
       />
       {(["each", "one", "mine"] as const).map((kind) => {
-        const items = travel.packingItems
-          .filter((item) => kindOf(item) === kind)
-          // Ticking must not move a row away from the finger.
-          .sort(
-            (a, b) =>
-              a.name.localeCompare(b.name, "ja") || a.id.localeCompare(b.id),
-          );
+        // The list's own order (oldest first), so ticking never moves a row.
+        const items = travel.packingItems.filter(
+          (item) => kindOf(item) === kind,
+        );
         const open = items.filter((item) => !item.assignee).length;
         return (
           <section key={kind} aria-label={kinds[kind][0]}>
-            <div className="prep-heading">
+            <div className="prep-heading prep-kind-heading">
               <b>{kinds[kind][0]}</b>
               <span>
                 {kind === "one"
                   ? open
                     ? `まだ決まってない ${open}`
-                    : items.length
-                      ? "ぜんぶ決まった"
-                      : ""
+                    : "ぜんぶ決まった"
                   : `${items.filter((item) => item.packed).length} / ${items.length}`}
               </span>
             </div>
@@ -989,10 +1069,11 @@ function PackingSheet({
     const value = name.trim();
     if (!value) {
       setError("名前を入れてください");
-      spring(input.current, [
-        { transform: "translateX(-8px)" },
-        { transform: "none" },
-      ]);
+      if (input.current)
+        void spring(input.current, [
+          { transform: "translateX(-8px)" },
+          { transform: "none" },
+        ]);
       input.current?.focus();
       return;
     }
@@ -1074,7 +1155,7 @@ function PackingSheet({
               aria-checked={kind === value}
               onClick={(event) => {
                 setKind(value);
-                spring(
+                void spring(
                   event.currentTarget,
                   [{ transform: "scale(.96)" }, { transform: "none" }],
                   "squish",
