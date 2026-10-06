@@ -212,9 +212,6 @@ export function NotesScreen() {
     <div className="page notes-page">
       <div className="memo-top">
         <div>
-          <small>
-            {travel.selectedTrip?.name} · {all.length}件
-          </small>
           <h2>メモ</h2>
         </div>
         <div className="memo-acts">

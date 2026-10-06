@@ -40,12 +40,6 @@ dialog:has(.memo-editor),
   gap: 10px;
   padding: 6px 4px 8px;
 }
-.memo-top small {
-  display: block;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--m-mute);
-}
 .memo-top h2 {
   margin: 0;
   font-size: 28px;
