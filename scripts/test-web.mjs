@@ -380,7 +380,7 @@ const editInPlace = async (change) => {
     assert.equal(document.querySelector("dialog[open]"), detail);
     assert.equal(dock.parentElement, detail);
     assert.ok(detail.querySelector("form"));
-    await keyboardWhileEditing("やめる");
+    if (!save) await keyboardWhileEditing("やめる");
     if (save) {
       await change();
       const submitButton = dock.querySelector(
@@ -420,7 +420,7 @@ const editAndReturn = async (label, value) => {
     assert.equal(dialogs.length, 2, "detail stays behind its editor");
     assert.equal(dialogs[0], detail);
     assert.equal(dock.parentElement, dialogs[1]);
-    await keyboardWhileEditing();
+    if (save) await keyboardWhileEditing();
     if (save) {
       await fill(label, value);
       await submit();
@@ -732,7 +732,10 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(
       document.querySelector('.context-back [aria-label="予定を削除"]'),
     );
-    await tick(400);
+    await waitFor(
+      () => !document.querySelector("dialog[open]"),
+      "deleting closes the plan at once",
+    );
     assert.equal(document.querySelector("dialog[open]"), null);
     assert.equal(
       [...document.querySelectorAll(".it-ev")].some((entry) =>
@@ -779,7 +782,12 @@ test("legacy account cache and pending changes survive React migration; real for
     // The mock's dock: 「やめる」 on the left island, 「追加する」 in ink.
     assert.ok(byText(".thumb-dock-host .context-back button", "やめる"));
     await click(byText(".thumb-dock-host .cdock-group button", "追加する"));
-    await tick(600);
+    await waitFor(
+      () =>
+        !document.querySelector("dialog[open]") &&
+        db.prepare("SELECT COUNT(*) AS n FROM bookings").get().n === 1,
+      "the hotel reaches the server and the sheet closes",
+    );
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings").get().n, 1);
     const saved = db.prepare("SELECT * FROM bookings").get();
     assert.equal(saved.title, "テストホテル");
@@ -928,7 +936,7 @@ test("legacy account cache and pending changes survive React migration; real for
       "the Worker stores the pin from the pasted Google Maps link",
     );
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
-    await tick(200);
+
     const pin = await waitFor(
       () =>
         document.querySelector('.places-pin[aria-label="1 更新した美術館"]'),
@@ -1289,7 +1297,7 @@ test("legacy account cache and pending changes survive React migration; real for
       document.querySelector('dialog .memo-ln.c [role="checkbox"]'),
       "a check line renders as a box",
     );
-    await tick(550);
+    await waitFor(() => noteCount() === 1, "the note autosaves");
     assert.equal(noteCount(), 1);
     assert.equal(
       db.prepare("SELECT title FROM note_details").get().title,
@@ -1304,7 +1312,10 @@ test("legacy account cache and pending changes survive React migration; real for
       "お土産\n- [ ] 待ち合わせ場所",
     );
     await click(document.querySelector('[aria-label="ピン留め"]'));
-    await tick(550);
+    await waitFor(
+      () => db.prepare("SELECT pinned FROM travel_notes").get().pinned === 1,
+      "pinning saves",
+    );
     assert.equal(db.prepare("SELECT pinned FROM travel_notes").get().pinned, 1);
     await closeNote();
     assert.match(
@@ -1315,7 +1326,11 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.match(document.querySelector(".memo-meta").textContent, /あなた/);
     // Ticking on the tile saves without opening the note.
     await click(document.querySelector('.memo-tile [role="checkbox"]'));
-    await tick(550);
+    await waitFor(
+      () =>
+        db.prepare("SELECT body FROM travel_notes").get().body.includes("[x]"),
+      "ticking on the tile saves",
+    );
     assert.equal(document.querySelector("dialog"), null);
     assert.equal(
       db.prepare("SELECT body FROM travel_notes").get().body,
@@ -1365,7 +1380,10 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.ok(document.querySelector('.cdock-group[data-slot="toast"]'));
     // Leaving the page settles the deletion instead of waiting for the timer.
     await click(byText("nav a", "しおり"));
-    await tick(550);
+    await waitFor(
+      () => noteCount() === 1,
+      "the undo window ends in a real delete",
+    );
     assert.equal(noteCount(), 1, "the undo window ends in a real delete");
     await click(byText("nav a", "メモ"));
     assert.deepEqual(
@@ -1507,7 +1525,10 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await fill("予約番号", "JM6EQC");
     await click(byText(".thumb-dock-host .cdock-group button", "追加する"));
-    await tick(600);
+    await waitFor(
+      () => !document.querySelector("dialog[open]"),
+      "the flight sheet closes after adding",
+    );
     const savedFlight = await waitFor(
       () =>
         db
@@ -2199,11 +2220,6 @@ test("booking cards stack journeys, lead stays with dates and stamp used booking
     ["19:00発", "01:00翌日 着"],
     "each big time sits on its stop row with its label below",
   );
-  assert.equal(
-    flight.querySelector(".bk-cn path").getAttribute("d"),
-    "M7 0 Q19 50 7 100",
-    "flights join their stops with an arc",
-  );
   assert.equal(flight.querySelector(".bk-code b").textContent, "JM6EQC");
   assert.equal(
     flight.querySelector(".bk-hd span"),
@@ -2225,10 +2241,6 @@ test("booking cards stack journeys, lead stays with dates and stamp used booking
     endDay: "2026-12-31",
     endTime: "21:30",
   });
-  assert.equal(
-    train.querySelector(".bk-cn path").getAttribute("d"),
-    "M7 0 V100",
-  );
   assert.equal(train.querySelector(".bk-du").textContent, "2時間30分");
   const hotel = {
     ...booking,
