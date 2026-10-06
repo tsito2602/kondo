@@ -1,9 +1,14 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import {
+  startTransition,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { Live, RM } from "./cartoon";
 import { DockBackIcon, DockGroup } from "./cartoon-dock";
 import { DockNavigationContext } from "./thumb-dock";
-import { reduceMotion, startRouteTransition } from "./motion";
 import { useContext } from "react";
 
 // The trip dock (kondo-prep3.html, kondo-memo.html, kondo-bookings.html): the
@@ -131,7 +136,6 @@ export function TripDock({
   const ind = useRef<HTMLSpanElement>(null);
   const springs = useRef<Edges | null>(null);
   const placed = useRef(false);
-  const transition = useRef<ViewTransition | undefined>(undefined);
   useLayoutEffect(() => setPending(-1), [location.pathname]);
   useLayoutEffect(() => {
     const node = group.current,
@@ -154,28 +158,27 @@ export function TripDock({
     // The first placement (and a return from a detail) is instant, as in the mock.
     place(placed.current);
     placed.current = true;
+    // Only a real change of width re-places the pill at once; observe()
+    // reports the current size straight away, which must not cut the move.
+    let width = node.offsetWidth;
     const observer =
       typeof ResizeObserver === "undefined"
         ? null
-        : new ResizeObserver(() => place(false));
+        : new ResizeObserver(() => {
+            if (node.offsetWidth === width) return;
+            width = node.offsetWidth;
+            place(false);
+          });
     observer?.observe(node);
     return () => observer?.disconnect();
   }, [shown]);
   const select = (index: number) => {
     setPending(index);
     const to = `/trips/${tripId}/${tripTabs[index].path}`;
+    // The mocks swap the pane at once (no page slide) while the pill runs;
+    // rendering the next screen as a transition keeps the pill's frames.
     if (controls) controls.beforeNavigate(() => navigate(to));
-    else if (
-      typeof document.startViewTransition === "function" &&
-      !reduceMotion()
-    ) {
-      document.documentElement.style.setProperty(
-        "--route-direction",
-        String(index < active ? -1 : 1),
-      );
-      transition.current?.skipTransition();
-      transition.current = startRouteTransition(() => navigate(to));
-    } else navigate(to);
+    else startTransition(() => void navigate(to));
   };
   return (
     <>
