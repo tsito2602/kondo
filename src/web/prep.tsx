@@ -875,24 +875,6 @@ function Packing() {
       );
     });
   };
-  const poke = (
-    button: HTMLElement,
-    item: PackingItem,
-    member: TripMember,
-    packed: boolean,
-  ) => {
-    void spring(
-      button,
-      [{ transform: "rotate(-14deg) scale(1.15)" }, { transform: "none" }],
-      "boing",
-    );
-    bubble(
-      button,
-      packed
-        ? `${label(member)}は入れました`
-        : `${label(member)}に「${item.name}まだ？」と知らせました`,
-    );
-  };
   const carrier = (item: PackingItem) =>
     item.assignee === me
       ? "あなた"
@@ -909,20 +891,17 @@ function Packing() {
           {others.map((member) => {
             const packed = item.packedBy?.includes(member.id) ?? false;
             return (
-              <button
-                type="button"
+              <span
                 key={member.id}
                 className={packed ? "is-on" : "is-off"}
-                aria-label={`${label(member)}：${packed ? "入れた" : "まだ（知らせる）"}`}
-                onClick={(event) =>
-                  poke(event.currentTarget, item, member, packed)
-                }
+                role="img"
+                aria-label={`${label(member)}：${packed ? "入れた" : "まだ"}`}
               >
                 <AssigneeAvatar
                   value={memberAssignee(member.id)}
                   members={travel.members}
                 />
-              </button>
+              </span>
             );
           })}
         </span>
