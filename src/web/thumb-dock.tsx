@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { CartoonDock, DockGroup } from "./cartoon-dock";
+import { CartoonDock, DOCK_MOVED, DockGroup } from "./cartoon-dock";
 import { UpdateNotice } from "./app-update";
 import { spring } from "./cartoon";
 
@@ -114,7 +114,12 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
   );
   useLayoutEffect(() => {
     const parent = active?.target?.() ?? document.body;
-    if (host.parentElement !== parent) parent.appendChild(host);
+    if (host.parentElement !== parent) {
+      parent.appendChild(host);
+      // WebKit can leave a moved SVG unpainted (the islands vanish under a
+      // dialog opened over another one); ask the dock to redraw itself.
+      window.dispatchEvent(new window.Event(DOCK_MOVED));
+    }
     if (noticeHost.parentElement !== parent) parent.appendChild(noticeHost);
     host.hidden = !active;
   });

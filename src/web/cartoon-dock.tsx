@@ -144,6 +144,9 @@ const keyOf = (el: HTMLElement, identity: string) => {
 
 type Props = { identity: string; children: ReactNode };
 
+/** Dispatched on window when the dock moves into another dialog or the page. */
+export const DOCK_MOVED = "kondo:dock-moved";
+
 /** Dispatched on window when the launch logo lands in the dock (boot.ts). */
 export const DOCK_INFLATE = "kondo:dock-inflate";
 
@@ -221,6 +224,7 @@ export class CartoonDock extends Component<Props> {
     this.observer?.observe(root);
     root.addEventListener("pointerdown", this.down, true);
     window.addEventListener(DOCK_INFLATE, this.onInflate);
+    window.addEventListener(DOCK_MOVED, this.onMoved);
     window.addEventListener("pointerup", this.up, true);
     window.addEventListener("pointercancel", this.up, true);
   }
@@ -263,6 +267,8 @@ export class CartoonDock extends Component<Props> {
     const root = this.root.current;
     root?.removeEventListener("pointerdown", this.down, true);
     window.removeEventListener(DOCK_INFLATE, this.onInflate);
+    window.removeEventListener(DOCK_MOVED, this.onMoved);
+    cancelAnimationFrame(this.moved);
     window.removeEventListener("pointerup", this.up, true);
     window.removeEventListener("pointercancel", this.up, true);
     this.Q.stop();
@@ -397,6 +403,27 @@ export class CartoonDock extends Component<Props> {
       if (!this.frame) this.frame = requestAnimationFrame(tick);
     });
   }
+
+  moved = 0;
+  /** After a move between dialogs, repaint the islands from scratch on the
+      next two frames (once the new dialog is open and laid out). */
+  onMoved = () => {
+    cancelAnimationFrame(this.moved);
+    const redraw = () => {
+      const goo = this.goo.current;
+      if (!goo) return;
+      this.last = "";
+      goo.style.display = "none";
+      void goo.offsetWidth;
+      goo.style.display = "";
+      this.layout(false);
+      this.paint();
+    };
+    this.moved = requestAnimationFrame(() => {
+      redraw();
+      this.moved = requestAnimationFrame(redraw);
+    });
+  };
 
   /** Draw the current shape (and the pressed island's squish). */
   paint() {
