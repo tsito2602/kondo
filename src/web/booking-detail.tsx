@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { BookOpen } from "lucide-react";
 import {
   findFlightConnections,
   flightConnectionCandidates,
@@ -16,7 +17,14 @@ import { DocumentPreview } from "./document-preview";
 import { BookingEditor } from "./editors";
 import { lockModalPage } from "./modal-scroll-lock";
 import { dismissModal } from "./motion";
-import { copyText, DetailDockActions, Modal, useAction, useToast } from "./ui";
+import {
+  copyText,
+  DetailDockActions,
+  DockFunction,
+  Modal,
+  useAction,
+  useToast,
+} from "./ui";
 
 const DOC_TYPES = [
   "application/pdf",
@@ -144,6 +152,22 @@ export function BookingDetail({
       "squish",
     );
   const seatLabel = booking.kind === "hotel" ? "部屋" : "メモ";
+  const showInItinerary = () => {
+    const trip = travel.selectedTrip?.id;
+    dismissModal(() => {
+      onClose();
+      if (trip) navigate(`/trips/${trip}/itinerary?day=${booking.day}`);
+    });
+  };
+  // しおりで見る is a function of its own: its own island in the dock.
+  const itineraryButton = booking.day ? (
+    <DockFunction
+      label="しおりで見る"
+      short="しおり"
+      icon={<BookOpen aria-hidden="true" />}
+      onClick={showInItinerary}
+    />
+  ) : undefined;
 
   return (
     <>
@@ -152,14 +176,18 @@ export function BookingDetail({
         addPanel
         onClose={onClose}
         dockActions={{
-          // Every detail panel's dock: ‹ closes, 編集 then 削除 at the right edge.
+          // Every detail panel's dock: ‹ closes, 編集 then 削除 at the right
+          // edge, and しおりで見る on its own island left of them.
           actions: travel.canEdit ? (
             <DetailDockActions
               onEdit={() => setEditing(true)}
               deleteLabel="予約を削除"
               onDelete={remove}
             />
-          ) : undefined,
+          ) : (
+            itineraryButton
+          ),
+          secondary: travel.canEdit ? itineraryButton : undefined,
         }}
       >
         <div className="bk-detail">
@@ -302,16 +330,11 @@ export function BookingDetail({
                     {booking.time ? ` ${booking.time}` : ""} の予定
                   </b>
                 </span>
+                {/* On a phone the dock carries it (しおり island). */}
                 <button
                   type="button"
-                  onClick={() => {
-                    const trip = travel.selectedTrip?.id;
-                    dismissModal(() => {
-                      onClose();
-                      if (trip)
-                        navigate(`/trips/${trip}/itinerary?day=${booking.day}`);
-                    });
-                  }}
+                  className="bk-kv-dock-twin"
+                  onClick={showInItinerary}
                 >
                   <ArrowIcon size={16} />
                   しおりで見る

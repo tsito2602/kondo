@@ -470,6 +470,14 @@ button.bk-card {
       0 0 0 1px var(--p-line),
       0 24px 60px -20px #0005;
   }
+  /* Content that would scroll: the full height, as Modal addPanel. */
+  :root:has(.thumb-dock-host) .bk-sheet[data-tall] {
+    height: calc(
+      100% - 10px - env(safe-area-inset-top) - var(--dock-height) -
+        var(--dock-bottom-gap) - 12px - env(safe-area-inset-bottom)
+    );
+    max-height: none;
+  }
   :root:has(.thumb-dock-host) .bk-sheet > h3 {
     font-size: 19px;
     line-height: 1.3;

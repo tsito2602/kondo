@@ -181,6 +181,31 @@
   background: var(--p-ink);
   color: var(--p-paper);
 }
+/* m: a separate function (しおりで見る, 券を開く) on its own island, 12 px
+   left of the r island (--cdock-r-w is r's width, set by the dock). */
+.cdock-group[data-slot="m"] {
+  right: calc(
+    16px + env(safe-area-inset-right) + var(--cdock-r-w, 136px) + 12px
+  );
+  min-width: 62px;
+}
+.cdock-group[data-slot="m"] > :is(button, a) {
+  min-width: 62px;
+}
+.cdock-group > .cdock-function {
+  gap: 6px;
+  padding: 0 16px 0 14px;
+}
+/* A phone too narrow for three islands with words: the icon alone. */
+@media (max-width: 349px) {
+  .cdock-group[data-slot="m"] > .cdock-function {
+    padding: 0;
+  }
+  .cdock-group[data-slot="m"] .cdock-function-label {
+    display: none;
+  }
+}
+
 /* Wide context rows (a note's tools) sit where the tabs do. */
 .cdock-group[data-slot="r"][data-wide] {
   left: calc(90px + env(safe-area-inset-left));
@@ -268,4 +293,13 @@
   font-size: 13px;
   font-weight: 700;
   line-height: 1.7;
+}
+
+/* A function the dock carries on a phone (its m island) is not repeated in
+   the panel: しおりで見る / しおりを見る / しおりへ追加. */
+@media (max-width: 759px) {
+  :root:has(.thumb-dock-host:not([hidden])) .bk-kv-dock-twin,
+  :root:has(.thumb-dock-host:not([hidden])) .detail-itinerary-action {
+    display: none;
+  }
 }

@@ -32,6 +32,7 @@ import { BookingEditor, bookingKinds, type BookingInput } from "./editors";
 import { anim, RM } from "./cartoon";
 import { reduceMotion } from "./motion";
 import { DockGroup } from "./cartoon-dock";
+import { watchPanelFit } from "./panel-fit";
 import { ThumbDock } from "./thumb-dock";
 import { FormBackButton, useToast } from "./ui";
 import { menuDepth } from "./menu-depth";
@@ -346,6 +347,8 @@ export function AddBookingSheet({
   const depth = useRef<ReturnType<typeof menuDepth> | null>(null);
   useLayoutEffect(() => {
     const sheet = body.current;
+    // Content that would scroll takes the full height (panel-fit.ts).
+    const unfit = sheet ? watchPanelFit(sheet, sheet) : undefined;
     depth.current = menuDepth(
       RM(),
       { duration: 320, easing: "cubic-bezier(.32, 0, .2, 1)", fill: "both" },
@@ -357,6 +360,7 @@ export function AddBookingSheet({
         { duration: 420, easing: "cubic-bezier(.2,1.2,.4,1)" },
       );
     return () => {
+      unfit?.();
       depth.current?.cancel();
       depth.current = null;
     };

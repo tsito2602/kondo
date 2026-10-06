@@ -47,6 +47,7 @@ import { LinkedNotes } from "./linked-notes";
 import { ContextDock, ThumbDock } from "./thumb-dock";
 import {
   DetailDockActions,
+  DockFunction,
   ErrorText,
   FormBackButton,
   Modal,
@@ -1036,36 +1037,36 @@ export function BookingSheet({
       : undefined;
   const stayEditable =
     booking.kind === "hotel" && Boolean(endpoint) && travel.canEdit;
+  const ticket = (
+    <DockFunction
+      label="予約タブで券を開く"
+      short="券を開く"
+      className="ps-dock-ticket"
+      icon={<Glyph name="ticket" className="ps-dock-glyph" />}
+      onClick={() =>
+        dismissModal(() => {
+          onClose();
+          navigate(
+            `/trips/${travel.selectedTrip!.id}/bookings?booking=${booking.id}`,
+          );
+        })
+      }
+    />
+  );
   return (
     <Modal
       title="予約の詳細"
       addPanel
       onClose={onClose}
       dockActions={{
-        actions: (
-          <>
-            {stayEditable && (
-              <button aria-label="編集" onClick={() => setEditing(true)}>
-                <Glyph name="edit" className="ps-dock-glyph" />
-              </button>
-            )}
-            <button
-              className="ps-dock-ticket"
-              aria-label="予約タブで券を開く"
-              onClick={() =>
-                dismissModal(() => {
-                  onClose();
-                  navigate(
-                    `/trips/${travel.selectedTrip!.id}/bookings?booking=${booking.id}`,
-                  );
-                })
-              }
-            >
-              <Glyph name="ticket" className="ps-dock-glyph" />
-              券を開く
-            </button>
-          </>
+        // 券を開く is a function of its own: its own island, left of 編集
+        // (Tsubasa 2026-10-06: 「別機能は別の島にして」).
+        actions: stayEditable ? (
+          <DetailDockActions onEdit={() => setEditing(true)} />
+        ) : (
+          ticket
         ),
+        secondary: stayEditable ? ticket : undefined,
       }}
     >
       {editing && endpoint ? (
