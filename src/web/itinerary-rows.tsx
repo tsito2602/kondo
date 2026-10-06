@@ -179,7 +179,17 @@ function PlanCard({
   );
 }
 
-function BookingCard({ entry, used }: { entry: DayEntry; used: boolean }) {
+function BookingCard({
+  entry,
+  used,
+  places,
+  numbers,
+}: {
+  entry: DayEntry;
+  used: boolean;
+  places: readonly Place[];
+  numbers: ReadonlyMap<string, number>;
+}) {
   const booking = entry.booking!;
   const chip = <b className="it-yk">{used ? "済" : "予約"}</b>;
   if (booking.kind === "hotel") {
@@ -261,7 +271,12 @@ function BookingCard({ entry, used }: { entry: DayEntry; used: boolean }) {
         </div>
       </div>
     );
-  const place = bookingPlaceName(booking);
+  // A venue linked to the map wears its number pin, as plans do.
+  const linked = booking.placeId
+    ? places.find((candidate) => candidate.id === booking.placeId)
+    : undefined;
+  const place = linked?.title ?? bookingPlaceName(booking);
+  const number = linked ? numbers.get(linked.id) : undefined;
   return (
     <div className="it-card" data-press-card>
       <div className="it-lab">
@@ -271,7 +286,7 @@ function BookingCard({ entry, used }: { entry: DayEntry; used: boolean }) {
       <h3>{booking.title}</h3>
       {place && (
         <div className="it-where">
-          <Glyph name="pin" />
+          {number ? <MapPin number={number} /> : <Glyph name="pin" />}
           <span>{place}</span>
         </div>
       )}
@@ -381,7 +396,12 @@ export function TimelineRow({
           <PlanCard item={entry.item} places={places} numbers={numbers} />
         </div>
       ) : (
-        <BookingCard entry={entry} used={row.past} />
+        <BookingCard
+          entry={entry}
+          used={row.past}
+          places={places}
+          numbers={numbers}
+        />
       )}
     </button>
   );

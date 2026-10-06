@@ -251,6 +251,24 @@ test('places survive offline edits, queue exactly once, and remain separate from
   } finally { f.close(); }
 });
 
+test('new bookings link to a matching place offline; deleting the place unlinks them', async () => {
+  const f = await fixture({ isDemo: true });
+  try {
+    const venue = f.api.createPlace({ title: 'ウィーン国立歌劇場', note: '', openingHours: '', reservationStatus: 'not_needed', location: 'https://www.google.com/maps/place/Oper/@48.20278,16.36885,17z/data=!4m6!3m5!8m2!3d48.20278!4d16.36885', referenceLinks: [], status: 'want' });
+    const base = { kind: 'ticket', title: '魔笛', detail: 'ウィーン国立歌劇場', origin: '', originCode: '', destination: '', destinationCode: '', day: '2026-11-23', endDay: '2026-11-23', time: '19:00', endTime: '', confirmationCode: '', note: '' };
+    const linked = f.api.createBooking(base);
+    const hotel = f.api.createBooking({ ...base, kind: 'hotel', title: 'ウィーン国立歌劇場' });
+    const explicit = f.api.createBooking({ ...base, placeId: null });
+    const placeOf = (id) => f.render().bookings.find((booking) => booking.id === id).placeId;
+    assert.equal(placeOf(linked), venue);
+    assert.equal(placeOf(hotel), null, 'hotels keep their own pin');
+    assert.equal(placeOf(explicit), null, 'an explicit choice is kept');
+    assert.equal(f.writes.at(-1).bookingsByTrip.trip.find((booking) => booking.id === linked).placeId, venue);
+    f.api.deletePlace(venue);
+    assert.equal(placeOf(linked), null);
+  } finally { f.close(); }
+});
+
 test('owner deletion removes trip collections; editors cannot delete', async () => {
   const stored = empty(); stored.placesByTrip.trip = [{ id: 'place', title: 'Place' }];
   const f = await fixture({ stored, isDemo: true });

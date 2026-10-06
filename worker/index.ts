@@ -461,8 +461,16 @@ function bookingFields(body: Record<string, unknown>) {
   const note = textField(body.note, 4000);
   const durationMinutes = body.durationMinutes;
   if (durationMinutes != null && (typeof durationMinutes !== 'number' || !Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 10080)) return null;
+  if (body.placeId != null && !idField(body.placeId)) return null;
   if (!kind || !bookingKinds.has(kind) || !title || detail === null || origin === null || originCode === null || destination === null || destinationCode === null || !day || !endDay || (kind !== 'flight' && endDay < day) || time === null || endTime === null || !/^([01]\d|2[0-3]):[0-5]\d$|^$/.test(time) || !/^([01]\d|2[0-3]):[0-5]\d$|^$/.test(endTime) || confirmationCode === null || note === null) return null;
   return { kind, title, detail, ...(location !== undefined ? { location } : {}), origin, originCode: originCode.toUpperCase(), destination, destinationCode: destinationCode.toUpperCase(), day, time, endDay, endTime, confirmationCode, note, ...(durationMinutes === undefined ? {} : { durationMinutes: durationMinutes as number | null }) };
+}
+
+/** Older clients omit placeId and keep the stored link; a place of another trip links nothing. */
+async function bookingPlace(env: Env, tripId: string, body: Record<string, unknown>): Promise<string | null | undefined> {
+  if (body.placeId === undefined) return undefined;
+  if (body.placeId === null) return null;
+  return (await env.DB.prepare('SELECT id FROM places WHERE id = ? AND trip_id = ?').bind(body.placeId, tripId).first<{ id: string }>())?.id ?? null;
 }
 
 async function listBookings(env: Env, user: User, tripId: string) {
@@ -479,9 +487,11 @@ async function readBookings(env: Env, tripId: string) {
            COALESCE(d.destination, '') AS destination, COALESCE(d.destination_code, '') AS destinationCode,
            COALESCE(NULLIF(d.end_day, ''), b.day) AS endDay, COALESCE(d.end_time, '') AS endTime,
            b.confirmation_code AS confirmationCode, b.note, b.updated_by AS updatedBy, b.updated_at AS updatedAt,
-           t.duration_minutes AS durationMinutes, COALESCE(c.mode, 'auto') AS connectionMode, c.departure_booking_id AS nextFlightId
+           t.duration_minutes AS durationMinutes, COALESCE(c.mode, 'auto') AS connectionMode, c.departure_booking_id AS nextFlightId,
+           p.place_id AS placeId
     FROM bookings b LEFT JOIN booking_details d ON d.booking_id = b.id
     LEFT JOIN booking_locations l ON l.booking_id = b.id
+    LEFT JOIN booking_places p ON p.booking_id = b.id
     LEFT JOIN booking_durations t ON t.booking_id = b.id
     LEFT JOIN flight_connection_preferences c ON c.arrival_booking_id = b.id
     WHERE b.trip_id = ? ORDER BY b.day, b.time, b.id
@@ -535,6 +545,7 @@ async function createBooking(request: Request, env: Env, user: User, tripId: str
   const body = await request.json().catch(() => null);
   const fields = isObject(body) ? bookingFields(body) : null;
   if (!fields) return json({ error: '正しい予約情報を入力してください' }, 400);
+  const placeId = await bookingPlace(env, tripId, body as Record<string, unknown>);
   const id = idField(isObject(body) ? body.id : undefined) ?? crypto.randomUUID();
   const [bookingResult] = await env.DB.batch([
     env.DB.prepare(`
@@ -563,10 +574,14 @@ async function createBooking(request: Request, env: Env, user: User, tripId: str
       INSERT INTO booking_durations (booking_id, duration_minutes)
       SELECT ?, ? WHERE EXISTS (SELECT 1 FROM bookings WHERE id = ? AND trip_id = ?)
       ON CONFLICT(booking_id) DO UPDATE SET duration_minutes = excluded.duration_minutes
-    `).bind(id, fields.durationMinutes, id, tripId)]),
+    `).bind(id, fields.durationMinutes, id, tripId)]),    ...(placeId === undefined ? [] : [env.DB.prepare(`
+      INSERT INTO booking_places (booking_id, place_id)
+      SELECT ?, ? WHERE EXISTS (SELECT 1 FROM bookings WHERE id = ? AND trip_id = ?)
+      ON CONFLICT(booking_id) DO UPDATE SET place_id = excluded.place_id
+    `).bind(id, placeId, id, tripId)]),
   ]);
   if (!bookingResult.meta.changes) return json({ error: '予約IDが競合しました' }, 409);
-  return json({ booking: { id, ...fields, updatedBy: user.id } }, 201);
+  return json({ booking: { id, ...fields, ...(placeId === undefined ? {} : { placeId }), updatedBy: user.id } }, 201);
 }
 
 async function updateBooking(request: Request, env: Env, user: User, tripId: string, bookingId: string) {
@@ -575,6 +590,7 @@ async function updateBooking(request: Request, env: Env, user: User, tripId: str
   const body = await request.json().catch(() => null);
   const fields = isObject(body) ? bookingFields(body) : null;
   if (!fields) return json({ error: '正しい予約情報を入力してください' }, 400);
+  const placeId = await bookingPlace(env, tripId, body as Record<string, unknown>);
   const [bookingResult] = await env.DB.batch([
     env.DB.prepare(`UPDATE bookings SET kind = ?, title = ?, detail = ?, day = ?, time = ?, confirmation_code = ?, note = ?, updated_by = ?, updated_at = unixepoch() WHERE id = ? AND trip_id = ?`)
       .bind(fields.kind, fields.title, fields.detail, fields.day, fields.time, fields.confirmationCode, fields.note, user.id, bookingId, tripId),
@@ -595,9 +611,13 @@ async function updateBooking(request: Request, env: Env, user: User, tripId: str
       INSERT INTO booking_durations (booking_id, duration_minutes)
       SELECT ?, ? WHERE EXISTS (SELECT 1 FROM bookings WHERE id = ? AND trip_id = ?)
       ON CONFLICT(booking_id) DO UPDATE SET duration_minutes = excluded.duration_minutes
-    `).bind(bookingId, fields.durationMinutes, bookingId, tripId)]),
+    `).bind(bookingId, fields.durationMinutes, bookingId, tripId)]),    ...(placeId === undefined ? [] : [env.DB.prepare(`
+      INSERT INTO booking_places (booking_id, place_id)
+      SELECT ?, ? WHERE EXISTS (SELECT 1 FROM bookings WHERE id = ? AND trip_id = ?)
+      ON CONFLICT(booking_id) DO UPDATE SET place_id = excluded.place_id
+    `).bind(bookingId, placeId, bookingId, tripId)]),
   ]);
-  return bookingResult.meta.changes ? json({ booking: { id: bookingId, ...fields, updatedBy: user.id } }) : json({ error: '予約が見つかりません' }, 404);
+  return bookingResult.meta.changes ? json({ booking: { id: bookingId, ...fields, ...(placeId === undefined ? {} : { placeId }), updatedBy: user.id } }) : json({ error: '予約が見つかりません' }, 404);
 }
 
 async function deleteBooking(env: Env, user: User, tripId: string, bookingId: string) {

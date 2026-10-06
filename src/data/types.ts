@@ -62,6 +62,8 @@ export type Booking = {
   note: string;
   connectionMode?: FlightConnectionMode;
   nextFlightId?: string | null;
+  /** The venue on the map (one of the trip's places). Absent on older rows and clients. */
+  placeId?: string | null;
   updatedBy?: string;
   updatedAt?: number;
 };

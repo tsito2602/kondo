@@ -277,3 +277,10 @@ CREATE TABLE IF NOT EXISTS packing_marks (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   PRIMARY KEY (item_id, user_id)
 );
+
+-- Optional link from a booking to one of the trip's places (the venue on the map).
+-- Omission by old clients preserves it; deleting the place clears it.
+CREATE TABLE IF NOT EXISTS booking_places (
+  booking_id TEXT PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
+  place_id TEXT REFERENCES places(id) ON DELETE SET NULL
+);

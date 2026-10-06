@@ -22,7 +22,8 @@ import {
 import { useTravel } from "@/data/travel-provider";
 import type { Booking } from "@/data/types";
 import { findAirportByCode, findAirports } from "@/data/airports";
-import { mapUrl } from "@/data/places";
+import { mapUrl, referenceUrl } from "@/data/places";
+import { linkBookingPlace } from "@/data/booking-place";
 import type { BookingKind } from "@/data/types";
 import { monthDay, spring } from "./booking-card";
 import { useLayer } from "./booking-detail";
@@ -538,6 +539,11 @@ export function AddBookingSheet({
       <input
         value={form[key]}
         placeholder={placeholder}
+        list={
+          key === "place" && form.kind !== "hotel" && travel.places.length
+            ? "booking-add-places"
+            : undefined
+        }
         onChange={(event) =>
           setForm((current) => ({ ...current, [key]: event.target.value }))
         }
@@ -551,7 +557,18 @@ export function AddBookingSheet({
     );
     const input = manualInput(form, year);
     if (typeof input === "string") return notify(input);
-    const id = travel.createBooking(input);
+    // 場所: one of the trip's places by name, or a map link (linked, or added as a place).
+    const linked = linkBookingPlace(travel, {
+      ...input,
+      location: form.place.trim(),
+    });
+    const id = travel.createBooking({
+      ...input,
+      location: referenceUrl(linked.location)
+        ? linked.location
+        : input.location,
+      placeId: linked.placeId,
+    });
     const chosen = form.files;
     leave(() => onAdded([id]));
     void attachDocuments(
@@ -764,6 +781,13 @@ export function AddBookingSheet({
                   ),
                 )}
                 {field(["code", "予約番号", "あれば"])}
+                {form.kind !== "hotel" && travel.places.length > 0 && (
+                  <datalist id="booking-add-places">
+                    {travel.places.map((place) => (
+                      <option key={place.id} value={place.title} />
+                    ))}
+                  </datalist>
+                )}
                 <label className="bk-attach">
                   <ClipIcon size={18} />
                   {form.files.length

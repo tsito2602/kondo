@@ -7,11 +7,12 @@ import { createDemoCache, demoMembers } from './demo';
 import { loadDemoDocument, saveDemoDocument } from './demo-documents';
 import { loadTravelCache, saveTravelCache } from './cache';
 import { connectionBetween, createsFlightConnectionCycle } from './flight-connections';
+import { matchBookingPlace } from './booking-place';
 import { Booking, BookingDocument, emptyTravelCache, ItineraryItem, PackingItem, PendingMutation, Place, PlaceInput, TravelCache, TravelTask, Trip, TripMember, TravelNote, NoteInput } from './types';
 
 type TripInput = Pick<Trip, 'name' | 'destination' | 'startsOn' | 'endsOn' | 'coverImage'>;
 type ItemInput = Pick<ItineraryItem, 'day' | 'time' | 'kind' | 'title' | 'note' | 'details'>;
-type BookingInput = Pick<Booking, 'kind' | 'title' | 'detail' | 'location' | 'origin' | 'originCode' | 'destination' | 'destinationCode' | 'day' | 'time' | 'endDay' | 'endTime' | 'confirmationCode' | 'note' | 'durationMinutes'>;
+type BookingInput = Pick<Booking, 'kind' | 'title' | 'detail' | 'location' | 'origin' | 'originCode' | 'destination' | 'destinationCode' | 'day' | 'time' | 'endDay' | 'endTime' | 'confirmationCode' | 'note' | 'durationMinutes' | 'placeId'>;
 type PackingInput = Pick<PackingItem, 'name' | 'category' | 'quantity' | 'packed' | 'assignee' | 'shared' | 'kind'>;
 /** みんな各自 keeps one tick per member; `packed` is always the viewer's own. */
 const withOwnTick = (item: PackingItem, self: string | undefined): PackingItem => {
@@ -308,7 +309,12 @@ export function TravelProvider({ children }: PropsWithChildren) {
     const tripId = cacheRef.current.selectedTripId;
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) return;
-    commit((current) => ({ ...current, placesByTrip: { ...current.placesByTrip, [tripId]: (current.placesByTrip[tripId] ?? []).filter((place) => place.id !== id) } }));
+    commit((current) => ({
+      ...current,
+      placesByTrip: { ...current.placesByTrip, [tripId]: (current.placesByTrip[tripId] ?? []).filter((place) => place.id !== id) },
+      // The Worker clears the booking's link with the place (ON DELETE SET NULL); mirror it offline.
+      bookingsByTrip: { ...current.bookingsByTrip, [tripId]: (current.bookingsByTrip[tripId] ?? []).map((booking) => booking.placeId === id ? { ...booking, placeId: null } : booking) },
+    }));
     enqueue({ method: 'DELETE', path: `/v1/trips/${tripId}/places/${id}` });
   }, [commit, enqueue]);
 
@@ -344,6 +350,8 @@ export function TravelProvider({ children }: PropsWithChildren) {
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
     const id = crypto.randomUUID();
+    // Imported and typed bookings link to the trip's place for their venue when one matches.
+    if (input.placeId === undefined) input = { ...input, placeId: matchBookingPlace(input, cacheRef.current.placesByTrip[tripId] ?? [])?.id ?? null };
     const booking: Booking = { id, ...input };
     commit((current) => ({
       ...current,
