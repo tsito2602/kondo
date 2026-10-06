@@ -1,12 +1,17 @@
-/* The cartoon dock (cartoon-dock.tsx), measured from kondo-cartoon.html and the
-   trip mocks: islands 62 px high, 30 px above the bottom edge, 16 px from each
-   side; the back circle 62 wide, the tabs from 90 px to the right edge. */
+/* The cartoon dock (cartoon-dock.tsx), sized and placed exactly as uchiwake's
+   (Tsubasa 2026-10-06: 「ボトムナビのサイズと配置をuchiwakeと全く同じにして」):
+   islands 56 px high, max(8 px, the safe area) above the bottom edge, 16 px
+   from each side, 10 px apart; the back circle 56 wide, the tabs from 82 px
+   (16 + 56 + 10) to the right edge. */
 .thumb-dock-host {
   display: none;
 }
 @media (max-width: 759px) {
   :root:has(.thumb-dock-host:not([hidden])) {
-    --nav-height: calc(var(--dock-height) + 12px + var(--dock-bottom-gap));
+    --nav-height: calc(
+      var(--dock-height) + 12px + var(--dock-bottom-gap) +
+        var(--dock-safe-bottom) - env(safe-area-inset-bottom)
+    );
   }
   :root:has(.thumb-dock-host:not([hidden]))::view-transition {
     --route-clip-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom));
@@ -17,14 +22,14 @@
     z-index: 40;
     left: env(safe-area-inset-left);
     right: env(safe-area-inset-right);
-    bottom: calc(var(--dock-bottom-gap) + env(safe-area-inset-bottom));
+    bottom: calc(var(--dock-bottom-gap) + var(--dock-safe-bottom));
     justify-content: center;
     pointer-events: none;
   }
   dialog .thumb-dock-host:not([hidden]) {
     /* Keep controls at the layout bottom, underneath the software keyboard. */
     position: absolute;
-    bottom: calc(var(--dock-bottom-gap) + env(safe-area-inset-bottom));
+    bottom: calc(var(--dock-bottom-gap) + var(--dock-safe-bottom));
   }
   .thumb-dock {
     position: relative;
@@ -79,7 +84,7 @@
 .cdock-group {
   position: absolute;
   bottom: 0;
-  height: 62px;
+  height: var(--dock-height);
   display: flex;
   align-items: center;
   pointer-events: auto;
@@ -97,11 +102,11 @@
 .cdock-group > a,
 .cdock-btn {
   position: relative;
-  height: 62px;
+  height: var(--dock-height);
   min-width: 0;
   padding: 0;
   border: 0;
-  border-radius: 31px;
+  border-radius: calc(var(--dock-height) / 2);
   background: none;
   color: var(--p-ink);
   font: inherit;
@@ -130,11 +135,11 @@
 
 /* l: the back circle (or a word such as 「やめる」). */
 .cdock-group[data-slot="l"] {
-  left: calc(16px + env(safe-area-inset-left));
-  min-width: 62px;
+  left: max(16px, env(safe-area-inset-left));
+  min-width: var(--dock-height);
 }
 .cdock-group[data-slot="l"] > :is(button, a) {
-  min-width: 62px;
+  min-width: var(--dock-height);
 }
 .cdock-group[data-slot="l"] > :is(button, a) > svg {
   width: 24px;
@@ -144,13 +149,13 @@
   padding: 0 22px;
 }
 
-/* r: context actions; icons 68 wide (136 for two), words padded. */
+/* r: context actions; icons 56 wide (112 for two), words padded. */
 .cdock-group[data-slot="r"] {
-  right: calc(16px + env(safe-area-inset-right));
-  min-width: 62px;
+  right: max(16px, env(safe-area-inset-right));
+  min-width: var(--dock-height);
 }
 .cdock-group[data-slot="r"] > :is(button, a) {
-  min-width: 68px;
+  min-width: var(--dock-height);
 }
 .cdock-group[data-slot="r"] > :is(button, a):not([aria-label]),
 .cdock-group[data-slot="r"] > :is(button, a):has(> svg + *),
@@ -181,16 +186,16 @@
   background: var(--p-ink);
   color: var(--p-paper);
 }
-/* m: a separate function (しおりで見る, 詳細を開く) on its own island, 12 px
+/* m: a separate function (しおりで見る, 詳細を開く) on its own island, 10 px
    left of the r island (--cdock-r-w is r's width, set by the dock). */
 .cdock-group[data-slot="m"] {
   right: calc(
-    16px + env(safe-area-inset-right) + var(--cdock-r-w, 136px) + 12px
+    max(16px, env(safe-area-inset-right)) + var(--cdock-r-w, 112px) + 10px
   );
-  min-width: 62px;
+  min-width: var(--dock-height);
 }
 .cdock-group[data-slot="m"] > :is(button, a) {
-  min-width: 62px;
+  min-width: var(--dock-height);
 }
 .cdock-group > .cdock-function {
   gap: 6px;
@@ -208,15 +213,15 @@
 
 /* Wide context rows (a note's tools) sit where the tabs do. */
 .cdock-group[data-slot="r"][data-wide] {
-  left: calc(90px + env(safe-area-inset-left));
+  left: max(82px, calc(66px + env(safe-area-inset-left)));
   padding: 0 4px;
   justify-content: space-around;
 }
 .cdock-group[data-slot="r"][data-wide] > :is(button, a) {
   flex: 1;
   min-width: 0;
-  height: 54px;
-  border-radius: 27px;
+  height: calc(var(--dock-height) - 8px);
+  border-radius: calc(var(--dock-height) / 2 - 4px);
   color: var(--p-mute);
 }
 .cdock-group[data-slot="r"][data-wide] > :is(button, a).on {
@@ -229,20 +234,20 @@
 
 /* tabs: six icons with the selection pill moving between them. */
 .cdock-tabs {
-  left: calc(90px + env(safe-area-inset-left));
-  right: calc(16px + env(safe-area-inset-right));
+  left: max(82px, calc(66px + env(safe-area-inset-left)));
+  right: max(16px, env(safe-area-inset-right));
   padding: 0 4px;
   justify-content: space-around;
 }
 /* No back circle on the trip tabs (the header goes back): the full width. */
 .cdock-tabs[data-full] {
-  left: calc(16px + env(safe-area-inset-left));
+  left: max(16px, env(safe-area-inset-left));
 }
 .cdock-tabs > a {
   z-index: 1;
   flex: 1;
-  height: 54px;
-  border-radius: 27px;
+  height: calc(var(--dock-height) - 8px);
+  border-radius: calc(var(--dock-height) / 2 - 4px);
   color: var(--p-mute);
   transition: color 0.2s;
 }
@@ -258,16 +263,16 @@
   top: 4px;
   left: 0;
   width: 0;
-  height: 54px;
-  border-radius: 27px;
+  height: calc(var(--dock-height) - 8px);
+  border-radius: calc(var(--dock-height) / 2 - 4px);
   background: var(--p-select);
   pointer-events: none;
 }
 
 /* toast: what happened, and 「元に戻す」 (kondo-cartoon §5). */
 .cdock-group[data-slot="toast"] {
-  left: calc(16px + env(safe-area-inset-left));
-  right: calc(16px + env(safe-area-inset-right));
+  left: max(16px, env(safe-area-inset-left));
+  right: max(16px, env(safe-area-inset-right));
   justify-content: space-between;
   gap: 8px;
   padding: 0 8px 0 22px;
@@ -275,7 +280,7 @@
   font-weight: 700;
 }
 .cdock-group[data-slot="toast"].cdock-toast-r {
-  left: calc(90px + env(safe-area-inset-left));
+  left: max(82px, calc(66px + env(safe-area-inset-left)));
 }
 .cdock-group[data-slot="toast"] > span {
   min-width: 0;

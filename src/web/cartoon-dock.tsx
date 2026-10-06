@@ -80,8 +80,8 @@ type Span = [number, number];
 type Groups = { key: string; el: HTMLElement }[];
 type Shape = { islands: DockIsland[]; tension: number };
 
-/** Island height (62) and where its centre sits in the 120 px islands box. */
-const RADIUS = 31;
+/** Island height (56, uchiwake's) and where its centre sits in the 120 px islands box. */
+const RADIUS = 28;
 const CENTER = 120 - 30 - RADIUS;
 const tones = new Set(["ink", "ink-dim"]);
 

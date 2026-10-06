@@ -56,13 +56,14 @@
   --radius-card: var(--r-card);
   --radius-control: 999px;
   --radius-field: 16px;
-  --dock-bottom-gap: 30px;
+  --dock-bottom-gap: 0px;
+  --dock-safe-bottom: max(8px, env(safe-area-inset-bottom));
   --control-size: 44px;
-  --dock-height: 62px;
+  --dock-height: 56px;
   --menu-glass: var(--p-paper);
   --dock-accent: var(--p-ink);
   --dock-on-accent: var(--p-paper);
-  --dock-max-width: 430px;
+  --dock-max-width: 100%;
   --ease-flow: cubic-bezier(0.22, 1, 0.36, 1);
   --route-direction: 1;
   --trip-header-height: 132px;
