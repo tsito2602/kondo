@@ -217,7 +217,7 @@ export function ThumbActions() {
 /** The current screen's controls on the cartoon dock's islands: the back
     circle on the left island, the context actions on the right one. A lone
     primary (保存, 追加する) turns its island ink; next to other actions it is
-    an ink pill on a plain island. A separate function (しおりで見る, 券を開く)
+    an ink pill on a plain island. A separate function (しおりで見る, 詳細を開く)
     gets its own island between them (Tsubasa 2026-10-06: 「別機能は別の島に」). */
 export function ContextDock({
   back,

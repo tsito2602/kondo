@@ -369,96 +369,6 @@ dialog[data-panel="add"],
   height: 13px;
   color: var(--it-mute);
 }
-/* Flights and trains: where to, the arrival with 着 and the real time on board. */
-.it-jp {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: start;
-  margin-top: 6px;
-}
-.it-jp-code {
-  display: block;
-  margin-top: 4px;
-  font-family: var(--it-num);
-  font-size: 23px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.01em;
-}
-.it-jp.is-train .it-jp-code {
-  font-family: inherit;
-  font-size: 15px;
-  line-height: 1.5;
-}
-.it-jp-mid {
-  position: relative;
-  display: block;
-  min-width: 0;
-  color: var(--it-ink);
-}
-.it-jp-mid svg {
-  display: block;
-  width: 100%;
-  height: 30px;
-  overflow: visible;
-}
-.it-jp-mid em {
-  position: absolute;
-  top: 27px;
-  right: 0;
-  left: 0;
-  font-size: 11.5px;
-  font-style: normal;
-  font-weight: 700;
-  color: var(--it-mute);
-  text-align: center;
-  white-space: nowrap;
-}
-.it-jp-end {
-  text-align: right;
-}
-.it-jp-arr {
-  display: block;
-  margin-top: 6px;
-  font-family: var(--it-num);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1;
-  white-space: nowrap;
-}
-.it-jp-arr small {
-  margin-right: 3px;
-  font-family: var(--f-body);
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0;
-  vertical-align: 8px;
-  opacity: 0.7;
-}
-.it-jp-arr i {
-  margin-left: 2px;
-  font-family: var(--f-body);
-  font-size: 11px;
-  font-style: normal;
-  color: var(--it-mute);
-}
-.it-jp.is-large {
-  margin: 8px 0 4px;
-  align-items: end;
-}
-.it-jp.is-large .it-jp-code {
-  font-size: 34px;
-}
-.it-jp.is-large.is-train .it-jp-code {
-  font-size: 18px;
-}
-.it-jp.is-large .it-jp-arr {
-  font-size: 18px;
-}
-.it-jp.is-large .it-jp-mid {
-  align-self: center;
-}
 /* An arrival on a later day and the check-out are the far end of a booking: one line. */
 .it-card.is-line {
   padding: 9px 2px;
@@ -1065,96 +975,6 @@ dialog[data-panel="add"],
   width: 13px;
   height: 13px;
   color: var(--it-mute);
-}
-/* Flights and trains: where to, the arrival with 着 and the real time on board. */
-.it-jp {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: start;
-  margin-top: 6px;
-}
-.it-jp-code {
-  display: block;
-  margin-top: 4px;
-  font-family: var(--it-num);
-  font-size: 23px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.01em;
-}
-.it-jp.is-train .it-jp-code {
-  font-family: inherit;
-  font-size: 15px;
-  line-height: 1.5;
-}
-.it-jp-mid {
-  position: relative;
-  display: block;
-  min-width: 0;
-  color: var(--it-ink);
-}
-.it-jp-mid svg {
-  display: block;
-  width: 100%;
-  height: 30px;
-  overflow: visible;
-}
-.it-jp-mid em {
-  position: absolute;
-  top: 27px;
-  right: 0;
-  left: 0;
-  font-size: 11.5px;
-  font-style: normal;
-  font-weight: 700;
-  color: var(--it-mute);
-  text-align: center;
-  white-space: nowrap;
-}
-.it-jp-end {
-  text-align: right;
-}
-.it-jp-arr {
-  display: block;
-  margin-top: 6px;
-  font-family: var(--it-num);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1;
-  white-space: nowrap;
-}
-.it-jp-arr small {
-  margin-right: 3px;
-  font-family: var(--f-body);
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0;
-  vertical-align: 8px;
-  opacity: 0.7;
-}
-.it-jp-arr i {
-  margin-left: 2px;
-  font-family: var(--f-body);
-  font-size: 11px;
-  font-style: normal;
-  color: var(--it-mute);
-}
-.it-jp.is-large {
-  margin: 8px 0 4px;
-  align-items: end;
-}
-.it-jp.is-large .it-jp-code {
-  font-size: 34px;
-}
-.it-jp.is-large.is-train .it-jp-code {
-  font-size: 18px;
-}
-.it-jp.is-large .it-jp-arr {
-  font-size: 18px;
-}
-.it-jp.is-large .it-jp-mid {
-  align-self: center;
 }
 /* An arrival on a later day and the check-out are the far end of a booking: one line. */
 .it-card.is-line {
@@ -1974,7 +1794,7 @@ dialog[data-panel="add"],
   width: 22px;
   height: 22px;
 }
-:root .cdock-group > button.ps-dock-ticket {
+:root .cdock-group > button.ps-dock-detail {
   width: auto;
 }
 

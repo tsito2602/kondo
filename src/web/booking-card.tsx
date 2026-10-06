@@ -133,18 +133,17 @@ function Stop({
   );
 }
 function Connector({ arc }: { arc: boolean }) {
+  // A box, not the svg itself, spans the rows: an svg would keep its own
+  // height instead of stretching from dot to dot.
   return (
-    <svg
-      className="bk-cn"
-      viewBox="0 0 14 100"
-      preserveAspectRatio="none"
-      aria-hidden="true"
-    >
-      <path
-        d={arc ? "M7 0 Q19 50 7 100" : "M7 0 V100"}
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
+    <span className="bk-cn" aria-hidden="true">
+      <svg viewBox="0 0 14 100" preserveAspectRatio="none">
+        <path
+          d={arc ? "M7 0 Q19 50 7 100" : "M7 0 V100"}
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+    </span>
   );
 }
 

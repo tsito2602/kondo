@@ -232,7 +232,7 @@ export function FormBackButton({
 
 /** Every card's detail panel has the same dock (Tsubasa 2026-10-06): ‹ on the
     left closes it, and on the right 編集 sits just left of 削除 at the edge.
-    A separate function (しおりで見る, 券を開く) goes on its own island left of
+    A separate function (しおりで見る, 詳細を開く) goes on its own island left of
     them (`dockActions.secondary`, DockFunction). */
 export function DetailDockActions({
   onEdit,
@@ -311,12 +311,16 @@ export function Modal({
   plain = false,
   transition,
   addPanel = false,
+  tall = false,
 }: PropsWithChildren<{
   title: string;
   /** The ＋ button's floating panel (しおり's 予定を追加 is the reference): all
       corners rounded, inset from the edges, right above the dock, the page
       blurred and receding behind it; it rises from the bottom like a sheet. */
   addPanel?: boolean;
+  /** The floating panel always takes the full height, however short its
+      content (予約の詳細, Tsubasa 2026-10-06: 「全画面で統一」). */
+  tall?: boolean;
   onClose: () => void;
   full?: boolean;
   fullscreen?: boolean;
@@ -370,7 +374,8 @@ export function Modal({
     // or up from the bottom as a sheet; wider screens keep the panel unfold.
     const panel = dialog.querySelector<HTMLElement>(".modal-inner");
     // A floating panel whose content would scroll takes the full height.
-    const unfit = addPanel && panel ? watchPanelFit(dialog, panel) : undefined;
+    const unfit =
+      addPanel && panel && !tall ? watchPanelFit(dialog, panel) : undefined;
     const phone =
       panel && !reduceMotion() && matchMedia("(max-width: 759px)").matches;
     cartoon.current = phone
@@ -516,6 +521,7 @@ export function Modal({
       ref={ref}
       aria-labelledby={id}
       data-panel={addPanel ? "add" : undefined}
+      data-tall={addPanel && tall ? "true" : undefined}
       className={`modal ${full || fullscreen ? "full" : ""} ${fullscreen ? "fullscreen" : ""} ${closing ? "closing" : ""}`}
       onCancel={(event) => {
         event.preventDefault();

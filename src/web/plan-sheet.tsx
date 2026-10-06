@@ -1,4 +1,5 @@
 import { type FormEvent, useId, useMemo, useRef, useState } from "react";
+import { FileText } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useTravel } from "@/data/travel-provider";
 import {
@@ -33,7 +34,6 @@ import {
   findFlightConnections,
   formatConnectionDuration,
 } from "@/data/flight-connections";
-import { findAirportByCode } from "@/data/airports";
 import { mapUrl } from "@/data/places";
 import type {
   Booking,
@@ -772,8 +772,80 @@ export function PlanSheet({
 }
 
 // ===== bookings: read here, changed in the 予約 tab =====
-const airportName = (code: string, fallback: string) =>
-  findAirportByCode(code)?.name ?? fallback;
+/** Our own check-in or check-out time; the hotel's terms need no row of their own. */
+function saveStayTime(
+  travel: ReturnType<typeof useTravel>,
+  booking: Booking,
+  endpoint: "start" | "end",
+  plan: ItineraryItem | undefined,
+  time: string,
+) {
+  const terms = endpoint === "start" ? booking.time : booking.endTime;
+  const day =
+    endpoint === "start" ? booking.day : booking.endDay || booking.day;
+  if (!time || time === terms) {
+    if (plan) travel.deleteItem(plan.id);
+    return;
+  }
+  const input = {
+    day,
+    time,
+    kind: "その他",
+    title: endpoint === "start" ? "チェックイン" : "チェックアウト",
+    note: plan?.note ?? "",
+    details: {
+      ...emptyItineraryDetails("other"),
+      stay: { bookingId: booking.id, endpoint },
+    },
+  };
+  if (plan) travel.updateItem(plan.id, input);
+  else travel.createItem(input);
+}
+
+/** The single-time picker for a stay's check-in or check-out. */
+function StayTimePicker({
+  booking,
+  endpoint,
+  time,
+  onSave,
+  onClose,
+}: {
+  booking: Booking;
+  endpoint: "start" | "end";
+  time: string;
+  /** The picked time, or the hotel's terms when cleared. */
+  onSave: (time: string) => void;
+  onClose: () => void;
+}) {
+  const travel = useTravel();
+  const terms = endpoint === "start" ? booking.time : booking.endTime;
+  return (
+    <TimelinePicker
+      title={booking.title}
+      day={endpoint === "start" ? booking.day : booking.endDay || booking.day}
+      time={time}
+      endTime=""
+      point
+      pointLabel={endpoint === "start" ? "チェックイン" : "チェックアウト"}
+      exclude={[`booking-${booking.id}-${endpoint}`]}
+      self={entryCoords(
+        {
+          key: `booking-${booking.id}-${endpoint}`,
+          day: booking.day,
+          time,
+          title: booking.title,
+          booking,
+          endpoint,
+        },
+        travel.places,
+      )}
+      allowClear={Boolean(terms)}
+      clearLabel="宿の条件の時刻に戻す"
+      onSave={(picked) => onSave(picked.time || terms)}
+      onClose={onClose}
+    />
+  );
+}
 
 function StayEditForm({
   booking,
@@ -795,26 +867,7 @@ function StayEditForm({
   const label = endpoint === "start" ? "チェックイン" : "チェックアウト";
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    const day =
-      endpoint === "start" ? booking.day : booking.endDay || booking.day;
-    // The hotel's terms are the default; only a different plan needs a row of its own.
-    if (!time || time === terms) {
-      if (plan) travel.deleteItem(plan.id);
-    } else {
-      const input = {
-        day,
-        time,
-        kind: "その他",
-        title: label,
-        note: plan?.note ?? "",
-        details: {
-          ...emptyItineraryDetails("other"),
-          stay: { bookingId: booking.id, endpoint },
-        },
-      };
-      if (plan) travel.updateItem(plan.id, input);
-      else travel.createItem(input);
-    }
+    saveStayTime(travel, booking, endpoint, plan, time);
     onDone();
   };
   return (
@@ -836,30 +889,11 @@ function StayEditForm({
         />
       </div>
       {picking && (
-        <TimelinePicker
-          title={booking.title}
-          day={
-            endpoint === "start" ? booking.day : booking.endDay || booking.day
-          }
+        <StayTimePicker
+          booking={booking}
+          endpoint={endpoint}
           time={time}
-          endTime=""
-          point
-          pointLabel={label}
-          exclude={[`booking-${booking.id}-${endpoint}`]}
-          self={entryCoords(
-            {
-              key: `booking-${booking.id}-${endpoint}`,
-              day: booking.day,
-              time,
-              title: booking.title,
-              booking,
-              endpoint,
-            },
-            travel.places,
-          )}
-          allowClear={Boolean(terms)}
-          clearLabel="宿の条件の時刻に戻す"
-          onSave={(picked) => setTime(picked.time || terms)}
+          onSave={setTime}
           onClose={() => setPicking(false)}
         />
       )}
@@ -904,6 +938,7 @@ function BookingView({
   plan?: ItineraryItem;
 }) {
   const travel = useTravel();
+  const [picking, setPicking] = useState(false);
   const place = bookingPlaceName(booking);
   const link = mapUrl(
     booking.location || (booking.kind === "hotel" ? booking.detail : ""),
@@ -975,19 +1010,11 @@ function BookingView({
           <h3 className="ps-title">{booking.title}</h3>
         </div>
         <div className="ps-row is-when">
-          <div className="ps-big-time">{booking.time || "未定"}</div>
-          <JourneyLine booking={booking} large />
           <div className="ps-from">
-            {md(booking.day)}（{weekday(booking.day)}）{" "}
-            {booking.kind === "flight"
-              ? airportName(booking.originCode, booking.origin)
-              : booking.origin}
-            {" → "}
-            {md(end)}（{weekday(end)}）{" "}
-            {booking.kind === "flight"
-              ? airportName(booking.destinationCode, booking.destination)
-              : booking.destination}
+            {md(booking.day)}（{weekday(booking.day)}）
+            {end !== booking.day && ` → ${md(end)}（${weekday(end)}）`}
           </div>
+          <JourneyLine booking={booking} />
         </div>
         {kv}
         {connection && (
@@ -1009,6 +1036,9 @@ function BookingView({
   if (booking.kind === "hotel") {
     const nights = nightsOf(booking);
     const own = endpoint && plan;
+    const stayTime = own
+      ? plan.time
+      : (endpoint === "start" ? booking.time : booking.endTime) || "";
     return (
       <div className="plan-sheet">
         <div className="ps-dt">
@@ -1039,12 +1069,30 @@ function BookingView({
                 : "チェックアウトの予定"}
             </h4>
             <div className="ps-ln">
-              {own
-                ? plan.time
-                : (endpoint === "start" ? booking.time : booking.endTime) ||
-                  "未定"}
+              {travel.canEdit ? (
+                <TimeTap
+                  label={`${endpoint === "start" ? "チェックイン" : "チェックアウト"}の時刻を直す`}
+                  onOpen={() => setPicking(true)}
+                >
+                  {stayTime || "未定"}
+                </TimeTap>
+              ) : (
+                stayTime || "未定"
+              )}
               <small>{own ? "わたしたちの予定" : "宿の条件のまま"}</small>
             </div>
+            {travel.canEdit && <p className="time-tap-hint">{TIME_TAP_HINT}</p>}
+            {picking && (
+              <StayTimePicker
+                booking={booking}
+                endpoint={endpoint}
+                time={stayTime}
+                onSave={(time) =>
+                  saveStayTime(travel, booking, endpoint, plan, time)
+                }
+                onClose={() => setPicking(false)}
+              />
+            )}
           </section>
         )}
         {kv}
@@ -1078,7 +1126,7 @@ function BookingView({
   );
 }
 
-/** A booking seen from the しおり: 「券を開く」 hands over to the 予約 tab, where it is changed. */
+/** A booking seen from the しおり: 「詳細を開く」 hands over to the 予約 tab, where it is changed. */
 export function BookingSheet({
   id,
   endpoint,
@@ -1105,12 +1153,12 @@ export function BookingSheet({
       : undefined;
   const stayEditable =
     booking.kind === "hotel" && Boolean(endpoint) && travel.canEdit;
-  const ticket = (
+  const details = (
     <DockFunction
-      label="予約タブで券を開く"
-      short="券を開く"
-      className="ps-dock-ticket"
-      icon={<Glyph name="ticket" className="ps-dock-glyph" />}
+      label="予約タブで詳細を開く"
+      short="詳細を開く"
+      className="ps-dock-detail"
+      icon={<FileText aria-hidden="true" className="ps-dock-glyph" />}
       onClick={() =>
         dismissModal(() => {
           onClose();
@@ -1125,16 +1173,17 @@ export function BookingSheet({
     <Modal
       title="予約の詳細"
       addPanel
+      tall
       onClose={onClose}
       dockActions={{
-        // 券を開く is a function of its own: its own island, left of 編集
+        // 詳細を開く is a function of its own: its own island, left of 編集
         // (Tsubasa 2026-10-06: 「別機能は別の島にして」).
         actions: stayEditable ? (
           <DetailDockActions onEdit={() => setEditing(true)} />
         ) : (
-          ticket
+          details
         ),
-        secondary: stayEditable ? ticket : undefined,
+        secondary: stayEditable ? details : undefined,
       }}
     >
       {editing && endpoint ? (

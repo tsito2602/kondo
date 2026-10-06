@@ -1969,6 +1969,14 @@ test("journeys and hotel endpoints retain chronological order; only ongoing stay
   assert.match(pair, /DXB/);
   assert.match(pair, /VIE/);
   assert.match(pair, /着/);
+  // The 予約 tab's stacked layout: departure over arrival, dot by dot.
+  const stacked = new JSDOM(pair).window.document;
+  assert.ok(stacked.querySelector(".bk-vj"), "the 予約 card's stacked body");
+  assert.equal(stacked.querySelectorAll(".bk-pt").length, 2);
+  assert.deepEqual(
+    [...stacked.querySelectorAll(".bk-t b")].map((node) => node.textContent),
+    ["14:00", "18:00"],
+  );
   const checkIn = render(
     first.rows.find((row) => row.key === "booking-hotel-start"),
   );
