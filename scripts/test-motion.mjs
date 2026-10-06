@@ -1607,7 +1607,14 @@ test("date strip slides to the selected day and scrolls only when needed, respec
       rail.querySelector(".date-selection"),
       "the same selection surface moves between days",
     );
-    assert.equal(marker.style.transform, "translate(144px, 9px)");
+    // kondo-itinerary's pill: the leading edge springs out first, the other
+    // follows, and both settle on the selected day.
+    for (let i = 0; i < 100 && marker.style.left !== "144px"; i++)
+      await act(async () => new Promise((resolve) => setTimeout(resolve, 20)));
+    for (let i = 0; i < 100 && marker.style.width !== "58px"; i++)
+      await act(async () => new Promise((resolve) => setTimeout(resolve, 20)));
+    assert.equal(marker.style.left, "144px");
+    assert.equal(marker.style.width, "58px");
     assert.deepEqual(scrolls.at(-1), { left: 98, behavior: "smooth" });
     assert.equal(buttons[2].getAttribute("aria-current"), "date");
     const count = scrolls.length;
