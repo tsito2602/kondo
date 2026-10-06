@@ -316,7 +316,8 @@ export function Modal({
   title: string;
   /** The ＋ button's floating panel (しおり's 予定を追加 is the reference): all
       corners rounded, inset from the edges, right above the dock, the page
-      blurred and receding behind it; it grows out of the tapped card or ＋. */
+      blurred and receding behind it; it grows out of the tapped card, or rises
+      from the bottom when ＋ opened it. */
   addPanel?: boolean;
   /** The floating panel always takes the full height, however short its
       content (予約の詳細, Tsubasa 2026-10-06: 「全画面で統一」). */
@@ -381,16 +382,11 @@ export function Modal({
       addPanel && panel && !tall ? watchPanelFit(dialog, panel) : undefined;
     const phone =
       panel && !reduceMotion() && matchMedia("(max-width: 759px)").matches;
-    // Every floating panel grows out of what was tapped: the card, or the ＋
-    // circle itself (Tsubasa 2026-10-06: 「もともとのカードから広がってパネル
-    // になるアニメーションに統一して」).
-    const plus = origin.current?.closest<HTMLElement>(".floating-add") ?? null;
-    const source = plain ? null : (cardOrigin(origin.current) ?? plus);
+    // Every floating panel grows out of the tapped card (Tsubasa 2026-10-06:
+    // 「もともとのカードから広がってパネルになるアニメーションに統一して」);
+    // one opened from ＋ rises from the bottom (「追加ボタンから開いたときは下からでいい」).
     cartoon.current = phone
-      ? {
-          card: source,
-          radius: source && source === plus ? source.offsetWidth / 2 : 20,
-        }
+      ? { card: plain ? null : cardOrigin(origin.current), radius: 20 }
       : null;
     if (phone && transition)
       void transition.enter(panel, cartoon.current!.card);
