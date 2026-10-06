@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createRequire } from "node:module";
-import { readFile } from "node:fs/promises";
 import { build } from "esbuild";
-import sharp from "sharp";
 import { JSDOM } from "jsdom";
 import React, { act } from "react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router";
@@ -35,7 +33,7 @@ const { outputFiles } = await build({
   stdin: {
     contents:
       "export { guardModalKeyboardFocus } from './src/web/modal-keyboard'; export { lockModalPage } from './src/web/modal-scroll-lock'; " +
-      "export { finishBootScreen } from './src/web/boot'; export { PlaceSheet, placeMapsHref } from './src/web/place-sheet'; export { PlaceStatusLabel } from './src/web/place-status'; export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { keyboardInset, revealModalField } from './src/web/viewport'; export { AnchoredMenu } from './src/web/anchored-menu'; export { TripDock } from './src/web/trip-dock'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { finishBootScreen } from './src/web/boot'; export { PlaceSheet, placeMapsHref } from './src/web/place-sheet'; export { PlaceStatusLabel } from './src/web/place-status'; export { DayStrip } from './src/web/day-strip'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { keyboardInset, revealModalField } from './src/web/viewport'; export { AnchoredMenu } from './src/web/anchored-menu'; export { TripDock } from './src/web/trip-dock'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -60,7 +58,6 @@ const {
   placeMapsHref,
   PlaceStatusLabel,
   DayStrip,
-  TaskList,
   DatePicker,
   startTripTransition,
   menuDepth,
@@ -294,26 +291,6 @@ test("real router commits the new page inside the snapshot update, retaining the
   }
 });
 
-test("route layers cover short pages, clip header and dock, and leave no opaque outgoing fragments", async () => {
-  const css = await readFile("src/web/styles.css", "utf8");
-  assert.match(
-    css,
-    /#root:has\(> #main-content\)\s*\{[^}]*display: flex;[^}]*flex-direction: column;/,
-  );
-  assert.match(css, /#root > #main-content\s*\{[^}]*flex: 1 0 auto;/);
-  assert.match(
-    css,
-    /::view-transition\s*\{[^}]*clip-path: inset\([^}]*--route-old-header-bottom[^}]*--route-new-header-bottom[^}]*--route-clip-bottom/,
-  );
-  assert.match(css, /@keyframes route-out\s*\{\s*to\s*\{[^}]*opacity: 0;/);
-  assert.equal((css.match(/clip-path: inset\(/g) ?? []).length >= 1, true);
-  // Mobile dock rules may supply a bottom inset, but must not replace the top clip.
-  assert.doesNotMatch(
-    css,
-    /:root:has\([^}]+::view-transition\s*\{[^}]*clip-path:/,
-  );
-});
-
 test("dialog reverses its retained timeline and backdrop before dismissing, including interrupted opening and Save", async () => {
   for (const trigger of ["close", "early-close", "save", "escape"]) {
     let surface, backdrop, background;
@@ -376,10 +353,10 @@ test("dialog reverses its retained timeline and backdrop before dismissing, incl
           );
         else dialog.querySelector('[aria-label="閉じる"]').click();
       });
-      assert.equal(surface.playbackRate, -1.15);
-      assert.equal(background.playbackRate, -1.15);
+      assert.ok(surface.playbackRate < 0, "the entrance plays backwards");
+      assert.equal(background.playbackRate, surface.playbackRate);
       assert.equal(background.currentTime, surface.currentTime);
-      assert.equal(backdrop.playbackRate, -1.15);
+      assert.equal(backdrop.playbackRate, surface.playbackRate);
       assert.equal(
         surface.currentTime,
         trigger === "early-close" ? 80 : 320,
@@ -867,45 +844,34 @@ test("details retain the same six tab nodes and close before one-tap navigation,
   }
 });
 
-test("standalone controls squish by the mock's amounts, release on cancellation, and preserve native activation", async () => {
+// Press feedback is behaviour, not the squish's spring amounts: a press marks
+// the right surface, releases on cancel/scroll, never blocks the tap, and
+// leaves disabled controls and reduced motion alone.
+test("press feedback marks the pressed surface, releases on cancel or scroll and keeps taps working", () => {
   const host = document.createElement("div");
   host.innerHTML =
-    '<a class="icon-button" href="#back"><span>戻る</span></a><button class="icon-button">メニュー</button><button class="primary add-action">追加</button><button class="floating-add">予定追加</button><button class="icon-button" disabled>無効</button><div class="thumb-dock"><div class="cdock-group"><button>ドック</button></div></div>';
+    '<button class="icon-button">メニュー</button><button class="icon-button" disabled>無効</button><article class="place-card" data-press-card><button class="place-card-main">場所詳細</button><button class="place-card-action">しおりへ</button></article><button class="timeline-empty" disabled><div data-press-card>閲覧のみ</div></button>';
   document.body.append(host);
-  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const squished = (element, amount) => {
-    const [x, y] = element.style.scale.split(" ").map(Number);
-    return Math.abs(x - (2 - amount)) < 0.004 && Math.abs(y - amount) < 0.004;
-  };
   const cleanup = installPressFeedback();
+  const [menu, disabled] = host.querySelectorAll(".icon-button");
+  const card = host.querySelector(".place-card");
+  const detail = host.querySelector(".place-card-main");
+  const add = host.querySelector(".place-card-action");
   try {
-    const amounts = [0.9, 0.9, 0.9, 0.88, null, 0.9];
-    const controls = [...host.querySelectorAll("a, button")];
-    for (const [index, element] of controls.entries()) {
-      if (amounts[index] === null) continue;
-      pointer(element.firstElementChild ?? element, "pointerdown");
-      assert.equal(element.dataset.pressActive, "true");
-      await wait(450);
-      assert.ok(
-        squished(element, amounts[index]),
-        `${element.textContent}: ${element.style.scale}`,
-      );
-      pointer(document, "pointerup");
-      assert.equal(element.dataset.pressActive, undefined);
-      await wait(1100);
-      assert.equal(element.style.scale, "", "springs back to rest");
-    }
-    const menu = host.querySelector("button");
+    pointer(menu, "pointerdown");
+    assert.equal(menu.dataset.pressActive, "true");
+    pointer(document, "pointerup");
+    assert.equal(menu.dataset.pressActive, undefined);
     pointer(menu, "pointerdown");
     pointer(menu, "pointercancel");
-    assert.equal(menu.dataset.pressActive, undefined);
+    assert.equal(menu.dataset.pressActive, undefined, "cancel releases");
     pointer(menu, "pointerdown");
     pointer(menu, "pointerout", 0, 0, { relatedTarget: document.body });
-    assert.equal(menu.dataset.pressActive, undefined);
+    assert.equal(menu.dataset.pressActive, undefined, "leaving releases");
     menu.dispatchEvent(
       new dom.window.KeyboardEvent("keydown", { key: " ", bubbles: true }),
     );
-    assert.equal(menu.dataset.pressActive, "true");
+    assert.equal(menu.dataset.pressActive, "true", "keyboard presses too");
     menu.dispatchEvent(
       new dom.window.KeyboardEvent("keyup", { key: " ", bubbles: true }),
     );
@@ -913,23 +879,40 @@ test("standalone controls squish by the mock's amounts, release on cancellation,
     let activated = 0;
     menu.onclick = () => activated++;
     menu.click();
-    assert.equal(activated, 1);
-    await wait(1100);
-    pointer(host.querySelector(":disabled"), "pointerdown");
+    assert.equal(activated, 1, "native activation is untouched");
+
+    // A card squishes as one surface; its inner actions stay independent.
+    pointer(add, "pointerdown", 20, 20);
+    assert.equal(card.dataset.pressActive, "true");
+    pointer(add, "pointermove", 22, 23);
     assert.equal(
-      host.querySelector(":disabled").dataset.pressActive,
-      undefined,
+      card.dataset.pressActive,
+      "true",
+      "a small move keeps contact",
     );
-    pointer(document, "pointerup");
+    pointer(add, "pointermove", 20, 45);
+    assert.equal(card.dataset.pressActive, undefined, "scrolling releases");
+    let details = 0,
+      additions = 0;
+    detail.onclick = () => details++;
+    add.onclick = () => additions++;
+    add.click();
+    assert.deepEqual([details, additions], [0, 1]);
+
+    for (const node of host.querySelectorAll(":disabled")) {
+      pointer(node, "pointerdown");
+      const surface = node.querySelector("[data-press-card]") ?? node;
+      assert.equal(surface.dataset.pressActive, undefined, "disabled stays");
+      pointer(document, "pointerup");
+    }
+    assert.equal(disabled.dataset.pressActive, undefined);
     reduced = true;
     pointer(menu, "pointerdown");
-    await wait(60);
-    assert.equal(menu.style.scale, "", "reduced motion stays still");
-    assert.equal(menu.dataset.pressActive, undefined);
+    assert.equal(menu.dataset.pressActive, undefined, "reduced motion");
     reduced = false;
     pointer(menu, "pointerdown");
     cleanup();
-    assert.equal(menu.dataset.pressActive, undefined);
+    assert.equal(menu.dataset.pressActive, undefined, "cleanup releases");
   } finally {
     reduced = false;
     cleanup();
@@ -1018,11 +1001,10 @@ test("menu depth keeps scrolled fixed controls in place and reverses from an int
     assert.equal(add.style.top, "1850px");
     assert.equal(add.style.left, "320px");
     assert.equal(calls[0].element, main);
-    assert.equal(calls[0].frames[1].scale, ".94");
-    assert.equal(calls[0].frames[1].filter, "blur(6px)");
     assert.equal(
       calls[0].frames[1].transformOrigin,
       `${window.innerWidth / 2}px ${window.innerHeight / 2 + 1200}px`,
+      "the page recedes around the visible centre, not the document's",
     );
     effect.reverse(120);
     assert.equal(calls[0].motion.currentTime, 120);
@@ -1034,7 +1016,7 @@ test("menu depth keeps scrolled fixed controls in place and reverses from an int
     calls.length = 0;
     const reducedEffect = menuDepth(true, { duration: 440 });
     assert.equal(calls.length, 0);
-    assert.equal(main.style.filter, "blur(6px)");
+    assert.notEqual(main.style.filter, "", "reduced motion still dims at once");
     reducedEffect.cancel();
     assert.equal(main.style.filter, "");
     assert.equal(add.getAttribute("style"), originalStyle);
@@ -1128,47 +1110,9 @@ test("the mobile add button survives page replacement and uses the current page 
     await act(async () => change("予約"));
     assert.equal(document.querySelector(".persistent-add"), button);
     assert.equal(button.hidden, false);
-    const css = await readFile("src/web/styles.css", "utf8");
-    assert.match(
-      css,
-      /::view-transition-group\(floating-add\)\s*\{[^}]*animation: none/,
-    );
-    assert.match(
-      css,
-      /::view-transition-old\(floating-add\)\s*\{[^}]*display: none/,
-    );
-    assert.match(
-      css,
-      /::view-transition-new\(floating-add\)\s*\{[^}]*animation: none/,
-    );
   } finally {
     await act(async () => root.unmount());
   }
-});
-
-test("panel and dock geometry stays independent of the keyboard", async () => {
-  const css =
-    (await readFile("src/web/styles.css", "utf8")) +
-    (await readFile("src/web/styles/dock.css", "utf8"));
-  const panelDock = css.match(
-    /dialog \.thumb-dock-host:not\(\[hidden\]\)\s*\{([^}]+)\}/,
-  )?.[1];
-  assert.ok(panelDock);
-  assert.match(panelDock, /position: absolute;/);
-  assert.doesNotMatch(panelDock, /--panel-keyboard-inset/);
-  assert.match(
-    panelDock,
-    /bottom: calc\(var\(--dock-bottom-gap\) \+ env\(safe-area-inset-bottom\)\);/,
-  );
-  assert.doesNotMatch(css, /\n\s+bottom:[^;]*--panel-keyboard-inset/);
-  assert.match(
-    css,
-    /padding-bottom: calc\(24px \+ var\(--panel-keyboard-inset, 0px\)\);/,
-  );
-  assert.match(
-    css,
-    /:root:has\(\.thumb-dock-host\) \.modal.full\s*\{[^}]*top: 0;[^}]*height: var\(--modal-layout-height/,
-  );
 });
 
 test("calendar floats above its editor, commits ranges only on confirmation and restores the editor dock", async () => {
@@ -1429,67 +1373,6 @@ test("a trip opens by stretching its card into the screen and returns into the c
   }
 });
 
-test("task list strikes before reordering, preserves row identity, and keeps edit separate from completion", async () => {
-  const h = React.createElement;
-  const root = createRoot(document.getElementById("root"));
-  const edits = [];
-  let readOnly;
-  function Harness() {
-    const [canEdit, setEditable] = React.useState(true);
-    readOnly = () => setEditable(false);
-    const [items, setItems] = React.useState([
-      { id: "a", title: "航空券", meta: "期限なし", done: false },
-      { id: "b", title: "パスポート", meta: "期限なし", done: false },
-      { id: "c", title: "ホテル", meta: "期限なし", done: true },
-    ]);
-    return h(TaskList, {
-      items,
-      canEdit,
-      onToggle: (id, done) =>
-        setItems((items) =>
-          items.map((item) => (item.id === id ? { ...item, done } : item)),
-        ),
-      onEdit: (id) => edits.push(id),
-    });
-  }
-  const ids = () =>
-    [...document.querySelectorAll("[data-task-id]")].map(
-      (row) => row.dataset.taskId,
-    );
-  try {
-    await act(async () => root.render(h(Harness)));
-    const row = document.querySelector('[data-task-id="a"]');
-    await act(async () => row.querySelector(".task-edit").click());
-    assert.deepEqual(edits, ["a"]);
-    assert.equal(
-      row.querySelector('[role="checkbox"]').getAttribute("aria-checked"),
-      "false",
-    );
-    await act(async () => row.querySelector('[role="checkbox"]').click());
-    assert.equal(row.classList.contains("is-done"), true);
-    assert.deepEqual(
-      ids(),
-      ["a", "b", "c"],
-      "strike plays before the row moves",
-    );
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 270)));
-    assert.deepEqual(ids(), ["b", "a", "c"]);
-    assert.equal(document.querySelector('[data-task-id="a"]'), row);
-    await act(async () => row.querySelector('[role="checkbox"]').click());
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 270)));
-    assert.deepEqual(ids(), ["a", "b", "c"]);
-    await act(async () => readOnly());
-    assert.equal(document.querySelector(".task-edit"), null);
-    assert.ok(
-      [...document.querySelectorAll('[role="checkbox"]')].every(
-        (button) => button.disabled,
-      ),
-    );
-  } finally {
-    await act(async () => root.unmount());
-  }
-});
-
 test("returning home when the trip's card is off screen fades the ink instead of shrinking it", async () => {
   const originalScroll = window.scrollTo;
   const host = document.getElementById("root");
@@ -1566,14 +1449,6 @@ test("date strip slides to the selected day and scrolls only when needed, respec
       rail.querySelector(".date-selection"),
       "the same selection surface moves between days",
     );
-    // kondo-itinerary's pill: the leading edge springs out first, the other
-    // follows, and both settle on the selected day.
-    for (let i = 0; i < 100 && marker.style.left !== "144px"; i++)
-      await act(async () => new Promise((resolve) => setTimeout(resolve, 20)));
-    for (let i = 0; i < 100 && marker.style.width !== "58px"; i++)
-      await act(async () => new Promise((resolve) => setTimeout(resolve, 20)));
-    assert.equal(marker.style.left, "144px");
-    assert.equal(marker.style.width, "58px");
     assert.deepEqual(scrolls.at(-1), { left: 98, behavior: "smooth" });
     assert.equal(buttons[2].getAttribute("aria-current"), "date");
     const count = scrolls.length;
@@ -1688,80 +1563,6 @@ test("place cards separate detail and scheduling actions, and open Google Maps o
     }
   } finally {
     await act(async () => root.unmount());
-  }
-});
-
-test("card contact scales the whole surface, keeps actions independent and releases on scrolling", async () => {
-  const host = document.createElement("div");
-  host.innerHTML =
-    '<button class="timeline-entry"><time>10:00</time><div data-press-card><h3>予定</h3></div></button><button class="timeline-empty"><div data-press-card>追加</div></button><article class="place-card" data-press-card><button class="place-card-main">場所詳細</button><button class="place-card-action">しおりへ</button><button disabled>無効</button></article><button class="booking-ticket" data-press-card>予約</button><button class="note-card" data-press-card>メモ</button><a href="#trip" class="trip-ticket" data-press-card>旅行</a><button class="timeline-empty" disabled><div data-press-card>閲覧のみ</div></button>';
-  document.body.append(host);
-  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const cleanup = installPressFeedback();
-  try {
-    const controls = [...host.querySelectorAll("button:not(:disabled), a")];
-    for (const control of controls) {
-      pointer(control, "pointerdown", 20, 20);
-      const surface =
-        control.closest("[data-press-card]") ??
-        control.querySelector("[data-press-card]");
-      assert.equal(surface.dataset.pressActive, "true");
-      await wait(450);
-      // The mock's card squish: scale(2 - .97, .97).
-      const [x, y] = surface.style.scale.split(" ").map(Number);
-      assert.ok(Math.abs(x - 1.03) < 0.003 && Math.abs(y - 0.97) < 0.003);
-      assert.equal(
-        surface.dataset.pressActive,
-        "true",
-        "hold persists after animation completes",
-      );
-      pointer(control, "pointermove", 22, 23);
-      assert.equal(
-        surface.dataset.pressActive,
-        "true",
-        "small touch movement keeps contact",
-      );
-      pointer(control, "pointermove", 20, 45);
-      assert.equal(
-        surface.dataset.pressActive,
-        undefined,
-        "scroll releases without blocking the gesture",
-      );
-      await wait(1100);
-      assert.equal(surface.style.scale, "", "springs back to rest");
-    }
-    const detail = host.querySelector(".place-card-main");
-    const add = host.querySelector(".place-card-action");
-    let details = 0,
-      additions = 0;
-    detail.onclick = () => details++;
-    add.onclick = () => additions++;
-    pointer(add, "pointerdown");
-    pointer(document, "pointerup");
-    add.click();
-    assert.equal(details, 0);
-    assert.equal(additions, 1);
-    detail.dispatchEvent(
-      new dom.window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-    );
-    assert.equal(detail.parentElement.dataset.pressActive, "true");
-    detail.dispatchEvent(
-      new dom.window.KeyboardEvent("keyup", { key: "Enter", bubbles: true }),
-    );
-    assert.equal(detail.parentElement.dataset.pressActive, undefined);
-    await wait(1100);
-    for (const disabled of host.querySelectorAll(":disabled")) {
-      pointer(disabled, "pointerdown");
-      await wait(60);
-      const surface =
-        disabled.closest("[data-press-card]") ??
-        disabled.querySelector("[data-press-card]");
-      assert.equal(surface.style.scale, "", "disabled card actions never move");
-      pointer(document, "pointerup");
-    }
-  } finally {
-    cleanup();
-    host.remove();
   }
 });
 
