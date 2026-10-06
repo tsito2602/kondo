@@ -1,10 +1,12 @@
 import { addDays, localDate } from '@/utils/dates';
 import { Booking, emptyTravelCache, PackingItem, TravelCache, TravelTask, Trip, TripMember } from './types';
 
-// Demo photos are drawn, so the sample needs no image files: a dusk sky over a skyline.
+// Demo photos are drawn, so the sample needs no image files: kondo-home.html's stand-in,
+// a dusk sky over a skyline. The sky fills the card and the skyline is stretched across
+// its lower 58 %, whatever the card's shape (the root has no viewBox, so no aspect ratio).
 const SKYLINE = 'M0 120V78h22V60h10v18h16V52l9-14 9 14v26h20V66h14v12h18V30l6-14 6 14v48h22V58h12v20h20V48h8V36h4v12h8v30h24V64h18v14h20V40l10-8 10 8v38h22V70h16v8h22V56h12v22h20v42z';
 const sceneCover = (sky: string[], ground: string) => 'data:image/svg+xml,' + encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 200" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1">${sky.map((color, i) => `<stop offset="${[0, 0.48, 0.8, 1][i]}" stop-color="${color}"/>`).join('')}</linearGradient></defs><rect width="390" height="200" fill="url(#s)"/><path transform="translate(0 84)" fill="${ground}" d="${SKYLINE}"/></svg>`,
+  `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1">${sky.map((color, i) => `<stop offset="${[0, 0.48, 0.8, 1][i]}" stop-color="${color}"/>`).join('')}</linearGradient></defs><rect width="100%" height="100%" fill="url(#s)"/><svg y="42%" width="100%" height="58%" viewBox="0 0 390 120" preserveAspectRatio="none"><path fill="${ground}" d="${SKYLINE}"/></svg></svg>`,
 );
 // Stand-in profile icons: companions who set one get a picture, others show their initial.
 const face = (background: string, skin: string) => 'data:image/svg+xml,' + encodeURIComponent(
@@ -27,9 +29,9 @@ import { withDemoPlaces } from './demo-places';
 import { withItineraryDemo } from './demo-itinerary';
 
 export function createDemoCache(): TravelCache {
-  const start = addDays(localDate(), 14);
+  const start = addDays(localDate(), 13);
   const next = addDays(start, 1);
-  const last = addDays(start, 3);
+  const last = addDays(start, 4);
   const today = localDate();
   const tripId = 'sample-vienna';
   const self = 'member:demo-self', misaki = 'member:demo-companion', kento = 'member:demo-friend';
@@ -75,7 +77,7 @@ export function createDemoCache(): TravelCache {
   });
   const extraTrips = [
     trip('sample-south-germany', '南ドイツからウィーンへ', 'シュトゥットガルト、ウィーン', addDays(today, 46), 3),
-    trip('sample-taipei', '台湾の夜市めぐり', '台北', addDays(today, -283), 4, sceneCover(['#1d2442', '#5a3d6b', '#c4566a', '#f0a35e'], '#16121c')),
+    trip('sample-taipei', '台湾の夜市めぐり', '台北', addDays(today, -283), 4, sceneCover(['#2b3550', '#7b5b6d', '#e2a074', '#f3c98f'], '#1b1820')),
     trip('sample-hokkaido', '北海道ドライブ', '北海道', addDays(today, -422), 5),
     trip('sample-okinawa', '沖縄でのんびり', '沖縄', addDays(today, -825), 4),
     // Past trips also fill the passport's entry stamps in 設定.

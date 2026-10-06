@@ -10,6 +10,7 @@
   font-size: 32px;
   font-weight: 900;
   line-height: 1.2;
+  letter-spacing: 0;
 }
 .home-group-heading {
   display: flex;
@@ -18,12 +19,14 @@
   margin: 22px 4px 10px;
   font-size: 15px;
   font-weight: 900;
+  line-height: 1.7;
+  letter-spacing: 0;
 }
 .home-group-heading > span {
-  color: var(--muted);
+  color: var(--p-mute);
+  font-family: var(--f-num);
   font-size: 14px;
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
 }
 .home-trip-list {
   display: grid;
@@ -42,17 +45,17 @@
   overflow: hidden;
   isolation: isolate;
   color: #fff;
-  background: var(--soft);
+  background: var(--p-soft);
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
 }
 .home-trip:focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--p-ink);
   outline-offset: 3px;
 }
 .home-trip.no-photo {
-  background: var(--ink);
-  color: var(--canvas);
+  background: var(--p-ink);
+  color: var(--p-paper);
 }
 .home-trip-photo {
   position: absolute;
@@ -116,17 +119,17 @@
   gap: 3px;
   padding: 5px 10px 4px;
   border-radius: 99px;
-  background: var(--canvas);
-  color: var(--ink);
+  background: var(--p-paper);
+  color: var(--p-ink);
   font-size: 12px;
   font-weight: 700;
   line-height: 1.1;
   white-space: nowrap;
 }
 .home-trip-countdown b {
+  font-family: var(--f-num);
   font-size: 17px;
   font-weight: 800;
-  font-variant-numeric: tabular-nums;
 }
 .home-trip-faces {
   display: flex;
@@ -143,8 +146,8 @@
   margin-left: -8px;
   overflow: hidden;
   border-radius: 50%;
-  background: var(--canvas);
-  color: var(--ink);
+  background: var(--p-paper);
+  color: var(--p-ink);
   font-size: 12px;
   font-weight: 900;
   box-shadow: 0 0 0 2.5px #0006;
@@ -157,9 +160,9 @@
   object-fit: cover;
 }
 .home-trip-faces > span.more {
-  background: var(--ink);
-  color: var(--canvas);
-  font-variant-numeric: tabular-nums;
+  background: var(--p-ink);
+  color: var(--p-paper);
+  font-family: var(--f-num);
 }
 .home-trip-card .home-trip-body {
   position: absolute;
@@ -188,9 +191,9 @@
 }
 .home-trip-dates {
   flex: none;
+  font-family: var(--f-num);
   font-size: 13px;
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
 }
 .home-trip-destination {
   min-width: 0;
@@ -218,20 +221,23 @@
 .home-trip-shelf-card small {
   display: block;
   margin-top: 2px;
+  font-family: var(--f-num);
   font-size: 11.5px;
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
   opacity: 0.85;
 }
 
+/* 13.5px / 1.7 as in the mock; the 44px tap height hangs evenly around it. */
 .home-join {
   display: block;
-  margin: 26px auto 0;
+  margin: 15.5px auto -10.5px;
   min-height: 44px;
-  padding: 0 12px;
+  padding: 0;
   border: 0;
   background: none;
-  color: var(--muted);
+  color: var(--p-mute);
+  font-family: inherit;
+  line-height: 1.7;
   font-size: 13.5px;
   font-weight: 700;
   text-decoration: underline;
@@ -240,9 +246,10 @@
 }
 
 @media (max-width: 759px) {
-  .home-page {
-    padding-top: 8px;
-    padding-inline: 18px;
+  /* The mock's phone: 8px under the status bar, 18px sides, 150px under the list for the dock. */
+  .page.home-page {
+    padding: calc(8px + env(safe-area-inset-top)) 18px
+      calc(150px + env(safe-area-inset-bottom));
   }
   /* The dock's create pill sizes to its label; settings stays a circle. */
   .context-island.context-actions > .home-create {
@@ -263,6 +270,6 @@
 }
 @media (hover: hover) {
   .home-join:hover {
-    color: var(--ink);
+    color: var(--p-ink);
   }
 }
