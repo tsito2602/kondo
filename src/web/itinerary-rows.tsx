@@ -39,6 +39,16 @@ export const bookingLabel: Record<Booking["kind"], string> = {
   other: "予約",
 };
 
+/** A venue booking's glyph: a restaurant wears the fork and knife, as meals do. */
+export const bookingGlyph = (kind: Booking["kind"]) =>
+  kind === "restaurant"
+    ? "meal"
+    : kind === "car"
+      ? "move"
+      : kind === "other"
+        ? "other"
+        : "ticket";
+
 /** A place for the card: its map number and name, or the plan's own words. */
 export function placeLabel(
   item: ItineraryItem,
@@ -233,7 +243,7 @@ function BookingCard({
   return (
     <div className="it-card" data-press-card>
       <div className="it-lab" data-kind={kindOfBooking(booking.kind)}>
-        <Glyph name="ticket" />
+        <Glyph name={bookingGlyph(booking.kind)} />
         {bookingLabel[booking.kind]}
       </div>
       <h3>{booking.title}</h3>

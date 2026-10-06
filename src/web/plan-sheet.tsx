@@ -57,6 +57,7 @@ import {
 import { categoryGlyph, Glyph, MapPin } from "./itinerary-icons";
 import { kindOfBooking } from "./kind-colors";
 import {
+  bookingGlyph,
   bookingLabel,
   bookingPlaceName,
   JourneyLine,
@@ -975,7 +976,7 @@ function BookingView({
               ? "move"
               : booking.kind === "hotel"
                 ? "bed"
-                : "ticket"
+                : bookingGlyph(booking.kind)
         }
       />
       {bookingLabel[booking.kind]}
