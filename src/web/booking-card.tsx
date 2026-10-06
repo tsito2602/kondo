@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { findAirportByCode } from "@/data/airports";
 import { bookingDuration } from "@/data/booking-duration";
+import { placeNameFromLink } from "@/data/geo";
 import { durationLabel } from "@/data/itinerary";
 import type { Booking, BookingKind } from "@/data/types";
 import { bookingIcons } from "./booking-icons";
@@ -174,8 +175,9 @@ export function BookingBody({
 }: {
   booking: Booking;
   now: string;
-  /** The しおり's left column already holds the departure time: only the
-      arrival's (Tsubasa 2026-10-06: 「時刻は到着の方だけ表示すればいい」). */
+  /** The しおり's left column already holds the departure time: the places
+      sit at the left and the arrival time goes under them (Tsubasa
+      2026-10-06: 「時刻は到着の方だけ」「到着時刻を下に、出発地点と到着地点を左に」). */
   arrivalOnly?: boolean;
 }) {
   const { kind } = booking;
@@ -185,7 +187,7 @@ export function BookingBody({
     const to = placeName(booking.destination, booking.destinationCode, flight);
     const duration = bookingDuration(booking);
     return (
-      <div className="bk-vj">
+      <div className={arrivalOnly ? "bk-vj is-arr" : "bk-vj"}>
         <Stop
           row={1}
           big={arrivalOnly ? "" : booking.time || "--:--"}
@@ -199,11 +201,23 @@ export function BookingBody({
         </span>
         <Stop
           row={3}
-          big={booking.endTime || "--:--"}
-          small={arrivalLabel(booking, kind === "car" ? "返却" : "着")}
+          big={arrivalOnly ? "" : booking.endTime || "--:--"}
+          small={
+            arrivalOnly
+              ? ""
+              : arrivalLabel(booking, kind === "car" ? "返却" : "着")
+          }
           place={to.primary}
           note={to.secondary}
         />
+        {arrivalOnly && (
+          <div className="bk-at">
+            <b>{booking.endTime || "--:--"}</b>
+            <small>
+              {arrivalLabel(booking, kind === "car" ? "返却" : "着")}
+            </small>
+          </div>
+        )}
       </div>
     );
   }
@@ -213,8 +227,6 @@ export function BookingBody({
     const tonight = dayCount(booking.day, now.slice(0, 10)) + 1;
     const staying =
       isStaying(booking, now) && tonight >= 1 && tonight <= nights;
-    const area =
-      booking.detail && !/^https?:/i.test(booking.detail) ? booking.detail : "";
     return (
       <div className="bk-vj bk-hv">
         <Stop
@@ -226,11 +238,7 @@ export function BookingBody({
         />
         <Connector arc={false} />
         <span className="bk-du">
-          {[
-            nights ? `${nights}泊` : "",
-            staying ? `いま${tonight}泊目` : "",
-            area,
-          ]
+          {[nights ? `${nights}泊` : "", staying ? `いま${tonight}泊目` : ""]
             .filter(Boolean)
             .join(" · ")}
         </span>
@@ -244,12 +252,13 @@ export function BookingBody({
       </div>
     );
   }
-  const where =
-    booking.detail && !/^https?:/i.test(booking.detail)
-      ? booking.detail
-      : booking.location && !/^https?:/i.test(booking.location)
-        ? booking.location
-        : "";
+  // Where it happens comes from the place field (予約内容 is gone from these
+  // kinds, Tsubasa 2026-10-06); not repeated when it is the title itself.
+  const location = (booking.location ?? "").trim();
+  const place = /^https?:/i.test(location)
+    ? (placeNameFromLink(location) ?? "")
+    : location;
+  const where = place === booking.title ? "" : place;
   return (
     <div className="bk-uni">
       <div className="bk-t">

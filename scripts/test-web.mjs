@@ -2395,10 +2395,7 @@ test("booking cards stack journeys, lead stays with dates and stamp used booking
     [...stay.querySelectorAll(".bk-pl")].map((node) => node.textContent),
     ["チェックイン15:00から", "チェックアウト11:00まで"],
   );
-  assert.equal(
-    stay.querySelector(".bk-du").textContent,
-    "3泊 · いま2泊目 · 旧市街",
-  );
+  assert.equal(stay.querySelector(".bk-du").textContent, "3泊 · いま2泊目");
   assert.equal(
     stay.querySelector(".bk-hd span:not(.bk-chip)"),
     null,
@@ -2411,7 +2408,7 @@ test("booking cards stack journeys, lead stays with dates and stamp used booking
   );
   assert.equal(
     render(hotel, "2026-10-01T09:00").querySelector(".bk-du").textContent,
-    "3泊 · 旧市街",
+    "3泊",
   );
   const used = render(hotel, "2026-10-23T11:01");
   assert.ok(used.querySelector(".bk-card.used"));

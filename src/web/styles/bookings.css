@@ -212,6 +212,32 @@ button.bk-card {
   font-weight: 700;
   color: var(--muted);
 }
+/* the しおり's card: no time column; the arrival time under the places */
+.bk-vj.is-arr {
+  grid-template-columns: 0 14px minmax(0, 1fr);
+  margin-left: -10px;
+}
+.bk-vj.is-arr .bk-t {
+  display: none;
+}
+.bk-at {
+  grid-column: 3;
+  grid-row: 4;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 8px;
+}
+.bk-at b {
+  font-family: var(--f-num);
+  font-size: 18px;
+  font-weight: 800;
+}
+.bk-at small {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
 
 /* one moment: the time, then what and where */
 .bk-uni {
