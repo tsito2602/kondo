@@ -1,0 +1,268 @@
+/* ホーム (trip list): upcoming trips as photo cards, past trips on a shelf. */
+.home-page {
+  --home-photo-shade: linear-gradient(180deg, #0000 35%, #0009 100%);
+  max-width: 1000px;
+}
+.home-page .home-toolbar {
+  margin: 10px 4px 18px;
+}
+.home-page .home-toolbar h1 {
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+.home-group-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 22px 4px 10px;
+  font-size: 15px;
+  font-weight: 900;
+}
+.home-group-heading > span {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.home-trip-list {
+  display: grid;
+  gap: 14px;
+}
+.home-trip-shelf {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+/* One card shape for both sizes: art behind, text in front. */
+.home-trip {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  isolation: isolate;
+  color: #fff;
+  background: var(--soft);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.home-trip:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+.home-trip.no-photo {
+  background: var(--ink);
+  color: var(--canvas);
+}
+.home-trip-photo {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+.home-trip-photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--home-photo-shade);
+}
+.home-trip-card {
+  height: 196px;
+  border-radius: 26px;
+}
+.home-trip-shelf-card {
+  height: 150px;
+  border-radius: 18px;
+}
+
+/* No photo: the destination, large and faint, right-aligned above the name. */
+.home-trip-place {
+  position: absolute;
+  z-index: -1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+  opacity: 0.42;
+  pointer-events: none;
+}
+.home-trip-place > span {
+  display: block;
+  width: max-content;
+}
+.home-trip-place small {
+  margin-left: 0.2em;
+  font-size: 0.42em;
+  letter-spacing: 0;
+}
+
+/* Large card: countdown and companions on top, name and dates at the bottom. */
+.home-trip-top {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+.home-trip-countdown {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  padding: 5px 10px 4px;
+  border-radius: 99px;
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.home-trip-countdown b {
+  font-size: 17px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.home-trip-faces {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  padding-left: 7px;
+}
+.home-trip-faces > span {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-left: -8px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: 0 0 0 2.5px #0006;
+}
+.home-trip-faces img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.home-trip-faces > span.more {
+  background: var(--ink);
+  color: var(--canvas);
+  font-variant-numeric: tabular-nums;
+}
+.home-trip-card .home-trip-body {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 16px;
+}
+.home-trip-card h3 {
+  margin: 0;
+  font-size: 23px;
+  font-weight: 900;
+  line-height: 1.3;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.home-trip-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0.9;
+}
+.home-trip-dates {
+  flex: none;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.home-trip-destination {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Shelf card: the name and the month it started. */
+.home-trip-shelf-card .home-trip-body {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 9px;
+}
+.home-trip-shelf-card b {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.3;
+}
+.home-trip-shelf-card small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+.home-join {
+  display: block;
+  margin: 26px auto 0;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+@media (max-width: 759px) {
+  .home-page {
+    padding-top: 8px;
+    padding-inline: 18px;
+  }
+  /* The dock's create pill sizes to its label; settings stays a circle. */
+  .context-island.context-actions > .home-create {
+    width: auto;
+    padding: 0 24px 0 20px;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 700;
+  }
+}
+@media (min-width: 760px) {
+  .home-trip-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .home-trip-shelf {
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  }
+}
+@media (hover: hover) {
+  .home-join:hover {
+    color: var(--ink);
+  }
+}

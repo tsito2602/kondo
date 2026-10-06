@@ -29,6 +29,8 @@ type TravelContextValue = {
   packingItems: PackingItem[];
   tasks: TravelTask[];
   members: TripMember[];
+  /** Members of every trip, for the trip list's companion icons. */
+  membersOf: (tripId: string) => TripMember[];
   places: Place[];
   notes: TravelNote[];
   saveNote: (id: string, input: NoteInput, targetTripId?: string) => void;
@@ -584,12 +586,15 @@ export function TravelProvider({ children }: PropsWithChildren) {
     .sort((a, b) => `${a.packed ? 1 : 0} ${a.category} ${a.name} ${a.id}`.localeCompare(`${b.packed ? 1 : 0} ${b.category} ${b.name} ${b.id}`));
   const tasks = [...(selectedTrip ? cache.tasksByTrip[selectedTrip.id] ?? [] : [])]
     .sort((a, b) => `${a.done ? 1 : 0} ${a.dueOn || '9999-12-31'} ${a.title} ${a.id}`.localeCompare(`${b.done ? 1 : 0} ${b.dueOn || '9999-12-31'} ${b.title} ${b.id}`));
-  const members = useMemo<TripMember[]>(() => {
-    const entries: TripMember[] = isDemo ? [{ id: 'demo-self', name: 'あなた', email: '', role: 'owner' }, { id: 'demo-companion', name: '同行者', email: '', role: 'editor' }] : cache.membersByTrip?.[cache.selectedTripId ?? ''] ?? [];
-    return entries.map((member) => member.id === user?.id ? { ...member, name: user.name, avatarUrl: user.avatarUrl } : member);
-  }, [cache.membersByTrip, cache.selectedTripId, isDemo, user]);
+  const membersOf = useCallback((tripId: string): TripMember[] => {
+    const stored = cache.membersByTrip?.[tripId];
+    const entries: TripMember[] = isDemo && !stored ? [{ id: 'demo-self', name: 'あなた', email: '', role: 'owner' }, { id: 'demo-companion', name: '同行者', email: '', role: 'editor' }] : stored ?? [];
+    return entries.map((member) => member.id === user?.id ? { ...member, name: user.name, avatarUrl: user.avatarUrl ?? member.avatarUrl } : member);
+  }, [cache.membersByTrip, isDemo, user]);
+  const members = useMemo<TripMember[]>(() => membersOf(cache.selectedTripId ?? ''), [membersOf, cache.selectedTripId]);
   const value = useMemo<TravelContextValue>(() => ({
     members,
+    membersOf,
     ready,
     canEdit: Boolean(selectedTrip && selectedTrip.role !== 'viewer'),
     syncing,
@@ -628,7 +633,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     deleteTask,
     createInvite,
     acceptInvite,
-  }), [saveNote, deleteNote, cache.notesByTrip, members, saveTripOffline, createPlace, updatePlace, deletePlace, deleteTrip, cache.placesByTrip, acceptInvite, bookings, cache.documentsByBooking, cache.pending.length, cache.trips, createBooking, createInvite, createItem, createPackingItem, createTask, createTrip, deleteBooking, deleteBookingDocument, deleteItem, deletePackingItem, deleteTask, downloadBookingDocument, error, items, packingItems, ready, selectTrip, selectedTrip, setFlightConnection, sync, syncing, tasks, updateBooking, updateItem, updatePackingItem, updateTask, updateTrip, uploadBookingDocument]);
+  }), [saveNote, deleteNote, cache.notesByTrip, members, membersOf, saveTripOffline, createPlace, updatePlace, deletePlace, deleteTrip, cache.placesByTrip, acceptInvite, bookings, cache.documentsByBooking, cache.pending.length, cache.trips, createBooking, createInvite, createItem, createPackingItem, createTask, createTrip, deleteBooking, deleteBookingDocument, deleteItem, deletePackingItem, deleteTask, downloadBookingDocument, error, items, packingItems, ready, selectTrip, selectedTrip, setFlightConnection, sync, syncing, tasks, updateBooking, updateItem, updatePackingItem, updateTask, updateTrip, uploadBookingDocument]);
 
   return <TravelContext.Provider value={value}>{children}</TravelContext.Provider>;
 }

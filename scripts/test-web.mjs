@@ -1191,16 +1191,20 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(
       document.querySelector('.trip-heading [aria-label="旅行一覧へ戻る"]'),
     );
+    // Home keeps settings (left) and create (right) in the dock only.
     assert.equal(
-      document.querySelector(".context-primary").textContent,
+      document.querySelector(".context-actions .home-create").textContent,
       "旅行を作成",
     );
-    assert.equal(document.querySelector(".context-back"), null);
-    await click(document.querySelector('.context-actions [aria-label="設定"]'));
+    assert.equal(
+      document.querySelector(".context-primary.context-island"),
+      null,
+    );
+    await click(document.querySelector('.context-back [aria-label="設定"]'));
     assert.equal(document.querySelectorAll(".context-island").length, 1);
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
-    await click(byText(".context-primary button", "旅行を作成"));
+    await click(byText(".context-actions button", "旅行を作成"));
     assert.equal(
       document.querySelector('.context-primary button[type="submit"]').form,
       document.querySelector("dialog form"),
@@ -1611,4 +1615,122 @@ test("compact reservation tickets retain airport names and both dates", async ()
     ].map((node) => node.textContent),
     ["時刻未定", "時刻未定"],
   );
+});
+
+test("home trip cards: destination lines, countdown and companion icons", async () => {
+  const {
+    destinationPlaces,
+    destinationLines,
+    daysUntil,
+    UpcomingTripCard,
+    PastTripCard,
+  } = await bundle("export * from './src/web/home-trips';");
+  // 「・」 lives inside one place name; only list separators split.
+  assert.deepEqual(destinationPlaces("サンティアゴ・デ・コンポステーラ"), [
+    "サンティアゴ・デ・コンポステーラ",
+  ]);
+  assert.deepEqual(destinationPlaces("シュトゥットガルト、ウィーン"), [
+    "シュトゥットガルト",
+    "ウィーン",
+  ]);
+  assert.deepEqual(destinationPlaces("Vienna, Austria / Prague／Brno，Linz"), [
+    "Vienna",
+    "Austria",
+    "Prague",
+    "Brno",
+    "Linz",
+  ]);
+  assert.deepEqual(destinationLines("ミラノ、フィレンツェ、ローマ、ナポリ"), [
+    { text: "ミラノ" },
+    { text: "フィレンツェ", more: "ほか2" },
+  ]);
+  assert.equal(destinationLines("京都、大阪、神戸").length, 3);
+  assert.equal(daysUntil("2026-10-06", "2026-10-19"), 13);
+  assert.equal(daysUntil("2026-10-06", "2026-10-04"), -2);
+
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const h = React.createElement;
+  const render = (element) =>
+    new JSDOM(renderToStaticMarkup(h(MemoryRouter, null, element))).window
+      .document;
+  const people = ["つ", "み", "け", "さ", "ゆ", "あ"].map((name, index) => ({
+    id: `m${index}`,
+    name,
+    email: "",
+    role: "editor",
+    avatarUrl: index === 0 ? "data:image/png;base64,AA==" : null,
+  }));
+  const trip = {
+    id: "t1",
+    name: "イタリアを南へ縦断",
+    destination: "ミラノ、フィレンツェ、ローマ、ナポリ",
+    startsOn: "2026-10-19",
+    endsOn: "2026-10-23",
+    role: "owner",
+    memberCount: 6,
+  };
+  const props = { today: "2026-10-06", onOpen() {}, members: people };
+  const next = render(h(UpcomingTripCard, { ...props, trip, nearest: true }));
+  const card = next.querySelector("a.home-trip");
+  assert.equal(card.getAttribute("href"), "/trips/t1/itinerary");
+  assert.equal(
+    card.dataset.tripSurface,
+    "t1",
+    "the trip-open transition finds the card",
+  );
+  assert.ok(card.classList.contains("no-photo"));
+  assert.equal(
+    next.querySelector(".home-trip-countdown").textContent,
+    "あと13日",
+  );
+  assert.deepEqual(
+    [...next.querySelectorAll(".home-trip-place > span")].map(
+      (n) => n.textContent,
+    ),
+    ["ミラノ", "フィレンツェほか2"],
+  );
+  assert.equal(
+    next.querySelector(".home-trip-place").getAttribute("aria-hidden"),
+    "true",
+  );
+  assert.equal(
+    next.querySelector(".home-trip-dates").textContent,
+    "10/19 – 10/23",
+  );
+  const faces = next.querySelector(".home-trip-faces");
+  assert.equal(faces.getAttribute("aria-label"), "6人");
+  assert.equal(
+    faces.querySelectorAll("img").length,
+    1,
+    "a set icon shows as a picture",
+  );
+  assert.deepEqual(
+    [...faces.children].map((n) => n.textContent),
+    ["", "み", "け", "+3"],
+  );
+  const during = render(
+    h(UpcomingTripCard, { ...props, trip, today: "2026-10-20", nearest: true }),
+  );
+  assert.equal(
+    during.querySelector(".home-trip-countdown").textContent,
+    "2日目",
+  );
+  const later = render(h(UpcomingTripCard, { ...props, trip, nearest: false }));
+  assert.equal(later.querySelector(".home-trip-countdown"), null);
+  const photo = render(
+    h(PastTripCard, {
+      onOpen() {},
+      trip: {
+        ...trip,
+        startsOn: "2025-12-27",
+        coverImage: "data:image/png;base64,AA==",
+      },
+    }),
+  );
+  assert.equal(
+    photo.querySelector("img[data-trip-cover]").dataset.tripCover,
+    "t1",
+  );
+  assert.equal(photo.querySelector(".home-trip-place"), null);
+  assert.equal(photo.querySelector("small").textContent, "2025.12");
 });
