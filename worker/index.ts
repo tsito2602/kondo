@@ -8,7 +8,7 @@ import { validNoteContent, notePlainText, NOTE_TITLE_LIMIT, NOTE_BODY_LIMIT } fr
 
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { connectionBetween, createsFlightConnectionCycle, type FlightConnectionInput } from '../src/data/flight-connections';
-import { startBookingImport } from './booking-import';
+import { startBookingImport, type AIBinding } from './booking-import';
 
 type Env = {
   DB: D1Database;
@@ -16,8 +16,9 @@ type Env = {
   ASSETS: Fetcher;
   GOOGLE_CLIENT_IDS: string;
   ALLOWED_ORIGINS?: string;
-  /** Worker secret for reading booking documents with OpenAI. Import is off without it. */
-  OPENAI_API_KEY?: string;
+  /** Workers AI binding and AI Gateway id for reading booking documents. Import is off without either. */
+  AI?: AIBinding;
+  AI_GATEWAY_ID?: string;
 };
 
 type User = { id: string; email: string; name: string | null; avatarUrl: string | null };
@@ -647,7 +648,7 @@ async function importBookings(request: Request, env: Env, user: User, tripId: st
   if (forbidden) return forbidden;
   const trip = await env.DB.prepare('SELECT starts_on AS startsOn, ends_on AS endsOn FROM trips WHERE id = ?').bind(tripId).first<{ startsOn: string; endsOn: string }>();
   if (!trip) return json({ error: '旅行が見つかりません' }, 404);
-  return startBookingImport(request, env.OPENAI_API_KEY, trip);
+  return startBookingImport(request, env, trip);
 }
 
 async function uploadBookingDocument(request: Request, env: Env, user: User, tripId: string, bookingId: string) {

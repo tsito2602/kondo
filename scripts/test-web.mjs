@@ -2387,7 +2387,7 @@ test("home trip cards: destination lines, countdown and companion icons", async 
   assert.equal(photo.querySelector("small").textContent, "2025.12");
 });
 
-test("booking import reads streamed rows, flags duplicates and needs the OpenAI secret", async () => {
+test("booking import reads streamed rows, flags duplicates and goes through the AI Gateway", async () => {
   const {
     findDuplicateBooking,
     normalizeImportedBooking,
@@ -2486,10 +2486,29 @@ test("booking import reads streamed rows, flags duplicates and needs the OpenAI 
     files: [{ name: "a.png", kind: "image", data: png, size: 12 }],
   };
   const trip = { startsOn: "2026-10-19", endsOn: "2026-10-23" };
-  assert.equal(
-    (await startBookingImport(request(files), undefined, trip)).status,
-    503,
-  );
+  let sent;
+  const sse = [
+    { type: "response.output_text.delta", delta: text.slice(0, 50) },
+    { type: "response.output_text.delta", delta: text.slice(50) },
+    { type: "response.completed", response: { status: "completed" } },
+  ]
+    .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+    .join("");
+  const AI = {
+    run: async (model, input, options) => {
+      sent = { model, input, options };
+      return new Response(sse, {
+        headers: { "content-type": "text/event-stream" },
+      });
+    },
+  };
+  const env = { AI, AI_GATEWAY_ID: "kondo" };
+  for (const missing of [{}, { AI }, { AI_GATEWAY_ID: "kondo" }])
+    assert.equal(
+      (await startBookingImport(request(files), missing, trip)).status,
+      503,
+      "import stays off without the AI binding and gateway",
+    );
   assert.equal(
     (
       await startBookingImport(
@@ -2503,34 +2522,21 @@ test("booking import reads streamed rows, flags duplicates and needs the OpenAI 
             },
           ],
         }),
-        "key",
+        env,
         trip,
       )
     ).status,
     400,
   );
-  let sent;
-  const sse = [
-    { type: "response.output_text.delta", delta: text.slice(0, 50) },
-    { type: "response.output_text.delta", delta: text.slice(50) },
-    { type: "response.completed", response: { status: "completed" } },
-  ]
-    .map((event) => `data: ${JSON.stringify(event)}\n\n`)
-    .join("");
-  const response = await startBookingImport(
-    request(files),
-    "secret-key",
-    trip,
-    async (url, init) => {
-      sent = { url, init };
-      return new Response(sse, {
-        headers: { "content-type": "text/event-stream" },
-      });
-    },
-  );
-  assert.equal(sent.url, "https://api.openai.com/v1/responses");
-  assert.equal(sent.init.headers.authorization, "Bearer secret-key");
-  const payload = JSON.parse(sent.init.body);
+  const response = await startBookingImport(request(files), env, trip);
+  assert.equal(sent.model, "openai/gpt-6-luna");
+  assert.deepEqual(sent.options.gateway, {
+    id: "kondo",
+    skipCache: true,
+    collectLog: false,
+  });
+  assert.equal(sent.options.returnRawResponse, true);
+  const payload = sent.input;
   assert.equal(payload.stream, true);
   assert.equal(payload.store, false);
   assert.equal(payload.text.format.type, "json_schema");
