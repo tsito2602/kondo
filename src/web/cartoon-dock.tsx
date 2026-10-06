@@ -85,11 +85,10 @@ const RADIUS = 31;
 const CENTER = 120 - 30 - RADIUS;
 const tones = new Set(["ink", "ink-dim"]);
 
-/** The fluid dock's path, on a cartoon spring: the islands overshoot their
-    new shape a little and settle back, so a morph lands with a プルン.
-    Damped to about 2 % overshoot: at d21 the stretch back to full tabs ran
-    into the screen edge (Tsubasa 2026-10-06: 「強すぎる」). */
-const JELLY = samples({ k: 300, d: 27 });
+/** The fluid dock's path on a near-critically damped spring: the islands
+    glide into their new shape and stop without a wobble (Tsubasa
+    2026-10-06: the overshoot was 「強すぎる」, then no プルン after a morph). */
+const JELLY = samples({ k: 300, d: 34 });
 const MORPH = Math.max(MORPH_MS, JELLY.ms);
 const jelly = (t: number) => {
   const at = t * (JELLY.vals.length - 1),
@@ -326,7 +325,6 @@ export class CartoonDock extends Component<Props> {
     const key = JSON.stringify([this.width, t.islands, t.tone]);
     if (key === this.geo && !instant) return;
     this.geo = key;
-    const wasMerged = this.merged;
     this.merged = t.merged;
     if (t.tone) this.tone = t.tone;
     // The right-hand island carries the tone (a lone save turns it ink); the
@@ -345,16 +343,15 @@ export class CartoonDock extends Component<Props> {
       this.paint();
       return;
     }
-    // Back to one full-width island: no bump or landing squish after it
-    // settles (Tsubasa 2026-10-06: 「全幅に戻ったあとの一プルンはいらない」).
-    const full = t.merged && !wasMerged;
-    // crouch, spring up as the material stretches, land with a squish
+    // The dock crouches as the material starts to move and rises with it,
+    // then simply stops: nothing wobbles once the morph has landed
+    // (Tsubasa 2026-10-06: 「ドックが変形したあとの勝手にプルンとする動きいらない」).
     void this.J.to(0.92, { k: 700, d: 26 });
-    const up = setTimeout(() => void this.J.to(1, { k: 420, d: 11 }, 3), 70);
+    const up = setTimeout(() => void this.J.to(1, { k: 420, d: 41 }), 70);
     void this.morphTo(to).then((landed) => {
       clearTimeout(up);
       if (!landed) return;
-      void this.J.to(1, { k: 420, d: 12 }, full ? 0 : -4);
+      void this.J.to(1, { k: 420, d: 41 });
     });
   }
 
