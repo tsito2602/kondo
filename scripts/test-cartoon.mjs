@@ -124,10 +124,11 @@ Object.defineProperty(dom.window.HTMLElement.prototype, "offsetWidth", {
     return this.tagName === "A" ? 46 : 0;
   },
 });
+let dockHidden = false;
 Object.defineProperty(dom.window.HTMLElement.prototype, "clientWidth", {
   configurable: true,
   get() {
-    return this.classList?.contains("cdock") ? 390 : 0;
+    return this.classList?.contains("cdock") && !dockHidden ? 390 : 0;
   },
 });
 const islands = () =>
@@ -799,4 +800,34 @@ test("a sheet opens out of its card, closes back onto it and sheets rise and dro
   reduced = false;
   card.remove();
   sheet.remove();
+});
+
+test("a dock that is hidden while its controls change (a closing dialog) still moves its islands", async () => {
+  stubAnimate();
+  const dock = await mountDock();
+  try {
+    await dock.go("ctx");
+    assert.ok(
+      near(islands(), [
+        [16, 78],
+        [238, 374],
+      ]),
+    );
+    // The dialog closes (display:none) before the provider moves the dock out,
+    // and comes back within the same frame, so no resize is ever observed.
+    dockHidden = true;
+    await act(async () => dock.go("tabs", 0));
+    dockHidden = false;
+    await act(async () => wait(900));
+    assert.ok(
+      near(islands(), [
+        [16, 78],
+        [90, 374],
+      ]),
+      "the islands follow",
+    );
+  } finally {
+    dockHidden = false;
+    await act(async () => dock.root.unmount());
+  }
 });

@@ -127,18 +127,31 @@ function popIn(group: HTMLElement) {
     easing: "ease",
     fill: "backwards",
   });
-  [...group.children]
-    .filter((child) => !child.matches(".cdock-ind, .haptic-touch"))
-    .forEach((b, i) =>
-      spring(
-        b,
-        [
-          { transform: "scale(.4)", opacity: 0 },
-          { transform: "none", opacity: 1 },
-        ],
-        { k: 380, d: 13 },
-        { delay: 110 + i * 45, fill: "backwards" },
-      ),
+  const parts = [...group.children].filter(
+    (child) => !child.matches(".cdock-ind, .haptic-touch"),
+  );
+  const frames = [
+    { transform: "scale(.4)", opacity: 0 },
+    { transform: "none", opacity: 1 },
+  ];
+  parts.forEach((b, i) =>
+    spring(
+      b,
+      frames,
+      { k: 380, d: 13 },
+      { delay: 110 + i * 45, fill: "backwards" },
+    ),
+  );
+  // The selection pill pops with its own tab, so it never shows empty while
+  // a tab further along is still on its way in.
+  const on = parts.findIndex((b) => b.matches('[data-on="true"]'));
+  const pill = group.querySelector<HTMLElement>(":scope > .cdock-ind");
+  if (pill && on >= 0)
+    spring(
+      pill,
+      frames,
+      { k: 380, d: 13 },
+      { delay: 110 + on * 45, fill: "backwards" },
     );
 }
 
@@ -166,6 +179,8 @@ export class CartoonDock extends Component<Props> {
   geo = "";
   merged = false;
   width = 0;
+  retry = 0;
+  tries = 0;
   pressed: Island | null = null;
   observer?: ResizeObserver;
 
@@ -203,8 +218,13 @@ export class CartoonDock extends Component<Props> {
     this.observer =
       typeof ResizeObserver === "undefined"
         ? undefined
-        : new ResizeObserver(() =>
-            this.layout(this.width !== root.clientWidth),
+        : // Only a change between two real widths (a rotation) jumps; coming
+          // back from hidden (0) animates from where the islands were.
+          new ResizeObserver(() =>
+            this.layout(
+              Boolean(this.width && root.clientWidth) &&
+                this.width !== root.clientWidth,
+            ),
           );
     this.observer?.observe(root);
     root.addEventListener("pointerdown", this.down, true);
@@ -244,6 +264,7 @@ export class CartoonDock extends Component<Props> {
 
   componentWillUnmount() {
     this.observer?.disconnect();
+    cancelAnimationFrame(this.retry);
     const root = this.root.current;
     root?.removeEventListener("pointerdown", this.down, true);
     window.removeEventListener(DOCK_INFLATE, this.onInflate);
@@ -289,8 +310,17 @@ export class CartoonDock extends Component<Props> {
       IA = this.IA,
       IB = this.IB;
     if (!root || !IA || !IB) return;
+    cancelAnimationFrame(this.retry);
+    if (!root.clientWidth) {
+      // Hidden for a moment: a closing dialog that still holds the dock is
+      // display:none until the provider moves the dock back to the page.
+      // Try again on the next frames rather than leave the islands stale.
+      if (this.tries++ < 30)
+        this.retry = requestAnimationFrame(() => this.layout(instant));
+      return;
+    }
+    this.tries = 0;
     this.width = root.clientWidth;
-    if (!this.width) return; // Hidden on wide screens, or not yet placed.
     const t = this.targets();
     if (!t) return;
     const key = JSON.stringify([t.a, t.b]);
