@@ -1,8 +1,8 @@
-import { ContextDock, ThumbDock } from "./thumb-dock";
+import { DockToast, ThumbDock } from "./thumb-dock";
 
 /**
- * The dock's toast mode after a plan is deleted: one island with what happened
- * and 「元に戻す」. Uses the dock's own entry hook; the dock itself is unchanged.
+ * The dock's toast mode after a plan is deleted: the two islands run together
+ * into one with what happened and 「元に戻す」 (kondo-cartoon §5).
  */
 export function PlanUndoDock({
   message,
@@ -12,15 +12,8 @@ export function PlanUndoDock({
   onUndo: () => void;
 }) {
   return (
-    <ThumbDock mode="context">
-      <ContextDock
-        actions={
-          <button className="it-undo" onClick={onUndo}>
-            <span role="status">{message}</span>
-            <b>元に戻す</b>
-          </button>
-        }
-      />
+    <ThumbDock mode="toast">
+      <DockToast message={message} onUndo={onUndo} />
     </ThumbDock>
   );
 }

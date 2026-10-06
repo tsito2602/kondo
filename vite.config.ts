@@ -27,6 +27,22 @@ export default defineConfig(({ mode }) => {
   const version = env.VITE_APP_VERSION || buildVersion();
   return {
     plugins: [
+      {
+        // Every browser that runs kondo reads woff2; dropping fontsource's
+        // .woff fallbacks keeps them out of the bundle and the offline cache.
+        name: "kondo-woff2-only",
+        apply: "build",
+        generateBundle(_options, bundle) {
+          for (const [name, file] of Object.entries(bundle)) {
+            if (name.endsWith(".woff")) delete bundle[name];
+            else if (file.type === "asset" && name.endsWith(".css"))
+              file.source = String(file.source).replace(
+                /,\s*url\([^)]*\.woff\)\s*format\(["']woff["']\)/g,
+                "",
+              );
+          }
+        },
+      },
       react(),
       tailwindcss(),
       {

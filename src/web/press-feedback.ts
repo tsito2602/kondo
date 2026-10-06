@@ -1,9 +1,10 @@
-import { animateDockPress } from "./dock-surface";
+import { squishDown, squishTarget, squishUp } from "./cartoon";
 import { reduceMotion } from "./motion";
 
-/** Share the dock's interruptible press/release timeline with standalone controls. */
+/** The mocks' squish under the finger (scale 2-v, v on k600/d22, released on
+    k420/d13), for every control in cartoon.ts's table, by pointer or key. */
 export function installPressFeedback() {
-  const animations = new Map<HTMLElement, Animation>();
+  const amounts = new Map<HTMLElement, number>();
   let active:
     | {
         element: HTMLElement;
@@ -14,18 +15,8 @@ export function installPressFeedback() {
       }
     | undefined;
   const animate = (element: HTMLElement, pressed: boolean) => {
-    const animation = animateDockPress(
-      element,
-      pressed,
-      animations.get(element),
-    );
-    if (animation) {
-      animations.set(element, animation);
-      const clear = () => {
-        if (animations.get(element) === animation) animations.delete(element);
-      };
-      void animation.finished.then(clear, clear);
-    } else animations.delete(element);
+    if (pressed) void squishDown(element, amounts.get(element) ?? 0.97);
+    else void squishUp(element);
   };
   const release = () => {
     if (!active) return;
@@ -42,19 +33,20 @@ export function installPressFeedback() {
     if (
       !control ||
       control.closest(
-        '.thumb-dock, .trip-menu-toggle, [inert], :disabled, [aria-disabled="true"]',
+        '.trip-menu-toggle, [inert], :disabled, [aria-disabled="true"]',
       )
     )
       return null;
-    // A place has separate detail/add controls but one shared card surface.
-    // Timeline time/marker columns stay still while their visual card responds.
-    return (
-      control.closest<HTMLElement>("[data-press-card]") ??
-      control.querySelector<HTMLElement>("[data-press-card]") ??
-      (control.matches(".icon-button, .floating-add, .add-action")
-        ? control
-        : null)
-    );
+    // A card squishes as one surface even when its press lands on a control
+    // inside it; timeline time/marker columns stay still.
+    const hit =
+      squishTarget(event.target) ??
+      (control.querySelector<HTMLElement>("[data-press-card]")
+        ? squishTarget(control.querySelector<HTMLElement>("[data-press-card]")!)
+        : null);
+    if (!hit) return null;
+    amounts.set(hit[0], hit[1]);
+    return hit[0];
   };
   const press = (element: HTMLElement) => {
     release();
@@ -140,8 +132,10 @@ export function installPressFeedback() {
     document.removeEventListener("keyup", keyup, true);
     document.removeEventListener("visibilitychange", visibility);
     window.removeEventListener("blur", release);
-    if (active) delete active.element.dataset.pressActive;
-    for (const animation of animations.values()) animation.cancel();
-    animations.clear();
+    if (active) {
+      delete active.element.dataset.pressActive;
+      animate(active.element, false);
+    }
+    amounts.clear();
   };
 }

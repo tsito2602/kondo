@@ -29,10 +29,16 @@ for (const file of files) { digest.update(path.relative(root, file)); digest.upd
 const version = digest.digest('hex').slice(0, 16);
 // Workers redirects /index.html to /. Cache the canonical URL directly.
 const urls = files.map((file) => file === path.join(root, 'index.html') ? '/' : '/' + path.relative(root, file).split(path.sep).join('/'));
+// The type faces come in many unicode-range slices (Japanese alone is ~120 per
+// weight). They are cached apart from the shell so one failed slice can never
+// block an update from installing; the shell itself stays all-or-nothing.
+const isFont = (url) => /\.(woff2?|ttf|otf)$/.test(url);
+const fonts = urls.filter(isFont);
+const shell = urls.filter((url) => !isFont(url));
 // The user-facing build label lets the page name a waiting update before it activates.
 const label = (await readFile(path.join(root, 'index.html'), 'utf8')).match(/<meta name="kondo-version" content="([^"]+)"/)?.[1] ?? '';
-await writeFile(path.join(root, 'sw.js'), template.replace('__VERSION__', version).replace('__PRECACHE__', JSON.stringify(urls)).replace('__BUILD_LABEL__', label.replace(/[^\w.-]/g, '')));
-console.log(`PWA ${version} (${label || 'unlabelled'}): ${urls.length} files prepared for offline startup`);
+await writeFile(path.join(root, 'sw.js'), template.replace('__VERSION__', version).replace('__PRECACHE__', JSON.stringify(shell)).replace('__FONTS__', JSON.stringify(fonts)).replace('__BUILD_LABEL__', label.replace(/[^\w.-]/g, '')));
+console.log(`PWA ${version} (${label || 'unlabelled'}): ${shell.length} files and ${fonts.length} font slices prepared for offline startup`);
 // Generate after icon rewriting and precaching: each comparison keeps its own
 // icon/manifest and never receives the main app's cached shell.
 await buildIconCheck(root, process.env.EXPO_PUBLIC_ENABLE_DEMO === 'true');

@@ -25,7 +25,6 @@ import {
   Check,
   Plus,
   LoaderCircle,
-  ArrowLeft,
   Keyboard,
   ChevronDown,
   SlidersHorizontal,
@@ -40,6 +39,14 @@ import {
   useThumbForm,
 } from "./thumb-dock";
 import { Button } from "./obsidian/button";
+import { DockBackIcon } from "./cartoon-dock";
+import {
+  cardOrigin,
+  closeToCard,
+  openFromCard,
+  sheetIn,
+  sheetOut,
+} from "./transitions";
 import {
   normalizeThemePreference,
   resolveTheme,
@@ -61,7 +68,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
       document.documentElement.dataset.theme = theme;
       document
         .querySelector('meta[name="theme-color"]')
-        ?.setAttribute("content", theme === "dark" ? "#000000" : "#FFFFFF");
+        ?.setAttribute("content", theme === "dark" ? "#141312" : "#FFFFFF");
     };
     localStorage.setItem(THEME_KEY, preference);
     update();
@@ -215,7 +222,7 @@ export function FormBackButton({
           <ChevronDown size={12} />
         </span>
       ) : (
-        (icon ?? label ?? <ArrowLeft size={22} />)
+        (icon ?? label ?? <DockBackIcon />)
       )}
     </button>
   );
@@ -241,6 +248,8 @@ export function Modal({
     primary?: ReactNode;
     actions?: ReactNode;
     backLabel?: string;
+    /** Many tools in a row where the tabs sit (a note's editor). */
+    wide?: boolean;
   };
 }>) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -253,6 +262,7 @@ export function Modal({
   } | null>(null);
   const origin = useRef<HTMLElement | null>(null);
   const animation = useRef<Animation | null>(null);
+  const cartoon = useRef<{ card: HTMLElement | null } | null>(null);
   const depth = useRef<ReturnType<typeof menuDepth> | null>(null);
   const backdropAnimation = useRef<Animation | undefined>(undefined);
   const closeCallback = useRef(onClose);
@@ -269,7 +279,23 @@ export function Modal({
     dialog.showModal();
     // Start on the title: opening a screen must not activate an input/keyboard.
     heading.current?.focus({ preventScroll: true });
-    const enter = animateDialog(dialog, origin.current);
+    // Phones get the mocks' moves: out of the pressed card (kondo-cartoon §4)
+    // or up from the bottom as a sheet; wider screens keep the panel unfold.
+    const panel = dialog.querySelector<HTMLElement>(".modal-inner");
+    const phone =
+      panel && !reduceMotion() && matchMedia("(max-width: 759px)").matches;
+    cartoon.current = phone ? { card: cardOrigin(origin.current) } : null;
+    if (phone && cartoon.current?.card)
+      void openFromCard(cartoon.current.card, panel, {
+        parent: dialog,
+        parts: [
+          ...panel.querySelectorAll<HTMLElement>(
+            ":scope > .modal-header, :scope > .modal-body > *",
+          ),
+        ].slice(0, 8),
+      });
+    else if (phone) void sheetIn(panel);
+    const enter = phone ? null : animateDialog(dialog, origin.current);
     animation.current = enter;
     depth.current = menuDepth(
       reduceMotion(),
@@ -294,6 +320,8 @@ export function Modal({
     };
     dialog.addEventListener("tabi:modal-close", requestClose);
     return () => {
+      const card = cartoon.current?.card;
+      if (card) card.style.visibility = "";
       dialog.removeEventListener("tabi:modal-close", requestClose);
       depth.current?.cancel();
       depth.current = null;
@@ -323,6 +351,32 @@ export function Modal({
   }, []);
   useEffect(() => {
     if (!closing) return;
+    const dialog = ref.current;
+    const panel = dialog?.querySelector<HTMLElement>(".modal-inner");
+    if (cartoon.current && dialog && panel && !reduceMotion()) {
+      const { card } = cartoon.current;
+      depth.current?.reverse(320, -1.15);
+      const backdrop = backdropAnimation.current;
+      if (backdrop) {
+        backdrop.playbackRate = -1.15;
+        backdrop.play();
+        void backdrop.finished.catch(() => undefined);
+      }
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        (pendingClose.current ?? closeCallback.current)();
+      };
+      void (
+        card ? closeToCard(card, panel, { parent: dialog }) : sheetOut(panel)
+      ).then(finish);
+      const timer = setTimeout(finish, 900);
+      return () => {
+        done = true;
+        clearTimeout(timer);
+      };
+    }
     const exit = animation.current;
     if (exit && !reduceMotion()) {
       exit.playbackRate = -1.15;
@@ -455,15 +509,17 @@ export function Modal({
                 )
               }
               actions={dockActions?.actions}
+              wide={dockActions?.wide}
             />
           ) : (
-            <>
-              <button className="thumb-control" onClick={close}>
-                <ArrowLeft size={20} />
-                戻る
-              </button>
-              {action}
-            </>
+            <ContextDock
+              back={
+                <button aria-label="戻る" onClick={close}>
+                  <DockBackIcon />
+                </button>
+              }
+              actions={action}
+            />
           )}
         </ThumbDock>
       </ThumbFormContext.Provider>
@@ -492,7 +548,7 @@ export function ThumbTools({
     <>
       <ThumbAction>
         <button
-          className="thumb-control"
+          className="cdock-btn"
           aria-label={title}
           onClick={() => setOpen(true)}
         >
