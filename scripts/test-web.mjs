@@ -990,7 +990,7 @@ test("legacy account cache and pending changes survive React migration; real for
       document.querySelector('[data-ring="owner"] small').textContent;
     await click(dockTab("やること"));
     assert.equal(
-      document.querySelector(".prep-top h2").textContent,
+      document.querySelector(".page-top h2").textContent,
       "やること",
     );
     assert.equal(
@@ -999,7 +999,7 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.equal(ringCount(), "あと0");
     await click(
-      document.querySelector('.prep-top [aria-label="やることを追加"]'),
+      document.querySelector('.page-top [aria-label="やることを追加"]'),
     );
     assert.equal(document.activeElement, document.querySelector("dialog h2"));
     assert.equal(
@@ -1139,10 +1139,10 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.equal(document.querySelector("dialog"), null);
 
     await click(dockTab("持ち物"));
-    assert.equal(document.querySelector(".prep-top h2").textContent, "持ち物");
+    assert.equal(document.querySelector(".page-top h2").textContent, "持ち物");
     const addPacking = async (name, kind) => {
       await click(
-        document.querySelector('.prep-top [aria-label="持ち物を追加"]'),
+        document.querySelector('.page-top [aria-label="持ち物を追加"]'),
       );
       assert.equal(
         document.querySelector('[role="radio"][aria-checked="true"] b')

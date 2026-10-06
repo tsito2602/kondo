@@ -237,6 +237,7 @@ export function Modal({
   action,
   preserveNavigation = false,
   dockActions,
+  plain = false,
 }: PropsWithChildren<{
   title: string;
   onClose: () => void;
@@ -251,6 +252,9 @@ export function Modal({
     /** Many tools in a row where the tabs sit (a note's editor). */
     wide?: boolean;
   };
+  /** kondo-prep3's sheets: always rise from the bottom edge, and the page
+      stays put under the scrim (no card stretch, no receding). */
+  plain?: boolean;
 }>) {
   const ref = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -284,7 +288,9 @@ export function Modal({
     const panel = dialog.querySelector<HTMLElement>(".modal-inner");
     const phone =
       panel && !reduceMotion() && matchMedia("(max-width: 759px)").matches;
-    cartoon.current = phone ? { card: cardOrigin(origin.current) } : null;
+    cartoon.current = phone
+      ? { card: plain ? null : cardOrigin(origin.current) }
+      : null;
     if (phone && cartoon.current?.card)
       void openFromCard(cartoon.current.card, panel, {
         parent: dialog,
@@ -297,15 +303,17 @@ export function Modal({
     else if (phone) void sheetIn(panel);
     const enter = phone ? null : animateDialog(dialog, origin.current);
     animation.current = enter;
-    depth.current = menuDepth(
-      reduceMotion(),
-      {
-        duration: 320,
-        easing: "cubic-bezier(.32, 0, .2, 1)",
-        fill: "both",
-      },
-      dialog,
-    );
+    depth.current = plain
+      ? null
+      : menuDepth(
+          reduceMotion(),
+          {
+            duration: 320,
+            easing: "cubic-bezier(.32, 0, .2, 1)",
+            fill: "both",
+          },
+          dialog,
+        );
     backdropAnimation.current = dialog
       .getAnimations?.({ subtree: true })
       .find(
