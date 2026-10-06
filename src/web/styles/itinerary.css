@@ -1,0 +1,1228 @@
+/* しおり, 予定の詳細と編集 and the add sheet (kondo-itinerary / kondo-detail mocks). */
+.itinerary-screen,
+dialog:has(.plan-sheet),
+dialog:has(.plan-add),
+.thumb-dock:has(.it-undo),
+.itinerary-poof-dot {
+  --it-paper: #fff;
+  --it-ink: #000;
+  --it-mid: #9c978f;
+  --it-pale: #cbc5bb;
+  --it-soft: #f3f2ef;
+  --it-mute: #77726b;
+  --it-line: #e8e6e1;
+  --it-num:
+    "Bricolage Grotesque", ui-rounded, system-ui, -apple-system, sans-serif;
+  --it-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --it-split: linear(
+    0,
+    0.045,
+    0.131,
+    0.24,
+    0.358,
+    0.476,
+    0.586,
+    0.686,
+    0.772,
+    0.843,
+    0.901,
+    0.946,
+    0.98,
+    1.004,
+    1.02,
+    1.03,
+    1.035,
+    1.037,
+    1.035,
+    1.029,
+    1.02,
+    1.012,
+    1.006,
+    1.002,
+    1
+  );
+}
+:root[data-theme="dark"]
+  :is(
+    .itinerary-screen,
+    dialog:has(.plan-sheet),
+    dialog:has(.plan-add),
+    .thumb-dock:has(.it-undo),
+    .itinerary-poof-dot
+  ) {
+  --it-paper: #141312;
+  --it-ink: #f5f1e9;
+  --it-mid: #b6b0a6;
+  --it-pale: #57534d;
+  --it-soft: #23221f;
+  --it-mute: #aaa49b;
+  --it-line: #2d2b29;
+}
+.it-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ===== date tabs: stay in the header, an ink pill on a soft track ===== */
+:root .itinerary-screen .date-strip {
+  display: flex;
+  gap: 0;
+  margin: 6px 16px 4px;
+  padding: 5px;
+  border: 0;
+  border-radius: 24px;
+  background: var(--it-soft);
+  box-shadow: 0 -6px 0 16px var(--canvas);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:root .itinerary-screen .date-strip button {
+  position: relative;
+  z-index: 1;
+  flex: 1 0 auto;
+  gap: 0;
+  min-width: 58px;
+  min-height: 0;
+  padding: 6px 0;
+  border-radius: 19px;
+  background: none;
+  color: var(--it-mute);
+  line-height: 1.1;
+}
+:root .itinerary-screen .date-strip small {
+  font-family: var(--it-mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+}
+:root .itinerary-screen .date-strip button > span {
+  display: block;
+  font-family: var(--it-num);
+  font-size: 19px;
+  font-weight: 700;
+}
+:root .itinerary-screen .date-strip [aria-current="date"] {
+  color: var(--it-paper);
+}
+.itinerary-screen .date-selection {
+  border-radius: 19px;
+  background: var(--it-ink);
+}
+.itinerary-screen .date-strip[data-ready="true"] .date-selection {
+  transition:
+    transform 650ms var(--it-split),
+    width 650ms var(--it-split);
+}
+.date-today {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ===== timeline ===== */
+.it-timeline {
+  position: relative;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 0 18px calc(150px + var(--nav-height) + env(safe-area-inset-bottom));
+  color: var(--it-ink);
+}
+/* The day's route: dots, as the logo draws a route. */
+.it-timeline::before {
+  content: "";
+  position: absolute;
+  top: 24px;
+  bottom: calc(150px + var(--nav-height));
+  left: 73px;
+  width: 3px;
+  background: radial-gradient(circle, var(--it-pale) 1.4px, transparent 1.6px) 0
+    0 / 3px 9px repeat-y;
+}
+.it-day {
+  position: relative;
+  scroll-margin-top: calc(var(--trip-header-height) + 80px);
+}
+.it-day-h {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  padding: 20px 0 6px 70px;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.5;
+}
+.it-day-h span {
+  font-family: var(--it-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: var(--it-mute);
+}
+.it-ev {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 26px;
+  align-items: start;
+  width: 100%;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.it-ev time {
+  padding-top: 12px;
+  font-family: var(--it-num);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.it-ev time.is-tbd {
+  padding-top: 14px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--it-mute);
+}
+.it-node {
+  position: absolute;
+  top: 20px;
+  left: 51px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--it-paper);
+  box-shadow: inset 0 0 0 3px var(--it-ink);
+}
+.it-ev.is-booking .it-node {
+  background: var(--it-ink);
+}
+.it-ev.is-mid .it-node {
+  background: var(--it-paper);
+  box-shadow: inset 0 0 0 3px var(--it-pale);
+}
+/* 「予約」: the booking fixes this time; once used it reads 済. */
+.it-yk {
+  display: inline-block;
+  padding: 3px 6px;
+  border-radius: 99px;
+  background: var(--it-ink);
+  color: var(--it-paper);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+}
+.it-ev time .it-yk {
+  display: block;
+  width: max-content;
+  margin: 4px 0 0 auto;
+}
+.it-cond {
+  white-space: nowrap;
+}
+.it-cond .it-yk {
+  margin-right: 5px;
+  vertical-align: 1px;
+}
+.it-card {
+  position: relative;
+  min-width: 0;
+  padding: 11px 14px 12px;
+  border-radius: 20px;
+  background: var(--it-soft);
+}
+.it-ev.is-highlight .it-card {
+  box-shadow: 0 0 0 2.5px var(--it-ink);
+}
+.it-lab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--it-mute);
+}
+.it-lab svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.it-lab.is-single {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.it-lab.is-single svg {
+  display: inline-block;
+  margin-right: 5px;
+  vertical-align: -2px;
+}
+/* Long names wrap to two lines, then end in an ellipsis; the detail has them in full. */
+.it-card h3,
+.it-lnr2 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+.it-card h3 {
+  margin: 1px 0 0;
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.it-where {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--it-mute);
+}
+.it-where > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.it-where > svg:not(.it-pin) {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.it-pin {
+  flex: none;
+  width: 17px;
+  height: 22px;
+  margin: -3px 0 -1px;
+  overflow: visible;
+}
+.it-pin path {
+  fill: var(--it-ink);
+}
+.it-pin text {
+  fill: var(--it-paper);
+  font-family: var(--it-num);
+  font-size: 17px;
+  font-weight: 800;
+  text-anchor: middle;
+}
+.it-pin .it-pin-house {
+  fill: var(--it-paper);
+}
+.it-route {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 12.5px;
+}
+.it-route svg {
+  width: 13px;
+  height: 13px;
+  color: var(--it-mute);
+}
+/* Flights and trains: where to, the arrival with 着 and the real time on board. */
+.it-jp {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  margin-top: 6px;
+}
+.it-jp-code {
+  display: block;
+  font-family: var(--it-num);
+  font-size: 23px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.it-jp.is-train .it-jp-code {
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.it-jp-mid {
+  position: relative;
+  display: block;
+  min-width: 0;
+  color: var(--it-ink);
+}
+.it-jp-mid svg {
+  display: block;
+  width: 100%;
+  height: 30px;
+  overflow: visible;
+}
+.it-jp-mid em {
+  position: absolute;
+  top: 27px;
+  right: 0;
+  left: 0;
+  font-size: 11.5px;
+  font-style: normal;
+  font-weight: 700;
+  color: var(--it-mute);
+  text-align: center;
+  white-space: nowrap;
+}
+.it-jp-end {
+  text-align: right;
+}
+.it-jp-arr {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--it-num);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.it-jp-arr small {
+  margin-right: 3px;
+  font-family: system-ui, sans-serif;
+  font-size: 9.5px;
+  vertical-align: 2px;
+  opacity: 0.7;
+}
+.it-jp-arr i {
+  margin-left: 2px;
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  font-style: normal;
+  color: var(--it-mute);
+}
+.it-jp.is-large {
+  margin: 8px 0 4px;
+  align-items: end;
+}
+.it-jp.is-large .it-jp-code {
+  font-size: 34px;
+}
+.it-jp.is-large.is-train .it-jp-code {
+  font-size: 18px;
+}
+.it-jp.is-large .it-jp-arr {
+  font-size: 18px;
+}
+.it-jp.is-large .it-jp-mid {
+  align-self: center;
+}
+/* An arrival on a later day and the check-out are the far end of a booking: one line. */
+.it-card.is-line {
+  padding: 9px 2px;
+  background: none;
+}
+.it-lnr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  line-height: 1.3;
+}
+.it-lnr > svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.it-lnr > b {
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.it-lnr > span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--it-mute);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.it-lnr > .it-cond {
+  flex: none;
+  overflow: visible;
+  font-size: 13px;
+}
+.it-lnr2 {
+  margin-top: 4px;
+  padding-left: 24px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--it-mute);
+}
+.it-card.is-mid {
+  padding: 9px 14px;
+  background: none;
+  box-shadow: inset 0 0 0 2px var(--it-line);
+}
+.it-card.is-mid h3 {
+  font-size: 14px;
+}
+.it-gap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 20px;
+  margin-left: 70px;
+  font-size: 11.5px;
+  color: var(--it-mute);
+}
+.it-gap svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+}
+.it-gap.is-far {
+  color: var(--it-mid);
+}
+/* W2: the walk line itself says the next plan will be missed. */
+.it-gap.is-late {
+  font-weight: 700;
+  color: var(--it-ink);
+}
+.it-gap i {
+  margin-left: 2px;
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: var(--it-ink);
+  color: var(--it-paper);
+  font-size: 11px;
+  font-style: normal;
+}
+.it-conn {
+  position: relative;
+  display: flex;
+  margin: 2px 0 4px 70px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.it-conn span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 5px 9px;
+  border-radius: 99px;
+  background: var(--it-paper);
+  box-shadow: inset 0 0 0 1.5px var(--it-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+.it-conn svg {
+  width: 14px;
+  height: 14px;
+}
+.it-empty {
+  position: relative;
+  margin: 4px 0 8px 70px;
+  padding: 14px 14px 12px;
+  border-radius: 20px;
+  background: var(--it-paper);
+  box-shadow: inset 0 0 0 2px var(--it-line);
+}
+.it-empty p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--it-mute);
+}
+.it-empty button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px 8px 11px;
+  border: 0;
+  border-radius: 99px;
+  background: var(--it-ink);
+  color: var(--it-paper);
+  font-size: 13px;
+  font-weight: 700;
+}
+.it-empty button svg {
+  width: 15px;
+  height: 15px;
+}
+/* Travelling: past plans fade, used bookings read 済, いま shows where we are. */
+.it-ev.is-past time {
+  color: var(--it-mid);
+}
+.it-ev.is-past .it-card {
+  opacity: 0.5;
+}
+.it-ev.is-past .it-node {
+  background: var(--it-pale);
+  box-shadow: inset 0 0 0 3px var(--it-pale);
+}
+.it-ev.is-past .it-yk {
+  background: var(--it-pale);
+}
+.it-gap.is-past,
+.it-conn.is-past {
+  opacity: 0.5;
+}
+.it-now {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 26px;
+  align-items: center;
+  padding: 6px 0;
+}
+.it-now time {
+  padding-right: 2px;
+  font-family: var(--it-num);
+  font-size: 13.5px;
+  font-weight: 800;
+  text-align: right;
+}
+.it-now-dot {
+  position: absolute;
+  top: 50%;
+  left: 49px;
+  width: 15px;
+  height: 15px;
+  margin-top: -7.5px;
+  border-radius: 50%;
+  background: var(--it-ink);
+  box-shadow: 0 0 0 4px var(--it-paper);
+}
+.it-now-dot::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border: 2px solid var(--it-ink);
+  border-radius: 50%;
+  opacity: 0;
+  animation: it-ring 2.2s ease-out infinite;
+}
+@keyframes it-ring {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.6;
+  }
+  80%,
+  100% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+}
+.it-now p {
+  margin: 0;
+}
+.it-now b {
+  display: inline-block;
+  padding: 1px 10px;
+  border-radius: 99px;
+  background: var(--it-ink);
+  color: var(--it-paper);
+  font-size: 12px;
+}
+/* + : right hand, just above the dock. */
+:root .itinerary-screen .floating-add {
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--it-ink);
+  color: var(--it-paper);
+  box-shadow: 0 12px 24px -10px #0006;
+}
+:root .itinerary-screen .floating-add svg {
+  width: 26px;
+  height: 26px;
+  stroke-width: 2.6;
+}
+:root .itinerary-screen .floating-add span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+@media (max-width: 759px) {
+  :root .itinerary-screen .floating-add {
+    right: 20px;
+    bottom: calc(var(--nav-height) + 8px + env(safe-area-inset-bottom));
+  }
+}
+.itinerary-poof-dot {
+  position: fixed;
+  z-index: 60;
+  border-radius: 50%;
+  background: var(--it-ink);
+  pointer-events: none;
+}
+
+/* ===== detail and edit sheets ===== */
+:root dialog:has(.plan-sheet) .modal-inner,
+:root dialog:has(.plan-add) .modal-inner {
+  border-radius: 30px;
+  background: var(--it-paper);
+  color: var(--it-ink);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow:
+    0 0 0 1px var(--it-line),
+    0 24px 60px -20px #0005;
+}
+:root dialog:has(.plan-sheet)::backdrop,
+:root dialog:has(.plan-add)::backdrop {
+  background: color-mix(in srgb, var(--paper) 50%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+/* The sheet has no title bar: its header is the grab handle you pull down. */
+:root dialog:has(.plan-sheet) .modal-header {
+  min-height: 0;
+  padding: 9px 0 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+:root dialog:has(.plan-sheet) .modal-header::before {
+  content: "";
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  width: 40px;
+  height: 5px;
+  margin-left: -20px;
+  border-radius: 3px;
+  background: var(--it-pale);
+}
+:root dialog:has(.plan-sheet) .modal-header h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+:root dialog:has(.plan-sheet) .modal-body {
+  padding: 18px 22px 24px;
+}
+.plan-sheet {
+  color: var(--it-ink);
+}
+.ps-kick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--it-mute);
+}
+.ps-kick svg {
+  width: 16px;
+  height: 16px;
+}
+:root .plan-sheet .ps-title {
+  margin: 6px 0 2px;
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.ps-row {
+  padding: 14px 0;
+  border-top: 1.5px solid var(--it-line);
+}
+.ps-row.is-when {
+  padding-top: 4px;
+  border-top: 0;
+}
+:root .plan-sheet .ps-row h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--it-mute);
+}
+.ps-row h4 svg {
+  width: 15px;
+  height: 15px;
+}
+.ps-when {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin: 6px 0 2px;
+}
+.ps-when b,
+.ps-big-time {
+  font-family: var(--it-num);
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.ps-when b em {
+  margin: 0 4px;
+  font-style: normal;
+  font-weight: 700;
+  color: var(--it-mid);
+}
+.ps-when b small {
+  margin-left: 4px;
+  font-size: 16px;
+}
+.ps-when span {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--it-mute);
+}
+.ps-from {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--it-mute);
+}
+.ps-ln {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.ps-ln small {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--it-mute);
+}
+.ps-ln .it-pin {
+  width: 20px;
+  height: 26px;
+}
+:root .plan-sheet .ps-note {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+:root .plan-sheet .ps-hint {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--it-mute);
+}
+.ps-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  border: 1.5px solid var(--it-line);
+  border-radius: 99px;
+  background: var(--it-paper);
+  color: var(--it-ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ps-act svg {
+  width: 14px;
+  height: 14px;
+}
+.ps-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--it-ink);
+  color: var(--it-paper);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.ps-warn > svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+}
+.ps-warn .ps-act {
+  border-color: transparent;
+}
+/* Mini map: the plan's pin among the day's other pins, nothing else. */
+.ps-map {
+  position: relative;
+  height: 120px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--it-soft);
+}
+.ps-map-pin {
+  position: absolute;
+  display: block;
+  transform: translate(-50%, -100%);
+}
+.ps-map-pin .it-pin {
+  display: block;
+  width: 22px;
+  height: 29px;
+  margin: 0;
+}
+.ps-map-pin.is-dim {
+  opacity: 0.3;
+}
+.ps-map-pin.is-dim .it-pin {
+  width: 16px;
+  height: 21px;
+}
+.ps-kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 14px;
+}
+.ps-kv dt {
+  padding-top: 2px;
+  font-size: 12.5px;
+  color: var(--it-mute);
+}
+.ps-kv dd {
+  margin: 0;
+  font-weight: 700;
+}
+.ps-kv dd.is-code {
+  font-family: var(--it-mono);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+/* E1 form */
+.ps-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 6px;
+}
+:root .ps-form .ps-old-h {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--it-mute);
+  text-align: center;
+}
+:root .ps-form .field {
+  display: grid;
+  gap: 6px;
+}
+:root .ps-form .field > span:first-child {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--it-mute);
+}
+:root:root .modal .field .ps-inp {
+  width: 100%;
+  min-height: 0;
+  padding: 11px 13px;
+  border: 1.5px solid var(--it-line);
+  border-radius: 14px;
+  background: var(--it-paper);
+  color: var(--it-ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+}
+:root:root .modal .field .ps-inp:focus {
+  border-color: var(--it-ink);
+  outline: none;
+}
+:root:root .modal .field textarea.ps-inp {
+  min-height: 96px;
+  line-height: 1.6;
+  resize: none;
+}
+.ps-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ps-chips button,
+.ps-days button {
+  border: 1.5px solid var(--it-line);
+  background: var(--it-paper);
+  color: var(--it-ink);
+  cursor: pointer;
+}
+.ps-chips button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border-radius: 99px;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.ps-chips svg {
+  width: 15px;
+  height: 15px;
+}
+.ps-days {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.ps-days button {
+  padding: 6px 0 5px;
+  border-radius: 14px;
+  line-height: 1.2;
+}
+.ps-days b {
+  display: block;
+  font-family: var(--it-num);
+  font-size: 17px;
+  font-weight: 800;
+}
+.ps-days small {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--it-mute);
+}
+:is(.ps-chips, .ps-days) button[aria-pressed="true"] {
+  border-color: var(--it-ink);
+  background: var(--it-ink);
+  color: var(--it-paper);
+}
+.ps-days button[aria-pressed="true"] small {
+  color: inherit;
+  opacity: 0.8;
+}
+.ps-times {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px;
+  align-items: center;
+}
+.ps-times > span {
+  font-weight: 700;
+  color: var(--it-mid);
+}
+:root:root .modal .field .ps-times .ps-inp {
+  padding: 9px 6px;
+  font-family: var(--it-num);
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+.it-plres {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 2px 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--it-ink);
+}
+.it-plres .it-pin {
+  width: 20px;
+  height: 26px;
+}
+.it-plres small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--it-mute);
+}
+
+/* ===== add sheet: right above the dock, every field within thumb reach ===== */
+:root dialog:has(.plan-add) .modal-header {
+  justify-content: flex-start;
+  min-height: 0;
+  padding: 20px 18px 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+:root dialog:has(.plan-add) .modal-header h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 900;
+  line-height: 1.3;
+  text-align: left;
+}
+:root dialog:has(.plan-add) .modal-body {
+  padding: 0 18px 18px;
+}
+.plan-add {
+  color: var(--it-ink);
+}
+:root .plan-add .field {
+  display: block;
+}
+:root .plan-add .field > span:not(.it-sr) {
+  display: block;
+  margin: 12px 0 5px;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--it-mute);
+}
+.it-chips {
+  display: flex;
+  gap: 6px;
+  margin: 0 -18px;
+  padding: 0 18px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.it-chips::-webkit-scrollbar {
+  display: none;
+}
+.it-chips button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border: 0;
+  border-radius: 99px;
+  background: var(--it-soft);
+  color: var(--it-ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.it-chips svg {
+  width: 15px;
+  height: 15px;
+}
+.it-chips small {
+  font-family: var(--it-mono);
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.7;
+}
+.it-chips button[aria-pressed="true"] {
+  background: var(--it-ink);
+  color: var(--it-paper);
+}
+:root:root .modal .field .it-inp {
+  width: 100%;
+  min-height: 0;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--it-soft);
+  color: var(--it-ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  outline: none;
+}
+:root:root .modal .field .it-inp::placeholder {
+  color: var(--it-mid);
+  font-weight: 500;
+}
+:root:root .modal .field .it-inp:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--it-ink);
+}
+:root:root .modal .field .it-inp[type="time"] {
+  font-family: var(--it-num);
+  font-size: 17px;
+}
+.it-row2 {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+:root .plan-add .it-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--it-mute);
+}
+:root .plan-add .it-hint.is-booking {
+  margin: 8px 2px 0;
+}
+
+/* ===== dock contents ===== */
+.ps-dock-glyph {
+  width: 22px;
+  height: 22px;
+}
+:root .context-island > button.ps-dock-ticket {
+  width: auto;
+  gap: 8px;
+  padding: 0 18px 0 16px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.thumb-dock:has(.it-undo) .context-primary:empty {
+  display: none;
+}
+.thumb-dock:has(.it-undo) .context-actions {
+  flex: 1;
+  min-width: 0;
+}
+:root .context-actions > .it-undo {
+  display: flex;
+  flex: 1;
+  justify-content: space-between;
+  gap: 8px;
+  width: auto;
+  min-width: 0;
+  padding: 0 5px 0 22px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.it-undo span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.it-undo b {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: calc(var(--dock-height) - 14px);
+  padding: 0 16px;
+  border-radius: 99px;
+  background: var(--it-ink);
+  color: var(--it-paper);
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .it-now-dot::after {
+    animation: none;
+  }
+  .itinerary-screen .date-strip[data-ready="true"] .date-selection {
+    transition: none;
+  }
+}

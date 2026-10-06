@@ -16,7 +16,6 @@ import {
   MapPin,
   Clock,
   Link as LinkIcon,
-  ChevronRight,
 } from "lucide-react";
 import { useTravel } from "@/data/travel-provider";
 import { bookingDurationLabel } from "@/data/booking-duration";
@@ -27,13 +26,6 @@ import {
   formatConnectionDuration,
 } from "@/data/flight-connections";
 import { mapUrl, reservationStatuses, referenceUrl } from "@/data/places";
-import {
-  itemDetails,
-  itemCategory,
-  durationMinutes,
-  durationLabel,
-  transportLabel,
-} from "@/data/itinerary";
 import type {
   Booking,
   BookingDocument,
@@ -384,124 +376,6 @@ export function BookingDetail({
       {preview && (
         <DocumentPreview {...preview} onClose={() => setPreview(null)} />
       )}
-    </>
-  );
-}
-export function ItemDetail({
-  id,
-  onClose,
-}: {
-  id: string;
-  onClose: () => void;
-}) {
-  const travel = useTravel();
-  const { run } = useAction();
-  const [editing, setEditing] = useState(false);
-  const item = travel.items.find((entry) => entry.id === id);
-  const place = travel.places.find((entry) => entry.itineraryItemId === id);
-  if (place) return <PlaceDetail id={place.id} onClose={onClose} />;
-  if (!item) return null;
-  const details = itemDetails(item);
-  const remove = () =>
-    void run(() => {
-      if (confirm("この予定を削除しますか？")) {
-        dismissModal(() => {
-          travel.deleteItem(id);
-          onClose();
-        });
-      }
-    });
-  return (
-    <>
-      <Modal
-        title="予定詳細"
-        dockActions={{
-          actions: travel.canEdit && (
-            <>
-              <button aria-label="編集" onClick={() => setEditing(true)}>
-                <Pencil />
-              </button>
-              <button
-                aria-label="予定を削除"
-                className="danger"
-                onClick={remove}
-              >
-                <Trash2 />
-              </button>
-            </>
-          ),
-        }}
-        onClose={onClose}
-        full
-        action={
-          travel.canEdit && (
-            <Button
-              variant="ghost"
-              className="text-button"
-              onClick={() => setEditing(true)}
-            >
-              編集
-            </Button>
-          )
-        }
-      >
-        <div className="detail-stack">
-          <header className="detail-hero">
-            <span className="badge">{itemCategory(item).label}</span>
-            <h1>{item.title}</h1>
-          </header>
-          <div className="detail-primary">
-            {details.category === "transport" &&
-              (details.transport?.origin || details.transport?.destination) && (
-                <div className="detail-route">
-                  <span>{details.transport?.origin || "出発地未設定"}</span>
-                  <ChevronRight size={18} />
-                  <span>
-                    {details.transport?.destination || "到着地未設定"}
-                  </span>
-                </div>
-              )}
-            <ItemSchedule item={item} />
-            {details.category === "transport" && (
-              <p className="detail-duration">
-                <Clock size={15} />
-                {[
-                  transportLabel(details),
-                  durationLabel(durationMinutes(item.day, item.time, details)),
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-            )}
-          </div>
-          {details.location && (
-            <section className="detail-section">
-              <h3>
-                <MapPin size={16} />
-                場所
-              </h3>
-              {!referenceUrl(details.location) && <p>{details.location}</p>}
-              <MapLink url={mapUrl(details.location)} />
-            </section>
-          )}
-          {item.note && (
-            <section className="detail-section">
-              <h3>メモ</h3>
-              <p className="pre-wrap">{item.note}</p>
-            </section>
-          )}
-          {travel.canEdit && (
-            <button
-              className="danger subtle detail-inline-action"
-              onClick={remove}
-            >
-              <Trash2 />
-              予定を削除
-            </button>
-          )}
-        </div>
-      </Modal>
-      {editing && <ItemEditor item={item} onClose={() => setEditing(false)} />}
     </>
   );
 }

@@ -329,6 +329,16 @@ function parseItineraryDetails(value: unknown, day: string, time: string): Itine
     if (origin === null || destination === null || (duration !== undefined && (typeof duration !== 'number' || !Number.isInteger(duration) || duration < 1 || duration > 10080))) return null;
     details.transport = { mode: transport.mode as NonNullable<ItineraryDetails['transport']>['mode'], origin, destination, ...(duration === undefined ? {} : { durationMinutes: duration as number }), ...(afterKey === undefined ? {} : { afterKey: afterKey as string }) };
   } else if (value.transport !== undefined) return null;
+  // Optional and additive: rows without these keep parsing as before.
+  const stay = value.stay;
+  if (stay !== undefined) {
+    if (!isObject(stay) || typeof stay.bookingId !== 'string' || !/^[a-zA-Z0-9-]{1,100}$/.test(stay.bookingId) || (stay.endpoint !== 'start' && stay.endpoint !== 'end')) return null;
+    details.stay = { bookingId: stay.bookingId, endpoint: stay.endpoint };
+  }
+  if (value.ownPlace !== undefined) {
+    if (typeof value.ownPlace !== 'boolean') return null;
+    if (value.ownPlace) details.ownPlace = true;
+  }
   return itineraryDetailsError(day, time, details) ? null : details;
 }
 

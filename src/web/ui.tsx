@@ -132,8 +132,19 @@ export function useAction() {
   };
   return { busy, run };
 }
-/** Keep the pointer-down action stable even when the browser blurs on tap. */
-function FormBackButton({ onBack }: { onBack: () => void }) {
+/**
+ * Keep the pointer-down action stable even when the browser blurs on tap.
+ * While an editor is focused it closes the keyboard; otherwise it leaves.
+ */
+export function FormBackButton({
+  onBack,
+  label = "戻る",
+  icon,
+}: {
+  onBack: () => void;
+  label?: string;
+  icon?: ReactNode;
+}) {
   const [editor, setEditor] = useState<HTMLElement | null>(null);
   const button = useRef<HTMLButtonElement>(null);
   const pressedEditor = useRef<HTMLElement | null>(null);
@@ -172,7 +183,7 @@ function FormBackButton({ onBack }: { onBack: () => void }) {
     <button
       ref={button}
       type="button"
-      aria-label={editor ? "キーボードを閉じる" : "戻る"}
+      aria-label={editor ? "キーボードを閉じる" : label}
       onPointerDown={(event) => {
         pressedEditor.current = editor;
         if (editor) event.preventDefault();
@@ -195,7 +206,7 @@ function FormBackButton({ onBack }: { onBack: () => void }) {
           <ChevronDown size={12} />
         </span>
       ) : (
-        <ArrowLeft size={22} />
+        (icon ?? <ArrowLeft size={22} />)
       )}
     </button>
   );

@@ -237,7 +237,7 @@ const submit = async () => {
 
 // Panels and dock retain the layout viewport when the keyboard opens.
 // Exercise focus, keyboard resizing/panning and dismissal in each real editor.
-const keyboardWhileEditing = async () => {
+const keyboardWhileEditing = async (backLabel = "戻る") => {
   const dialog = [...document.querySelectorAll("dialog[open]")].at(-1);
   const dock = document.querySelector(".thumb-dock-host");
   const field = dialog.querySelector('input:not([type="checkbox"]), textarea');
@@ -334,7 +334,7 @@ const keyboardWhileEditing = async () => {
     "keyboard dismissal preserves the draft",
   );
   assert.ok(
-    dialog.querySelector('[aria-label="戻る"]'),
+    dialog.querySelector(`[aria-label="${backLabel}"]`),
     "Back returns after dismissal",
   );
   panel.getBoundingClientRect = measurePanel;
@@ -353,6 +353,55 @@ const keyboardWhileEditing = async () => {
   );
   assert.equal(document.documentElement.dataset.keyboardOpen, "false");
   assert.equal(panel.style.getPropertyValue("--modal-panel-height"), "");
+};
+
+const setTime = async (label, value) => {
+  const input = document.querySelector(`dialog [aria-label="${label}"]`);
+  assert.ok(input, `time ${label} exists`);
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      dom.window.HTMLInputElement.prototype,
+      "value",
+    ).set.call(input, value);
+    input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+  });
+};
+
+// 予定の詳細 edits in place: the same sheet becomes the form and comes back.
+const editInPlace = async (change) => {
+  const detail = document.querySelector("dialog[open]");
+  const dock = document.querySelector(".thumb-dock-host");
+  for (const save of [false, true]) {
+    await click(document.querySelector('.context-actions [aria-label="編集"]'));
+    assert.equal(document.querySelectorAll("dialog[open]").length, 1);
+    assert.equal(document.querySelector("dialog[open]"), detail);
+    assert.equal(dock.parentElement, detail);
+    assert.ok(detail.querySelector("form"));
+    await keyboardWhileEditing("やめる");
+    if (save) {
+      await change();
+      const submitButton = dock.querySelector(
+        '.context-primary button[type="submit"]',
+      );
+      assert.equal(submitButton?.form, detail.querySelector("form"));
+      await act(async () =>
+        detail
+          .querySelector("form")
+          .dispatchEvent(
+            new dom.window.Event("submit", { bubbles: true, cancelable: true }),
+          ),
+      );
+      await tick(30);
+    } else {
+      await click(
+        document.querySelector('.context-back [aria-label="やめる"]'),
+      );
+      await tick(30);
+    }
+    assert.equal(document.querySelector("dialog[open]"), detail);
+    assert.equal(detail.querySelector("form"), null, "back to the details");
+    assert.ok(document.querySelector('.context-actions [aria-label="編集"]'));
+  }
 };
 
 // Exercise real details/editors: a fresh dialog would replay its entrance and
@@ -608,35 +657,80 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.equal((await loadTravelCache("owner")).pending.length, 0);
     assert.equal(localStorage.getItem("tabi.session"), "test-session");
     assert.equal(sessionStorage.getItem("tabi.session"), null);
-    const emptyDay = document.querySelector("#day-2026-11-24 .timeline-empty");
+    const emptyDay = document.querySelector("#day-2026-11-24 .it-empty button");
     assert.ok(emptyDay && !emptyDay.disabled);
     await click(emptyDay);
-    assert.match(field("開始").textContent, /2026年11月24日/);
+    assert.match(
+      document.querySelector(
+        'dialog [aria-label="日にち"] [aria-pressed="true"]',
+      ).textContent,
+      /^11\/24/,
+      "an empty day's button adds on that day",
+    );
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
     await click(document.querySelector('[aria-label="予定を追加"]'));
-    await fill("タイトル", "市内を歩く");
-    await fill("開始", { time: "14:00" });
-    await fill("終了", { start: trip.startsOn, time: "15:00" });
+    assert.match(
+      document.querySelector("dialog").textContent,
+      /予約タブから入れるとしおりにも並びます/,
+      "bookings are added in the 予約 tab, not here",
+    );
+    await fill("なにをする？", "市内を歩く");
+    await fill("時刻", "14:00");
     await submit();
     assert.equal(
       db.prepare("SELECT COUNT(*) AS n FROM itinerary_items").get().n,
       2,
-      "end time supplies same-day end date",
     );
     await click(
-      [...document.querySelectorAll(".timeline-entry")].find((entry) =>
+      [...document.querySelectorAll(".it-ev")].find((entry) =>
         entry.textContent.includes("市内を歩く"),
       ),
     );
     assert.ok(
       document.querySelector('.context-actions [aria-label="予定を削除"]'),
     );
-    await editAndReturn("タイトル", "市内を散策");
+    await editInPlace(async () => {
+      await fill("タイトル", "市内を散策");
+      await setTime("終了", "15:00");
+    });
+    assert.deepEqual(
+      JSON.parse(
+        db
+          .prepare(
+            "SELECT details FROM itinerary_details d JOIN itinerary_items i ON i.id = d.item_id WHERE i.title = ?",
+          )
+          .get("市内を散策").details,
+      ).endDay,
+      trip.startsOn,
+      "end time supplies same-day end date",
+    );
     assert.equal(document.querySelector(".context-primary").textContent, "");
     assert.equal(document.querySelector(".thumb-dock-host .safari-tabs"), null);
-    await click(document.querySelector('.context-back [aria-label="戻る"]'));
+    // Deleting is quiet: the plan goes at once and 「元に戻す」 brings it back.
+    await click(
+      document.querySelector('.context-actions [aria-label="予定を削除"]'),
+    );
+    await tick(400);
+    assert.equal(document.querySelector("dialog[open]"), null);
+    assert.equal(
+      [...document.querySelectorAll(".it-ev")].some((entry) =>
+        entry.textContent.includes("市内を散策"),
+      ),
+      false,
+    );
+    await click(document.querySelector(".it-undo"));
     await tick(30);
+    assert.ok(
+      [...document.querySelectorAll(".it-ev")].some((entry) =>
+        entry.textContent.includes("市内を散策"),
+      ),
+      "undo restores the plan",
+    );
+    assert.equal(
+      db.prepare("SELECT COUNT(*) AS n FROM itinerary_items").get().n,
+      2,
+    );
     await click(byText("nav a", "予約"));
     await click(document.querySelector('[aria-label="予約を追加"]'));
     await fill("種類", "hotel");
@@ -1238,8 +1332,10 @@ test("all-day hotel checkout remains visible in itinerary without an end time", 
 });
 
 test("journeys and hotel endpoints retain chronological order; only ongoing stays lead the day", async () => {
-  const { dayTimeline, staysOnDay, JourneyPair, StayCards, StayCard } =
-    await bundle("export * from './src/web/itinerary-bookings';");
+  const { dayTimeline, staysOnDay, buildTimeline, JourneyLine, TimelineRow } =
+    await bundle(
+      "export { dayTimeline, staysOnDay, buildTimeline } from './src/data/plan-timeline'; export { JourneyLine, TimelineRow } from './src/web/itinerary-rows';",
+    );
   const day = "2026-11-22";
   const flight = {
     id: "flight",
@@ -1340,54 +1436,157 @@ test("journeys and hotel endpoints retain chronological order; only ongoing stay
   );
 
   const { renderToStaticMarkup } = await import("react-dom/server");
+  const days = ["2026-11-22", "2026-11-23", "2026-11-24", "2026-11-25"];
+  const timeline = (bookingList) =>
+    buildTimeline({ days, items: [], bookings: bookingList, places: [] });
+  const markup = (row) =>
+    renderToStaticMarkup(
+      React.createElement(TimelineRow, {
+        row,
+        places: [],
+        numbers: new Map(),
+        onOpen() {},
+      }),
+    );
+  const render = (row) =>
+    new JSDOM(markup(row)).window.document.body.textContent;
+  const [first, second, , last] = timeline(bookings);
+  const departure = render(
+    first.rows.find((row) => row.key === "booking-flight-start"),
+  );
+  assert.match(departure, /14:00/, "departure in the time column");
+  assert.match(departure, /18:00/, "arrival on the card");
+  assert.match(departure, /予約/, "a booked time is marked as fixed");
   const pair = renderToStaticMarkup(
-    React.createElement(JourneyPair, { booking: flight, arrival: false }),
+    React.createElement(JourneyLine, { booking: flight }),
   );
-  assert.match(pair, /14:00/);
-  assert.match(pair, /18:00/);
-  assert.match(pair, /現地時刻/);
-  const arrival = renderToStaticMarkup(
-    React.createElement(JourneyPair, { booking: flight, arrival: true }),
+  assert.match(pair, /DXB/);
+  assert.match(pair, /VIE/);
+  assert.match(pair, /着/);
+  const checkIn = render(
+    first.rows.find((row) => row.key === "booking-hotel-start"),
   );
-  assert.match(arrival, /DXB/);
-  assert.match(arrival, /VIE/);
-  const stay = renderToStaticMarkup(
-    React.createElement(StayCards, {
-      bookings,
-      day: "2026-11-23",
-      onOpen() {},
-    }),
+  assert.match(checkIn, /チェックイン/);
+  assert.match(checkIn, /15:00〜/);
+  assert.match(checkIn, /3泊/);
+  const stay = second.rows.filter((row) => row.type === "stay");
+  assert.equal(stay.length, 1, "an ongoing stay leads the day");
+  assert.equal(second.rows[0].type, "stay");
+  assert.match(render(stay[0]), /連泊 · 2泊目/);
+  assert.match(
+    render(last.rows.find((row) => row.key === "booking-hotel-end")),
+    /〜11:00/,
   );
-  assert.match(stay, /連泊/);
-  assert.match(stay, /15:00〜/);
-  assert.match(stay, /〜11:00/);
-  const untimed = renderToStaticMarkup(
-    React.createElement(StayCard, {
-      booking: { ...hotel, time: "", endTime: "" },
-      endpoint: "end",
-      onOpen() {},
-    }),
+  const untimedDays = timeline([{ ...hotel, time: "", endTime: "" }]);
+  const untimedRow = untimedDays[3].rows.find(
+    (row) => row.key === "booking-hotel-end",
   );
+  const untimed = render(untimedRow);
   assert.match(untimed, /チェックアウト/);
-  assert.match(untimed, /時刻未定/);
-  const checkoutMarker = new JSDOM(untimed).window.document.querySelector(
-    ".timeline-marker",
-  );
-  assert.equal(checkoutMarker.dataset.endpoint, "end");
-  assert.equal(checkoutMarker.querySelectorAll("svg").length, 1);
-  for (const boundary of [hotel.day, hotel.endDay]) {
+  assert.match(untimed, /未定/);
+  const checkoutRow = new JSDOM(
+    markup(untimedRow),
+  ).window.document.querySelector("[data-entry-key]");
+  assert.equal(checkoutRow.dataset.entryKey, "booking-hotel-end");
+  assert.equal(checkoutRow.querySelectorAll(".it-node").length, 1);
+  for (const boundary of [first, last])
     assert.equal(
-      renderToStaticMarkup(
-        React.createElement(StayCards, {
-          bookings,
-          day: boundary,
-          onOpen() {},
-        }),
-      ),
-      "",
+      boundary.rows.some((row) => row.type === "stay"),
+      false,
       "check-in/out are not duplicated in the stay band",
     );
-  }
+});
+
+test("しおり: walks between places, lateness and いま", async () => {
+  const { buildTimeline, walkBetween, timelineEntries } = await bundle(
+    "export { buildTimeline, walkBetween, timelineEntries } from './src/data/plan-timeline';",
+  );
+  const { coordsFromLink, walkMinutes, distanceMeters } = await bundle(
+    "export * from './src/data/geo';",
+  );
+  assert.deepEqual(
+    coordsFromLink(
+      "https://www.google.com/maps/place/Stephansdom/@48.2084,16.3731,17z/data=!3d48.2085!4d16.3733",
+    ),
+    { lat: 48.2085, lng: 16.3733 },
+  );
+  assert.equal(
+    coordsFromLink("https://example.com/?query=48.2,16.3"),
+    null,
+    "only map links carry coordinates",
+  );
+  const link = (lat, lng) =>
+    `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  const day = "2026-11-23";
+  const item = (id, time, location, endTime = "") => ({
+    id,
+    day,
+    time,
+    kind: "予定",
+    title: id,
+    note: "",
+    details: {
+      category: "sightseeing",
+      location,
+      endDay: endTime ? day : "",
+      endTime,
+    },
+  });
+  // Stephansdom → Belvedere is about 1.7 km in a straight line.
+  const items = [
+    item("dom", "09:00", link(48.2085, 16.3733), "10:00"),
+    item("belvedere", "10:20", link(48.1915, 16.3809)),
+    item("later", "", ""),
+  ];
+  const meters = distanceMeters(
+    { lat: 48.2085, lng: 16.3733 },
+    { lat: 48.1915, lng: 16.3809 },
+  );
+  const [dom, belvedere] = timelineEntries(items, []);
+  const walk = walkBetween(dom, belvedere, []);
+  assert.equal(walk.minutes, walkMinutes(meters));
+  assert.equal(
+    walk.late,
+    walk.minutes - 20,
+    "leaving at the end time arrives after the next plan starts",
+  );
+  const [plain] = buildTimeline({
+    days: [day],
+    items,
+    bookings: [],
+    places: [],
+  });
+  assert.deepEqual(
+    plain.rows.map((row) => row.type),
+    ["entry", "walk", "entry", "entry"],
+    "no walk to or from a plan without a place",
+  );
+  assert.equal(plain.today, false);
+  // A landing in Vienna the day before puts the clock on Vienna time.
+  const landed = {
+    id: "in",
+    kind: "flight",
+    title: "OS52",
+    day: "2026-11-22",
+    time: "11:00",
+    endDay: "2026-11-22",
+    endTime: "16:00",
+    originCode: "NRT",
+    destinationCode: "VIE",
+  };
+  const [live] = buildTimeline({
+    days: [day],
+    items,
+    bookings: [landed],
+    places: [],
+    now: new Date("2026-11-23T08:30:00Z"),
+  });
+  assert.equal(live.today, true);
+  const now = live.rows.findIndex((row) => row.type === "now");
+  assert.equal(live.rows[now - 1].key, "item-dom");
+  assert.equal(live.rows[now - 1].past, true);
+  assert.equal(live.rows[now + 1].key, "item-belvedere");
+  assert.equal(live.rows[now + 1].past, false);
 });
 
 test("booking clocks align Japan conversions in a shared row and preserve seasonal UTC offsets", async () => {
