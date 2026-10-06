@@ -24,8 +24,9 @@ export function DockGroup({
   children,
 }: {
   slot: DockSlot;
-  /** "ink": the island under this group turns ink (a lone save button). */
-  tone?: "ink";
+  /** "ink": the island under this group turns ink (a lone save button);
+      "ink-dim": that ink at the mocks' disabled .4 (読み取る before a file). */
+  tone?: "ink" | "ink-dim";
   /** Several actions with a primary one: the primary is an ink pill. */
   mixed?: boolean;
   /** Spread over the tab row's span (context tools such as a note's). */

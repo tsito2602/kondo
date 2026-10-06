@@ -41,7 +41,7 @@ const DOC_TYPES = [
 
 /** A full-screen layer of its own (the mock's .det and .show): a modal
     <dialog> so focus, Escape and the dock's top layer behave like a sheet. */
-function useLayer(onEscape: () => void) {
+export function useLayer(onEscape: () => void) {
   const ref = useRef<HTMLDialogElement>(null);
   const escape = useRef(onEscape);
   escape.current = onEscape;

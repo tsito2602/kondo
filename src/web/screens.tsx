@@ -71,6 +71,11 @@ export function BookingsScreen() {
       bookings.map((booking) => [booking.id, isUsed(booking, now)]),
     );
   });
+  const turning = bookings
+    .filter(
+      (booking) => previous?.get(booking.id) === false && isUsed(booking, now),
+    )
+    .map((booking) => booking.id);
   const connections = useMemo(
     () => findFlightConnections(bookings),
     [bookings],
@@ -161,10 +166,8 @@ export function BookingsScreen() {
                     <BookingCard
                       booking={booking}
                       now={now}
-                      spinStamp={
-                        previous?.get(booking.id) === false &&
-                        isUsed(booking, now)
-                      }
+                      spinStamp={turning.includes(booking.id)}
+                      spinDelay={300 + turning.indexOf(booking.id) * 180}
                       onOpen={() => setId(booking.id)}
                     />
                     {connection && (

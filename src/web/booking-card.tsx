@@ -267,7 +267,16 @@ export function BookingBody({
 }
 
 /** 済: a thin ink ring badge. It spins in when a booking is used up while the screen is open. */
-export function UsedStamp({ id, spin }: { id: string; spin: boolean }) {
+export function UsedStamp({
+  id,
+  spin,
+  delay = 300,
+}: {
+  id: string;
+  spin: boolean;
+  /** The mock's slam(): 300 ms, then 180 ms per stamp landing together. */
+  delay?: number;
+}) {
   const ref = useRef<HTMLSpanElement>(null);
   useLayoutEffect(() => {
     if (!spin || reduceMotion() || !ref.current?.animate) return;
@@ -277,7 +286,12 @@ export function UsedStamp({ id, spin }: { id: string; spin: boolean }) {
         { transform: "rotate(8deg) scale(1.06)", opacity: 1, offset: 0.7 },
         { transform: "rotate(-12deg)" },
       ],
-      { duration: 760, easing: "cubic-bezier(.2,.9,.3,1)" },
+      {
+        duration: 760,
+        delay,
+        easing: "cubic-bezier(.2,.9,.3,1)",
+        fill: "backwards",
+      },
     );
   }, [spin]);
   const ring = `bk-ring-${id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
@@ -307,6 +321,7 @@ export function BookingCard({
   now,
   showDate = false,
   spinStamp = false,
+  spinDelay,
   onOpen,
 }: {
   booking: Booking;
@@ -314,13 +329,14 @@ export function BookingCard({
   /** Hidden under a day heading; hotels are led by their dates anyway. */
   showDate?: boolean;
   spinStamp?: boolean;
+  spinDelay?: number;
   onOpen?: () => void;
 }) {
   const Icon = bookingIcons[booking.kind];
   const used = isUsed(booking, now);
   const content = (
     <>
-      {used && <UsedStamp id={booking.id} spin={spinStamp} />}
+      {used && <UsedStamp id={booking.id} spin={spinStamp} delay={spinDelay} />}
       <div className="bk-mn">
         <div className="bk-hd">
           <Icon size={20} strokeWidth={1.9} aria-hidden="true" />

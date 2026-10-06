@@ -138,9 +138,9 @@ export async function receiveBookingImport(response: Response, onBooking: (row: 
 export function demoImportRows(startsOn: string): ImportedBooking[] {
   const base = { detail: '', origin: '', originCode: '', destination: '', destinationCode: '', time: '', endDay: '', endTime: '', confirmationCode: '', party: '', review: 'none' as ImportReview };
   return [
-    { ...base, kind: 'ticket', title: 'シェーンブルン宮殿', detail: 'インペリアル・ツアー', day: addDays(startsOn, 3), time: '09:00', confirmationCode: 'SBG-204718', party: '大人2名', source: 0 },
+    { ...base, kind: 'ticket', title: 'シェーンブルン宮殿', detail: 'インペリアル・ツアー', day: addDays(startsOn, 3), time: '14:30', confirmationCode: 'SBG-204718', party: '大人3名', source: 0 },
     { ...base, kind: 'flight', title: 'サンプル航空 101', detail: 'サンプル航空', origin: '成田国際空港', originCode: 'NRT', destination: 'ドバイ国際空港', destinationCode: 'DXB', day: startsOn, time: '22:20', endDay: addDays(startsOn, 1), endTime: '05:30', confirmationCode: 'SAMPLE', source: 1 },
-    { ...base, kind: 'flight', title: 'サンプル航空 203', detail: 'サンプル航空', origin: 'ドバイ国際空港', originCode: 'DXB', destination: '成田国際空港', destinationCode: 'NRT', day: addDays(startsOn, 4), time: '02:50', endDay: addDays(startsOn, 4), endTime: '17:35', confirmationCode: 'SAMPLE', party: '38A・38B', source: 1 },
-    { ...base, kind: 'restaurant', title: 'マイヤー・アム・プファールプラッツ', detail: 'ホイリゲ（グリンツィング）', day: addDays(startsOn, 2), time: '12:00', confirmationCode: 'MP-3302', review: 'missing_people', source: 2 },
+    { ...base, kind: 'flight', title: 'サンプル航空 203', detail: 'サンプル航空', origin: 'ドバイ国際空港', originCode: 'DXB', destination: '成田国際空港', destinationCode: 'NRT', day: addDays(startsOn, 5), time: '02:50', endDay: addDays(startsOn, 5), endTime: '17:35', confirmationCode: 'SAMPLE', party: '38A・38B・38C', source: 1 },
+    { ...base, kind: 'restaurant', title: 'マイヤー・アム・プファールプラッツ', detail: 'ホイリゲ（グリンツィング）', day: addDays(startsOn, 3), time: '18:30', confirmationCode: 'MP-3302', review: 'missing_people', source: 2 },
   ];
 }
