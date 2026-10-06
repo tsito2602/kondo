@@ -21,7 +21,7 @@ import {
 } from "@/data/booking-import";
 import { useTravel } from "@/data/travel-provider";
 import type { Booking } from "@/data/types";
-import { findAirportByCode } from "@/data/airports";
+import { findAirportByCode, findAirports } from "@/data/airports";
 import { mapUrl } from "@/data/places";
 import type { BookingKind } from "@/data/types";
 import { monthDay, spring } from "./booking-card";
@@ -266,15 +266,18 @@ function parseMoment(text: string, year: number) {
     time: time ? `${pad(time[1])}:${time[2]}` : "",
   };
 }
-/** "成田（NRT）", "NRT" or a station's name. */
-function parseStop(text: string) {
+/** "成田（NRT）", "nrt", "成田" or a station's name. */
+function parseStop(text: string, airport: boolean) {
   const value = text.normalize("NFKC").trim();
-  const code = value.match(/\b([A-Z]{3})\b/)?.[1] ?? "";
-  const name = value.replace(/[(（]?\s*[A-Z]{3}\s*[)）]?/, "").trim();
-  return {
-    name: name || findAirportByCode(code)?.name || "",
-    code: code && findAirportByCode(code) ? code : "",
-  };
+  if (!airport) return { name: value, code: "" };
+  const code = value.match(/\b([A-Za-z]{3})\b/)?.[1] ?? "";
+  const name = value.replace(/[(（]?\s*\b[A-Za-z]{3}\b\s*[)）]?/, "").trim();
+  const found =
+    (code && findAirportByCode(code)) ||
+    (name ? findAirports(name, 1)[0] : undefined);
+  return found
+    ? { name: found.name, code: found.code }
+    : { name: name || value, code: "" };
 }
 function manualInput(form: ManualForm, year: number): BookingInput | string {
   const kind = form.kind!;
@@ -282,8 +285,12 @@ function manualInput(form: ManualForm, year: number): BookingInput | string {
   const end = parseMoment(form.end, year);
   if (!start.day) return "日付を「10/19 22:20」のように入れてください";
   const route = kind === "flight" || kind === "train";
-  const from = route ? parseStop(form.from) : { name: "", code: "" };
-  const to = route ? parseStop(form.to) : { name: "", code: "" };
+  const from = route
+    ? parseStop(form.from, kind === "flight")
+    : { name: "", code: "" };
+  const to = route
+    ? parseStop(form.to, kind === "flight")
+    : { name: "", code: "" };
   const title =
     form.title.trim() ||
     (kind === "flight"
@@ -334,7 +341,7 @@ export function AddBookingSheet({
   const layer = useLayer(() => leave());
   useLayoutEffect(() => {
     const sheet = body.current;
-    if (sheet && !RM())
+    if (sheet?.animate && !RM())
       sheet.animate(
         [{ transform: "translateY(100%)" }, { transform: "none" }],
         { duration: 420, easing: "cubic-bezier(.2,1.2,.4,1)" },

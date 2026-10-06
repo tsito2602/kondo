@@ -92,8 +92,8 @@ export function BookingDetail({
   );
   // The card it was opened from, measured before the page is locked.
   const [from] = useState(() =>
-    document
-      .querySelector(`[data-booking="${CSS.escape(id)}"]`)
+    [...document.querySelectorAll<HTMLElement>("[data-booking]")]
+      .find((element) => element.dataset.booking === id)
       ?.getBoundingClientRect(),
   );
   const close = () => setClosing(true);
@@ -102,7 +102,7 @@ export function BookingDetail({
   useLayoutEffect(() => {
     const dialog = ref.current;
     const card = dialog?.querySelector<HTMLElement>(".bk-card");
-    if (!dialog || !card || RM()) return;
+    if (!dialog?.animate || !card || RM()) return;
     // The card flies from where it sat in the list, on split.
     if (from) {
       const to = card.getBoundingClientRect();
@@ -462,7 +462,7 @@ export function BookingShow({
   const ref = useLayer(() => setClosing(true));
   useLayoutEffect(() => {
     const dialog = ref.current;
-    if (!dialog || RM()) return;
+    if (!dialog?.animate || RM()) return;
     dialog.animate(
       [
         { clipPath: "circle(0% at 80% 95%)" },
