@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
-import { ChevronRight, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { registeredGoogleMapsUrl, type Coordinates } from "@/data/places";
 import { boing } from "./places-motion";
 
@@ -55,7 +55,6 @@ export function PlaceSheet({
             aria-label={`${title}の詳細`}
           >
             <h2>{title}</h2>
-            <ChevronRight size={18} aria-hidden="true" />
           </button>
           <div className="places-card-meta">
             {lines.map((line, index) => (
