@@ -35,7 +35,7 @@ const { outputFiles } = await build({
   stdin: {
     contents:
       "export { guardModalKeyboardFocus } from './src/web/modal-keyboard'; export { lockModalPage } from './src/web/modal-scroll-lock'; " +
-      "export { finishBootScreen } from './src/web/boot'; export { PlaceCard } from './src/web/place-card'; export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { keyboardInset, revealModalField } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { finishBootScreen } from './src/web/boot'; export { PlaceSheet, placeMapsHref } from './src/web/place-sheet'; export { PlaceStatusLabel } from './src/web/place-status'; export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { keyboardInset, revealModalField } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -56,7 +56,9 @@ const {
   guardModalKeyboardFocus,
   lockModalPage,
   finishBootScreen,
-  PlaceCard,
+  PlaceSheet,
+  placeMapsHref,
+  PlaceStatusLabel,
   DayStrip,
   TaskList,
   DatePicker,
@@ -767,13 +769,14 @@ function pointer(target, type, x = 0, y = 0, extra = {}) {
 }
 
 function layoutTabs(nav, width = () => 360) {
-  [...nav.querySelectorAll("a")].forEach((link, index) => {
+  const links = [...nav.querySelectorAll("a")];
+  links.forEach((link, index) => {
     link.getBoundingClientRect = () => ({
-      left: (index * width()) / 5,
-      right: ((index + 1) * width()) / 5,
+      left: (index * width()) / links.length,
+      right: ((index + 1) * width()) / links.length,
       top: 100,
       bottom: 164,
-      width: width() / 5,
+      width: width() / links.length,
       height: 64,
     });
   });
@@ -826,7 +829,7 @@ test("trip tabs stay joined with names and support one-tap or hold selection", a
     const icons = [...nav.querySelectorAll("svg")];
     const places = nav.querySelector('a[href$="/places"]');
     const notes = nav.querySelector('a[href$="/notes"]');
-    assert.equal(icons.length, 5);
+    assert.equal(icons.length, 6);
     assert.equal(dock.dataset.level, "trip");
     assert.equal(dock.dataset.wide, "true");
     assert.equal(document.querySelectorAll(".safari-side[inert]").length, 2);
@@ -912,7 +915,7 @@ test("trip tabs stay joined with names and support one-tap or hold selection", a
   }
 });
 
-test("details retain the same five tab nodes and close before one-tap navigation, including the current tab", async () => {
+test("details retain the same six tab nodes and close before one-tap navigation, including the current tab", async () => {
   let surface;
   HTMLElement.prototype.animate = function () {
     const animation = timeline();
@@ -1098,7 +1101,7 @@ test("hold and drag previews live tab bounds, commits once on release, and cance
       "true",
       "transferring implicit touch capture from link to nav is not cancellation",
     );
-    await act(async () => pointer(nav, "pointermove", 225, 130));
+    await act(async () => pointer(nav, "pointermove", 200, 130));
     assert.equal(links[3].dataset.preview, "true");
     assert.equal(
       document.querySelector("output").textContent,
@@ -1120,12 +1123,12 @@ test("hold and drag previews live tab bounds, commits once on release, and cance
       "another finger cannot change this gesture",
     );
     await act(async () => {
-      pointer(nav, "pointerup", 225, 130);
+      pointer(nav, "pointerup", 200, 130);
       links[0].click(); // Compatibility click may still target the initial link.
     });
     assert.equal(
       document.querySelector("output").textContent,
-      "/trips/demo/packing",
+      "/trips/demo/tasks",
     );
     assert.equal(transitions, 1, "release must navigate exactly once");
     assert.equal(nav.hasPointerCapture(1), false);
@@ -1138,7 +1141,7 @@ test("hold and drag previews live tab bounds, commits once on release, and cance
     ]) {
       await hold();
       await act(async () => pointer(nav, "pointermove", 378, 130));
-      assert.equal(links[4].dataset.preview, "true");
+      assert.equal(links[5].dataset.preview, "true");
       await act(async () => {
         if (reason === "outside") {
           pointer(nav, "pointermove", 378, 70);
@@ -1158,7 +1161,7 @@ test("hold and drag previews live tab bounds, commits once on release, and cance
       });
       assert.equal(
         document.querySelector("output").textContent,
-        "/trips/demo/packing",
+        "/trips/demo/tasks",
         reason,
       );
       assert.equal(dock.dataset.expanded, "false", reason);
@@ -1235,7 +1238,7 @@ test("contact previews immediately and a short scrub commits once without waitin
       "/trips/demo/itinerary",
     );
     await act(async () => pointer(nav, "pointermove", 324, 130));
-    assert.equal(selected(), "4", "short drags track the finger immediately");
+    assert.equal(selected(), "5", "short drags track the finger immediately");
     await act(async () => {
       pointer(nav, "pointerup", 324, 130);
       links[1].click();
@@ -1250,7 +1253,7 @@ test("contact previews immediately and a short scrub commits once without waitin
     );
     assert.equal(
       selected(),
-      "4",
+      "5",
       "release must not flash the old tab while the route waits",
     );
     await act(async () => updateRoute());
@@ -1259,7 +1262,7 @@ test("contact previews immediately and a short scrub commits once without waitin
       document.querySelector("output").textContent,
       "/trips/demo/notes",
     );
-    assert.equal(selected(), "4");
+    assert.equal(selected(), "5");
     assert.equal(
       nav.querySelector(".safari-selection"),
       indicator,
@@ -1271,7 +1274,7 @@ test("contact previews immediately and a short scrub commits once without waitin
       pointer(nav, "pointerup", 36, 70);
       links[0].click();
     });
-    assert.equal(selected(), "4", "outside release restores the current tab");
+    assert.equal(selected(), "5", "outside release restores the current tab");
     assert.equal(dock.dataset.touching, "false");
     assert.equal(transitions, 1);
     await act(async () =>
@@ -2672,103 +2675,82 @@ test("date strip slides to the selected day and scrolls only when needed, respec
   }
 });
 
-test("place cards separate detail and scheduling actions, and link scheduled visits to the correct itinerary", async () => {
+test("place cards separate detail and scheduling actions, and open Google Maps only from a saved link or the pin", async () => {
   const root = createRoot(document.getElementById("root"));
-  const place = {
-    id: "p",
-    title: "美術館",
-    status: "want",
-    reservationStatus: "needed",
-    location: "旧市街",
-    note: "展示を見る",
-  };
   let opened = 0;
   let scheduled = 0;
+  let closed = 0;
   const render = (props = {}) =>
     root.render(
-      React.createElement(
-        MemoryRouter,
-        null,
-        React.createElement(PlaceCard, {
-          place,
-          tripId: "trip",
-          onOpen: () => opened++,
-          onSchedule: () => scheduled++,
-          ...props,
-        }),
-      ),
+      React.createElement(PlaceSheet, {
+        title: "美術館",
+        tag: React.createElement("span", null, "候補 · まだ予定なし"),
+        lines: ["展示を見る"],
+        mapsHref: "https://maps.app.goo.gl/demo",
+        onOpen: () => opened++,
+        onClose: () => closed++,
+        onSchedule: () => scheduled++,
+        ...props,
+      }),
     );
   try {
     await act(async () => render());
-    await act(async () => document.querySelector(".place-card-main").click());
+    await act(async () =>
+      document.querySelector('[aria-label="美術館の詳細"]').click(),
+    );
     assert.equal(opened, 1);
     assert.equal(scheduled, 0);
-    await act(async () => document.querySelector(".place-card-action").click());
+    await act(async () =>
+      document.querySelector(".places-card-actions .is-secondary").click(),
+    );
     assert.equal(scheduled, 1);
     assert.equal(opened, 1, "scheduling does not also open the detail panel");
-    await act(async () =>
-      render({
-        linked: { id: "item", day: "2026-11-22", time: "16:00" },
-        onSchedule: undefined,
-      }),
-    );
     assert.equal(
-      document.querySelector(".place-card-action").getAttribute("href"),
-      "/trips/trip/itinerary?day=2026-11-22&item=item",
+      document.querySelector(".places-card-actions .is-secondary")
+        .nextElementSibling.tagName,
+      "A",
+      "scheduling precedes the map, as in the mock",
     );
-    assert.match(
-      document.querySelector(".place-card-schedule").textContent,
-      /16:00/,
+    await act(async () =>
+      document.querySelector('.places-card [aria-label="閉じる"]').click(),
     );
+    assert.equal(closed, 1);
+    assert.equal(opened, 1, "closing does not open the detail panel");
     await act(async () => render({ onSchedule: undefined }));
     assert.equal(
-      document.querySelector(".place-card-action"),
+      document.querySelector(".places-card-actions .is-secondary"),
       null,
-      "read-only visitors cannot schedule",
+      "read-only visitors and scheduled places cannot schedule",
     );
-    assert.ok(document.querySelector(".place-card-main"));
+    assert.ok(
+      document.querySelector(".places-card a.is-primary"),
+      "viewers can open maps",
+    );
+    await act(async () => render({ mapsHref: null }));
+    assert.equal(document.querySelector(".places-card a"), null);
     for (const [status, icon] of [
       ["want", "heart"],
       ["planned", "calendar-check"],
       ["visited", "circle-check"],
       ["skipped", "circle-pause"],
     ]) {
-      await act(async () => render({ place: { ...place, status } }));
+      await act(async () =>
+        root.render(React.createElement(PlaceStatusLabel, { status })),
+      );
       assert.ok(document.querySelector(`.place-status-label .lucide-${icon}`));
     }
+    const pin = { lat: 48.2, lng: 16.37 };
     for (const location of [
       "https://maps.app.goo.gl/demo",
       "https://goo.gl/maps/demo",
       "https://www.google.com/maps/search/?api=1&query=Vienna",
       "https://maps.google.co.jp/?q=Vienna",
     ]) {
-      await act(async () => render({ place: { ...place, location } }));
-      const map = document.querySelector(".place-card-map");
-      assert.equal(map.getAttribute("href"), location);
-      assert.equal(map.getAttribute("target"), "_blank");
+      assert.equal(placeMapsHref(location, null), location);
       assert.equal(
-        map.nextElementSibling.tagName,
-        "BUTTON",
-        "map precedes scheduling action",
-      );
-      await act(async () =>
-        render({
-          place: { ...place, location },
-          linked: { id: "item", day: "2026-11-22", time: "16:00" },
-          onSchedule: undefined,
-        }),
-      );
-      assert.match(
-        document.querySelector(".place-card-map").nextElementSibling
-          .textContent,
-        /しおりを見る/,
-      );
-      await act(async () =>
-        render({ place: { ...place, location }, onSchedule: undefined }),
-      );
-      assert.ok(
-        document.querySelector(".place-card-map"),
-        "viewers can open maps",
+        placeMapsHref(location, pin),
+        location,
+        "the saved link wins",
       );
     }
     for (const location of [
@@ -2778,8 +2760,12 @@ test("place cards separate detail and scheduling actions, and link scheduled vis
       "https://google.com.evil.example/maps",
       "javascript:alert(1)",
     ]) {
-      await act(async () => render({ place: { ...place, location } }));
-      assert.equal(document.querySelector(".place-card-map"), null);
+      assert.equal(placeMapsHref(location, null), null);
+      assert.equal(
+        placeMapsHref(location, pin),
+        "https://www.google.com/maps/search/?api=1&query=48.2,16.37",
+        "a pin without a Google link opens its coordinates",
+      );
     }
   } finally {
     await act(async () => root.unmount());
@@ -3118,28 +3104,54 @@ test("modal page lock survives nested replacement and restores the original scro
 });
 
 test("top, middle, last and tall textarea editors stay visible without moving the panel or dock", () => {
-  const previousViewport = Object.getOwnPropertyDescriptor(window, "visualViewport");
+  const previousViewport = Object.getOwnPropertyDescriptor(
+    window,
+    "visualViewport",
+  );
   const viewport = { height: 400, offsetTop: 0, scale: 1 };
-  Object.defineProperty(window, "visualViewport", { configurable: true, value: viewport });
+  Object.defineProperty(window, "visualViewport", {
+    configurable: true,
+    value: viewport,
+  });
   const dialog = document.createElement("dialog");
   dialog.open = true;
-  dialog.innerHTML = '<div class="modal-inner"><header class="modal-header"></header><label class="field"><textarea>keep draft</textarea></label></div><div class="thumb-dock-host"></div>';
+  dialog.innerHTML =
+    '<div class="modal-inner"><header class="modal-header"></header><label class="field"><textarea>keep draft</textarea></label></div><div class="thumb-dock-host"></div>';
   document.body.append(dialog);
-  const panel = dialog.firstElementChild, field = panel.lastElementChild, input = field.firstElementChild;
+  const panel = dialog.firstElementChild,
+    field = panel.lastElementChild,
+    input = field.firstElementChild;
   const geometry = { top: 12, bottom: 684, height: 672 };
   panel.getBoundingClientRect = () => geometry;
   panel.firstElementChild.getBoundingClientRect = () => ({ bottom: 68 });
-  dialog.lastElementChild.getBoundingClientRect = () => ({ top: 700, height: 64 });
-  let inputTop = 120, inputHeight = 44;
-  input.getBoundingClientRect = () => ({ top: inputTop - panel.scrollTop, bottom: inputTop + inputHeight - panel.scrollTop });
-  field.getBoundingClientRect = () => ({ top: inputTop - 24 - panel.scrollTop });
+  dialog.lastElementChild.getBoundingClientRect = () => ({
+    top: 700,
+    height: 64,
+  });
+  let inputTop = 120,
+    inputHeight = 44;
+  input.getBoundingClientRect = () => ({
+    top: inputTop - panel.scrollTop,
+    bottom: inputTop + inputHeight - panel.scrollTop,
+  });
+  field.getBoundingClientRect = () => ({
+    top: inputTop - 24 - panel.scrollTop,
+  });
   try {
-    for (const [top, height] of [[120,44],[420,44],[840,44],[120,44],[1000,500]]) {
-      inputTop = top; inputHeight = height;
+    for (const [top, height] of [
+      [120, 44],
+      [420, 44],
+      [840, 44],
+      [120, 44],
+      [1000, 500],
+    ]) {
+      inputTop = top;
+      inputHeight = height;
       revealModalField(input);
       const bounds = input.getBoundingClientRect();
       assert.ok(bounds.top >= 80 && bounds.top < 388);
-      if (height < 308) assert.ok(bounds.bottom <= 388, "deep fields rise above the keyboard");
+      if (height < 308)
+        assert.ok(bounds.bottom <= 388, "deep fields rise above the keyboard");
       assert.deepEqual(panel.getBoundingClientRect(), geometry);
       assert.equal(dialog.lastElementChild.getBoundingClientRect().top, 700);
       assert.equal(input.value, "keep draft");
@@ -3148,10 +3160,15 @@ test("top, middle, last and tall textarea editors stay visible without moving th
       assert.equal(panel.scrollTop, scroll, "settled focus never oscillates");
     }
     viewport.offsetTop = 400;
-    assert.equal(keyboardInset(window.innerHeight, viewport, input), window.innerHeight - 400, "native panning cannot erase keyboard scroll space");
+    assert.equal(
+      keyboardInset(window.innerHeight, viewport, input),
+      window.innerHeight - 400,
+      "native panning cannot erase keyboard scroll space",
+    );
   } finally {
     dialog.remove();
-    if (previousViewport) Object.defineProperty(window, "visualViewport", previousViewport);
+    if (previousViewport)
+      Object.defineProperty(window, "visualViewport", previousViewport);
     else delete window.visualViewport;
   }
 });

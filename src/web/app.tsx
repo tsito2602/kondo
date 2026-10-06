@@ -1,8 +1,12 @@
-import { SegmentSelection } from "./segment-selection";
+import { SettingsScreen } from "./settings";
+import { startUpdateChecks, useUpdateGuard } from "./app-update";
 import { startTripTransition } from "./trip-transition";
 import { finishBootScreen } from "./boot";
-import { TripCover } from "./trip-cover";
-import { ticketDate } from "./ticket-content";
+import {
+  PastTripCard,
+  UpcomingTripCard,
+  useTripListEntrance,
+} from "./home-trips";
 import {
   captureMotionOrigin,
   dismissModal,
@@ -11,13 +15,7 @@ import {
 import type { CSSProperties } from "react";
 import { Button } from "./obsidian/button";
 import { Input } from "./obsidian/input";
-import {
-  type FormEvent,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Link,
   NavLink,
@@ -33,27 +31,22 @@ import {
 } from "react-router";
 import {
   ArrowLeft,
-  Monitor,
-  Sun,
-  Moon,
   Settings,
   Users,
   Download,
   Pencil,
   Trash2,
   RefreshCw,
-  LogOut,
   ChevronRight,
   Copy,
   BookOpen,
   Plus,
-  MapPin,
   Check,
 } from "lucide-react";
 import { Card } from "./obsidian/card";
 import { GoogleSignIn, useAuth } from "@/auth/auth-provider";
 import { TravelProvider, useTravel } from "@/data/travel-provider";
-import type { TripMember } from "@/data/types";
+import type { Trip, TripMember } from "@/data/types";
 import { formatDate, localDate } from "@/utils/dates";
 import { TripEditor } from "./editors";
 import { SafariTabs, tripTabs } from "./safari-tabs";
@@ -65,9 +58,9 @@ import {
   BookingsScreen,
   ItineraryScreen,
   NotesScreen,
-  PackingScreen,
   PlacesScreen,
 } from "./screens";
+import { PackingScreen, TasksScreen } from "./prep";
 import {
   Empty,
   Field,
@@ -75,7 +68,6 @@ import {
   Modal,
   copyText,
   useAction,
-  useTheme,
   useToast,
 } from "./ui";
 
@@ -111,21 +103,7 @@ export function App() {
       delete root.dataset.inputModality;
     };
   }, []);
-  useEffect(() => {
-    if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
-    void navigator.serviceWorker
-      .register("/sw.js", { updateViaCache: "none" })
-      .catch(() => undefined);
-    const update = () => {
-      if (document.visibilityState === "visible")
-        void navigator.serviceWorker
-          .getRegistration()
-          .then((registration) => registration?.update())
-          .catch(() => undefined);
-    };
-    document.addEventListener("visibilitychange", update);
-    return () => document.removeEventListener("visibilitychange", update);
-  }, []);
+  useEffect(startUpdateChecks, []);
   useEffect(() => {
     const viewport = window.visualViewport;
     let revealFrame = 0;
@@ -286,6 +264,7 @@ function TravelApp() {
       : location;
   const routePath =
     typeof routeLocation === "string" ? routeLocation : routeLocation.pathname;
+  useUpdateGuard(travel.ready, travel.pendingCount);
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [routePath]);
@@ -308,6 +287,7 @@ function TravelApp() {
           <Route path="itinerary" element={<ItineraryScreen />} />
           <Route path="bookings" element={<BookingsScreen />} />
           <Route path="places" element={<PlacesScreen />} />
+          <Route path="tasks" element={<TasksScreen />} />
           <Route path="packing" element={<PackingScreen />} />
           <Route path="notes" element={<NotesScreen />} />
         </Route>
@@ -385,19 +365,25 @@ function Home() {
   const [invite, setInvite] = useState(params.get("invite") ?? "");
   const { busy, run } = useAction();
   const today = localDate();
-  const future = travel.trips.filter((trip) => trip.endsOn >= today);
-  const past = travel.trips.filter((trip) => trip.endsOn < today);
+  const future = travel.trips
+    .filter((trip) => trip.endsOn >= today)
+    .sort((a, b) => a.startsOn.localeCompare(b.startsOn));
+  const past = travel.trips
+    .filter((trip) => trip.endsOn < today)
+    .sort((a, b) => b.startsOn.localeCompare(a.startsOn));
+  const list = useRef<HTMLElement>(null);
+  useTripListEntrance(list);
+  const open = (trip: Trip) =>
+    startTripTransition(() => {
+      travel.selectTrip(trip.id);
+      navigate(`/trips/${trip.id}/itinerary`);
+    }, trip.id);
   return (
     <>
+      {/* Settings on the left, create on the right: both only here on phones. */}
       <ThumbDock mode="context">
         <ContextDock
-          primary={
-            <button onClick={() => setEditing(true)}>
-              <Plus size={18} aria-hidden="true" />
-              旅行を作成
-            </button>
-          }
-          actions={
+          back={
             <Link
               to="/settings"
               state={{ background: location }}
@@ -406,11 +392,18 @@ function Home() {
               <Settings size={22} />
             </Link>
           }
+          actions={
+            <button className="home-create" onClick={() => setEditing(true)}>
+              <Plus size={22} strokeWidth={2.6} aria-hidden="true" />
+              旅行を作成
+            </button>
+          }
         />
       </ThumbDock>
-      <main id="main-content" className="page home-page">
+      <main id="main-content" className="page home-page" ref={list}>
         <div className="home-toolbar">
           <h1>旅行</h1>
+          {/* Wide screens have no dock, so the same two controls live here. */}
           <Link
             className="icon-button home-settings"
             to="/settings"
@@ -440,89 +433,40 @@ function Home() {
             <p>旅行を作成するか、招待リンクから参加できます。</p>
           </Empty>
         )}
-        {[
-          { label: "これからの旅", trips: future },
-          { label: "これまでの旅", trips: past },
-        ].map(
-          (group) =>
-            group.trips.length > 0 && (
-              <section className="trip-group" key={group.label}>
-                <div className="section-heading">
-                  <h2>{group.label}</h2>
-                  <span className="muted">{group.trips.length}</span>
-                </div>
-                <div className="trip-grid">
-                  {group.trips.map((trip) => (
-                    <Link
-                      className="trip-ticket"
-                      data-press-card
-                      data-trip-surface={trip.id}
-                      data-motion-managed
-                      onClick={(event) => {
-                        if (
-                          event.button !== 0 ||
-                          event.metaKey ||
-                          event.ctrlKey ||
-                          event.shiftKey ||
-                          event.altKey
-                        )
-                          return;
-                        event.preventDefault();
-                        startTripTransition(() => {
-                          travel.selectTrip(trip.id);
-                          navigate(`/trips/${trip.id}/itinerary`);
-                        }, trip.id);
-                      }}
-                      key={trip.id}
-                      to={`/trips/${trip.id}/itinerary`}
-                    >
-                      <div className="trip-photo">
-                        <TripCover id={trip.id} src={trip.coverImage ?? ""} />
-                        <div className="trip-photo-content">
-                          <h2>{trip.name}</h2>
-                          {trip.destination && (
-                            <span className="trip-destination">
-                              <MapPin size={13} />
-                              {trip.destination}
-                            </span>
-                          )}
-                          <div className="trip-ticket-period">
-                            <p>
-                              {ticketDate(trip.startsOn)}
-                              <span className="ticket-range-end">
-                                〜 {ticketDate(trip.endsOn, trip.startsOn)}
-                              </span>
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="trip-stub">
-                        <strong>
-                          {Math.round(
-                            (Date.parse(trip.endsOn) -
-                              Date.parse(trip.startsOn)) /
-                              86400000,
-                          ) + 1}
-                          <small>日間</small>
-                        </strong>
-                        <span>
-                          <Users size={14} />
-                          {trip.memberCount}人
-                        </span>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            ),
+        {future.length > 0 && (
+          <section className="home-group" aria-labelledby="home-upcoming">
+            <h2 className="home-group-heading" id="home-upcoming">
+              これからの旅<span>{future.length}</span>
+            </h2>
+            <div className="home-trip-list">
+              {future.map((trip, index) => (
+                <UpcomingTripCard
+                  key={trip.id}
+                  trip={trip}
+                  members={travel.membersOf(trip.id)}
+                  today={today}
+                  nearest={index === 0}
+                  onOpen={open}
+                />
+              ))}
+            </div>
+          </section>
         )}
-        <Button
-          variant="ghost"
-          className="subtle invite-entry"
-          onClick={() => setInvite(" ")}
-        >
+        {past.length > 0 && (
+          <section className="home-group" aria-labelledby="home-past">
+            <h2 className="home-group-heading" id="home-past">
+              これまでの旅<span>{past.length}</span>
+            </h2>
+            <div className="home-trip-shelf">
+              {past.map((trip) => (
+                <PastTripCard key={trip.id} trip={trip} onOpen={open} />
+              ))}
+            </div>
+          </section>
+        )}
+        <button className="home-join" onClick={() => setInvite(" ")}>
           招待リンクから参加
-        </Button>
+        </button>
         {editing && (
           <TripEditor
             onClose={() => setEditing(false)}
@@ -932,233 +876,5 @@ function MembersScreen({ onClose }: { onClose: () => void }) {
         )}
       </div>
     </Modal>
-  );
-}
-function SettingsScreen() {
-  const location = useLocation();
-  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo;
-  const backTo = returnTo?.startsWith("/trips/") ? returnTo : "/";
-  const auth = useAuth();
-  const travel = useTravel();
-  const theme = useTheme();
-  const notify = useToast();
-  const { busy, run } = useAction();
-  const navigate = useNavigate();
-  const [name, setName] = useState(auth.user?.name ?? "");
-  const save = (event: FormEvent) => {
-    event.preventDefault();
-    void run(async () => {
-      await auth.updateProfile(name);
-      notify("表示名を保存しました");
-    });
-  };
-  return (
-    <Modal
-      title="設定"
-      full
-      dockActions={{}}
-      onClose={() => {
-        if ((location.state as { background?: Location } | null)?.background)
-          navigate(-1);
-        else navigate(backTo, { replace: true });
-      }}
-    >
-      <div className="settings-page">
-        <Card className="settings-card">
-          <h2>アカウント</h2>
-          <div className="member-row">
-            {auth.user?.avatarUrl && (
-              <img
-                className="avatar"
-                src={auth.user.avatarUrl}
-                referrerPolicy="no-referrer"
-                alt="Googleアカウントのアイコン"
-              />
-            )}
-            <span>{auth.user?.email || "サンプルアカウント"}</span>
-          </div>
-          <form className="form" onSubmit={save}>
-            <Field label="表示名">
-              <Input
-                required
-                maxLength={100}
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </Field>
-            <Button variant="ghost" className="secondary" disabled={busy}>
-              表示名を保存
-            </Button>
-          </form>
-        </Card>
-        <Card className="settings-card">
-          <h2>外観</h2>
-          <div
-            className="segmented appearance-control has-selection"
-            aria-label="表示モード"
-          >
-            {(
-              [
-                { value: "system", label: "端末に合わせる", icon: Monitor },
-                { value: "light", label: "ライト", icon: Sun },
-                { value: "dark", label: "ダーク", icon: Moon },
-              ] as const
-            ).map((entry) => (
-              <button
-                key={entry.value}
-                aria-label={entry.label}
-                aria-pressed={theme.preference === entry.value}
-                className={theme.preference === entry.value ? "selected" : ""}
-                onClick={() => theme.setPreference(entry.value)}
-              >
-                <entry.icon size={18} aria-hidden="true" />
-                {entry.value === "system" ? "自動" : entry.label}
-              </button>
-            ))}
-            <SegmentSelection
-              index={["system", "light", "dark"].indexOf(theme.preference)}
-            />
-          </div>
-        </Card>
-        <Card className="settings-card">
-          <h2>アプリ</h2>
-          <PwaControls />
-        </Card>
-        <Button
-          variant="ghost"
-          className="secondary danger"
-          disabled={busy}
-          onClick={() =>
-            void run(async () => {
-              if (travel.pendingCount)
-                throw new Error(
-                  "未同期の変更を送信してからログアウトしてください",
-                );
-              if (auth.isDemo) auth.exitDemo();
-              else await auth.signOut();
-              navigate("/");
-            })
-          }
-        >
-          <LogOut />
-          {auth.isDemo ? "サンプルを終了" : "ログアウト"}
-        </Button>
-        <section className="settings-app-info" aria-label="アプリ情報">
-          <span className="settings-app-mark" aria-hidden="true">
-            <img className="light-logo" src="/logo.svg" alt="" />
-            <img className="dark-logo" src="/logo-dark.svg" alt="" />
-          </span>
-          <strong>kondo</strong>
-          <small>バージョン {import.meta.env.VITE_APP_VERSION}</small>
-        </section>
-      </div>
-    </Modal>
-  );
-}
-type InstallEvent = Event & { prompt: () => Promise<void> };
-function PwaControls() {
-  const { pendingCount } = useTravel();
-  const [checking, setChecking] = useState(false);
-  const [updateStatus, setUpdateStatus] = useState("");
-  const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
-  const [installEvent, setInstallEvent] = useState<InstallEvent | null>(null);
-  const [standalone] = useState(
-    () =>
-      matchMedia("(display-mode: standalone)").matches ||
-      Boolean((navigator as Navigator & { standalone?: boolean }).standalone),
-  );
-  const notify = useToast();
-  useEffect(() => {
-    let active = true;
-    const check = () => {
-      if ("serviceWorker" in navigator)
-        void navigator.serviceWorker.getRegistration().then((registration) => {
-          if (active) setWaiting(registration?.waiting ?? null);
-        });
-    };
-    const install = (event: Event) => {
-      event.preventDefault();
-      setInstallEvent(event as InstallEvent);
-    };
-    check();
-    const timer = setInterval(check, 3000);
-    window.addEventListener("beforeinstallprompt", install);
-    return () => {
-      active = false;
-      clearInterval(timer);
-      window.removeEventListener("beforeinstallprompt", install);
-    };
-  }, []);
-  return (
-    <div className="form">
-      {!standalone && (
-        <Button
-          variant="ghost"
-          className="secondary"
-          onClick={() => {
-            if (installEvent) void installEvent.prompt();
-            else
-              notify(
-                /iPhone|iPad/.test(navigator.userAgent)
-                  ? "Safariの共有メニューから「ホーム画面に追加」を選んでください"
-                  : "ブラウザーのメニューから「アプリをインストール」または「ホーム画面に追加」を選んでください",
-              );
-          }}
-        >
-          ホーム画面に追加
-        </Button>
-      )}
-      <Button
-        variant="ghost"
-        className="secondary"
-        disabled={pendingCount > 0 || checking}
-        onClick={async () => {
-          setUpdateStatus("");
-          if (waiting) {
-            navigator.serviceWorker.addEventListener(
-              "controllerchange",
-              () => location.reload(),
-              { once: true },
-            );
-            waiting.postMessage({ type: "ACTIVATE_UPDATE" });
-          } else {
-            setChecking(true);
-            try {
-              const registration =
-                "serviceWorker" in navigator
-                  ? await navigator.serviceWorker.getRegistration()
-                  : undefined;
-              if (!registration) throw new Error("Service worker unavailable");
-              await registration.update();
-              if (registration.waiting) setWaiting(registration.waiting);
-              else
-                setUpdateStatus(
-                  "更新を確認しました。準備ができると更新ボタンが表示されます",
-                );
-            } catch {
-              setUpdateStatus("更新を確認できませんでした");
-            } finally {
-              setChecking(false);
-            }
-          }
-        }}
-      >
-        {checking
-          ? "確認中…"
-          : waiting
-            ? "新しいバージョンに更新"
-            : "更新を確認"}
-      </Button>
-      <p
-        className="pwa-update-status muted small"
-        role="status"
-        aria-live="polite"
-      >
-        {waiting ? "" : updateStatus}
-      </p>
-      {pendingCount > 0 && (
-        <p className="muted">未同期の変更を送信してから更新できます。</p>
-      )}
-    </div>
   );
 }

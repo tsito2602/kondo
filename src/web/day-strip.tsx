@@ -1,13 +1,24 @@
 import { useLayoutEffect, useRef } from "react";
 import { reduceMotion } from "./motion";
 
+const longDate = (day: string) =>
+  new Intl.DateTimeFormat("ja-JP", {
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  }).format(new Date(`${day}T12:00:00`));
+
+/** The trip's days in the header (tapped rarely, so outside thumb reach). */
 export function DayStrip({
   days,
   selectedDay,
+  today,
   onSelect,
 }: {
   days: string[];
   selectedDay: string;
+  /** While travelling, today's tab carries a dot. */
+  today?: string | null;
   onSelect: (day: string, behavior: ScrollBehavior) => void;
 }) {
   const strip = useRef<HTMLElement>(null);
@@ -58,10 +69,12 @@ export function DayStrip({
           id={`date-tab-${day}`}
           key={day}
           aria-current={selectedDay === day ? "date" : undefined}
+          aria-label={`DAY ${index + 1} ${longDate(day)}${today === day ? "（今日）" : ""}`}
           onClick={() => onSelect(day, reduceMotion() ? "instant" : "smooth")}
         >
           <small>DAY {index + 1}</small>
-          <span>{day.slice(5).replace("-", "/")}</span>
+          <span>{Number(day.slice(8, 10))}</span>
+          {today === day && <i className="date-today" aria-hidden="true" />}
         </button>
       ))}
     </nav>

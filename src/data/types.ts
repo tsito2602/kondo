@@ -21,6 +21,10 @@ export type ItineraryDetails = {
   endDay: string;
   endTime: string;
   transport?: { mode: TransportMode; origin: string; destination: string; durationMinutes?: number; afterKey?: string };
+  /** The travellers' own check-in/out time for a hotel booking; the booking keeps the hotel's terms. */
+  stay?: { bookingId: string; endpoint: 'start' | 'end' };
+  /** The linked place was attached in the しおり (a map link), not scheduled from the places list. */
+  ownPlace?: boolean;
 };
 
 export type ItineraryItem = {
@@ -72,14 +76,23 @@ export type BookingDocument = {
   createdAt: number;
 };
 
+/** みんな各自 (everyone packs their own), 1つでいい (one member takes it), 自分だけ (private). */
+export type PackingKind = 'each' | 'one' | 'mine';
+
 export type PackingItem = {
   id: string;
   name: string;
   category: string;
   quantity: number;
+  /** For みんな各自 this is the viewer's own tick; otherwise the carrier's. */
   packed: boolean;
+  /** For 1つでいい, the member who said 「私が持つ」 (`member:<id>`). */
   assignee?: string;
   shared?: boolean;
+  /** Missing on legacy items, which read as 'one'. */
+  kind?: PackingKind;
+  /** みんな各自: member ids that have packed it. */
+  packedBy?: string[];
   updatedBy?: string;
   updatedAt?: number;
 };
@@ -107,12 +120,16 @@ export type Place = {
   referenceLinks?: PlaceReferenceLink[];
   itineraryItemId?: string | null;
   status: PlaceStatus;
+  /** Read from the Google Maps link by the Worker; absent on older rows and offline edits. */
+  lat?: number | null;
+  lng?: number | null;
   updatedAt?: number;
 };
-export type PlaceInput = Omit<Place, 'id' | 'updatedAt'>;
+export type PlaceInput = Omit<Place, 'id' | 'updatedAt' | 'lat' | 'lng'>;
 
-export type TravelNote = { id: string; title?: string; body: string; content?: import('./notes').NoteContent | null; pinned?: boolean; updatedAt: number };
-export type NoteInput = Pick<TravelNote, 'title' | 'body' | 'content'>;
+/** placeId links the note to a numbered place (and through it, a day's plan). Both optional for older rows. */
+export type TravelNote = { id: string; title?: string; body: string; content?: import('./notes').NoteContent | null; pinned?: boolean; placeId?: string | null; updatedBy?: string | null; updatedAt: number };
+export type NoteInput = Pick<TravelNote, 'title' | 'body' | 'content' | 'pinned' | 'placeId'>;
 
 export type PendingMutation = {
   id: string;
@@ -186,6 +203,8 @@ export const normalizeTravelCache = (value: TravelCache): TravelCache => ({
         packed: Boolean(item.packed),
         assignee: item.assignee ?? '',
         shared: item.shared ?? false,
+        kind: item.kind ?? 'one',
+        packedBy: item.packedBy ?? [],
       })),
     ]),
   ),

@@ -13,6 +13,7 @@ import { createPortal } from "react-dom";
 import { Plus } from "lucide-react";
 import { DockContent } from "./dock-content";
 import { FluidDockSurface, type FluidDockHandle } from "./fluid-dock";
+import { UpdateNotice } from "./app-update";
 
 type DockEntry = {
   content: ReactNode;
@@ -47,6 +48,12 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
   const [host] = useState(() =>
     Object.assign(document.createElement("div"), {
       className: "thumb-dock-host",
+    }),
+  );
+  // The update notice follows the dock into each sheet's top layer.
+  const [noticeHost] = useState(() =>
+    Object.assign(document.createElement("div"), {
+      className: "update-notice-host",
     }),
   );
   const surface = useRef<HTMLDivElement>(null);
@@ -95,14 +102,16 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
   useLayoutEffect(() => {
     const parent = active?.target?.() ?? document.body;
     if (host.parentElement !== parent) parent.appendChild(host);
+    if (noticeHost.parentElement !== parent) parent.appendChild(noticeHost);
     host.hidden = !active;
     if (active) morph.current?.measure();
   });
   useLayoutEffect(
     () => () => {
       host.remove();
+      noticeHost.remove();
     },
-    [host],
+    [host, noticeHost],
   );
   return (
     <Registry.Provider value={registry}>
@@ -140,6 +149,7 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
           </SharedDockSurfaceContext.Provider>,
           host,
         )}
+        {createPortal(<UpdateNotice />, noticeHost)}
       </Actions.Provider>
     </Registry.Provider>
   );

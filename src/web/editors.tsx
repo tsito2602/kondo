@@ -4,7 +4,8 @@ import { Button } from "./obsidian/button";
 import { Input } from "./obsidian/input";
 import { Textarea } from "./obsidian/textarea";
 import { type FormEvent, useRef, useState } from "react";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, Paperclip } from "lucide-react";
+import { bookingIcons, spring } from "./booking-card";
 import { AirportField } from "./airport-field";
 import { findAirportByCode } from "@/data/airports";
 import { findMatchingItineraryItem } from "@/data/booking-match";
@@ -15,6 +16,7 @@ import {
   emptyItineraryDetails,
   itemDetails,
   itineraryDetailsError,
+  ordinaryPlans,
 } from "@/data/itinerary";
 import {
   placeStatuses,
@@ -22,7 +24,6 @@ import {
   referenceUrl,
   mapUrl,
 } from "@/data/places";
-import { assigneeName, memberAssignee } from "@/data/assignee";
 import { localDate, validDate } from "@/utils/dates";
 import type {
   Trip,
@@ -30,8 +31,6 @@ import type {
   BookingKind,
   ItineraryItem,
   Place,
-  TravelTask,
-  PackingItem,
   ItineraryCategory,
   TransportMode,
 } from "@/data/types";
@@ -437,16 +436,37 @@ function flightTitle(
       .join(" → ") || "フライト"
   ).slice(0, 160);
 }
-export function BookingEditor({
+export type BookingInput = Omit<
+  Booking,
+  | "id"
+  | "updatedBy"
+  | "updatedAt"
+  | "connectionMode"
+  | "nextFlightId"
+  | "location"
+> & { location?: string };
+/** The booking fields for one kind. Without a kind yet, only the kind picker shows. */
+export function BookingForm({
   booking,
   onClose,
+  pickKind = false,
+  onDraft,
+  onSaved,
 }: {
-  booking?: Booking;
+  booking?: Booking | BookingInput;
   onClose: () => void;
+  /** Start with no kind chosen (the manual add). */
+  pickKind?: boolean;
+  /** Return the input instead of saving (fixing an imported row before it is saved). */
+  onDraft?: (input: BookingInput) => void;
+  /** A new booking was saved, with the documents chosen for it. */
+  onSaved?: (id: string, files: File[]) => void;
 }) {
   const travel = useTravel();
+  const existing = booking && "id" in booking ? booking : undefined;
+  const [files, setFiles] = useState<File[]>([]);
   const [draft, setDraft] = useState({
-    kind: booking?.kind ?? ("flight" as BookingKind),
+    kind: (pickKind ? null : (booking?.kind ?? "flight")) as BookingKind | null,
     title:
       booking?.kind === "flight" && booking.title === flightTitle(booking)
         ? ""
@@ -473,6 +493,7 @@ export function BookingEditor({
     confirmationCode: booking?.confirmationCode ?? "",
     note: booking?.note ?? "",
   });
+  const kind = draft.kind ?? "other";
   const titleLabel = {
     flight: "便名（任意）",
     hotel: "宿泊施設名",
@@ -481,18 +502,24 @@ export function BookingEditor({
     restaurant: "お店の名前",
     ticket: "施設・イベント名",
     other: "予約のタイトル",
-  }[draft.kind];
+  }[kind];
   const displayTitle =
-    draft.title.trim() || (draft.kind === "flight" ? flightTitle(draft) : "");
+    draft.title.trim() || (kind === "flight" ? flightTitle(draft) : "");
   const [mergeId, setMergeId] = useState<string | null>(null);
-  const candidate = !booking
-    ? findMatchingItineraryItem(travel.items, { ...draft, title: displayTitle })
-    : null;
+  const candidate =
+    !existing && !onDraft && draft.kind
+      ? findMatchingItineraryItem(ordinaryPlans(travel.items), {
+          ...draft,
+          kind,
+          title: displayTitle,
+        })
+      : null;
   const merged = candidate?.item.id === mergeId ? candidate.item : null;
   const { error, busy, submit } = useSubmit(
     () => {
       const input = {
         ...draft,
+        kind,
         title: displayTitle,
         endDay: draft.endDay || draft.day,
         note: [
@@ -504,23 +531,29 @@ export function BookingEditor({
       };
       if (input.note.length > 4000)
         throw new Error("メモは4,000文字以内にしてください");
-      if (booking) travel.updateBooking(booking.id, input);
-      else travel.createBooking(input);
+      if (onDraft) return onDraft(input);
+      if (existing) travel.updateBooking(existing.id, input);
+      else {
+        const id = travel.createBooking(input);
+        onSaved?.(id, files);
+      }
       if (merged) travel.deleteItem(merged.id);
     },
     () =>
-      !displayTitle
-        ? `${titleLabel}を入力してください`
-        : dateError(draft.day) ||
-          (draft.endDay && !validDate(draft.endDay)
-            ? "正しい終了日を入力してください"
-            : "") ||
-          (draft.kind !== "flight" && draft.endDay && draft.endDay < draft.day
-            ? "終了日は開始日以降にしてください"
-            : "") ||
-          (draft.location && !mapUrl(draft.location)
-            ? "正しい住所・URLを入力してください"
-            : ""),
+      !draft.kind
+        ? "先に種類を選んでください"
+        : !displayTitle
+          ? `${titleLabel}を入力してください`
+          : dateError(draft.day) ||
+            (draft.endDay && !validDate(draft.endDay)
+              ? "正しい終了日を入力してください"
+              : "") ||
+            (kind !== "flight" && draft.endDay && draft.endDay < draft.day
+              ? "終了日は開始日以降にしてください"
+              : "") ||
+            (draft.location && !mapUrl(draft.location)
+              ? "正しい住所・URLを入力してください"
+              : ""),
     onClose,
   );
   const field = (
@@ -556,8 +589,8 @@ export function BookingEditor({
       />
     </Field>
   );
-  const route = ["flight", "train", "car"].includes(draft.kind);
-  const rangeBooking = route || draft.kind === "hotel";
+  const route = ["flight", "train", "car"].includes(kind);
+  const rangeBooking = route || kind === "hotel";
   const dateLabels = {
     flight: { label: "フライト日時", start: "出発", end: "到着" },
     hotel: { label: "宿泊期間", start: "チェックイン", end: "チェックアウト" },
@@ -566,138 +599,185 @@ export function BookingEditor({
     restaurant: { label: "予約日・予約時刻", start: "予約日", end: "" },
     ticket: { label: "利用日・利用時刻", start: "利用日", end: "" },
     other: { label: "日付・時刻", start: "日付", end: "" },
-  }[draft.kind];
+  }[kind];
   return (
-    <Modal title={booking ? "予約を編集" : "予約を追加"} onClose={onClose} full>
-      <form className="form" onSubmit={submit}>
-        <Field label="種類">
-          <select
-            value={draft.kind}
-            onChange={(event) =>
-              setDraft({ ...draft, kind: event.target.value as BookingKind })
+    <form className="form" onSubmit={submit}>
+      <div className="bk-kinds" role="group" aria-label="種類">
+        {bookingKinds.map((entry) => {
+          const Icon = bookingIcons[entry.value];
+          return (
+            <button
+              key={entry.value}
+              type="button"
+              aria-pressed={draft.kind === entry.value}
+              onClick={(event) => {
+                setDraft({ ...draft, kind: entry.value });
+                spring(
+                  event.currentTarget,
+                  [{ transform: "scale(.88)" }, { transform: "none" }],
+                  "boing",
+                );
+              }}
+            >
+              <Icon size={26} strokeWidth={1.9} aria-hidden="true" />
+              {entry.label}
+            </button>
+          );
+        })}
+      </div>
+      {draft.kind && (
+        <>
+          {field("title", titleLabel, kind !== "flight")}
+          {kind === "flight" && (
+            <p className="muted form-hint">
+              例：GK211。空欄の場合は出発地・到着地を表示します。
+            </p>
+          )}
+          {field(
+            "detail",
+            kind === "flight" ? "航空会社・補足（任意）" : "予約内容",
+          )}
+          {route && (
+            <div className={kind === "flight" ? "airport-fields" : "form-grid"}>
+              {kind === "flight" ? (
+                <>
+                  <AirportField
+                    label="出発地"
+                    value={draft.origin}
+                    code={draft.originCode}
+                    onChange={(origin, originCode) =>
+                      setDraft((current) => ({
+                        ...current,
+                        origin,
+                        originCode,
+                      }))
+                    }
+                  />
+                  <AirportField
+                    label="到着地"
+                    value={draft.destination}
+                    code={draft.destinationCode}
+                    onChange={(destination, destinationCode) =>
+                      setDraft((current) => ({
+                        ...current,
+                        destination,
+                        destinationCode,
+                      }))
+                    }
+                  />
+                </>
+              ) : (
+                <>
+                  {field("origin", kind === "car" ? "受取場所" : "出発駅")}
+                  {field("destination", kind === "car" ? "返却場所" : "到着駅")}
+                </>
+              )}
+            </div>
+          )}
+          {!route && field("location", "住所・Google MapsのURL")}
+          <DatePicker
+            label={dateLabels.label}
+            startLabel={dateLabels.start}
+            endLabel={dateLabels.end}
+            range={rangeBooking}
+            required
+            showTime
+            value={draft.day}
+            endValue={draft.endDay}
+            startTime={draft.time}
+            endTime={draft.endTime}
+            onChange={(day, endDay, time, endTime) =>
+              setDraft({
+                ...draft,
+                day,
+                endDay,
+                time,
+                endTime: rangeBooking ? endTime : time,
+              })
             }
-          >
-            {bookingKinds.map((entry) => (
-              <option key={entry.value} value={entry.value}>
-                {entry.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        {field("title", titleLabel, draft.kind !== "flight")}
-        {draft.kind === "flight" && (
-          <p className="muted form-hint">
-            例：GK211。空欄の場合は出発地・到着地を表示します。
-          </p>
-        )}
-        {field(
-          "detail",
-          draft.kind === "flight" ? "航空会社・補足（任意）" : "予約内容",
-        )}
-        {route && (
-          <div
-            className={draft.kind === "flight" ? "airport-fields" : "form-grid"}
-          >
-            {draft.kind === "flight" ? (
-              <>
-                <AirportField
-                  label="出発地"
-                  value={draft.origin}
-                  code={draft.originCode}
-                  onChange={(origin, originCode) =>
-                    setDraft((current) => ({ ...current, origin, originCode }))
-                  }
-                />
-                <AirportField
-                  label="到着地"
-                  value={draft.destination}
-                  code={draft.destinationCode}
-                  onChange={(destination, destinationCode) =>
-                    setDraft((current) => ({
-                      ...current,
-                      destination,
-                      destinationCode,
-                    }))
-                  }
-                />
-              </>
-            ) : (
-              <>
-                {field("origin", draft.kind === "car" ? "受取場所" : "出発駅")}
-                {field(
-                  "destination",
-                  draft.kind === "car" ? "返却場所" : "到着駅",
-                )}
-              </>
-            )}
-          </div>
-        )}
-        {!route && field("location", "住所・Google MapsのURL")}
-        <DatePicker
-          label={dateLabels.label}
-          startLabel={dateLabels.start}
-          endLabel={dateLabels.end}
-          range={rangeBooking}
-          required
-          showTime
-          value={draft.day}
-          endValue={draft.endDay}
-          startTime={draft.time}
-          endTime={draft.endTime}
-          onChange={(day, endDay, time, endTime) =>
-            setDraft({
-              ...draft,
-              day,
-              endDay,
-              time,
-              endTime: rangeBooking ? endTime : time,
-            })
-          }
-        />
-        {["flight", "train"].includes(draft.kind) && (
-          <Field label="所要時間（分・空欄なら自動計算）">
-            <Input
-              type="number"
-              min={1}
-              max={10080}
-              value={draft.durationMinutes ?? ""}
+          />
+          {["flight", "train"].includes(kind) && (
+            <Field label="所要時間（分・空欄なら自動計算）">
+              <Input
+                type="number"
+                min={1}
+                max={10080}
+                value={draft.durationMinutes ?? ""}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    durationMinutes: event.target.value
+                      ? Number(event.target.value)
+                      : null,
+                  })
+                }
+              />
+            </Field>
+          )}
+          {candidate && (
+            <label className="check-line">
+              <input
+                type="checkbox"
+                checked={merged !== null}
+                onChange={(event) =>
+                  setMergeId(event.target.checked ? candidate.item.id : null)
+                }
+              />
+              重複する予定「{candidate.item.title}」をこの予約へまとめる
+            </label>
+          )}
+          {field("confirmationCode", "予約番号")}
+          <Field label="メモ">
+            <Textarea
+              rows={5}
+              maxLength={4000}
+              value={draft.note}
               onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  durationMinutes: event.target.value
-                    ? Number(event.target.value)
-                    : null,
-                })
+                setDraft({ ...draft, note: event.target.value })
               }
             />
           </Field>
-        )}
-        {candidate && (
-          <label className="check-line">
-            <input
-              type="checkbox"
-              checked={merged !== null}
-              onChange={(event) =>
-                setMergeId(event.target.checked ? candidate.item.id : null)
-              }
-            />
-            重複する予定「{candidate.item.title}」をこの予約へまとめる
-          </label>
-        )}
-        {field("confirmationCode", "予約番号")}
-        <Field label="メモ">
-          <Textarea
-            rows={5}
-            maxLength={4000}
-            value={draft.note}
-            onChange={(event) =>
-              setDraft({ ...draft, note: event.target.value })
-            }
-          />
-        </Field>
-        <ErrorText message={error} />
-        <SaveButton busy={busy} />
-      </form>
+          {!existing && !onDraft && (
+            <label className="bk-attach">
+              <Paperclip size={18} aria-hidden="true" />
+              {files.length
+                ? files.map((file) => file.name).join("、")
+                : "書類（PDF・画像）を付ける"}
+              <input
+                hidden
+                type="file"
+                multiple
+                accept="application/pdf,image/jpeg,image/png,image/gif,image/webp,.heic,.heif"
+                onChange={(event) => {
+                  setFiles(Array.from(event.target.files ?? []));
+                  event.target.value = "";
+                }}
+              />
+            </label>
+          )}
+        </>
+      )}
+      <ErrorText message={error} />
+      <SaveButton busy={busy} />
+    </form>
+  );
+}
+export function BookingEditor({
+  booking,
+  onClose,
+  onDraft,
+}: {
+  booking?: Booking | BookingInput;
+  onClose: () => void;
+  onDraft?: (input: BookingInput) => void;
+}) {
+  return (
+    <Modal
+      title={onDraft ? "予約を直す" : booking ? "予約を編集" : "予約を追加"}
+      onClose={onClose}
+      full
+    >
+      <BookingForm booking={booking} onClose={onClose} onDraft={onDraft} />
     </Modal>
   );
 }
@@ -901,179 +981,6 @@ export function PlaceEditor({
           />
         </Field>
 
-        <ErrorText message={error} />
-        <SaveButton busy={busy} />
-      </form>
-    </Modal>
-  );
-}
-export function PreparationEditor({
-  type,
-  item,
-  onClose,
-}: {
-  type: "task" | "packing";
-  item?: TravelTask | PackingItem;
-  onClose: () => void;
-}) {
-  const travel = useTravel();
-  const task = type === "task";
-  const [name, setName] = useState(
-    item ? ("title" in item ? item.title : item.name) : "",
-  );
-  const [assignee, setAssignee] = useState(item?.assignee ?? "");
-  const [dueOn, setDueOn] = useState(item && "dueOn" in item ? item.dueOn : "");
-  const [hasDueDate, setHasDueDate] = useState(Boolean(dueOn));
-  const [category, setCategory] = useState(
-    item && "category" in item ? item.category : "その他",
-  );
-  const [quantity, setQuantity] = useState(
-    item && "quantity" in item ? item.quantity : 1,
-  );
-  const [shared, setShared] = useState(
-    item && "shared" in item ? (item.shared ?? false) : false,
-  );
-  const { error, busy, submit } = useSubmit(
-    () => {
-      if (task) {
-        const input = {
-          title: name,
-          dueOn: hasDueDate ? dueOn : "",
-          assignee,
-          done: item && "done" in item ? item.done : false,
-        };
-        if (item) travel.updateTask(item.id, input);
-        else travel.createTask(input);
-      } else {
-        const input = {
-          name,
-          category,
-          quantity,
-          assignee,
-          shared: !assignee || shared,
-          packed: item && "packed" in item ? item.packed : false,
-        };
-        if (item) travel.updatePackingItem(item.id, input);
-        else travel.createPackingItem(input);
-      }
-    },
-    () =>
-      !name.trim()
-        ? "名前を入力してください"
-        : task && hasDueDate && !validDate(dueOn)
-          ? "正しい期限を入力してください"
-          : "",
-    onClose,
-  );
-  const { run: runDelete, busy: deleting } = useAction();
-  const deleteButton = item ? (
-    <button
-      type="button"
-      className="icon-button danger"
-      aria-label={`${task ? "やること" : "持ち物"}を削除`}
-      disabled={busy || deleting}
-      onClick={() => {
-        if (!confirm(`「${name}」を削除しますか？`)) return;
-        void runDelete(() => {
-          if (task) travel.deleteTask(item.id);
-          else travel.deletePackingItem(item.id);
-          dismissModal(onClose);
-        });
-      }}
-    >
-      <Trash2 size={20} />
-    </button>
-  ) : undefined;
-  return (
-    <Modal
-      title={`${task ? "やること" : "持ち物"}を${item ? "編集" : "追加"}`}
-      onClose={onClose}
-      full={task}
-      action={deleteButton}
-      dockActions={{ actions: deleteButton }}
-    >
-      <form className="form" onSubmit={submit}>
-        <Field label={task ? "やること" : "持ち物"}>
-          <Input
-            required
-            maxLength={task ? 160 : 120}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-        </Field>
-        <Field label="担当">
-          <select
-            value={assignee}
-            onChange={(event) => setAssignee(event.target.value)}
-          >
-            <option value="">{task ? "未指定" : "共用"}</option>
-            {travel.members.map((member) => (
-              <option key={member.id} value={memberAssignee(member.id)}>
-                {member.name || member.email}
-              </option>
-            ))}
-            {assignee &&
-              !travel.members.some(
-                (member) => memberAssignee(member.id) === assignee,
-              ) && (
-                <option value={assignee}>
-                  {assigneeName(assignee, travel.members)}
-                </option>
-              )}
-          </select>
-        </Field>
-        {task ? (
-          <>
-            <label className="check-line">
-              <input
-                type="checkbox"
-                checked={hasDueDate}
-                onChange={(event) => setHasDueDate(event.target.checked)}
-              />
-              期限を設定する
-            </label>
-            {hasDueDate && (
-              <DatePicker
-                label="期限"
-                required
-                value={dueOn}
-                onChange={(day) => setDueOn(day)}
-              />
-            )}
-          </>
-        ) : (
-          <>
-            <div className="form-grid">
-              <Field label="カテゴリ">
-                <Input
-                  maxLength={40}
-                  value={category}
-                  onChange={(event) => setCategory(event.target.value)}
-                />
-              </Field>
-              <Field label="個数">
-                <Input
-                  type="number"
-                  min={1}
-                  max={99}
-                  required
-                  value={quantity}
-                  onChange={(event) => setQuantity(Number(event.target.value))}
-                />
-              </Field>
-            </div>
-            {assignee && (
-              <label className="check-line">
-                <input
-                  type="checkbox"
-                  checked={shared}
-                  onChange={(event) => setShared(event.target.checked)}
-                />
-                みんなで使う共用品
-              </label>
-            )}
-          </>
-        )}
         <ErrorText message={error} />
         <SaveButton busy={busy} />
       </form>

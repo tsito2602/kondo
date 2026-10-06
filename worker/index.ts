@@ -3,11 +3,12 @@ import { Hono } from 'hono';
 import { validDate } from '../src/utils/dates';
 import { itineraryCategories, transportModes, itineraryDetailsError } from '../src/data/itinerary';
 import type { ItineraryDetails } from '../src/data/types';
-import { mapUrl, referenceUrl } from '../src/data/places';
+import { isShortMapsLink, mapCoordinates, mapUrl, referenceUrl, type Coordinates } from '../src/data/places';
 import { validNoteContent, notePlainText, NOTE_TITLE_LIMIT, NOTE_BODY_LIMIT } from '../src/data/notes';
 
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { connectionBetween, createsFlightConnectionCycle, type FlightConnectionInput } from '../src/data/flight-connections';
+import { startBookingImport, type AIBinding } from './booking-import';
 
 type Env = {
   DB: D1Database;
@@ -15,6 +16,9 @@ type Env = {
   ASSETS: Fetcher;
   GOOGLE_CLIENT_IDS: string;
   ALLOWED_ORIGINS?: string;
+  /** Workers AI binding and AI Gateway id for reading booking documents. Import is off without either. */
+  AI?: AIBinding;
+  AI_GATEWAY_ID?: string;
 };
 
 type User = { id: string; email: string; name: string | null; avatarUrl: string | null };
@@ -221,11 +225,23 @@ function placeFields(body: Record<string, unknown>) {
   if (/^[a-z][a-z0-9+.-]*:/i.test(location) && !/^https?:\/\//i.test(location)) return null;
   return { title, note, openingHours, location, status, reservationStatus, ...(referenceLinks === undefined ? {} : { referenceLinks }), ...(itineraryItemId === undefined ? {} : { itineraryItemId }) };
 }
+/** Coordinates from a pasted Google Maps link; a short share link is followed one redirect. */
+async function placeCoordinates(location: string): Promise<Coordinates | null> {
+  const direct = mapCoordinates(location);
+  if (direct || !isShortMapsLink(location)) return direct;
+  try {
+    const response = await fetch(new URL(location.trim()).href, { redirect: 'manual', signal: AbortSignal.timeout(4000) });
+    const target = response.headers.get('location');
+    return target ? mapCoordinates(new URL(target, location.trim()).href) : null;
+  } catch {
+    return null;
+  }
+}
 async function placesRoute(request: Request, env: Env, user: User, tripId: string, placeId?: string) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
   if (!placeId && request.method === 'GET') {
-    const rows = await env.DB.prepare(`SELECT p.id, p.title, p.note, p.opening_hours AS openingHours, COALESCE(d.reservation_status, p.reservation_status) AS reservationStatus, p.location, p.status, p.updated_at AS updatedAt, COALESCE(d.reference_links, '[]') AS referenceLinks, l.item_id AS itineraryItemId FROM places p LEFT JOIN place_itinerary_links l ON l.place_id = p.id LEFT JOIN place_details d ON d.place_id = p.id WHERE p.trip_id = ? ORDER BY p.updated_at DESC, p.id`).bind(tripId).all();
+    const rows = await env.DB.prepare(`SELECT p.id, p.title, p.note, p.opening_hours AS openingHours, COALESCE(d.reservation_status, p.reservation_status) AS reservationStatus, p.location, p.status, p.updated_at AS updatedAt, COALESCE(d.reference_links, '[]') AS referenceLinks, l.item_id AS itineraryItemId, c.lat, c.lng FROM places p LEFT JOIN place_itinerary_links l ON l.place_id = p.id LEFT JOIN place_details d ON d.place_id = p.id LEFT JOIN place_coordinates c ON c.place_id = p.id WHERE p.trip_id = ? ORDER BY p.updated_at DESC, p.id`).bind(tripId).all();
     return json({ places: rows.results.map((row) => ({ ...row, referenceLinks: JSON.parse(row.referenceLinks as string) })) });
   }
   if (placeId && request.method === 'DELETE') {
@@ -253,16 +269,27 @@ async function placesRoute(request: Request, env: Env, user: User, tripId: strin
       ON CONFLICT(place_id) DO UPDATE SET item_id = CASE WHEN ? THEN excluded.item_id ELSE place_itinerary_links.item_id END
     `).bind(id, fields.itineraryItemId ?? null, id, tripId, fields.itineraryItemId !== undefined ? 1 : 0);
     const linksJson = referenceLinks === undefined ? null : JSON.stringify(referenceLinks);
+    // Re-read coordinates only when the link changed, so a failed redirect never drops a known pin.
+    const previous = await env.DB.prepare('SELECT p.location, c.lat, c.lng FROM places p LEFT JOIN place_coordinates c ON c.place_id = p.id WHERE p.id = ? AND p.trip_id = ?').bind(id, tripId).first<{ location: string; lat: number | null; lng: number | null }>();
+    const coordinates = previous && previous.location === location && previous.lat != null && previous.lng != null
+      ? { lat: previous.lat, lng: previous.lng }
+      : await placeCoordinates(location);
+    const coordinateStatement = coordinates
+      ? env.DB.prepare(`INSERT INTO place_coordinates (place_id, lat, lng)
+          SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM places WHERE id = ? AND trip_id = ?)
+          ON CONFLICT(place_id) DO UPDATE SET lat = excluded.lat, lng = excluded.lng`).bind(id, coordinates.lat, coordinates.lng, id, tripId)
+      : env.DB.prepare('DELETE FROM place_coordinates WHERE place_id = ? AND EXISTS (SELECT 1 FROM places WHERE id = ? AND trip_id = ?)').bind(id, id, tripId);
     const [result] = await env.DB.batch([
       statement,
       itemLink,
+      coordinateStatement,
       env.DB.prepare(`INSERT INTO place_details (place_id, reference_links, reservation_status)
         SELECT ?, COALESCE(?, '[]'), ? WHERE EXISTS (SELECT 1 FROM places WHERE id = ? AND trip_id = ?)
         ON CONFLICT(place_id) DO UPDATE SET reference_links = COALESCE(?, place_details.reference_links), reservation_status = excluded.reservation_status
       `).bind(id, linksJson, reservationStatus === 'unavailable' ? reservationStatus : null, id, tripId, linksJson),
     ]);
     if (!result.meta.changes) return json({ error: '場所が見つからないか、IDが競合しました' }, placeId ? 404 : 409);
-    return json({ place: { id, ...fields } }, placeId ? 200 : 201);
+    return json({ place: { id, ...fields, lat: coordinates?.lat ?? null, lng: coordinates?.lng ?? null } }, placeId ? 200 : 201);
   }
   return json({ error: 'Not found' }, 404);
 }
@@ -271,9 +298,9 @@ async function notesRoute(request: Request, env: Env, user: User, tripId: string
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
   if (request.method === 'GET' && !noteId) {
-    const rows = await env.DB.prepare(`SELECT n.id, n.body, n.updated_at AS updatedAt, COALESCE(d.title, '') AS title, d.content
-      FROM travel_notes n LEFT JOIN note_details d ON d.note_id=n.id WHERE n.trip_id=? ORDER BY n.updated_at DESC, n.id`).bind(tripId).all();
-    return json({ notes: rows.results.map(({ content, ...row }) => ({ ...row, pinned: false, content: content ? JSON.parse(String(content)) : null })) });
+    const rows = await env.DB.prepare(`SELECT n.id, n.body, n.pinned, n.updated_by AS updatedBy, n.updated_at AS updatedAt, COALESCE(d.title, '') AS title, d.content, l.place_id AS placeId
+      FROM travel_notes n LEFT JOIN note_details d ON d.note_id=n.id LEFT JOIN note_places l ON l.note_id=n.id WHERE n.trip_id=? ORDER BY n.updated_at DESC, n.id`).bind(tripId).all();
+    return json({ notes: rows.results.map(({ content, pinned, ...row }) => ({ ...row, pinned: pinned === 1, content: content ? JSON.parse(String(content)) : null })) });
   }
   if (request.method === 'DELETE' && noteId) {
     await env.DB.prepare('DELETE FROM travel_notes WHERE id=? AND trip_id=?').bind(noteId, tripId).run();
@@ -284,17 +311,25 @@ async function notesRoute(request: Request, env: Env, user: User, tripId: string
     if (!isObject(body) || !idField(body.id) || typeof body.body !== 'string' || body.body.length > NOTE_BODY_LIMIT) return json({ error: 'メモは50,000文字以内で入力してください' }, 400);
     if (body.title !== undefined && (typeof body.title !== 'string' || body.title.length > NOTE_TITLE_LIMIT)) return json({ error: 'タイトルは120文字以内で入力してください' }, 400);
     if (body.content != null && !validNoteContent(body.content)) return json({ error: 'メモの書式を確認してください' }, 400);
+    // Older clients omit pinned/placeId; omission keeps what is stored.
+    if (body.pinned !== undefined && typeof body.pinned !== 'boolean') return json({ error: 'ピン留めの値を確認してください' }, 400);
+    if (body.placeId != null && !idField(body.placeId)) return json({ error: '場所を確認してください' }, 400);
+    const pinned = body.pinned === undefined ? null : body.pinned ? 1 : 0;
+    const placeId = body.placeId === undefined ? undefined : body.placeId === null ? null : (await env.DB.prepare('SELECT id FROM places WHERE id=? AND trip_id=?').bind(body.placeId, tripId).first<{ id: string }>())?.id ?? null;
     const plain = body.content == null ? body.body : notePlainText(body.content);
     if (plain.length > NOTE_BODY_LIMIT) return json({ error: 'メモは50,000文字以内で入力してください' }, 400);
     const content = body.content == null ? null : JSON.stringify(body.content);
     const [result] = await env.DB.batch([
-      env.DB.prepare(`INSERT INTO travel_notes (id,trip_id,body,pinned,updated_by) VALUES (?,?,?,0,?)
-        ON CONFLICT(id) DO UPDATE SET body=excluded.body,pinned=0,updated_by=excluded.updated_by,updated_at=unixepoch()
-        WHERE travel_notes.trip_id=excluded.trip_id`).bind(body.id, tripId, plain, user.id),
+      env.DB.prepare(`INSERT INTO travel_notes (id,trip_id,body,pinned,updated_by) VALUES (?,?,?,COALESCE(?,0),?)
+        ON CONFLICT(id) DO UPDATE SET body=excluded.body,pinned=COALESCE(?,travel_notes.pinned),updated_by=excluded.updated_by,updated_at=unixepoch()
+        WHERE travel_notes.trip_id=excluded.trip_id`).bind(body.id, tripId, plain, pinned, user.id, pinned),
       env.DB.prepare(`INSERT INTO note_details (note_id,title,content)
         SELECT ?,COALESCE(?,''),? WHERE EXISTS (SELECT 1 FROM travel_notes WHERE id=? AND trip_id=?)
         ON CONFLICT(note_id) DO UPDATE SET title=COALESCE(?,note_details.title),content=excluded.content
       `).bind(body.id, body.title ?? null, content, body.id, tripId, body.title ?? null),
+      ...(placeId === undefined ? [] : [env.DB.prepare(`INSERT INTO note_places (note_id,place_id)
+        SELECT ?,? WHERE EXISTS (SELECT 1 FROM travel_notes WHERE id=? AND trip_id=?)
+        ON CONFLICT(note_id) DO UPDATE SET place_id=excluded.place_id`).bind(body.id, placeId, body.id, tripId)]),
     ]);
     if (!result.meta.changes) return json({ error: 'メモのIDが競合しました' }, 409);
     return json({ id: body.id }, 201);
@@ -329,6 +364,16 @@ function parseItineraryDetails(value: unknown, day: string, time: string): Itine
     if (origin === null || destination === null || (duration !== undefined && (typeof duration !== 'number' || !Number.isInteger(duration) || duration < 1 || duration > 10080))) return null;
     details.transport = { mode: transport.mode as NonNullable<ItineraryDetails['transport']>['mode'], origin, destination, ...(duration === undefined ? {} : { durationMinutes: duration as number }), ...(afterKey === undefined ? {} : { afterKey: afterKey as string }) };
   } else if (value.transport !== undefined) return null;
+  // Optional and additive: rows without these keep parsing as before.
+  const stay = value.stay;
+  if (stay !== undefined) {
+    if (!isObject(stay) || typeof stay.bookingId !== 'string' || !/^[a-zA-Z0-9-]{1,100}$/.test(stay.bookingId) || (stay.endpoint !== 'start' && stay.endpoint !== 'end')) return null;
+    details.stay = { bookingId: stay.bookingId, endpoint: stay.endpoint };
+  }
+  if (value.ownPlace !== undefined) {
+    if (typeof value.ownPlace !== 'boolean') return null;
+    if (value.ownPlace) details.ownPlace = true;
+  }
   return itineraryDetailsError(day, time, details) ? null : details;
 }
 
@@ -598,6 +643,14 @@ async function listBookingDocuments(env: Env, user: User, tripId: string) {
   return json({ documents: result.results });
 }
 
+async function importBookings(request: Request, env: Env, user: User, tripId: string) {
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  const trip = await env.DB.prepare('SELECT starts_on AS startsOn, ends_on AS endsOn FROM trips WHERE id = ?').bind(tripId).first<{ startsOn: string; endsOn: string }>();
+  if (!trip) return json({ error: '旅行が見つかりません' }, 404);
+  return startBookingImport(request, env, trip);
+}
+
 async function uploadBookingDocument(request: Request, env: Env, user: User, tripId: string, bookingId: string) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
@@ -665,6 +718,9 @@ async function deleteBookingDocument(env: Env, user: User, tripId: string, booki
   return new Response(null, { status: 204 });
 }
 
+type PackingKind = 'each' | 'one' | 'mine';
+const packingKinds = new Set<PackingKind>(['each', 'one', 'mine']);
+
 type PackingRow = {
   id: string;
   name: string;
@@ -673,6 +729,8 @@ type PackingRow = {
   packed: number;
   assignee: string;
   shared: number;
+  kind: PackingKind;
+  marks: string | null;
   updatedBy: string;
   updatedAt: number;
 };
@@ -686,19 +744,35 @@ function packingFields(body: Record<string, unknown>) {
   const assignee = body.assignee === undefined ? undefined : typeof body.assignee === 'string' ? textField(body.assignee, 80) : null;
   const shared = body.shared;
   if (assignee === null || (shared !== undefined && typeof shared !== 'boolean')) return null;
-  return { name, category, quantity, packed, assignee, shared };
+  // Older clients omit the kind; the stored kind (or legacy 'one') is kept.
+  const kind = body.kind === undefined ? undefined : packingKinds.has(body.kind as PackingKind) ? body.kind as PackingKind : null;
+  if (kind === null) return null;
+  return { name, category, quantity, packed, assignee, shared, kind };
 }
+
+/** Each member sees their own tick as `packed`; みんな各自 also lists who has packed. */
+function packingView(row: PackingRow, userId: string) {
+  const { marks, ...item } = row;
+  const packedBy = row.kind === 'each' ? (marks ?? '').split('\n').filter(Boolean).sort() : [];
+  return { ...item, packed: row.kind === 'each' ? packedBy.includes(userId) : Boolean(row.packed), shared: Boolean(row.shared), packedBy };
+}
+
+const packingSelect = `
+  SELECT p.id, p.name, p.category, p.quantity, p.packed, p.updated_by AS updatedBy, p.updated_at AS updatedAt,
+    COALESCE(d.assignee, '') AS assignee, COALESCE(d.shared, 0) AS shared, COALESCE(k.kind, 'one') AS kind,
+    (SELECT group_concat(m.user_id, char(10)) FROM packing_marks m
+      JOIN trip_members tm ON tm.trip_id = p.trip_id AND tm.user_id = m.user_id WHERE m.item_id = p.id) AS marks
+  FROM packing_items p LEFT JOIN packing_details d ON d.item_id = p.id LEFT JOIN packing_kinds k ON k.item_id = p.id`;
+// 自分だけ items stay on the server for their owner only, never for the rest of the trip.
+const packingVisible = `(COALESCE(k.kind, 'one') <> 'mine' OR k.owner_id = ?)`;
 
 async function listPacking(env: Env, user: User, tripId: string) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
-  const result = await env.DB.prepare(`
-    SELECT p.id, p.name, p.category, p.quantity, p.packed, p.updated_by AS updatedBy, p.updated_at AS updatedAt,
-      COALESCE(d.assignee, '') AS assignee, COALESCE(d.shared, 0) AS shared
-    FROM packing_items p LEFT JOIN packing_details d ON d.item_id = p.id
-    WHERE p.trip_id = ? ORDER BY p.packed, p.category, p.name, p.id
-  `).bind(tripId).all<PackingRow>();
-  return json({ items: result.results.map((item) => ({ ...item, packed: Boolean(item.packed), shared: Boolean(item.shared) })) });
+  const result = await env.DB.prepare(`${packingSelect}
+    WHERE p.trip_id = ? AND ${packingVisible} ORDER BY p.packed, p.category, p.name, p.id
+  `).bind(tripId, user.id).all<PackingRow>();
+  return json({ items: result.results.map((item) => packingView(item, user.id)) });
 }
 
 async function validatePackingAssignee(env: Env, tripId: string, assignee: string | undefined, itemId: string) {
@@ -716,30 +790,53 @@ async function writePackingItem(request: Request, env: Env, user: User, tripId: 
   const fields = isObject(body) ? packingFields(body) : null;
   if (!fields) return json({ error: '正しい持ち物情報を入力してください' }, 400);
   const id = itemId ?? idField(isObject(body) ? body.id : undefined) ?? crypto.randomUUID();
+  const existing = await env.DB.prepare(`SELECT p.packed, COALESCE(d.assignee, '') AS assignee, COALESCE(k.kind, 'one') AS kind, k.owner_id AS ownerId
+    FROM packing_items p LEFT JOIN packing_details d ON d.item_id = p.id LEFT JOIN packing_kinds k ON k.item_id = p.id WHERE p.id = ?`)
+    .bind(id).first<{ packed: number; assignee: string; kind: PackingKind; ownerId: string | null }>();
+  // Someone else's private item does not exist for this user.
+  if (existing?.kind === 'mine' && existing.ownerId !== user.id) return json({ error: '持ち物が見つからないか、IDが競合しました' }, itemId ? 404 : 409);
   const invalidAssignee = await validatePackingAssignee(env, tripId, fields.assignee, id);
   if (invalidAssignee) return invalidAssignee;
+  const kind = fields.kind ?? existing?.kind ?? 'one';
+  const carrier = fields.assignee ?? existing?.assignee ?? '';
+  // 1つでいい: only the member who took it ticks it. A stale or foreign tick is
+  // ignored rather than rejected so an offline queue is never blocked by it.
+  const packed = kind === 'one' && existing && carrier.startsWith('member:') && carrier !== `member:${user.id}`
+    ? Boolean(existing.packed)
+    : fields.packed;
   const statement = itemId
     ? env.DB.prepare(`UPDATE packing_items SET name = ?, category = ?, quantity = ?, packed = ?, updated_by = ?, updated_at = unixepoch() WHERE id = ? AND trip_id = ?`)
-      .bind(fields.name, fields.category, fields.quantity, fields.packed ? 1 : 0, user.id, id, tripId)
+      .bind(fields.name, fields.category, fields.quantity, packed ? 1 : 0, user.id, id, tripId)
     : env.DB.prepare(`INSERT INTO packing_items (id, trip_id, name, category, quantity, packed, updated_by)
       VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET name = excluded.name, category = excluded.category, quantity = excluded.quantity,
         packed = excluded.packed, updated_by = excluded.updated_by, updated_at = unixepoch()
       WHERE packing_items.trip_id = excluded.trip_id`)
-      .bind(id, tripId, fields.name, fields.category, fields.quantity, fields.packed ? 1 : 0, user.id);
+      .bind(id, tripId, fields.name, fields.category, fields.quantity, packed ? 1 : 0, user.id);
   // Omitted fields from older/offline clients must not clear the assignment.
   const assignee = fields.assignee ?? null;
   const shared = fields.shared === undefined ? null : fields.shared ? 1 : 0;
-  const [result] = await env.DB.batch([
+  const inTrip = 'EXISTS (SELECT 1 FROM packing_items WHERE id = ? AND trip_id = ?)';
+  const statements = [
     statement,
     env.DB.prepare(`INSERT INTO packing_details (item_id, assignee, shared)
-      SELECT ?, COALESCE(?, ''), COALESCE(?, 0) WHERE EXISTS (SELECT 1 FROM packing_items WHERE id = ? AND trip_id = ?)
+      SELECT ?, COALESCE(?, ''), COALESCE(?, 0) WHERE ${inTrip}
       ON CONFLICT(item_id) DO UPDATE SET assignee = COALESCE(?, packing_details.assignee), shared = COALESCE(?, packing_details.shared)`)
       .bind(id, assignee, shared, id, tripId, assignee, shared),
-  ]);
+  ];
+  if (fields.kind)
+    statements.push(env.DB.prepare(`INSERT INTO packing_kinds (item_id, kind, owner_id) SELECT ?, ?, ? WHERE ${inTrip}
+      ON CONFLICT(item_id) DO UPDATE SET kind = excluded.kind, owner_id = excluded.owner_id`)
+      .bind(id, fields.kind, fields.kind === 'mine' ? user.id : null, id, tripId));
+  // みんな各自: `packed` is the caller's own tick.
+  if (kind === 'each')
+    statements.push(packed
+      ? env.DB.prepare(`INSERT INTO packing_marks (item_id, user_id) SELECT ?, ? WHERE ${inTrip} ON CONFLICT DO NOTHING`).bind(id, user.id, id, tripId)
+      : env.DB.prepare('DELETE FROM packing_marks WHERE item_id = ? AND user_id = ? AND ' + inTrip).bind(id, user.id, id, tripId));
+  const [result] = await env.DB.batch(statements);
   if (!result.meta.changes) return json({ error: '持ち物が見つからないか、IDが競合しました' }, itemId ? 404 : 409);
-  const details = await env.DB.prepare('SELECT assignee, shared FROM packing_details WHERE item_id = ?').bind(id).first<{ assignee: string; shared: number }>();
-  return json({ item: { id, ...fields, assignee: details?.assignee ?? '', shared: Boolean(details?.shared), updatedBy: user.id } }, itemId ? 200 : 201);
+  const saved = await env.DB.prepare(`${packingSelect} WHERE p.id = ? AND p.trip_id = ?`).bind(id, tripId).first<PackingRow>();
+  return json({ item: { ...(saved ? packingView(saved, user.id) : { id, ...fields, kind }), updatedBy: user.id } }, itemId ? 200 : 201);
 }
 
 const createPackingItem = (request: Request, env: Env, user: User, tripId: string) => writePackingItem(request, env, user, tripId);
@@ -748,7 +845,9 @@ const updatePackingItem = (request: Request, env: Env, user: User, tripId: strin
 async function deletePackingItem(env: Env, user: User, tripId: string, itemId: string) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
-  const result = await env.DB.prepare('DELETE FROM packing_items WHERE id = ? AND trip_id = ?').bind(itemId, tripId).run();
+  const result = await env.DB.prepare(`DELETE FROM packing_items WHERE id = ? AND trip_id = ?
+    AND NOT EXISTS (SELECT 1 FROM packing_kinds k WHERE k.item_id = packing_items.id AND k.kind = 'mine' AND k.owner_id IS NOT ?)`)
+    .bind(itemId, tripId, user.id).run();
   return result.meta.changes ? new Response(null, { status: 204 }) : json({ error: '持ち物が見つかりません' }, 404);
 }
 
@@ -951,6 +1050,7 @@ app.post('/v1/trips/:tripId/bookings', (c) => createBooking(c.req.raw, c.env, c.
 app.patch('/v1/trips/:tripId/bookings/:bookingId', (c) => updateBooking(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId')));
 app.delete('/v1/trips/:tripId/bookings/:bookingId', (c) => deleteBooking(c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId')));
 app.patch('/v1/trips/:tripId/bookings/:bookingId/connection', (c) => updateFlightConnection(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId')));
+app.post('/v1/trips/:tripId/booking-import', (c) => importBookings(c.req.raw, c.env, c.get('user'), c.req.param('tripId')));
 app.get('/v1/trips/:tripId/booking-documents', (c) => listBookingDocuments(c.env, c.get('user'), c.req.param('tripId')));
 app.post('/v1/trips/:tripId/bookings/:bookingId/documents', (c) => uploadBookingDocument(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId')));
 app.get('/v1/trips/:tripId/bookings/:bookingId/documents/:documentId', (c) => getBookingDocument(c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId'), c.req.param('documentId')));

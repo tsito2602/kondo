@@ -237,7 +237,7 @@ const submit = async () => {
 
 // Panels and dock retain the layout viewport when the keyboard opens.
 // Exercise focus, keyboard resizing/panning and dismissal in each real editor.
-const keyboardWhileEditing = async () => {
+const keyboardWhileEditing = async (backLabel = "戻る") => {
   const dialog = [...document.querySelectorAll("dialog[open]")].at(-1);
   const dock = document.querySelector(".thumb-dock-host");
   const field = dialog.querySelector('input:not([type="checkbox"]), textarea');
@@ -334,7 +334,7 @@ const keyboardWhileEditing = async () => {
     "keyboard dismissal preserves the draft",
   );
   assert.ok(
-    dialog.querySelector('[aria-label="戻る"]'),
+    dialog.querySelector(`[aria-label="${backLabel}"], .context-back-label`),
     "Back returns after dismissal",
   );
   panel.getBoundingClientRect = measurePanel;
@@ -353,6 +353,55 @@ const keyboardWhileEditing = async () => {
   );
   assert.equal(document.documentElement.dataset.keyboardOpen, "false");
   assert.equal(panel.style.getPropertyValue("--modal-panel-height"), "");
+};
+
+const setTime = async (label, value) => {
+  const input = document.querySelector(`dialog [aria-label="${label}"]`);
+  assert.ok(input, `time ${label} exists`);
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      dom.window.HTMLInputElement.prototype,
+      "value",
+    ).set.call(input, value);
+    input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+  });
+};
+
+// 予定の詳細 edits in place: the same sheet becomes the form and comes back.
+const editInPlace = async (change) => {
+  const detail = document.querySelector("dialog[open]");
+  const dock = document.querySelector(".thumb-dock-host");
+  for (const save of [false, true]) {
+    await click(document.querySelector('.context-actions [aria-label="編集"]'));
+    assert.equal(document.querySelectorAll("dialog[open]").length, 1);
+    assert.equal(document.querySelector("dialog[open]"), detail);
+    assert.equal(dock.parentElement, detail);
+    assert.ok(detail.querySelector("form"));
+    await keyboardWhileEditing("やめる");
+    if (save) {
+      await change();
+      const submitButton = dock.querySelector(
+        '.context-primary button[type="submit"]',
+      );
+      assert.equal(submitButton?.form, detail.querySelector("form"));
+      await act(async () =>
+        detail
+          .querySelector("form")
+          .dispatchEvent(
+            new dom.window.Event("submit", { bubbles: true, cancelable: true }),
+          ),
+      );
+      await tick(30);
+    } else {
+      await click(
+        document.querySelector('.context-back [aria-label="やめる"]'),
+      );
+      await tick(30);
+    }
+    assert.equal(document.querySelector("dialog[open]"), detail);
+    assert.equal(detail.querySelector("form"), null, "back to the details");
+    assert.ok(document.querySelector('.context-actions [aria-label="編集"]'));
+  }
 };
 
 // Exercise real details/editors: a fresh dialog would replay its entrance and
@@ -569,6 +618,20 @@ test("legacy account cache and pending changes survive React migration; real for
       });
     return response;
   };
+  // The app looks for a waiting service worker from launch.
+  const swRegistration = {
+    waiting: null,
+    update: async () => {},
+    addEventListener() {},
+  };
+  Object.defineProperty(navigator, "serviceWorker", {
+    configurable: true,
+    value: {
+      getRegistration: async () => swRegistration,
+      addEventListener() {},
+      removeEventListener() {},
+    },
+  });
   const root = createRoot(document.getElementById("root"));
   try {
     await act(async () =>
@@ -608,38 +671,93 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.equal((await loadTravelCache("owner")).pending.length, 0);
     assert.equal(localStorage.getItem("tabi.session"), "test-session");
     assert.equal(sessionStorage.getItem("tabi.session"), null);
-    const emptyDay = document.querySelector("#day-2026-11-24 .timeline-empty");
+    const emptyDay = document.querySelector("#day-2026-11-24 .it-empty button");
     assert.ok(emptyDay && !emptyDay.disabled);
     await click(emptyDay);
-    assert.match(field("開始").textContent, /2026年11月24日/);
+    assert.match(
+      document.querySelector(
+        'dialog [aria-label="日にち"] [aria-pressed="true"]',
+      ).textContent,
+      /^11\/24/,
+      "an empty day's button adds on that day",
+    );
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
     await click(document.querySelector('[aria-label="予定を追加"]'));
-    await fill("タイトル", "市内を歩く");
-    await fill("開始", { time: "14:00" });
-    await fill("終了", { start: trip.startsOn, time: "15:00" });
+    assert.match(
+      document.querySelector("dialog").textContent,
+      /予約タブから入れるとしおりにも並びます/,
+      "bookings are added in the 予約 tab, not here",
+    );
+    await fill("なにをする？", "市内を歩く");
+    await fill("時刻", "14:00");
     await submit();
     assert.equal(
       db.prepare("SELECT COUNT(*) AS n FROM itinerary_items").get().n,
       2,
-      "end time supplies same-day end date",
     );
     await click(
-      [...document.querySelectorAll(".timeline-entry")].find((entry) =>
+      [...document.querySelectorAll(".it-ev")].find((entry) =>
         entry.textContent.includes("市内を歩く"),
       ),
     );
     assert.ok(
       document.querySelector('.context-actions [aria-label="予定を削除"]'),
     );
-    await editAndReturn("タイトル", "市内を散策");
+    await editInPlace(async () => {
+      await fill("タイトル", "市内を散策");
+      await setTime("終了", "15:00");
+    });
+    assert.deepEqual(
+      JSON.parse(
+        db
+          .prepare(
+            "SELECT details FROM itinerary_details d JOIN itinerary_items i ON i.id = d.item_id WHERE i.title = ?",
+          )
+          .get("市内を散策").details,
+      ).endDay,
+      trip.startsOn,
+      "end time supplies same-day end date",
+    );
     assert.equal(document.querySelector(".context-primary").textContent, "");
     assert.equal(document.querySelector(".thumb-dock-host .safari-tabs"), null);
-    await click(document.querySelector('.context-back [aria-label="戻る"]'));
+    // Deleting is quiet: the plan goes at once and 「元に戻す」 brings it back.
+    await click(
+      document.querySelector('.context-actions [aria-label="予定を削除"]'),
+    );
+    await tick(400);
+    assert.equal(document.querySelector("dialog[open]"), null);
+    assert.equal(
+      [...document.querySelectorAll(".it-ev")].some((entry) =>
+        entry.textContent.includes("市内を散策"),
+      ),
+      false,
+    );
+    await click(document.querySelector(".it-undo"));
     await tick(30);
+    assert.ok(
+      [...document.querySelectorAll(".it-ev")].some((entry) =>
+        entry.textContent.includes("市内を散策"),
+      ),
+      "undo restores the plan",
+    );
+    assert.equal(
+      db.prepare("SELECT COUNT(*) AS n FROM itinerary_items").get().n,
+      2,
+    );
     await click(byText("nav a", "予約"));
     await click(document.querySelector('[aria-label="予約を追加"]'));
-    await fill("種類", "hotel");
+    assert.equal(
+      document.querySelector("dialog h2").textContent,
+      "予約を取り込む",
+    );
+    await click(document.querySelector("dialog .bk-swap"));
+    assert.equal(
+      field("宿泊施設名"),
+      undefined,
+      "the manual form shows no fields before a kind is chosen",
+    );
+    await click(byText("dialog .bk-kinds button", "ホテル"));
     await fill("宿泊施設名", "テストホテル");
     const hotelUrl =
       "https://links.h6.hilton.com/f/a/" +
@@ -650,7 +768,7 @@ test("legacy account cache and pending changes survive React migration; real for
     await fill("宿泊期間", { start: trip.startsOn, end: "2026-11-25" });
     await submit();
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings").get().n, 1);
-    await click(document.querySelector(".booking-ticket"));
+    await click(document.querySelector(".bk-card"));
     const hotelLink = document.querySelector("dialog .reference-link");
     assert.equal(hotelLink.href, hotelUrl);
     assert.match(hotelLink.textContent, /サイトを開く/);
@@ -673,7 +791,7 @@ test("legacy account cache and pending changes survive React migration; real for
     await editAndReturn("宿泊施設名", "更新したホテル");
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
-    await click(byText("nav a", "行きたい場所"));
+    await click(byText("nav a", "場所"));
     await click(document.querySelector('[aria-label="場所を追加"]'));
     assert.equal(field("訪問ステータス").closest("details"), null);
     assert.equal(field("訪問ステータス").value, "want");
@@ -700,7 +818,15 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await submit();
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM places").get().n, 1);
-    await click([...document.querySelectorAll(".place-card-main")][0]);
+    const placeRow = document.querySelector(".places-row");
+    assert.equal(placeRow.querySelector(".places-badge").textContent, "1");
+    assert.equal(
+      placeRow.querySelector(".places-row-distance").textContent,
+      "位置なし",
+      "a place without a map link says why it has no pin",
+    );
+    // Without coordinates the row opens 場所の詳細 directly.
+    await click(placeRow);
     const placeMapLink = [
       ...document.querySelectorAll("dialog .reference-link"),
     ].find((link) => link.textContent.includes("Google Mapsで開く"));
@@ -771,124 +897,219 @@ test("legacy account cache and pending changes survive React migration; real for
       document.querySelector(".context-primary").textContent,
       "しおりを見る",
     );
+    await click(document.querySelector('.context-actions [aria-label="編集"]'));
+    await fill(
+      "住所・Google MapsのURL",
+      "https://www.google.com/maps/place/Kunsthistorisches+Museum/@48.2037,16.3616,17z/data=!4m6!3m5!8m2!3d48.20379!4d16.36166",
+    );
+    await submit();
+    assert.deepEqual(
+      { ...db.prepare("SELECT lat, lng FROM place_coordinates").get() },
+      { lat: 48.20379, lng: 16.36166 },
+      "the Worker stores the pin from the pasted Google Maps link",
+    );
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(200);
-    await click(byText("nav a", "準備"));
-    await click(document.querySelector('[aria-label="やることを追加"]'));
+    const pin = await waitFor(
+      () =>
+        document.querySelector('.places-pin[aria-label="1 更新した美術館"]'),
+      "the scheduled place appears as pin 1 on its day",
+    );
+    assert.ok(pin.classList.contains("plan"));
     assert.equal(
-      field("担当").querySelector('option[value=""]').textContent,
-      "未指定",
+      [...document.querySelectorAll(".places-chips button")]
+        .map((chip) => chip.textContent)
+        .join(","),
+      "全日程,11/22",
+    );
+    await click(pin);
+    assert.equal(
+      document.querySelector(".places-card .places-tag").textContent,
+      "DAY 1 · 11/22 16:00",
+    );
+    assert.ok(
+      document
+        .querySelector(".places-card a.is-primary")
+        .href.startsWith("https://www.google.com/maps/place/"),
+    );
+    await click(document.querySelector('.places-card [aria-label="閉じる"]'));
+    assert.equal(document.querySelector(".places-card"), null);
+    // やること and 持ち物 are separate icon-only dock pages.
+    const dockTab = (label) =>
+      document.querySelector(
+        `.thumb-dock-host .safari-tabs a[aria-label="${label}"]`,
+      );
+    assert.deepEqual(
+      [...document.querySelectorAll(".thumb-dock-host .safari-tabs a")].map(
+        (link) => [link.getAttribute("aria-label"), link.textContent],
+      ),
+      [
+        ["しおり", ""],
+        ["場所", ""],
+        ["やること", ""],
+        ["持ち物", ""],
+        ["予約", ""],
+        ["メモ", ""],
+      ],
+    );
+    const typeInto = async (input, value) => {
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(
+          dom.window.HTMLInputElement.prototype,
+          "value",
+        ).set.call(input, value);
+        input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+      });
+    };
+    const submitSheet = async (primary) => {
+      // While typing, the back island closes the keyboard instead.
+      await act(async () => document.activeElement?.blur());
+      await tick(30);
+      const dock = document.querySelector(".thumb-dock-host");
+      const save = dock.querySelector('.context-primary button[type="submit"]');
+      assert.equal(save?.textContent, primary);
+      assert.equal(save.form, document.querySelector("dialog form"));
+      assert.equal(
+        dock.querySelector(".context-back .context-back-label")?.textContent,
+        "やめる",
+      );
+      await act(async () =>
+        save.form.dispatchEvent(
+          new dom.window.Event("submit", { bubbles: true, cancelable: true }),
+        ),
+      );
+      await tick(30);
+    };
+    const ringCount = () =>
+      document.querySelector('[data-ring="owner"] small').textContent;
+    await click(dockTab("やること"));
+    assert.equal(
+      document.querySelector(".prep-top h2").textContent,
+      "やること",
+    );
+    assert.equal(
+      document.querySelector('[data-ring="owner"] b').textContent,
+      "あなた",
+    );
+    assert.equal(ringCount(), "あと0");
+    await click(
+      document.querySelector('.prep-top [aria-label="やることを追加"]'),
     );
     assert.equal(document.activeElement, document.querySelector("dialog h2"));
+    assert.equal(
+      document.querySelector("dialog h2").textContent,
+      "やることを追加",
+    );
     assert.equal(document.querySelector("dialog input[autofocus]"), null);
     assert.equal(
-      document.querySelector("dialog").classList.contains("full"),
-      true,
+      document.querySelector(".prep-who-all"),
+      null,
+      "みんな各自 needs more than one member",
     );
-    assert.equal(field("期限"), undefined);
-    assert.equal(
-      byText("label", "期限を設定する").querySelector("input").checked,
-      false,
+    assert.match(
+      document.querySelector('.prep-whos [aria-pressed="true"]').textContent,
+      /あなた$/,
+      "a new task is mine unless I choose someone else",
     );
     await keyboardWhileEditing();
-    await fill("やること", "チケットを予約");
-    await submit();
-    assert.equal(
-      db.prepare("SELECT COUNT(*) AS n FROM travel_tasks").get().n,
-      1,
-    );
-    const preparationPanel = document.querySelector('[role="tabpanel"]');
-    assert.match(document.querySelector(".task-list").textContent, /未指定/);
-    preparationPanel.focus();
-    await click(
-      document.querySelector('[aria-label="チケットを予約の詳細を編集"]'),
-    );
-    assert.equal(document.activeElement, document.querySelector("dialog h2"));
-    assert.equal(
-      document.querySelector("dialog").classList.contains("full"),
-      true,
-    );
-    const deadlineToggle = () =>
-      byText("label", "期限を設定する").querySelector("input");
-    assert.equal(deadlineToggle().checked, false);
-    assert.equal(
-      db.prepare("SELECT due_on FROM travel_tasks").get().due_on,
-      "",
-    );
-    await click(deadlineToggle());
-    assert.equal(field("期限").getAttribute("aria-required"), "true");
-    await submit();
+    await submitSheet("追加する");
     assert.match(
       document.querySelector("dialog .error").textContent,
-      /正しい期限/,
+      /やることの名前を入れてください/,
     );
-    await fill("期限", "2026-11-20");
-    await fill("担当", "member:owner");
-    await submit();
+    assert.equal(
+      db.prepare("SELECT COUNT(*) AS n FROM travel_tasks").get().n,
+      0,
+    );
+    await typeInto(
+      document.querySelector('dialog input[aria-label="やること"]'),
+      "チケットを予約",
+    );
+    const dueDay = new Date();
+    dueDay.setDate(dueDay.getDate() + 40);
+    const due = `${dueDay.getFullYear()}-${String(dueDay.getMonth() + 1).padStart(2, "0")}-${String(dueDay.getDate()).padStart(2, "0")}`;
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const before = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
+    if (document.querySelector(`[data-day="${before}"]`))
+      assert.equal(
+        document.querySelector(`[data-day="${before}"]`).disabled,
+        true,
+        "past days cannot be a deadline",
+      );
+    assert.equal(
+      document.querySelector('.prep-cal [aria-label="前の月"]').disabled,
+      true,
+    );
+    while (!document.querySelector(`[data-day="${due}"]`))
+      await click(document.querySelector('.prep-cal [aria-label="次の月"]'));
+    await click(document.querySelector(`[data-day="${due}"]`));
     assert.equal(
       document
-        .querySelector(".task-list .assignee-avatar")
-        .getAttribute("aria-label"),
-      "テスト",
+        .querySelector(`[data-day="${due}"]`)
+        .getAttribute("aria-pressed"),
+      "true",
     );
-    assert.doesNotMatch(
-      document.querySelector(".task-list .preparation-meta").textContent,
-      /テスト|未指定/,
+    assert.match(
+      document.querySelector(".prep-label").textContent,
+      new RegExp(`期限 · ${+due.slice(5, 7)}/${+due.slice(8)}（`),
     );
-    const avatarImage = document.querySelector(
-      ".task-list .assignee-avatar img",
+    await submitSheet("追加する");
+    assert.equal(document.querySelector("dialog"), null);
+    const savedTask = db
+      .prepare("SELECT id, title, due_on, assignee, done FROM travel_tasks")
+      .get();
+    assert.deepEqual(
+      [savedTask.title, savedTask.due_on, savedTask.assignee, savedTask.done],
+      ["チケットを予約", due, "member:owner", 0],
     );
+    assert.equal(ringCount(), "あと1");
+    assert.equal(
+      document.querySelector(`[data-task="${savedTask.id}"] small`).textContent,
+      `${+due.slice(5, 7)}/${+due.slice(8)}まで`,
+    );
+    const ringAvatar = () =>
+      document.querySelector('[data-ring="owner"] .assignee-avatar');
+    assert.equal(ringAvatar().getAttribute("aria-label"), "テスト");
+    const avatarImage = ringAvatar().querySelector("img");
     assert.equal(avatarImage.src, "https://example.test/avatar.png");
     await act(async () =>
       avatarImage.dispatchEvent(new dom.window.Event("error")),
     );
-    assert.equal(
-      document.querySelector(".task-list .assignee-avatar img"),
-      null,
-    );
-    assert.equal(
-      document.querySelector(".task-list .assignee-avatar").textContent,
-      "テ",
-    );
-    assert.equal(
-      db.prepare("SELECT due_on FROM travel_tasks").get().due_on,
-      "2026-11-20",
-    );
+    assert.equal(ringAvatar().querySelector("img"), null);
+    assert.equal(ringAvatar().textContent, "テ");
     await click(
-      document.querySelector('[aria-label="チケットを予約の詳細を編集"]'),
+      document.querySelector(`[data-task="${savedTask.id}"] [role="checkbox"]`),
     );
-    assert.equal(deadlineToggle().checked, true);
-    assert.equal(field("期限").dataset.dateValue, "2026-11-20");
-    await click(deadlineToggle());
-    assert.equal(field("期限"), undefined);
-    await click(deadlineToggle());
-    assert.equal(
-      field("期限").dataset.dateValue,
-      "2026-11-20",
-      "temporary toggle keeps the draft date",
-    );
-    await click(deadlineToggle());
-    await submit();
-    assert.equal(
-      db.prepare("SELECT due_on FROM travel_tasks").get().due_on,
-      "",
-    );
-    await click(
-      document.querySelector('[aria-label="チケットを予約の詳細を編集"]'),
-    );
-    assert.equal(deadlineToggle().checked, false);
-    assert.equal(field("期限"), undefined);
-    await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
-    assert.equal(document.querySelector("dialog"), null);
-    assert.notEqual(document.activeElement, preparationPanel);
+    assert.equal(db.prepare("SELECT done FROM travel_tasks").get().done, 1);
+    assert.equal(ringCount(), "あと0");
+    assert.ok(
+      document
+        .querySelector('[data-ring="owner"]')
+        .classList.contains("is-closed"),
+      "the ring closes when every task is done",
+    );
+    await click(document.querySelector('[aria-label="チケットを予約を直す"]'));
     assert.equal(
-      document.querySelector('.task-list [aria-label*="削除"]'),
-      null,
+      document.querySelector("dialog h2").textContent,
+      "やることを直す",
     );
-    await click(
-      document.querySelector('[aria-label="チケットを予約の詳細を編集"]'),
+    await click(document.querySelector(".prep-cal-none"));
+    assert.equal(
+      document.querySelector(".prep-label").textContent,
+      "期限 · 期限なし",
     );
+    await submitSheet("保存");
+    const editedTask = db
+      .prepare("SELECT due_on, done FROM travel_tasks")
+      .get();
+    assert.deepEqual([editedTask.due_on, editedTask.done], ["", 1]);
+    assert.equal(
+      document.querySelector(`[data-task="${savedTask.id}"] small`).textContent,
+      "期限なし",
+    );
+    await click(document.querySelector('[aria-label="チケットを予約を直す"]'));
     const taskDelete = document.querySelector(
       '.context-actions [aria-label="やることを削除"]',
     );
@@ -896,7 +1117,6 @@ test("legacy account cache and pending changes survive React migration; real for
       taskDelete,
       "delete sits to the right of save in the task editor",
     );
-    assert.ok(document.querySelector('.context-primary button[type="submit"]'));
     globalThis.confirm = () => false;
     await click(taskDelete);
     assert.equal(
@@ -911,69 +1131,147 @@ test("legacy account cache and pending changes survive React migration; real for
       0,
     );
     assert.equal(document.querySelector("dialog"), null);
-    await click(document.querySelector('[role="tab"][aria-label="持ち物"]'));
-    assert.doesNotMatch(
-      document.querySelector(".filter-strip").textContent,
-      /未指定/,
-    );
-    await click(document.querySelector('[aria-label="持ち物を追加"]'));
+
+    await click(dockTab("持ち物"));
+    assert.equal(document.querySelector(".prep-top h2").textContent, "持ち物");
+    const addPacking = async (name, kind) => {
+      await click(
+        document.querySelector('.prep-top [aria-label="持ち物を追加"]'),
+      );
+      assert.equal(
+        document.querySelector('[role="radio"][aria-checked="true"] b')
+          .textContent,
+        "みんな各自",
+        "みんな各自 is the default kind",
+      );
+      await typeInto(
+        document.querySelector('dialog input[aria-label="持ち物"]'),
+        name,
+      );
+      await click(byText('[role="radio"] b', kind).closest("button"));
+      await submitSheet("追加する");
+      return db.prepare("SELECT id FROM packing_items WHERE name = ?").get(name)
+        .id;
+    };
+    const kindRow = (id) => document.querySelector(`[data-item="${id}"]`);
+    const charger = await addPacking("充電器", "みんな各自");
     assert.equal(
-      field("担当").querySelector('option[value=""]').textContent,
-      "共用",
+      db
+        .prepare("SELECT kind FROM packing_kinds WHERE item_id = ?")
+        .get(charger).kind,
+      "each",
     );
-    await fill("持ち物", "充電器");
-    await submit();
-    assert.match(
-      document.querySelector(".task-list .preparation-meta").textContent,
-      /共用/,
+    assert.ok(
+      document.querySelector(`[data-kind="each"] [data-item="${charger}"]`),
     );
-    assert.doesNotMatch(
-      document.querySelector(".task-list .preparation-meta").textContent,
-      /未指定/,
+    await click(kindRow(charger).querySelector('[role="checkbox"]'));
+    await tick(30);
+    assert.deepEqual(
+      db
+        .prepare("SELECT user_id FROM packing_marks WHERE item_id = ?")
+        .all(charger)
+        .map((row) => row.user_id),
+      ["owner"],
+      "みんな各自 keeps each member's own tick",
     );
+    const medicine = await addPacking("常備薬", "1つでいい");
+    assert.match(kindRow(medicine).textContent, /まだ誰も持っていない/);
+    assert.equal(kindRow(medicine).querySelector('[role="checkbox"]'), null);
+    await click(byText(`[data-item="${medicine}"] button`, "私が持つ"));
+    await tick(30);
     assert.equal(
-      db.prepare("SELECT shared FROM packing_details").get().shared,
-      1,
+      db
+        .prepare("SELECT assignee FROM packing_details WHERE item_id = ?")
+        .get(medicine).assignee,
+      "member:owner",
+    );
+    assert.match(kindRow(medicine).textContent, /あなたが持つ/);
+    assert.ok(kindRow(medicine).querySelector('[role="checkbox"]'));
+    const diary = await addPacking("日記", "自分だけ");
+    assert.deepEqual(
+      {
+        ...db
+          .prepare("SELECT kind, owner_id FROM packing_kinds WHERE item_id = ?")
+          .get(diary),
+      },
+      { kind: "mine", owner_id: "owner" },
+    );
+    assert.match(kindRow(diary).textContent, /ほかの人には見えない/);
+    await click(document.querySelector('[aria-label="充電器を直す"]'));
+    assert.equal(
+      document.querySelector("dialog h2").textContent,
+      "持ち物を直す",
+    );
+    await click(byText('[role="radio"] b', "1つでいい").closest("button"));
+    await submitSheet("保存");
+    assert.equal(
+      db
+        .prepare("SELECT kind FROM packing_kinds WHERE item_id = ?")
+        .get(charger).kind,
+      "one",
+      "the kind can be changed later",
+    );
+    assert.ok(
+      document.querySelector(`[data-kind="one"] [data-item="${charger}"]`),
     );
     assert.equal(
       db.prepare("SELECT COUNT(*) AS n FROM packing_items").get().n,
-      1,
+      3,
     );
     await click(byText("nav a", "メモ"));
+    const noteCount = () =>
+      db.prepare("SELECT COUNT(*) AS n FROM travel_notes").get().n;
+    const typeIntoNote = async (node, value) => {
+      assert.ok(node, "text field exists");
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(
+          dom.window.HTMLTextAreaElement.prototype,
+          "value",
+        ).set.call(node, value);
+        node.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+      });
+    };
+    const closeNote = async () => {
+      // The dock's back button first dismisses the keyboard, then goes back.
+      document.activeElement?.blur();
+      await tick(40);
+      await click(document.querySelector('dialog [aria-label="戻る"]'));
+      await tick();
+    };
     await click(document.querySelector('[aria-label="メモを書く"]'));
     await tick(550);
+    assert.equal(noteCount(), 0, "opening an empty note does not save it");
     assert.equal(
-      db.prepare("SELECT COUNT(*) AS n FROM travel_notes").get().n,
-      0,
-      "opening an empty note does not save it",
+      byText("dialog button", "完了"),
+      undefined,
+      "notes autosave; there is no 完了",
     );
-    await click(byText(".context-primary button", "完了"));
+    await closeNote();
     await click(document.querySelector('[aria-label="メモを書く"]'));
-    assert.equal(document.activeElement, document.querySelector("dialog h2"));
-    assert.equal(document.querySelector('[aria-label="ピン留め"]'), null);
-    const title = document.querySelector('[aria-label="メモのタイトル"]');
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(
-        dom.window.HTMLInputElement.prototype,
-        "value",
-      ).set.call(title, "旅先の買い物");
-      title.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
-    });
-    const textarea = document.querySelector('textarea[aria-label="メモ本文"]');
-    assert.equal(textarea.placeholder, "メモを入力...");
-    assert.equal(document.querySelector('[aria-label="本文の書式"]'), null);
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(
-        dom.window.HTMLTextAreaElement.prototype,
-        "value",
-      ).set.call(textarea, "お土産\n待ち合わせ場所");
-      textarea.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
-    });
-    await tick(550);
     assert.equal(
-      db.prepare("SELECT COUNT(*) AS n FROM travel_notes").get().n,
-      1,
+      document.activeElement,
+      document.querySelector('[aria-label="メモのタイトル"]'),
+      "＋ starts on the title",
     );
+    await typeIntoNote(
+      document.querySelector('[aria-label="メモのタイトル"]'),
+      "旅先の買い物",
+    );
+    await typeIntoNote(
+      document.querySelector('textarea[aria-label="1行目"]'),
+      "お土産",
+    );
+    await click(document.querySelector('[aria-label="チェックを足す"]'));
+    await typeIntoNote(
+      document.querySelector('textarea[aria-label="2行目"]'),
+      "待ち合わせ場所",
+    );
+    assert.ok(
+      document.querySelector('dialog .memo-ln.c [role="checkbox"]'),
+      "a check line renders as a box",
+    );
+    await tick(550);
+    assert.equal(noteCount(), 1);
     assert.equal(
       db.prepare("SELECT title FROM note_details").get().title,
       "旅先の買い物",
@@ -984,41 +1282,71 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.equal(
       db.prepare("SELECT body FROM travel_notes").get().body,
-      "お土産\n待ち合わせ場所",
+      "お土産\n- [ ] 待ち合わせ場所",
     );
-    await click(byText(".context-primary button", "完了"));
-    await tick();
+    await click(document.querySelector('[aria-label="ピン留め"]'));
+    await tick(550);
+    assert.equal(db.prepare("SELECT pinned FROM travel_notes").get().pinned, 1);
+    await closeNote();
     assert.match(
-      document.querySelector(".note-card").textContent,
+      document.querySelector(".memo-tile").textContent,
       /旅先の買い物/,
     );
-    await click(document.querySelector(".note-card"));
-    assert.equal(
-      document.querySelector('textarea[aria-label="メモ本文"]').value,
-      "お土産\n待ち合わせ場所",
-    );
-    await click(byText(".context-primary button", "完了"));
-    await tick();
-    await click(document.querySelector('[aria-label="メモを書く"]'));
-    const temporaryTitle = document.querySelector(
-      '[aria-label="メモのタイトル"]',
-    );
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(
-        dom.window.HTMLInputElement.prototype,
-        "value",
-      ).set.call(temporaryTitle, "削除するメモ");
-      temporaryTitle.dispatchEvent(
-        new dom.window.Event("input", { bubbles: true }),
-      );
-    });
-    await click(document.querySelector('[aria-label="メモを削除"]'));
+    assert.ok(byText(".memo-lab b", "ピン留め"), "pinned notes group on top");
+    assert.match(document.querySelector(".memo-meta").textContent, /あなた/);
+    // Ticking on the tile saves without opening the note.
+    await click(document.querySelector('.memo-tile [role="checkbox"]'));
     await tick(550);
+    assert.equal(document.querySelector("dialog"), null);
     assert.equal(
-      db.prepare("SELECT COUNT(*) AS n FROM travel_notes").get().n,
-      1,
-      "deleting a pending draft cancels its autosave",
+      db.prepare("SELECT body FROM travel_notes").get().body,
+      "お土産\n- [x] 待ち合わせ場所",
     );
+    await click(document.querySelector(".memo-tile-open"));
+    assert.equal(
+      document.querySelector('textarea[aria-label="2行目"]').value,
+      "待ち合わせ場所",
+    );
+    assert.equal(
+      document
+        .querySelector('dialog [role="checkbox"]')
+        .getAttribute("aria-checked"),
+      "true",
+    );
+    await closeNote();
+    await click(document.querySelector('[aria-label="メモを書く"]'));
+    await typeIntoNote(
+      document.querySelector('[aria-label="メモのタイトル"]'),
+      "削除するメモ",
+    );
+    await click(document.querySelector('[aria-label="メモを消す"]'));
+    await tick(50);
+    assert.ok(
+      ![...document.querySelectorAll(".memo-tile")].some((tile) =>
+        tile.textContent.includes("削除するメモ"),
+      ),
+      "a deleted note leaves the list at once, with no confirm",
+    );
+    await click(document.querySelector(".memo-undo"));
+    assert.ok(
+      [...document.querySelectorAll(".memo-tile")].some((tile) =>
+        tile.textContent.includes("削除するメモ"),
+      ),
+      "元に戻す brings it back",
+    );
+    await click(
+      [...document.querySelectorAll(".memo-tile-open")].find((button) =>
+        button.textContent.includes("削除するメモ"),
+      ),
+    );
+    await click(document.querySelector('[aria-label="メモを消す"]'));
+    await tick(50);
+    assert.ok(document.querySelector(".memo-undo"));
+    // Leaving the page settles the deletion instead of waiting for the timer.
+    await click(byText("nav a", "しおり"));
+    await tick(550);
+    assert.equal(noteCount(), 1, "the undo window ends in a real delete");
+    await click(byText("nav a", "メモ"));
     assert.deepEqual(
       failures,
       [],
@@ -1039,43 +1367,71 @@ test("legacy account cache and pending changes survive React migration; real for
     const settingsBackground = document.querySelector("#main-content");
     assert.equal(document.querySelector("dialog h2").textContent, "設定");
     assert.ok(document.querySelector("dialog.full .settings-page"));
-    const appInfo = document.querySelector("dialog .settings-app-info");
-    assert.match(appInfo.textContent, /kondo\s*バージョン 2\.0\.0/);
-    assert.equal(appInfo.querySelectorAll("img").length, 2);
-    let updateFails = false;
-    Object.defineProperty(navigator, "serviceWorker", {
-      configurable: true,
-      value: {
-        getRegistration: async () => ({
-          waiting: null,
-          update: async () => {
-            if (updateFails) throw new Error("offline");
-          },
-        }),
-      },
+    const foot = document.querySelector("dialog .settings-foot");
+    assert.match(
+      foot.textContent,
+      /^kondo$/,
+      "the version moved to the app row",
+    );
+    assert.ok(foot.querySelector("button[aria-label='kondo'] svg"));
+    assert.match(
+      document.querySelector("dialog .passport-stamps").textContent,
+      /これまでの旅 \d+回/,
+    );
+    assert.equal(byText("dialog button", "表示名を保存"), undefined);
+    assert.equal(byText("dialog button", "更新を確認"), undefined);
+    const versionRow = [
+      ...document.querySelectorAll("dialog .settings-row"),
+    ].find((row) => row.textContent.includes("バージョン 2.0.0"));
+    assert.match(versionRow.textContent, /最新です/);
+    const nameInput = document.querySelector("dialog .passport-name");
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        dom.window.HTMLInputElement.prototype,
+        "value",
+      ).set.call(nameInput, "つばさ");
+      nameInput.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
     });
-    await click(byText("dialog button", "更新を確認"));
-    const updateStatus = document.querySelector(".pwa-update-status");
-    assert.match(updateStatus.textContent, /更新を確認しました/);
-    assert.equal(
-      updateStatus.previousElementSibling,
-      byText("dialog button", "更新を確認"),
-      "confirmation stays in document flow below its button",
+    await waitFor(
+      () =>
+        document.querySelector(".toast.visible")?.textContent ===
+        "表示名を保存しました",
+      "the display name autosaves while typing",
     );
-    assert.ok(
-      !document
-        .querySelector(".toast")
-        .textContent.includes("更新を確認しました"),
+    const posted = [];
+    const waitingWorker = {
+      postMessage(message, ports) {
+        posted.push(message.type);
+        if (message.type === "GET_VERSION")
+          ports[0].postMessage({ version: "2026.10.7.1432" });
+      },
+    };
+    swRegistration.waiting = waitingWorker;
+    await act(async () => {
+      document.dispatchEvent(new dom.window.Event("visibilitychange"));
+    });
+    const notice = await waitFor(
+      () => document.querySelector("dialog .update-notice"),
+      "a waiting version shows the notice inside the open sheet",
     );
-    updateFails = true;
-    await click(byText("dialog button", "更新を確認"));
-    assert.match(updateStatus.textContent, /更新を確認できませんでした/);
-    assert.equal(
-      byText("dialog button", "更新を確認").disabled,
-      false,
-      "failed checks can be retried",
+    assert.match(
+      notice.textContent,
+      /アップデートされました\s*kondo 2026\.10\.7\.1432\s*新しくする/,
     );
-    delete navigator.serviceWorker;
+    assert.equal(document.documentElement.dataset.appUpdate, "waiting");
+    assert.match(versionRow.textContent, /2026\.10\.7\.1432 が届いています/);
+    await click(notice);
+    assert.deepEqual(posted, ["GET_VERSION", "ACTIVATE_UPDATE"]);
+    assert.equal(sessionStorage.getItem("kondo.updated"), "1");
+    sessionStorage.removeItem("kondo.updated");
+    swRegistration.waiting = null;
+    await act(async () => {
+      document.dispatchEvent(new dom.window.Event("visibilitychange"));
+    });
+    await waitFor(
+      () => !document.querySelector(".update-notice"),
+      "the notice leaves once nothing is waiting",
+    );
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
     assert.equal(document.querySelector("#main-content"), settingsBackground);
@@ -1112,6 +1468,8 @@ test("legacy account cache and pending changes survive React migration; real for
 
     await click(byText("nav a", "予約"));
     await click(document.querySelector('[aria-label="予約を追加"]'));
+    await click(document.querySelector("dialog .bk-swap"));
+    await click(byText("dialog .bk-kinds button", "航空券"));
     assert.equal(field("予約名"), undefined);
     assert.equal(field("出発空港（IATA）"), undefined);
     await fill("出発地", "成田");
@@ -1166,7 +1524,7 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.equal(savedFlight.destination_code, "KIX");
     assert.equal(savedFlight.confirmation_code, "JM6EQC");
     await click(
-      [...document.querySelectorAll(".booking-ticket")].find((entry) =>
+      [...document.querySelectorAll(".bk-card")].find((entry) =>
         entry.textContent.includes("NRT → KIX"),
       ),
     );
@@ -1191,16 +1549,20 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(
       document.querySelector('.trip-heading [aria-label="旅行一覧へ戻る"]'),
     );
+    // Home keeps settings (left) and create (right) in the dock only.
     assert.equal(
-      document.querySelector(".context-primary").textContent,
+      document.querySelector(".context-actions .home-create").textContent,
       "旅行を作成",
     );
-    assert.equal(document.querySelector(".context-back"), null);
-    await click(document.querySelector('.context-actions [aria-label="設定"]'));
+    assert.equal(
+      document.querySelector(".context-primary.context-island"),
+      null,
+    );
+    await click(document.querySelector('.context-back [aria-label="設定"]'));
     assert.equal(document.querySelectorAll(".context-island").length, 1);
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
-    await click(byText(".context-primary button", "旅行を作成"));
+    await click(byText(".context-actions button", "旅行を作成"));
     assert.equal(
       document.querySelector('.context-primary button[type="submit"]').form,
       document.querySelector("dialog form"),
@@ -1209,10 +1571,95 @@ test("legacy account cache and pending changes survive React migration; real for
     await tick(30);
   } finally {
     await act(async () => root.unmount());
+    delete navigator.serviceWorker;
     db.close();
     dom.window.close();
   }
 });
+test("places map reads Google Maps links and numbers places with walking estimates", async () => {
+  const { mapCoordinates, isShortMapsLink, placeCoordinates } = await bundle(
+    "export * from './src/data/places';",
+  );
+  const { distanceMeters, walkMinutes, formatMeters } = await bundle(
+    "export * from './src/data/place-geo';",
+  );
+  const { placeNumbers } = await bundle(
+    "export * from './src/data/place-numbers';",
+  );
+  // The place's own pin wins over the camera position.
+  assert.deepEqual(
+    mapCoordinates(
+      "https://www.google.com/maps/place/Stephansdom/@48.2,16.37,17z/data=!3m1!4b1!4m6!3m5!8m2!3d48.20849!4d16.37314",
+    ),
+    { lat: 48.20849, lng: 16.37314 },
+  );
+  assert.deepEqual(
+    mapCoordinates("https://www.google.com/maps/@48.21,16.36,15z"),
+    { lat: 48.21, lng: 16.36 },
+  );
+  assert.deepEqual(
+    mapCoordinates("https://maps.google.com/?q=48.1984,16.363"),
+    { lat: 48.1984, lng: 16.363 },
+  );
+  assert.deepEqual(
+    mapCoordinates(
+      "https://www.google.com/maps/search/?api=1&query=48.21665%2C16.39585",
+    ),
+    { lat: 48.21665, lng: 16.39585 },
+  );
+  assert.equal(
+    mapCoordinates(
+      "https://www.google.com/maps/search/?api=1&query=Kunsthistorisches+Museum",
+    ),
+    null,
+  );
+  assert.equal(mapCoordinates("https://example.com/@48.2,16.3"), null);
+  assert.equal(mapCoordinates("Stephansplatz 3, Wien"), null);
+  assert.equal(
+    mapCoordinates("https://www.google.com/maps/@95.0,16.3,15z"),
+    null,
+  );
+  assert.equal(isShortMapsLink("https://maps.app.goo.gl/AbCdEf"), true);
+  assert.equal(isShortMapsLink("https://www.google.com/maps/@1,2,3z"), false);
+  assert.deepEqual(
+    placeCoordinates({
+      lat: 1,
+      lng: 2,
+      location: "https://maps.google.com/?q=3,4",
+    }),
+    { lat: 1, lng: 2 },
+    "stored coordinates win; the link is only a fallback",
+  );
+  // Cafe Central to Stephansdom: about 610 m straight, x1.3 at 80 m/min.
+  const metres = distanceMeters(
+    { lat: 48.21043, lng: 16.36547 },
+    { lat: 48.20849, lng: 16.37314 },
+  );
+  assert.ok(metres > 590 && metres < 630, `${metres}`);
+  assert.equal(walkMinutes(metres), 10);
+  assert.equal(formatMeters(metres), `${Math.round(metres / 10) * 10}m`);
+  assert.equal(formatMeters(1234), "1.2km");
+  const items = [
+    { id: "late", day: "2026-11-23", time: "09:00" },
+    { id: "early", day: "2026-11-22", time: "18:30" },
+  ];
+  const numbers = placeNumbers(
+    [
+      { id: "c-b" },
+      { id: "p-late", itineraryItemId: "late" },
+      { id: "c-a" },
+      { id: "p-early", itineraryItemId: "early" },
+    ],
+    items,
+  );
+  assert.deepEqual(Object.fromEntries(numbers), {
+    "p-early": 1,
+    "p-late": 2,
+    "c-a": 3,
+    "c-b": 4,
+  });
+});
+
 test("all-day hotel checkout remains visible in itinerary without an end time", () => {
   const entries = timelineEntries(
     [],
@@ -1238,8 +1685,10 @@ test("all-day hotel checkout remains visible in itinerary without an end time", 
 });
 
 test("journeys and hotel endpoints retain chronological order; only ongoing stays lead the day", async () => {
-  const { dayTimeline, staysOnDay, JourneyPair, StayCards, StayCard } =
-    await bundle("export * from './src/web/itinerary-bookings';");
+  const { dayTimeline, staysOnDay, buildTimeline, JourneyLine, TimelineRow } =
+    await bundle(
+      "export { dayTimeline, staysOnDay, buildTimeline } from './src/data/plan-timeline'; export { JourneyLine, TimelineRow } from './src/web/itinerary-rows';",
+    );
   const day = "2026-11-22";
   const flight = {
     id: "flight",
@@ -1340,54 +1789,224 @@ test("journeys and hotel endpoints retain chronological order; only ongoing stay
   );
 
   const { renderToStaticMarkup } = await import("react-dom/server");
+  const days = ["2026-11-22", "2026-11-23", "2026-11-24", "2026-11-25"];
+  const timeline = (bookingList) =>
+    buildTimeline({ days, items: [], bookings: bookingList, places: [] });
+  const markup = (row) =>
+    renderToStaticMarkup(
+      React.createElement(TimelineRow, {
+        row,
+        places: [],
+        numbers: new Map(),
+        onOpen() {},
+      }),
+    );
+  const render = (row) =>
+    new JSDOM(markup(row)).window.document.body.textContent;
+  const [first, second, , last] = timeline(bookings);
+  const departure = render(
+    first.rows.find((row) => row.key === "booking-flight-start"),
+  );
+  assert.match(departure, /14:00/, "departure in the time column");
+  assert.match(departure, /18:00/, "arrival on the card");
+  assert.match(departure, /予約/, "a booked time is marked as fixed");
   const pair = renderToStaticMarkup(
-    React.createElement(JourneyPair, { booking: flight, arrival: false }),
+    React.createElement(JourneyLine, { booking: flight }),
   );
-  assert.match(pair, /14:00/);
-  assert.match(pair, /18:00/);
-  assert.match(pair, /現地時刻/);
-  const arrival = renderToStaticMarkup(
-    React.createElement(JourneyPair, { booking: flight, arrival: true }),
+  assert.match(pair, /DXB/);
+  assert.match(pair, /VIE/);
+  assert.match(pair, /着/);
+  const checkIn = render(
+    first.rows.find((row) => row.key === "booking-hotel-start"),
   );
-  assert.match(arrival, /DXB/);
-  assert.match(arrival, /VIE/);
-  const stay = renderToStaticMarkup(
-    React.createElement(StayCards, {
-      bookings,
-      day: "2026-11-23",
-      onOpen() {},
-    }),
+  assert.match(checkIn, /チェックイン/);
+  assert.match(checkIn, /15:00〜/);
+  assert.match(checkIn, /3泊/);
+  const stay = second.rows.filter((row) => row.type === "stay");
+  assert.equal(stay.length, 1, "an ongoing stay leads the day");
+  assert.equal(second.rows[0].type, "stay");
+  assert.match(render(stay[0]), /連泊 · 2泊目/);
+  assert.match(
+    render(last.rows.find((row) => row.key === "booking-hotel-end")),
+    /〜11:00/,
   );
-  assert.match(stay, /連泊/);
-  assert.match(stay, /15:00〜/);
-  assert.match(stay, /〜11:00/);
-  const untimed = renderToStaticMarkup(
-    React.createElement(StayCard, {
-      booking: { ...hotel, time: "", endTime: "" },
-      endpoint: "end",
-      onOpen() {},
-    }),
+  const untimedDays = timeline([{ ...hotel, time: "", endTime: "" }]);
+  const untimedRow = untimedDays[3].rows.find(
+    (row) => row.key === "booking-hotel-end",
   );
+  const untimed = render(untimedRow);
   assert.match(untimed, /チェックアウト/);
-  assert.match(untimed, /時刻未定/);
-  const checkoutMarker = new JSDOM(untimed).window.document.querySelector(
-    ".timeline-marker",
-  );
-  assert.equal(checkoutMarker.dataset.endpoint, "end");
-  assert.equal(checkoutMarker.querySelectorAll("svg").length, 1);
-  for (const boundary of [hotel.day, hotel.endDay]) {
+  assert.match(untimed, /未定/);
+  const checkoutRow = new JSDOM(
+    markup(untimedRow),
+  ).window.document.querySelector("[data-entry-key]");
+  assert.equal(checkoutRow.dataset.entryKey, "booking-hotel-end");
+  assert.equal(checkoutRow.querySelectorAll(".it-node").length, 1);
+  for (const boundary of [first, last])
     assert.equal(
-      renderToStaticMarkup(
-        React.createElement(StayCards, {
-          bookings,
-          day: boundary,
-          onOpen() {},
-        }),
-      ),
-      "",
+      boundary.rows.some((row) => row.type === "stay"),
+      false,
       "check-in/out are not duplicated in the stay band",
     );
-  }
+});
+
+test("our own hotel in/out times stay out of every plan list", async () => {
+  const { ordinaryPlans, isStayRecord, findMatchingItineraryItem } =
+    await bundle(
+      "export { ordinaryPlans, isStayRecord } from './src/data/itinerary'; export { findMatchingItineraryItem } from './src/data/booking-match';",
+    );
+  const day = "2026-11-22";
+  const stay = {
+    id: "stay",
+    day,
+    time: "15:00",
+    kind: "その他",
+    title: "チェックイン",
+    note: "",
+    details: {
+      category: "other",
+      location: "",
+      endDay: "",
+      endTime: "",
+      stay: { bookingId: "hotel", endpoint: "start" },
+    },
+  };
+  const plan = {
+    id: "plan",
+    day,
+    time: "18:00",
+    kind: "食事",
+    title: "夕食",
+    note: "",
+  };
+  assert.equal(isStayRecord(stay), true);
+  assert.equal(isStayRecord(plan), false);
+  assert.deepEqual(
+    ordinaryPlans([stay, plan]).map((item) => item.id),
+    ["plan"],
+  );
+  assert.equal(
+    findMatchingItineraryItem([stay], {
+      kind: "hotel",
+      title: "チェックイン",
+      detail: "",
+      origin: "",
+      originCode: "",
+      destination: "",
+      destinationCode: "",
+      day,
+      time: "15:00",
+    }),
+    null,
+    "a new hotel booking never links to our own check-in time",
+  );
+  assert.equal(
+    findMatchingItineraryItem([{ ...stay, details: undefined }], {
+      kind: "hotel",
+      title: "チェックイン",
+      detail: "",
+      origin: "",
+      originCode: "",
+      destination: "",
+      destinationCode: "",
+      day,
+      time: "15:00",
+    })?.item.id,
+    "stay",
+    "the same item without details.stay is an ordinary plan",
+  );
+});
+
+test("しおり: walks between places, lateness and いま", async () => {
+  const { buildTimeline, walkBetween, timelineEntries } = await bundle(
+    "export { buildTimeline, walkBetween, timelineEntries } from './src/data/plan-timeline';",
+  );
+  const { coordsFromLink, walkMinutes, distanceMeters } = await bundle(
+    "export * from './src/data/geo';",
+  );
+  assert.deepEqual(
+    coordsFromLink(
+      "https://www.google.com/maps/place/Stephansdom/@48.2084,16.3731,17z/data=!3d48.2085!4d16.3733",
+    ),
+    { lat: 48.2085, lng: 16.3733 },
+  );
+  assert.equal(
+    coordsFromLink("https://example.com/?query=48.2,16.3"),
+    null,
+    "only map links carry coordinates",
+  );
+  const link = (lat, lng) =>
+    `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  const day = "2026-11-23";
+  const item = (id, time, location, endTime = "") => ({
+    id,
+    day,
+    time,
+    kind: "予定",
+    title: id,
+    note: "",
+    details: {
+      category: "sightseeing",
+      location,
+      endDay: endTime ? day : "",
+      endTime,
+    },
+  });
+  // Stephansdom → Belvedere is about 1.7 km in a straight line.
+  const items = [
+    item("dom", "09:00", link(48.2085, 16.3733), "10:00"),
+    item("belvedere", "10:20", link(48.1915, 16.3809)),
+    item("later", "", ""),
+  ];
+  const meters = distanceMeters(
+    { lat: 48.2085, lng: 16.3733 },
+    { lat: 48.1915, lng: 16.3809 },
+  );
+  const [dom, belvedere] = timelineEntries(items, []);
+  const walk = walkBetween(dom, belvedere, []);
+  assert.equal(walk.minutes, walkMinutes(meters));
+  assert.equal(
+    walk.late,
+    walk.minutes - 20,
+    "leaving at the end time arrives after the next plan starts",
+  );
+  const [plain] = buildTimeline({
+    days: [day],
+    items,
+    bookings: [],
+    places: [],
+  });
+  assert.deepEqual(
+    plain.rows.map((row) => row.type),
+    ["entry", "walk", "entry", "entry"],
+    "no walk to or from a plan without a place",
+  );
+  assert.equal(plain.today, false);
+  // A landing in Vienna the day before puts the clock on Vienna time.
+  const landed = {
+    id: "in",
+    kind: "flight",
+    title: "OS52",
+    day: "2026-11-22",
+    time: "11:00",
+    endDay: "2026-11-22",
+    endTime: "16:00",
+    originCode: "NRT",
+    destinationCode: "VIE",
+  };
+  const [live] = buildTimeline({
+    days: [day],
+    items,
+    bookings: [landed],
+    places: [],
+    now: new Date("2026-11-23T08:30:00Z"),
+  });
+  assert.equal(live.today, true);
+  const now = live.rows.findIndex((row) => row.type === "now");
+  assert.equal(live.rows[now - 1].key, "item-dom");
+  assert.equal(live.rows[now - 1].past, true);
+  assert.equal(live.rows[now + 1].key, "item-belvedere");
+  assert.equal(live.rows[now + 1].past, false);
 });
 
 test("booking clocks align Japan conversions in a shared row and preserve seasonal UTC offsets", async () => {
@@ -1531,14 +2150,16 @@ test("booking details use kind-specific labels and keep single-date reservations
   );
 });
 
-test("compact reservation tickets retain airport names and both dates", async () => {
-  const { BookingTicketContent } = await bundle(
-    "export { BookingTicketContent } from './src/web/booking-ticket';",
+test("booking cards stack journeys, lead stays with dates and stamp used bookings", async () => {
+  const { BookingCard } = await bundle(
+    "export { BookingCard } from './src/web/booking-card';",
   );
   const { renderToStaticMarkup } = await import("react-dom/server");
   const booking = {
+    id: "f1",
     kind: "flight",
     title: "GK211",
+    detail: "",
     origin: "",
     originCode: "NRT",
     destination: "",
@@ -1548,67 +2169,383 @@ test("compact reservation tickets retain airport names and both dates", async ()
     endDay: "2027-01-01",
     endTime: "01:00",
     confirmationCode: "JM6EQC",
+    note: "",
   };
-  const render = (value) =>
+  const render = (value, now = "2026-12-01T09:00", showDate = false) =>
     new JSDOM(
       renderToStaticMarkup(
-        React.createElement(BookingTicketContent, { booking: value }),
+        React.createElement(BookingCard, { booking: value, now, showDate }),
       ),
     ).window.document;
   const flight = render(booking);
   assert.deepEqual(
-    [...flight.querySelectorAll(".ticket-place strong")].map(
-      (node) => node.textContent,
-    ),
+    [...flight.querySelectorAll(".bk-pl b")].map((node) => node.textContent),
     ["NRT", "KIX"],
   );
   assert.deepEqual(
-    [...flight.querySelectorAll(".ticket-place span")].map(
+    [...flight.querySelectorAll(".bk-pl small")].map(
       (node) => node.textContent,
     ),
     ["成田国際空港", "関西国際空港"],
   );
-  assert.equal(flight.querySelector(".ticket-service").textContent, "GK211");
+  assert.deepEqual(
+    [...flight.querySelectorAll(".bk-t")].map((node) => node.textContent),
+    ["19:00発", "01:00翌日 着"],
+    "each big time sits on its stop row with its label below",
+  );
   assert.equal(
-    flight.querySelector(".ticket-reference strong").textContent,
-    "JM6EQC",
+    flight.querySelector(".bk-cn path").getAttribute("d"),
+    "M7 0 Q19 50 7 100",
+    "flights join their stops with an arc",
   );
-  assert.match(
-    flight.querySelector(".ticket-schedule").textContent,
-    /12\/31.*19:00.*2027\/1\/1.*01:00/,
+  assert.equal(flight.querySelector(".bk-code b").textContent, "JM6EQC");
+  assert.equal(
+    flight.querySelector(".bk-hd span"),
+    null,
+    "no date under a day heading",
   );
-  const hotel = render({
+  assert.equal(
+    render(booking, undefined, true).querySelector(".bk-hd span").textContent,
+    "12/31（木）",
+  );
+  assert.equal(flight.querySelector(".bk-stamp"), null);
+  const train = render({
+    ...booking,
+    kind: "train",
+    origin: "東京",
+    originCode: "",
+    destination: "新大阪",
+    destinationCode: "",
+    endDay: "2026-12-31",
+    endTime: "21:30",
+  });
+  assert.equal(
+    train.querySelector(".bk-cn path").getAttribute("d"),
+    "M7 0 V100",
+  );
+  assert.equal(train.querySelector(".bk-du").textContent, "2時間30分");
+  const hotel = {
     ...booking,
     kind: "hotel",
     title: "星の宿",
-    time: "22:30",
+    detail: "旧市街",
+    day: "2026-10-20",
+    time: "15:00",
+    endDay: "2026-10-23",
     endTime: "11:00",
-  });
-  assert.equal(hotel.querySelector(".ticket-title").textContent, "星の宿");
-  assert.equal(hotel.querySelector(".ticket-route"), null);
-  assert.match(
-    hotel.querySelector(".ticket-schedule").textContent,
-    /チェックイン.*22:30〜.*チェックアウト.*〜11:00/,
-  );
-  assert.equal(
-    render({
-      ...booking,
-      kind: "hotel",
-      time: "",
-      endTime: "",
-      confirmationCode: "",
-    }).querySelector(".ticket-reference"),
-    null,
+  };
+  const stay = render(hotel, "2026-10-21T13:00", true);
+  assert.deepEqual(
+    [...stay.querySelectorAll(".bk-t b")].map((node) => node.textContent),
+    ["10/20", "10/23"],
   );
   assert.deepEqual(
-    [
-      ...render({
-        ...booking,
-        kind: "hotel",
-        time: "",
-        endTime: "",
-      }).querySelectorAll("time"),
-    ].map((node) => node.textContent),
-    ["時刻未定", "時刻未定"],
+    [...stay.querySelectorAll(".bk-pl")].map((node) => node.textContent),
+    ["チェックイン15:00から", "チェックアウト11:00まで"],
   );
+  assert.equal(
+    stay.querySelector(".bk-du").textContent,
+    "3泊 · いま2泊目 · 旧市街",
+  );
+  assert.equal(
+    stay.querySelector(".bk-hd span"),
+    null,
+    "hotels never show a header date",
+  );
+  assert.equal(
+    render(hotel, "2026-10-01T09:00").querySelector(".bk-du").textContent,
+    "3泊 · 旧市街",
+  );
+  const used = render(hotel, "2026-10-23T11:01");
+  assert.ok(used.querySelector(".bk-card.used"));
+  assert.match(
+    used.querySelector(".bk-stamp textPath").textContent,
+    /USED · USED · USED · USED/,
+  );
+  assert.equal(used.querySelector(".bk-stamp .bk-c").textContent, "済");
+  assert.equal(
+    render({ ...hotel, confirmationCode: "" }).querySelector(".bk-code"),
+    null,
+  );
+});
+
+test("home trip cards: destination lines, countdown and companion icons", async () => {
+  const {
+    destinationPlaces,
+    destinationLines,
+    daysUntil,
+    UpcomingTripCard,
+    PastTripCard,
+  } = await bundle("export * from './src/web/home-trips';");
+  // 「・」 lives inside one place name; only list separators split.
+  assert.deepEqual(destinationPlaces("サンティアゴ・デ・コンポステーラ"), [
+    "サンティアゴ・デ・コンポステーラ",
+  ]);
+  assert.deepEqual(destinationPlaces("シュトゥットガルト、ウィーン"), [
+    "シュトゥットガルト",
+    "ウィーン",
+  ]);
+  assert.deepEqual(destinationPlaces("Vienna, Austria / Prague／Brno，Linz"), [
+    "Vienna",
+    "Austria",
+    "Prague",
+    "Brno",
+    "Linz",
+  ]);
+  assert.deepEqual(destinationLines("ミラノ、フィレンツェ、ローマ、ナポリ"), [
+    { text: "ミラノ" },
+    { text: "フィレンツェ", more: "ほか2" },
+  ]);
+  assert.equal(destinationLines("京都、大阪、神戸").length, 3);
+  assert.equal(daysUntil("2026-10-06", "2026-10-19"), 13);
+  assert.equal(daysUntil("2026-10-06", "2026-10-04"), -2);
+
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const h = React.createElement;
+  const render = (element) =>
+    new JSDOM(renderToStaticMarkup(h(MemoryRouter, null, element))).window
+      .document;
+  const people = ["つ", "み", "け", "さ", "ゆ", "あ"].map((name, index) => ({
+    id: `m${index}`,
+    name,
+    email: "",
+    role: "editor",
+    avatarUrl: index === 0 ? "data:image/png;base64,AA==" : null,
+  }));
+  const trip = {
+    id: "t1",
+    name: "イタリアを南へ縦断",
+    destination: "ミラノ、フィレンツェ、ローマ、ナポリ",
+    startsOn: "2026-10-19",
+    endsOn: "2026-10-23",
+    role: "owner",
+    memberCount: 6,
+  };
+  const props = { today: "2026-10-06", onOpen() {}, members: people };
+  const next = render(h(UpcomingTripCard, { ...props, trip, nearest: true }));
+  const card = next.querySelector("a.home-trip");
+  assert.equal(card.getAttribute("href"), "/trips/t1/itinerary");
+  assert.equal(
+    card.dataset.tripSurface,
+    "t1",
+    "the trip-open transition finds the card",
+  );
+  assert.ok(card.classList.contains("no-photo"));
+  assert.equal(
+    next.querySelector(".home-trip-countdown").textContent,
+    "あと13日",
+  );
+  assert.deepEqual(
+    [...next.querySelectorAll(".home-trip-place > span")].map(
+      (n) => n.textContent,
+    ),
+    ["ミラノ", "フィレンツェほか2"],
+  );
+  assert.equal(
+    next.querySelector(".home-trip-place").getAttribute("aria-hidden"),
+    "true",
+  );
+  assert.equal(
+    next.querySelector(".home-trip-dates").textContent,
+    "10/19 – 10/23",
+  );
+  const faces = next.querySelector(".home-trip-faces");
+  assert.equal(faces.getAttribute("aria-label"), "6人");
+  assert.equal(
+    faces.querySelectorAll("img").length,
+    1,
+    "a set icon shows as a picture",
+  );
+  assert.deepEqual(
+    [...faces.children].map((n) => n.textContent),
+    ["", "み", "け", "+3"],
+  );
+  const during = render(
+    h(UpcomingTripCard, { ...props, trip, today: "2026-10-20", nearest: true }),
+  );
+  assert.equal(
+    during.querySelector(".home-trip-countdown").textContent,
+    "2日目",
+  );
+  const later = render(h(UpcomingTripCard, { ...props, trip, nearest: false }));
+  assert.equal(later.querySelector(".home-trip-countdown"), null);
+  const photo = render(
+    h(PastTripCard, {
+      onOpen() {},
+      trip: {
+        ...trip,
+        startsOn: "2025-12-27",
+        coverImage: "data:image/png;base64,AA==",
+      },
+    }),
+  );
+  assert.equal(
+    photo.querySelector("img[data-trip-cover]").dataset.tripCover,
+    "t1",
+  );
+  assert.equal(photo.querySelector(".home-trip-place"), null);
+  assert.equal(photo.querySelector("small").textContent, "2025.12");
+});
+
+test("booking import reads streamed rows, flags duplicates and goes through the AI Gateway", async () => {
+  const {
+    findDuplicateBooking,
+    normalizeImportedBooking,
+    receiveBookingImport,
+    importedBookingInput,
+  } = await bundle("export * from './src/data/booking-import';");
+  const { startBookingImport, BookingDecoder } = await bundle(
+    "export * from './worker/booking-import';",
+  );
+  const existing = [
+    {
+      id: "a",
+      kind: "flight",
+      title: "EK 319",
+      day: "2026-10-19",
+      time: "22:20",
+      originCode: "NRT",
+      destinationCode: "DXB",
+    },
+  ];
+  const row = normalizeImportedBooking(
+    {
+      kind: "flight",
+      title: "EK319",
+      day: "2026-10-19",
+      time: "22:20",
+      origin_code: "nrt",
+      destination_code: "dxb",
+      review_reason: "none",
+      source_file: 4,
+    },
+    2,
+  );
+  assert.equal(row.originCode, "NRT");
+  assert.equal(
+    row.source,
+    0,
+    "an unknown file index falls back to the first file",
+  );
+  assert.equal(findDuplicateBooking(row, existing)?.id, "a");
+  assert.equal(
+    findDuplicateBooking({ ...row, title: "EK 128", time: "14:40" }, existing),
+    undefined,
+  );
+  assert.equal(
+    normalizeImportedBooking(
+      { kind: "ticket", title: "魔笛", day: "10/20", review_reason: "none" },
+      1,
+    ).review,
+    "missing_date",
+    "an unreadable date is never guessed",
+  );
+  assert.equal(
+    importedBookingInput({ ...row, party: "34A" }).note,
+    "人数・座席：34A",
+  );
+
+  const decoder = new BookingDecoder(1);
+  const text = JSON.stringify({
+    bookings: [
+      {
+        kind: "hotel",
+        title: "宿 {本館}",
+        day: "2026-10-20",
+        review_reason: "none",
+      },
+      {
+        kind: "ticket",
+        title: "魔笛",
+        day: "2026-10-20",
+        review_reason: "none",
+      },
+    ],
+  });
+  const rows = [
+    ...decoder.append(text.slice(0, 60)),
+    ...decoder.append(text.slice(60)),
+  ];
+  assert.deepEqual(
+    rows.map((entry) => entry.title),
+    ["宿 {本館}", "魔笛"],
+  );
+  decoder.finish();
+
+  const request = (body) =>
+    new Request("https://tabi.test/v1/trips/t/booking-import", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  const png =
+    "data:image/png;base64," +
+    Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0,
+    ]).toString("base64");
+  const files = {
+    files: [{ name: "a.png", kind: "image", data: png, size: 12 }],
+  };
+  const trip = { startsOn: "2026-10-19", endsOn: "2026-10-23" };
+  let sent;
+  const sse = [
+    { type: "response.output_text.delta", delta: text.slice(0, 50) },
+    { type: "response.output_text.delta", delta: text.slice(50) },
+    { type: "response.completed", response: { status: "completed" } },
+  ]
+    .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+    .join("");
+  const AI = {
+    run: async (model, input, options) => {
+      sent = { model, input, options };
+      return new Response(sse, {
+        headers: { "content-type": "text/event-stream" },
+      });
+    },
+  };
+  const env = { AI, AI_GATEWAY_ID: "kondo" };
+  for (const missing of [{}, { AI }, { AI_GATEWAY_ID: "kondo" }])
+    assert.equal(
+      (await startBookingImport(request(files), missing, trip)).status,
+      503,
+      "import stays off without the AI binding and gateway",
+    );
+  assert.equal(
+    (
+      await startBookingImport(
+        request({
+          files: [
+            {
+              name: "a.png",
+              kind: "image",
+              data: "data:image/png;base64,AAAA",
+              size: 3,
+            },
+          ],
+        }),
+        env,
+        trip,
+      )
+    ).status,
+    400,
+  );
+  const response = await startBookingImport(request(files), env, trip);
+  assert.equal(sent.model, "openai/gpt-6-luna");
+  assert.deepEqual(sent.options.gateway, {
+    id: "kondo",
+    skipCache: true,
+    collectLog: false,
+  });
+  assert.equal(sent.options.returnRawResponse, true);
+  const payload = sent.input;
+  assert.equal(payload.stream, true);
+  assert.equal(payload.store, false);
+  assert.equal(payload.text.format.type, "json_schema");
+  const received = [];
+  await receiveBookingImport(
+    response,
+    (entry) => received.push(entry.title),
+    new AbortController().signal,
+    1,
+  );
+  assert.deepEqual(received, ["宿 {本館}", "魔笛"]);
 });

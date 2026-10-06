@@ -11,6 +11,15 @@ const dir = await mkdtemp(join(tmpdir(), 'tabi-pwa-'));
 await build({ entryPoints: ['worker/index.ts'], bundle: true, platform: 'node', format: 'cjs', outfile: join(dir, 'worker.cjs'), logLevel: 'silent' });
 const worker = createRequire(import.meta.url)(join(dir, 'worker.cjs')).default;
 after(() => rm(dir, { recursive: true, force: true }));
+// Short Google Maps links are followed once by the Worker; never reach the network in tests.
+const shortLinkRequests = [];
+globalThis.fetch = async (input, init) => {
+  const url = new URL(input instanceof Request ? input.url : input);
+  if (url.hostname !== 'maps.app.goo.gl') throw new Error(`unexpected fetch ${url}`);
+  shortLinkRequests.push({ url: url.href, redirect: init?.redirect });
+  const location = url.pathname === '/stephansdom' ? 'https://www.google.com/maps/place/Stephansdom/@48.2,16.37,17z/data=!3m1!4b1!4m6!3m5!8m2!3d48.20849!4d16.37314' : 'https://www.google.com/maps?q=Vienna';
+  return new Response(null, { status: 302, headers: { location } });
+};
 async function fixture() {
   const db = new DatabaseSync(':memory:'); db.exec('PRAGMA foreign_keys=ON');
   const schema = await readFile('worker/schema.sql', 'utf8'); db.exec(schema); db.exec(schema);
@@ -36,7 +45,9 @@ test('titled rich notes round-trip, preserve legacy text and enforce schema, rol
     const legacy = { id, body: '旅のメモ\n- [ ] お土産', pinned: true };
     assert.equal((await call(base, 'POST', legacy)).status, 201);
     assert.equal((await read()).body, legacy.body);
-    assert.equal((await read()).pinned, false);
+    assert.equal((await read()).pinned, true);
+    assert.equal((await read()).updatedBy, 'owner');
+    assert.equal((await read()).placeId, null);
     const content = { type: 'doc', content: [
       { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: '買い物' }] },
       { type: 'taskList', content: [{ type: 'taskItem', attrs: { checked: true }, content: [
@@ -47,6 +58,9 @@ test('titled rich notes round-trip, preserve legacy text and enforce schema, rol
     assert.equal((await call(base, 'POST', rich, 'editor')).status, 201);
     assert.deepEqual((await read()).content, content);
     assert.equal((await read()).body, rich.body);
+    // A save that omits the pin keeps it; the last writer is reported.
+    assert.equal((await read()).pinned, true);
+    assert.equal((await read()).updatedBy, 'editor');
     db.exec(await readFile('worker/schema.sql', 'utf8'));
     assert.equal((await read()).title, rich.title);
     assert.deepEqual((await read()).content, content);
@@ -113,6 +127,57 @@ test('packing assignment and shared status survive old clients, membership chang
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM packing_details WHERE item_id = ?').get(id).n, 0);
   } finally { db.close(); }
 });
+test('packing kinds: legacy rows read as 1つでいい, みんな各自 ticks per member, 自分だけ stays private on the server', async () => {
+  const { db, call, trip } = await fixture();
+  try {
+    const base = `/trips/${trip.id}/packing`;
+    const list = async (user = 'owner') => (await (await call(base, 'GET', undefined, user)).json()).items;
+    const find = async (id, user) => (await list(user)).find((item) => item.id === id);
+    const legacy = { id: randomUUID(), name: '変換プラグ', category: '電子機器', quantity: 1, packed: false, assignee: 'member:editor', shared: false };
+    assert.equal((await call(base, 'POST', legacy)).status, 201);
+    assert.equal((await find(legacy.id)).kind, 'one', 'items without a kind are 1つでいい with their old carrier');
+    assert.deepEqual((await find(legacy.id)).packedBy, []);
+    // Only the carrier ticks a 1つでいい item; others' ticks are ignored, not rejected.
+    assert.equal((await call(`${base}/${legacy.id}`, 'PATCH', { ...legacy, packed: true })).status, 200);
+    assert.equal((await find(legacy.id)).packed, false);
+    assert.equal((await call(`${base}/${legacy.id}`, 'PATCH', { ...legacy, packed: true }, 'editor')).status, 200);
+    assert.equal((await find(legacy.id)).packed, true);
+
+    const each = { id: randomUUID(), name: 'パスポート', category: '書類', quantity: 1, packed: false, assignee: '', shared: false, kind: 'each' };
+    assert.equal((await call(base, 'POST', each)).status, 201);
+    const ticked = await call(`${base}/${each.id}`, 'PATCH', { ...each, packed: true }, 'editor');
+    assert.deepEqual((await ticked.json()).item.packedBy, ['editor']);
+    assert.equal((await find(each.id, 'editor')).packed, true, 'packed is the reader’s own tick');
+    assert.equal((await find(each.id, 'owner')).packed, false);
+    assert.deepEqual((await find(each.id, 'owner')).packedBy, ['editor']);
+    // An older client omits the kind and sends the reader's own tick back.
+    const { kind: _kind, ...old } = each;
+    assert.equal((await call(`${base}/${each.id}`, 'PATCH', { ...old, packed: true }, 'owner')).status, 200);
+    assert.equal((await find(each.id)).kind, 'each');
+    assert.deepEqual((await find(each.id)).packedBy, ['editor', 'owner']);
+    db.prepare("DELETE FROM trip_members WHERE trip_id = ? AND user_id = 'editor'").run(trip.id);
+    assert.deepEqual((await find(each.id)).packedBy, ['owner'], 'a departed member no longer shows as packed');
+    db.prepare("INSERT INTO trip_members (trip_id,user_id,role) VALUES (?, 'editor', 'editor')").run(trip.id);
+
+    const mine = { id: randomUUID(), name: 'コンタクトレンズ', category: 'その他', quantity: 1, packed: false, assignee: '', shared: false, kind: 'mine' };
+    assert.equal((await call(base, 'POST', mine, 'editor')).status, 201);
+    assert.equal((await find(mine.id, 'editor')).kind, 'mine');
+    assert.equal(await find(mine.id, 'owner'), undefined, 'another member never receives a private item');
+    assert.equal((await call(`${base}/${mine.id}`, 'PATCH', { ...mine, name: '覗き見' }, 'owner')).status, 404);
+    assert.equal((await call(base, 'POST', { ...mine, name: '上書き' }, 'owner')).status, 409);
+    assert.equal((await call(`${base}/${mine.id}`, 'DELETE', undefined, 'owner')).status, 404);
+    assert.equal((await find(mine.id, 'editor')).name, 'コンタクトレンズ');
+    // Sharing it again is the owner's choice.
+    assert.equal((await call(`${base}/${mine.id}`, 'PATCH', { ...mine, kind: 'each' }, 'editor')).status, 200);
+    assert.equal((await find(mine.id, 'owner')).kind, 'each');
+    assert.equal((await call(`${base}/${mine.id}`, 'PATCH', { ...mine, kind: 'secret' }, 'editor')).status, 400);
+    db.exec(await readFile('worker/schema.sql', 'utf8'));
+    assert.equal((await find(each.id)).kind, 'each', 'kinds survive schema reruns');
+    assert.equal((await call(`${base}/${each.id}`, 'DELETE')).status, 204);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM packing_marks WHERE item_id = ?').get(each.id).n, 0);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM packing_kinds WHERE item_id = ?').get(each.id).n, 0);
+  } finally { db.close(); }
+});
 test('multiple place links and unavailable reservations round-trip without losing legacy data', async () => {
   const { db, call, trip } = await fixture();
   try {
@@ -145,6 +210,35 @@ test('multiple place links and unavailable reservations round-trip without losin
     assert.deepEqual((await read()).referenceLinks, []);
     assert.equal((await call(`${base}/${id}`, 'DELETE')).status, 204);
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM place_details WHERE place_id = ?').get(id).n, 0);
+  } finally { db.close(); }
+});
+test('place coordinates come from Google Maps links, follow one short-link redirect and survive unchanged edits', async () => {
+  const { db, call, trip } = await fixture();
+  try {
+    const base = `/trips/${trip.id}/places`, id = randomUUID();
+    const read = async () => (await (await call(base)).json()).places.find((item) => item.id === id);
+    const long = 'https://www.google.com/maps/place/Belvedere/@48.19,16.38,17z/data=!4m6!3m5!8m2!3d48.19149!4d16.38085';
+    const created = await call(base, 'POST', { id, ...place, location: long });
+    assert.equal(created.status, 201);
+    assert.deepEqual([(await created.json()).place.lat, (await read()).lng], [48.19149, 16.38085]);
+    // A short link is resolved through its redirect without following it further.
+    shortLinkRequests.length = 0;
+    assert.equal((await call(`${base}/${id}`, 'PATCH', { ...place, location: 'https://maps.app.goo.gl/stephansdom' })).status, 200);
+    assert.deepEqual(shortLinkRequests, [{ url: 'https://maps.app.goo.gl/stephansdom', redirect: 'manual' }]);
+    assert.deepEqual([(await read()).lat, (await read()).lng], [48.20849, 16.37314]);
+    // An unchanged link keeps its pin without asking Google again; lat/lng sent by clients are ignored.
+    assert.equal((await call(`${base}/${id}`, 'PATCH', { ...place, location: 'https://maps.app.goo.gl/stephansdom', title: '大聖堂', lat: 1, lng: 2 })).status, 200);
+    assert.equal(shortLinkRequests.length, 1);
+    assert.deepEqual([(await read()).lat, (await read()).lng], [48.20849, 16.37314]);
+    // A link without a position, or an address, clears the old pin.
+    assert.equal((await call(`${base}/${id}`, 'PATCH', { ...place, location: 'https://maps.app.goo.gl/somewhere' })).status, 200);
+    assert.deepEqual([(await read()).lat, (await read()).lng], [null, null]);
+    assert.equal((await call(`${base}/${id}`, 'PATCH', { ...place, location: long })).status, 200);
+    assert.equal((await call(`${base}/${id}`, 'PATCH', { ...place, location: 'Prinz-Eugen-Straße 27, Wien' })).status, 200);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM place_coordinates').get().n, 0);
+    assert.equal((await call(`${base}/${id}`, 'PATCH', { ...place, location: long })).status, 200);
+    assert.equal((await call(`${base}/${id}`, 'DELETE')).status, 204);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM place_coordinates').get().n, 0, 'coordinates go with the place');
   } finally { db.close(); }
 });
 test('place itinerary links survive status/title edits and old clients, but clear after plan deletion', async () => {
@@ -388,7 +482,10 @@ test('travel notes preserve text, replay safely and enforce trip permissions', a
     const read = async () => (await (await call(base)).json()).notes;
     assert.equal((await read()).length, 1);
     assert.equal((await read())[0].body, note.body);
+    assert.equal((await read())[0].pinned, true);
+    assert.equal((await call(base, 'POST', { ...note, pinned: false })).status, 201);
     assert.equal((await read())[0].pinned, false);
+    assert.equal((await call(base, 'POST', { ...note, pinned: 'yes' })).status, 400);
     assert.equal((await call(base, 'POST', { ...note, body: 'a'.repeat(50001) })).status, 400);
     assert.equal((await call(base, 'GET', undefined, 'outsider')).status, 403);
     assert.equal((await call(base, 'POST', note, 'outsider')).status, 403);
@@ -406,6 +503,37 @@ test('travel notes preserve text, replay safely and enforce trip permissions', a
     await call(base, 'POST', note);
     await call(`/trips/${trip.id}`, 'DELETE');
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM travel_notes').get().n, 0);
+  } finally { db.close(); }
+});
+
+test('notes link to a place of the same trip, survive old clients and schema reruns, and unlink when the place goes', async () => {
+  const { db, call, trip } = await fixture();
+  try {
+    const placeId = randomUUID(), otherPlace = randomUUID(), id = randomUUID();
+    assert.equal((await call(`/trips/${trip.id}/places`, 'POST', { id: placeId, ...place })).status, 201);
+    const other = { ...trip, id: randomUUID() };
+    await call('/trips', 'POST', other);
+    assert.equal((await call(`/trips/${other.id}/places`, 'POST', { id: otherPlace, ...place })).status, 201);
+    const base = `/trips/${trip.id}/notes`;
+    const read = async () => (await (await call(base)).json()).notes.find((note) => note.id === id);
+    const note = { id, title: '美術館で見たいもの', body: '- [ ] 展示', pinned: false, placeId };
+    assert.equal((await call(base, 'POST', note)).status, 201);
+    assert.equal((await read()).placeId, placeId);
+    // Old clients send only text: the link stays.
+    assert.equal((await call(base, 'POST', { id, title: note.title, body: '- [x] 展示' }, 'editor')).status, 201);
+    assert.equal((await read()).placeId, placeId);
+    db.exec(await readFile('worker/schema.sql', 'utf8'));
+    assert.equal((await read()).placeId, placeId);
+    // Another trip's place is never linked.
+    assert.equal((await call(base, 'POST', { ...note, placeId: otherPlace })).status, 201);
+    assert.equal((await read()).placeId, null);
+    assert.equal((await call(base, 'POST', { ...note, placeId: 'not-an-id' })).status, 400);
+    assert.equal((await call(base, 'POST', note)).status, 201);
+    assert.equal((await call(`/trips/${trip.id}/places/${placeId}`, 'DELETE')).status, 204);
+    assert.equal((await read()).placeId, null);
+    assert.equal((await read()).body, note.body);
+    assert.equal((await call(`${base}/${id}`, 'DELETE')).status, 204);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM note_places').get().n, 0);
   } finally { db.close(); }
 });
 

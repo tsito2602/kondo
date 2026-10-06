@@ -132,8 +132,21 @@ export function useAction() {
   };
   return { busy, run };
 }
-/** Keep the pointer-down action stable even when the browser blurs on tap. */
-function FormBackButton({ onBack }: { onBack: () => void }) {
+/**
+ * Keep the pointer-down action stable even when the browser blurs on tap.
+ * While an editor is focused it closes the keyboard; otherwise it leaves.
+ * A sheet may name its way out (「やめる」) as text instead of an arrow, or
+ * pass an icon, in which case the label is only the accessible name.
+ */
+export function FormBackButton({
+  onBack,
+  label,
+  icon,
+}: {
+  onBack: () => void;
+  label?: string;
+  icon?: ReactNode;
+}) {
   const [editor, setEditor] = useState<HTMLElement | null>(null);
   const button = useRef<HTMLButtonElement>(null);
   const pressedEditor = useRef<HTMLElement | null>(null);
@@ -172,7 +185,14 @@ function FormBackButton({ onBack }: { onBack: () => void }) {
     <button
       ref={button}
       type="button"
-      aria-label={editor ? "キーボードを閉じる" : "戻る"}
+      aria-label={
+        editor
+          ? "キーボードを閉じる"
+          : label && !icon
+            ? undefined
+            : (label ?? "戻る")
+      }
+      className={label && !icon && !editor ? "context-back-label" : undefined}
       onPointerDown={(event) => {
         pressedEditor.current = editor;
         if (editor) event.preventDefault();
@@ -195,7 +215,7 @@ function FormBackButton({ onBack }: { onBack: () => void }) {
           <ChevronDown size={12} />
         </span>
       ) : (
-        <ArrowLeft size={22} />
+        (icon ?? label ?? <ArrowLeft size={22} />)
       )}
     </button>
   );
@@ -217,7 +237,11 @@ export function Modal({
   fullscreen?: boolean;
   action?: ReactNode;
   preserveNavigation?: boolean;
-  dockActions?: { primary?: ReactNode; actions?: ReactNode };
+  dockActions?: {
+    primary?: ReactNode;
+    actions?: ReactNode;
+    backLabel?: string;
+  };
 }>) {
   const ref = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -409,7 +433,10 @@ export function Modal({
                     <X size={22} />
                   </button>
                 ) : (
-                  <FormBackButton onBack={close} />
+                  <FormBackButton
+                    onBack={close}
+                    label={dockActions?.backLabel}
+                  />
                 )
               }
               primary={

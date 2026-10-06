@@ -1,0 +1,582 @@
+/* やること and 持ち物 (kondo-prep3 mock, layout L3). */
+:root {
+  --prep-pale: #cbc5bb;
+  --prep-mid: #9c978f;
+  --prep-late: #c2410c;
+}
+:root[data-theme="dark"] {
+  --prep-pale: #57534d;
+  --prep-mid: #b6b0a6;
+}
+
+.prep-page {
+  padding-top: 14px;
+}
+.prep-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 4px 8px;
+}
+.prep-top small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.prep-top h2 {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+.prep-plus {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--soft);
+  color: var(--ink);
+}
+.prep-empty {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Section headings: what the list is, and what a tap does / how far along. */
+.prep-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 16px 4px 8px;
+}
+.prep-heading b {
+  font-size: 14px;
+  font-weight: 900;
+}
+.prep-heading span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+.prep-list {
+  padding: 2px 0;
+  border-radius: 20px;
+  background: var(--soft);
+}
+.prep-none {
+  margin: 0;
+  padding: 14px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ---------- rings ---------- */
+.prep-rings {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 6px 0 4px;
+}
+.prep-ring {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 0;
+  border: 0;
+  border-radius: 20px;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.prep-ring[aria-pressed="true"] {
+  background: var(--soft);
+}
+.prep-ring-view {
+  position: relative;
+  width: 92px;
+  height: 92px;
+}
+.prep-ring-view > svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.prep-ring-view circle {
+  fill: none;
+  stroke-width: 11;
+  stroke-linecap: round;
+}
+.prep-ring-track {
+  stroke: var(--soft);
+}
+.prep-ring[aria-pressed="true"] .prep-ring-track {
+  stroke: var(--canvas);
+}
+.prep-ring-fill {
+  stroke: var(--ink);
+  transition: stroke-dashoffset 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.prep-ring-view > .assignee-avatar {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px;
+  box-shadow: inset 0 0 0 1.5px var(--prep-pale);
+  font-size: 18px;
+  font-weight: 900;
+}
+.prep-ring.is-closed .prep-ring-view::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ink)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 15px no-repeat;
+  box-shadow: 0 0 0 3px var(--canvas);
+}
+:root[data-theme="dark"] .prep-ring.is-closed .prep-ring-view::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.prep-ring > b {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prep-ring > small {
+  display: block;
+  margin-top: -4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- rows ---------- */
+.prep-row,
+.prep-item {
+  display: grid;
+  align-items: center;
+}
+.prep-row {
+  grid-template-columns: 1fr auto;
+  gap: 4px;
+  padding: 0 4px 0 0;
+}
+.prep-row + .prep-row,
+.prep-item + .prep-item {
+  border-top: 1.5px solid var(--line);
+}
+.prep-row-main,
+.prep-item-name {
+  min-width: 0;
+  padding: 11px 0 11px 14px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.prep-row-main:disabled,
+.prep-item-name:disabled,
+.prep-item-picture:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.prep-row-main b,
+.prep-item-name b {
+  position: relative;
+  display: inline;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+/* The strike-through is the one line that shows progress: drawn when done. */
+.prep-row-main b::after,
+.prep-item-name b::after {
+  content: "";
+  position: absolute;
+  top: 52%;
+  right: -2px;
+  left: -2px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--prep-mid);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 0.32s;
+}
+.is-done .prep-row-main b,
+.is-done .prep-item-name b {
+  color: var(--muted);
+}
+.is-done .prep-row-main b::after,
+.is-done .prep-item-name b::after {
+  transform: scaleX(1);
+}
+.prep-row-main small,
+.prep-item-name small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.prep-late {
+  color: var(--prep-late);
+  font-style: normal;
+}
+.prep-check {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.prep-check:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.prep-box {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 2.5px var(--ink);
+}
+.prep-box svg {
+  color: var(--canvas);
+  opacity: 0;
+}
+.prep-check[aria-checked="true"] .prep-box {
+  background: var(--ink);
+}
+.prep-check[aria-checked="true"] .prep-box svg {
+  opacity: 1;
+}
+.is-readonly .prep-box {
+  box-shadow: inset 0 0 0 2.5px var(--prep-pale);
+}
+.is-readonly .prep-check[aria-checked="true"] .prep-box {
+  background: var(--prep-pale);
+}
+
+/* ---------- 持ち物 rows ---------- */
+.prep-item {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 10px;
+  padding: 0 4px 0 14px;
+}
+.prep-item-name {
+  padding-left: 0;
+}
+.prep-item-picture {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+}
+.prep-item-name small .assignee-avatar {
+  width: 16px;
+  height: 16px;
+  box-shadow: inset 0 0 0 1.5px var(--prep-pale);
+  font-size: 8px;
+  font-weight: 900;
+}
+.prep-item-name small svg {
+  color: var(--prep-mid);
+}
+.prep-others {
+  display: flex;
+  gap: 3px;
+}
+.prep-others > span {
+  position: relative;
+  display: inline-flex;
+}
+.prep-others .assignee-avatar {
+  box-shadow: inset 0 0 0 1.5px var(--prep-pale);
+  font-weight: 900;
+}
+.prep-others .is-off .assignee-avatar {
+  opacity: 0.3;
+  filter: grayscale(1);
+}
+.prep-others .is-on::after {
+  content: "";
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--ink)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E")
+    center / 8px no-repeat;
+  box-shadow: 0 0 0 2px var(--soft);
+}
+:root[data-theme="dark"] .prep-others .is-on::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.prep-take {
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 99px;
+  background: var(--ink);
+  color: var(--canvas);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+/* ---------- sheets ---------- */
+.prep-sheet .prep-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 16px;
+  outline: none;
+  background: var(--soft);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+.prep-sheet .error {
+  margin: 8px 2px 0;
+}
+.prep-label {
+  display: block;
+  margin: 16px 2px 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+.prep-cal {
+  margin-top: 6px;
+  padding: 8px 8px 6px;
+  border-radius: 20px;
+  background: var(--soft);
+}
+.prep-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 4px;
+}
+.prep-cal-head b {
+  font-size: 15px;
+  font-weight: 900;
+}
+.prep-cal-head button {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink);
+  font-size: 20px;
+}
+.prep-cal-head button:disabled {
+  color: var(--prep-pale);
+}
+.prep-cal-week,
+.prep-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+.prep-cal-week span {
+  padding: 2px 0 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+.prep-cal-grid button {
+  position: relative;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.prep-cal-grid button:disabled {
+  color: var(--prep-pale);
+  opacity: 1;
+}
+.prep-cal-grid button.is-today {
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+/* The trip's days, as one band: departure to return. */
+.prep-cal-grid button.is-trip {
+  border-radius: 0;
+  background: color-mix(in srgb, var(--prep-mid) 22%, transparent);
+}
+.prep-cal-grid button.is-trip.is-first {
+  border-radius: 12px 0 0 12px;
+}
+.prep-cal-grid button.is-trip.is-last {
+  border-radius: 0 12px 12px 0;
+}
+.prep-cal-grid button.is-trip.is-first.is-last {
+  border-radius: 12px;
+}
+.prep-cal-grid button small {
+  position: absolute;
+  right: 0;
+  bottom: 1px;
+  left: 0;
+  color: var(--muted);
+  font-size: 8.5px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+.prep-cal-grid button[aria-pressed="true"] {
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--canvas);
+}
+.prep-cal-grid button[aria-pressed="true"] small {
+  color: var(--prep-pale);
+}
+.prep-cal-none {
+  display: block;
+  margin: 4px auto 0;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 99px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+.prep-cal-none[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--canvas);
+}
+.prep-whos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.prep-whos button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px 5px 5px;
+  border: 0;
+  border-radius: 99px;
+  background: var(--soft);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+}
+.prep-whos button .assignee-avatar {
+  width: 30px;
+  height: 30px;
+  box-shadow: inset 0 0 0 1.5px var(--prep-pale);
+  font-size: 13px;
+  font-weight: 900;
+}
+.prep-whos button.prep-who-all {
+  padding: 5px 14px;
+  min-height: 40px;
+}
+.prep-whos button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--canvas);
+}
+.prep-who-note {
+  flex-basis: 100%;
+  margin: 2px 4px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.prep-kinds {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+.prep-kinds button {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--soft);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+.prep-kinds i {
+  grid-row: span 2;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2.5px var(--prep-pale);
+}
+.prep-kinds b {
+  font-size: 15px;
+}
+.prep-kinds small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.prep-kinds button[aria-checked="true"] {
+  background: var(--ink);
+  color: var(--canvas);
+}
+.prep-kinds button[aria-checked="true"] small {
+  color: var(--prep-pale);
+}
+.prep-kinds button[aria-checked="true"] i {
+  box-shadow: inset 0 0 0 6px var(--canvas);
+}
+
+/* 「やめる」 is a word, not an icon: the back island widens to hold it. */
+.context-island > .context-back-label {
+  width: auto;
+  padding: 0 22px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.context-primary > .prep-primary {
+  font-size: 15px;
+  font-weight: 700;
+}

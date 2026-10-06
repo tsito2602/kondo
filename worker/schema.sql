@@ -191,6 +191,13 @@ CREATE TABLE IF NOT EXISTS place_details (
   reservation_status TEXT CHECK(reservation_status IS NULL OR reservation_status = 'unavailable')
 );
 
+-- Map position read from the place's Google Maps link (WGS84 degrees); absent when the link has none.
+CREATE TABLE IF NOT EXISTS place_coordinates (
+  place_id TEXT PRIMARY KEY REFERENCES places(id) ON DELETE CASCADE,
+  lat REAL NOT NULL CHECK(lat BETWEEN -90 AND 90),
+  lng REAL NOT NULL CHECK(lng BETWEEN -180 AND 180)
+);
+
 -- Add read-only membership without rebuilding the existing member table.
 CREATE TABLE IF NOT EXISTS trip_member_permissions (
   trip_id TEXT NOT NULL,
@@ -230,6 +237,12 @@ CREATE TABLE IF NOT EXISTS note_details (
   content TEXT
 );
 
+-- Optional link from a note to a numbered place; omission by old clients preserves it.
+CREATE TABLE IF NOT EXISTS note_places (
+  note_id TEXT PRIMARY KEY REFERENCES travel_notes(id) ON DELETE CASCADE,
+  place_id TEXT REFERENCES places(id) ON DELETE SET NULL
+);
+
 -- Optional packing ownership preserves existing rows and repeatable deployment.
 CREATE TABLE IF NOT EXISTS packing_details (
   item_id TEXT PRIMARY KEY REFERENCES packing_items(id) ON DELETE CASCADE,
@@ -247,4 +260,20 @@ CREATE TABLE IF NOT EXISTS itinerary_details (
 CREATE TABLE IF NOT EXISTS booking_durations (
   booking_id TEXT PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
   duration_minutes INTEGER
+);
+
+-- Packing kinds: みんな各自 (each), 1つでいい (one) and 自分だけ (mine). Items
+-- without a row are legacy items and read as 'one' with their old carrier.
+-- owner_id is set only for 'mine'; nobody else can read or change those rows.
+CREATE TABLE IF NOT EXISTS packing_kinds (
+  item_id TEXT PRIMARY KEY REFERENCES packing_items(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL DEFAULT 'one' CHECK(kind IN ('each', 'one', 'mine')),
+  owner_id TEXT REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Per-member packed marks for みんな各自 items: one row per member who packed it.
+CREATE TABLE IF NOT EXISTS packing_marks (
+  item_id TEXT NOT NULL REFERENCES packing_items(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  PRIMARY KEY (item_id, user_id)
 );
