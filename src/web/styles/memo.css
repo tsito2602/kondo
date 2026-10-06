@@ -491,23 +491,66 @@ dialog:has(.memo-editor),
 }
 
 /* editor dock: back, then the note's tools (the mock's .tb) */
-dialog:has(.memo-editor):not(:has(.memo-show)) .context-actions {
+dialog:not([data-panel]):has(.memo-editor):not(:has(.memo-show))
+  .context-actions {
   justify-content: space-around;
   padding: 0 4px;
 }
-:root dialog:has(.memo-editor):not(:has(.memo-show)) .context-actions > button {
+:root
+  dialog:not([data-panel]):has(.memo-editor):not(:has(.memo-show))
+  .context-actions
+  > button {
   flex: 1;
   min-width: 0;
   height: 54px;
   border-radius: 27px;
   color: var(--m-mute);
 }
-:root dialog:has(.memo-editor) .context-actions > button.on {
+:root dialog:not([data-panel]):has(.memo-editor) .context-actions > button.on {
   color: var(--m-ink);
 }
-dialog:has(.memo-editor) .context-actions > button svg {
+dialog:not([data-panel]):has(.memo-editor) .context-actions > button svg {
   width: 24px;
   height: 24px;
+}
+
+/* The ＋ opens a new memo in the shared floating add panel (Modal addPanel):
+   title, lines and the link row, with the line tools in a row at its foot. */
+.memo-editor.is-panel {
+  padding-top: 12px;
+}
+.memo-editor.is-panel .memo-title {
+  margin-bottom: 8px;
+  font-size: 22px;
+}
+.memo-editor.is-panel .memo-lines {
+  min-height: 72px;
+}
+.memo-panel-tools {
+  display: flex;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--m-line);
+}
+.memo-panel-tools > button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 20px;
+  background: var(--m-soft);
+  color: var(--m-mute);
+  cursor: pointer;
+}
+.memo-panel-tools > button.on {
+  color: var(--m-ink);
+}
+.memo-panel-tools svg {
+  width: 22px;
+  height: 22px;
 }
 
 /* ===== 見せる: big type for a taxi driver or shop staff ===== */

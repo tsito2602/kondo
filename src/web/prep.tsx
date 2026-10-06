@@ -167,8 +167,11 @@ function PrepSheet({
   onClose,
   onDelete,
   deleteLabel,
+  add = false,
   children,
 }: {
+  /** Opened by the ＋: the shared floating add panel, ‹ cancels. */
+  add?: boolean;
   title: string;
   primary: string;
   formId: string;
@@ -181,9 +184,10 @@ function PrepSheet({
     <Modal
       title={title}
       onClose={onClose}
-      plain
+      plain={!add}
+      addPanel={add}
       dockActions={{
-        backLabel: "やめる",
+        backLabel: add ? undefined : "やめる",
         primary: (
           <button type="submit" className="prep-primary" form={formId}>
             <CheckIcon />
@@ -700,6 +704,7 @@ function TaskSheet({
   return (
     <PrepSheet
       title={task ? "やることを直す" : "やることを追加"}
+      add={!task}
       primary={task ? "保存" : "追加する"}
       formId={formId}
       onClose={onClose}
@@ -1087,6 +1092,7 @@ function PackingSheet({
   return (
     <PrepSheet
       title={item ? "持ち物を直す" : "持ち物を追加"}
+      add={!item}
       primary={item ? "保存" : "追加する"}
       formId={formId}
       onClose={onClose}

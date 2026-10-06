@@ -17,6 +17,7 @@ import {
   type NoteLine,
   type NoteLineKind,
 } from "@/data/note-lines";
+import { Check } from "lucide-react";
 import { Modal } from "./ui";
 import { dismissModal } from "./motion";
 import { bubble, memoEditorTransition, sink, spring } from "./memo-motion";
@@ -95,6 +96,8 @@ export function NoteEditor({
   onClose: () => void;
   /** The list poofs the note and offers 元に戻す before it is really deleted. */
   onDelete: (note: TravelNote) => void;
+  /** Opened by the ＋: the shared floating add panel. Nothing is saved until
+      「追加する」; the ‹ circle drops the draft. */
   fresh?: boolean;
 }) {
   const {
@@ -124,6 +127,8 @@ export function NoteEditor({
   const focusNext = useRef<{ index: number; caret: number } | null>(null);
   const dialogBody = useRef<HTMLDivElement>(null);
   const deleting = useRef(false);
+  // A tile opens the full editor (autosaves); the ＋ opens the add panel.
+  const panel = fresh;
   const [transition] = useState(() =>
     memoEditorTransition(
       () =>
@@ -137,14 +142,14 @@ export function NoteEditor({
   );
   const flush = () => {
     if (timer.current) clearTimeout(timer.current);
-    if (!dirty.current || !canEdit) return;
+    if (!dirty.current || !canEdit) return true;
     if (
       !exists.current &&
       !latest.current.title?.trim() &&
       !latest.current.body.trim()
     ) {
       dirty.current = false;
-      return;
+      return true;
     }
     try {
       const { title = "", body, pinned, placeId } = latest.current;
@@ -156,18 +161,23 @@ export function NoteEditor({
       dirty.current = false;
       exists.current = true;
       setSaveError("");
+      return true;
     } catch (error) {
       setSaveError(
         error instanceof Error
           ? error.message
           : "保存できませんでした。もう一度お試しください。",
       );
+      return false;
     }
   };
   const flushRef = useRef(flush);
   flushRef.current = flush;
   useEffect(() => {
-    const persist = () => flushRef.current();
+    // The add panel keeps its draft to itself until 「追加する」.
+    const persist = () => {
+      if (!panel) flushRef.current();
+    };
     window.addEventListener("pagehide", persist);
     document.addEventListener("visibilitychange", persist);
     return () => {
@@ -194,7 +204,7 @@ export function NoteEditor({
     setDraft(latest.current);
     setSaveError("");
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => flushRef.current(), 500);
+    if (!panel) timer.current = setTimeout(() => flushRef.current(), 500);
   };
   const changeLines = (next: NoteLine[]) => {
     const body = serializeNoteLines(next);
@@ -203,8 +213,14 @@ export function NoteEditor({
     change({ body, content: null });
   };
   const close = () => {
-    flush();
+    // ‹ on the add panel cancels: the draft is dropped.
+    if (panel) dirty.current = false;
+    else flush();
     onClose();
+  };
+  const add = () => {
+    if (!flush()) return;
+    dismissModal(onClose, dialogBody.current?.closest("dialog"));
   };
 
   const editLine = (index: number, value: string) => {
@@ -354,32 +370,73 @@ export function NoteEditor({
     </>
   );
 
+  const panelTools = canEdit && (
+    <div className="memo-panel-tools" role="group" aria-label="書式">
+      <button
+        type="button"
+        aria-label="チェックを足す"
+        onClick={() => addLine("c")}
+      >
+        <AddCheckIcon />
+      </button>
+      <button
+        type="button"
+        aria-label="見出しを足す"
+        onClick={() => addLine("h")}
+      >
+        <AddHeadingIcon />
+      </button>
+      <button
+        type="button"
+        aria-label="ピン留め"
+        aria-pressed={Boolean(draft.pinned)}
+        className={draft.pinned ? "on" : ""}
+        onClick={(event) => togglePin(event.currentTarget)}
+      >
+        {draft.pinned ? <PinFilledIcon /> : <PinIcon />}
+      </button>
+    </div>
+  );
+
   return (
     <Modal
-      title={draft.title?.trim() || "メモ"}
-      full
-      transition={transition}
+      title={panel ? "メモを追加" : draft.title?.trim() || "メモ"}
+      full={!panel}
+      addPanel={panel}
+      transition={panel ? undefined : transition}
       onClose={close}
       dockActions={
-        showing
+        panel
           ? {
               primary: (
-                <button
-                  className="memo-show-close"
-                  onClick={() => setShowing(false)}
-                >
-                  閉じる
+                <button type="button" onClick={add}>
+                  <Check size={18} aria-hidden="true" />
+                  追加する
                 </button>
               ),
             }
-          : {
-              actions: tools,
-              wide: true,
-            }
+          : showing
+            ? {
+                primary: (
+                  <button
+                    className="memo-show-close"
+                    onClick={() => setShowing(false)}
+                  >
+                    閉じる
+                  </button>
+                ),
+              }
+            : {
+                actions: tools,
+                wide: true,
+              }
       }
     >
-      <div className="memo-editor" ref={dialogBody}>
-        <NoteMeta note={meta} />
+      <div
+        className={`memo-editor${panel ? " is-panel" : ""}`}
+        ref={dialogBody}
+      >
+        {!panel && <NoteMeta note={meta} />}
         <LineText
           className="memo-title"
           aria-label="メモのタイトル"
@@ -485,6 +542,7 @@ export function NoteEditor({
             </div>
           ))}
         </div>
+        {panel && panelTools}
         {(saveError || syncError) && (
           <p className="small danger" role="status">
             {saveError || syncError}

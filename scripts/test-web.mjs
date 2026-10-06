@@ -779,8 +779,17 @@ test("legacy account cache and pending changes survive React migration; real for
     await fill("チェックイン", `${md(trip.startsOn)} 15:00〜`);
     await fill("チェックアウト", "11/25 〜11:00");
     await fill("場所", hotelUrl);
-    // The mock's dock: 「やめる」 on the left island, 「追加する」 in ink.
-    assert.ok(byText(".thumb-dock-host .context-back button", "やめる"));
+    // The ＋ panel's dock: the ‹ circle on the left island (it closes the
+    // keyboard first while typing), 「追加する」 in ink.
+    assert.ok(
+      document.querySelector(
+        '.thumb-dock-host .context-back button:is([aria-label="戻る"], [aria-label="キーボードを閉じる"])',
+      ),
+    );
+    assert.equal(
+      byText(".thumb-dock-host .context-back button", "やめる"),
+      undefined,
+    );
     await click(byText(".thumb-dock-host .cdock-group button", "追加する"));
     await waitFor(
       () =>
@@ -996,10 +1005,18 @@ test("legacy account cache and pending changes survive React migration; real for
       const save = dock.querySelector('.context-actions button[type="submit"]');
       assert.equal(save?.textContent, primary);
       assert.equal(save.form, document.querySelector("dialog form"));
-      assert.equal(
-        dock.querySelector(".context-back .context-back-label")?.textContent,
-        "やめる",
-      );
+      if (primary === "追加する") {
+        // Adding: the ＋ button's floating panel, ‹ on the left cancels.
+        assert.equal(
+          document.querySelector("dialog[open]").dataset.panel,
+          "add",
+        );
+        assert.ok(dock.querySelector('.context-back [aria-label="戻る"]'));
+      } else
+        assert.equal(
+          dock.querySelector(".context-back .context-back-label")?.textContent,
+          "やめる",
+        );
       await act(async () =>
         save.form.dispatchEvent(
           new dom.window.Event("submit", { bubbles: true, cancelable: true }),
@@ -1265,15 +1282,33 @@ test("legacy account cache and pending changes survive React migration; real for
       await click(document.querySelector('dialog [aria-label="戻る"]'));
       await tick();
     };
+    const addNote = async () => {
+      document.activeElement?.blur();
+      await tick(40);
+      await click(byText("dialog .context-actions button", "追加する"));
+      await tick(50);
+    };
     await click(document.querySelector('[aria-label="メモを書く"]'));
     await tick(550);
     assert.equal(noteCount(), 0, "opening an empty note does not save it");
     assert.equal(
-      byText("dialog button", "完了"),
-      undefined,
-      "notes autosave; there is no 完了",
+      document.querySelector("dialog[open]").dataset.panel,
+      "add",
+      "＋ opens the new memo in the floating add panel",
     );
+    assert.equal(byText("dialog button", "完了"), undefined);
     await closeNote();
+    // ‹ on the add panel cancels: the draft is never saved.
+    await click(document.querySelector('[aria-label="メモを書く"]'));
+    await typeIntoNote(
+      document.querySelector('[aria-label="メモのタイトル"]'),
+      "捨てるメモ",
+    );
+    await tick(550);
+    assert.equal(noteCount(), 0, "the add panel does not autosave");
+    await closeNote();
+    await tick(550);
+    assert.equal(noteCount(), 0, "‹ drops the draft");
     await click(document.querySelector('[aria-label="メモを書く"]'));
     assert.equal(
       document.activeElement,
@@ -1297,8 +1332,12 @@ test("legacy account cache and pending changes survive React migration; real for
       document.querySelector('dialog .memo-ln.c [role="checkbox"]'),
       "a check line renders as a box",
     );
-    await waitFor(() => noteCount() === 1, "the note autosaves");
+    await click(document.querySelector('[aria-label="ピン留め"]'));
+    assert.equal(noteCount(), 0, "nothing is saved before 追加する");
+    await addNote();
+    await waitFor(() => noteCount() === 1, "追加する saves the note");
     assert.equal(noteCount(), 1);
+    assert.equal(document.querySelector("dialog[open]"), null);
     assert.equal(
       db.prepare("SELECT title FROM note_details").get().title,
       "旅先の買い物",
@@ -1311,13 +1350,11 @@ test("legacy account cache and pending changes survive React migration; real for
       db.prepare("SELECT body FROM travel_notes").get().body,
       "お土産\n- [ ] 待ち合わせ場所",
     );
-    await click(document.querySelector('[aria-label="ピン留め"]'));
     await waitFor(
       () => db.prepare("SELECT pinned FROM travel_notes").get().pinned === 1,
       "pinning saves",
     );
     assert.equal(db.prepare("SELECT pinned FROM travel_notes").get().pinned, 1);
-    await closeNote();
     assert.match(
       document.querySelector(".memo-tile").textContent,
       /旅先の買い物/,
@@ -1352,6 +1389,13 @@ test("legacy account cache and pending changes survive React migration; real for
     await typeIntoNote(
       document.querySelector('[aria-label="メモのタイトル"]'),
       "削除するメモ",
+    );
+    await addNote();
+    await waitFor(() => noteCount() === 2, "the second note is added");
+    await click(
+      [...document.querySelectorAll(".memo-tile-open")].find((button) =>
+        button.textContent.includes("削除するメモ"),
+      ),
     );
     await click(document.querySelector('[aria-label="メモを消す"]'));
     await tick(50);

@@ -33,7 +33,8 @@ import { anim, RM } from "./cartoon";
 import { reduceMotion } from "./motion";
 import { DockGroup } from "./cartoon-dock";
 import { ThumbDock } from "./thumb-dock";
-import { useToast } from "./ui";
+import { FormBackButton, useToast } from "./ui";
+import { menuDepth } from "./menu-depth";
 
 type Travel = ReturnType<typeof useTravel>;
 type Row = {
@@ -340,17 +341,30 @@ export function AddBookingSheet({
     });
   };
   const layer = useLayer(() => leave());
+  // The same floating add panel as 予定を追加 (Modal addPanel): it rises from
+  // the bottom while the page recedes behind the blurred scrim.
+  const depth = useRef<ReturnType<typeof menuDepth> | null>(null);
   useLayoutEffect(() => {
     const sheet = body.current;
+    depth.current = menuDepth(
+      RM(),
+      { duration: 320, easing: "cubic-bezier(.32, 0, .2, 1)", fill: "both" },
+      layer.current ?? undefined,
+    );
     if (sheet?.animate && !RM())
       sheet.animate(
         [{ transform: "translateY(100%)" }, { transform: "none" }],
         { duration: 420, easing: "cubic-bezier(.2,1.2,.4,1)" },
       );
+    return () => {
+      depth.current?.cancel();
+      depth.current = null;
+    };
   }, []);
   useEffect(() => {
     if (!leaving) return;
     const sheet = body.current;
+    depth.current?.reverse(320, -1.15);
     if (!sheet || RM()) return leaving();
     let done = false;
     const finish = () => {
@@ -704,15 +718,10 @@ export function AddBookingSheet({
     );
   };
 
+  // The ＋ panel's dock: the ‹ circle cancels (and first closes the keyboard).
   const cancel = (
     <DockGroup slot="l" className="context-back">
-      <button
-        type="button"
-        className="context-back-label"
-        onClick={() => leave()}
-      >
-        やめる
-      </button>
+      <FormBackButton onBack={() => leave()} />
     </DockGroup>
   );
   /** The lone ink action on the right island; dimmed like the mock's .4. */

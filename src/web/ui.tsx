@@ -245,8 +245,13 @@ export function Modal({
   plain = false,
   sheet,
   transition,
+  addPanel = false,
 }: PropsWithChildren<{
   title: string;
+  /** The ＋ button's floating panel (しおり's 予定を追加 is the reference): all
+      corners rounded, inset from the edges, right above the dock, the page
+      blurred and receding behind it; it rises from the bottom like a sheet. */
+  addPanel?: boolean;
   /** "bottom": kondo-detail's sheet on phones: it rises from the bottom edge
       on the split spring and drops on lead, instead of opening out of the
       pressed card. */
@@ -306,7 +311,10 @@ export function Modal({
       panel && !reduceMotion() && matchMedia("(max-width: 759px)").matches;
     cartoon.current = phone
       ? {
-          card: plain || sheet === "bottom" ? null : cardOrigin(origin.current),
+          card:
+            plain || addPanel || sheet === "bottom"
+              ? null
+              : cardOrigin(origin.current),
         }
       : null;
     if (phone && transition)
@@ -460,6 +468,7 @@ export function Modal({
       ref={ref}
       aria-labelledby={id}
       data-sheet={sheet}
+      data-panel={addPanel ? "add" : undefined}
       className={`modal ${full || fullscreen ? "full" : ""} ${fullscreen ? "fullscreen" : ""} ${closing ? "closing" : ""}`}
       onCancel={(event) => {
         event.preventDefault();

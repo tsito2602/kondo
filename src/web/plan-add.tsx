@@ -87,9 +87,10 @@ export function PlanAddSheet({
     <Modal
       title="予定を追加"
       onClose={onClose}
+      addPanel
       dockActions={{
-        // kondo-itinerary: 「追加する」 sits on a plain island (uiAdd).
-        actions: (
+        // The ＋ panel's dock: ‹ cancels, 「追加する」 is the ink pill.
+        primary: (
           <button type="submit" form={formId} disabled={busy}>
             <Glyph name="plus" className="ps-dock-glyph" />
             追加する
