@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./theme.css";
 @import "./styles/prep.css";
 @import "./styles/home.css";
 @import "./styles/settings.css";
@@ -6,6 +7,7 @@
 @import "./styles/bookings.css";
 @import "./styles/places.css";
 @import "./styles/itinerary.css";
+@import "./styles/dock.css";
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 @theme inline {
   --color-brand: var(--brand);
@@ -28,76 +30,50 @@
 }
 :root {
   color-scheme: light;
-  --canvas: #fff;
-  --paper: #fff;
-  --ink: #171717;
-  --muted: #707070;
-  --line: #e5e5e5;
-  --soft: #f2f2f2;
-  --selected: #e8e8e8;
-  --brand: #171717;
-  --danger: #b42318;
+  /* The app's names for the mocks' material (theme.css), so every screen and
+     shared control follows the same light/dark values. */
+  --canvas: var(--p-paper);
+  --paper: var(--p-paper);
+  --ink: var(--p-ink);
+  --muted: var(--p-mute);
+  --line: var(--p-line);
+  --soft: var(--p-soft);
+  --selected: var(--p-select);
+  --brand: var(--p-ink);
+  --danger: var(--p-danger);
   --shadow: 0 1px 2px #182a3806, 0 6px 20px #182a3808;
   --surface-glow: #ffffffbd;
-  --panel-tint: #ffffffa3;
-  --panel-header-tint: #ffffffe0;
-  --field-tint: #ffffff66;
-  /* Separate reading cards from the white canvas; paper stays white for controls. */
-  --content-card: #f3f3f3;
-  --ticket-stub: var(--selected);
-  --panel-card-tint: #ececece6;
-  --panel-card-edge: #1717170a;
-  --radius-panel: 28px;
-  --radius-card: 22px;
+  --panel-tint: var(--p-paper);
+  --panel-header-tint: var(--p-paper);
+  --field-tint: var(--p-soft);
+  --content-card: var(--p-soft);
+  --ticket-stub: var(--p-pale);
+  --panel-card-tint: var(--p-soft);
+  --panel-card-edge: transparent;
+  --radius-panel: var(--r-sheet);
+  --radius-card: var(--r-card);
   --radius-control: 999px;
   --radius-field: 16px;
-  --dock-glass: #ffffff52;
-  --dock-bottom-gap: 32px;
+  --dock-bottom-gap: 30px;
   --control-size: 44px;
-  --dock-height: 56px;
-  --menu-glass: #ffffffa3;
-  --dock-accent: var(--brand);
-  --dock-on-accent: #fff;
-  --dock-max-width: 420px;
-  --dock-border: #20232612;
-  --dock-border-top: #2023261a;
-  --dock-border-bottom: #2023260b;
+  --dock-height: 62px;
+  --menu-glass: var(--p-paper);
+  --dock-accent: var(--p-ink);
+  --dock-on-accent: var(--p-paper);
+  --dock-max-width: 430px;
   --ease-flow: cubic-bezier(0.22, 1, 0.36, 1);
   --route-direction: 1;
   --trip-header-height: 132px;
   --nav-height: 0px;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif;
+  font-family: var(--f-body);
   font-synthesis: none;
   color: var(--ink);
   background: var(--canvas);
 }
 :root[data-theme="dark"] {
-  --dock-on-accent: #171717;
   color-scheme: dark;
-  --canvas: #000;
-  --paper: #1c1c1c;
-  --ink: #f3f3f3;
-  --muted: #aaa;
-  --line: #333;
-  --soft: #262626;
-  --selected: #383838;
-  --brand: #fff;
-  --danger: #ffa69d;
   --shadow: 0 1px 2px #0003, 0 8px 24px #0002;
   --surface-glow: #ffffff0e;
-  --panel-tint: #1c1c1ca3;
-  --panel-header-tint: #202020e0;
-  --field-tint: #ffffff08;
-  --content-card: #1c1c1c;
-  --ticket-stub: var(--soft);
-  --panel-card-tint: #ffffff0f;
-  --panel-card-edge: transparent;
-  --dock-glass: #18181859;
-  --menu-glass: #242424a3;
-  --dock-border: #ffffff18;
-  --dock-border-top: #ffffff26;
-  --dock-border-bottom: #ffffff10;
 }
 * {
   box-sizing: border-box;
@@ -105,11 +81,18 @@
 html {
   scroll-padding-top: 0;
 }
+/* The mocks' base type: body 15px / 1.7 with proportional kana (palt). */
 body {
   margin: 0;
   min-width: 0;
   min-height: 100dvh;
   background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.7;
+  font-feature-settings: "palt";
+  -webkit-font-smoothing: antialiased;
 }
 #root {
   min-height: 100dvh;
@@ -430,9 +413,6 @@ strong {
 .empty p {
   font-size: 13px;
 }
-.floating-add.persistent-add {
-  display: none;
-}
 .floating-add {
   position: fixed;
   z-index: 15;
@@ -457,9 +437,6 @@ strong {
   --safari-press-scale: 1.1;
   transform-origin: center;
   transition: background 150ms;
-}
-:is(.icon-button, .floating-add, .add-action)[data-press-active="true"] {
-  transform: scale(1.1);
 }
 .logo {
   width: 38px;
@@ -2690,10 +2667,6 @@ input::-webkit-date-and-time-value {
   overflow: hidden;
 }
 
-/* A single thumb surface stays outside route snapshots and inside modal focus scopes. */
-.thumb-dock-host {
-  display: none;
-}
 .thumb-date-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2724,176 +2697,8 @@ input::-webkit-date-and-time-value {
   }
 }
 @media (max-width: 759px) {
-  :root:has(.thumb-dock-host:not([hidden])) {
-    --nav-height: calc(var(--dock-height) + 12px + var(--dock-bottom-gap));
-  }
-  :root:has(.thumb-dock-host:not([hidden]))::view-transition {
-    --route-clip-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom));
-  }
-  .thumb-dock-host:not([hidden]) {
-    --dock-fade-color: var(--canvas);
-    display: flex;
-    position: fixed;
-    z-index: 40;
-    left: max(12px, env(safe-area-inset-left));
-    right: max(12px, env(safe-area-inset-right));
-    bottom: calc(var(--dock-bottom-gap) + env(safe-area-inset-bottom));
-    justify-content: center;
-    pointer-events: none;
-  }
-  dialog .thumb-dock-host:not([hidden]) {
-    --dock-fade-color: var(--paper);
-    /* Keep controls at the layout bottom, underneath the software keyboard. */
-    position: absolute;
-    bottom: calc(var(--dock-bottom-gap) + env(safe-area-inset-bottom));
-  }
-  .thumb-dock-host:not([hidden])::before {
-    content: "";
-    position: fixed;
-    z-index: -1;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: calc(160px + env(safe-area-inset-bottom));
-    background: linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--dock-fade-color) 0%, transparent) 0%,
-      color-mix(in srgb, var(--dock-fade-color) 5%, transparent) 22%,
-      color-mix(in srgb, var(--dock-fade-color) 14%, transparent) 50%,
-      color-mix(in srgb, var(--dock-fade-color) 36%, transparent) 78%,
-      color-mix(in srgb, var(--dock-fade-color) 60%, transparent) 100%
-    );
-    pointer-events: none;
-  }
-  .thumb-dock {
-    position: relative;
-    isolation: isolate;
-    width: min(100%, var(--dock-max-width));
-    pointer-events: auto;
-    border-radius: 28px;
-    color: var(--ink);
-  }
-  .thumb-dock[data-mode="context"],
-  .thumb-dock[data-mode="edit"] {
-    pointer-events: none;
-  }
-  .thumb-dock[data-mode="context"] > .thumb-dock-content,
-  .thumb-dock[data-mode="edit"] > .thumb-dock-content {
-    padding: 0;
-  }
-  .thumb-dock .thumb-dock-content > .context-dock {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    height: var(--dock-height);
-    pointer-events: none;
-  }
-  .context-primary {
-    flex: 1;
-    min-width: 0;
-  }
-  .context-island {
-    position: relative;
-    isolation: isolate;
-    height: var(--dock-height);
-    border-radius: calc(var(--dock-height) / 2);
-    pointer-events: auto;
-  }
-  .context-back,
-  .context-actions {
-    display: flex;
-    flex: none;
-  }
-  .context-island > button,
-  .context-island > a {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: var(--dock-height);
-    height: var(--dock-height);
-    min-width: 44px;
-    padding: 0;
-    border-radius: calc(var(--dock-height) / 2);
-    background: transparent;
-    font-size: 12px;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-  .context-primary > button,
-  .context-primary > a {
-    width: 100%;
-    gap: 6px;
-    padding: 0 8px;
-  }
-  .context-primary > button > svg,
-  .context-primary > a > svg {
-    width: 18px;
-    height: 18px;
-    flex-shrink: 0;
-  }
-  .context-island > :not(.danger) {
-    color: var(--ink);
-  }
-  .context-island.context-primary > :not(.danger) {
-    color: var(--dock-on-accent);
-  }
-  .context-island {
-    transform-origin: center;
-  }
-  .context-island[data-pressed="true"] {
-    transform: scale(var(--safari-press-scale, 1.06), 1.1);
-  }
-  .thumb-dock-content[data-outgoing] {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-  }
-  .thumb-dock-content[data-outgoing] * {
-    pointer-events: none !important;
-  }
   .detail-inline-action {
     display: none;
-  }
-  .thumb-dock-material {
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-  }
-  .thumb-dock-content {
-    height: var(--dock-height);
-    padding: 0;
-  }
-  .thumb-dock-content:not([data-mode="browse"]) {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-  .thumb-dock-content:not([data-mode="browse"]) > * {
-    flex: 1;
-    min-height: 48px;
-    border-radius: 23px;
-  }
-  .thumb-action {
-    display: contents;
-  }
-  .thumb-control {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    justify-content: center;
-    min-width: 44px;
-    min-height: 44px;
-    padding: 8px 10px;
-    border-radius: 22px;
-    font-size: 13px;
-    font-weight: 550;
-    white-space: nowrap;
-  }
-  .thumb-control:active {
-    transform: scale(0.96);
   }
   :root:has(.thumb-dock-host) .trip-tabs,
   :root:has(.thumb-dock-host) .home-header .icon-button,
@@ -2913,12 +2718,15 @@ input::-webkit-date-and-time-value {
     bottom: auto;
     height: var(--modal-layout-height, 100dvh);
     max-height: var(--modal-layout-height, 100dvh);
-    padding: 12px max(12px, env(safe-area-inset-right))
+    /* kondo-cartoon §4: the sheet sits 10 px in from the sides and 10 px
+       below the status bar, its foot 18 px above the dock. */
+    padding: calc(10px + env(safe-area-inset-top))
+      max(10px, env(safe-area-inset-right))
       calc(
-        var(--dock-height) + var(--dock-bottom-gap) + 16px +
+        var(--dock-height) + var(--dock-bottom-gap) + 18px +
           env(safe-area-inset-bottom)
       )
-      max(12px, env(safe-area-inset-left));
+      max(10px, env(safe-area-inset-left));
     background: transparent;
     border: 0;
     border-radius: 0;
@@ -2933,16 +2741,19 @@ input::-webkit-date-and-time-value {
     width: 100%;
     min-height: 0;
     max-height: 100%;
-    background: var(--panel-tint);
-    -webkit-backdrop-filter: blur(32px) saturate(1.05);
-    backdrop-filter: blur(32px) saturate(1.05);
-    border-radius: var(--radius-panel);
+    background: var(--p-paper);
+    border-radius: var(--r-sheet);
     overflow-y: auto;
     overscroll-behavior: contain;
     scroll-padding-bottom: calc(24px + var(--panel-keyboard-inset, 0px));
-    box-shadow:
-      inset 0 1px 0 var(--surface-glow),
-      0 12px 40px #0003;
+    box-shadow: var(--p-sheet-shadow);
+  }
+  /* The mock's scrim: half paper, blurred 8 px, over .3 s. */
+  :root:has(.thumb-dock-host) .modal::backdrop {
+    background: var(--p-scrim);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    animation-duration: 300ms;
   }
   :root:has(.thumb-dock-host) .modal.full .modal-inner {
     height: 100%;
@@ -2957,9 +2768,6 @@ input::-webkit-date-and-time-value {
   }
   :root:has(.thumb-dock-host) .modal .modal-body {
     padding-bottom: calc(24px + var(--panel-keyboard-inset, 0px));
-  }
-  dialog .thumb-dock-host:not([hidden])::before {
-    display: none;
   }
   :root:has(.thumb-dock-host) .modal-header > button,
   :root:has(.thumb-dock-host) .modal-header > .icon-spacer,
@@ -2982,28 +2790,6 @@ input::-webkit-date-and-time-value {
     overflow: auto;
   }
 }
-@media (prefers-reduced-transparency: reduce) {
-  .safari-glass {
-    background: var(--paper);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .fluid-dock-accent {
-    transition: none !important;
-  }
-  .context-island[data-pressed="true"] {
-    transform: none;
-  }
-  .thumb-dock-content {
-    animation: none;
-  }
-  .thumb-tabs::before,
-  .thumb-control {
-    transition: none;
-  }
-}
 @media (max-width: 759px) {
   :root:has(.thumb-dock-host) .modal-header {
     touch-action: none;
@@ -3015,241 +2801,6 @@ input::-webkit-date-and-time-value {
 
 /* Trip tabs stay joined; detail actions separate from the same surface. */
 @media (max-width: 759px) {
-  .thumb-dock[data-mode="browse"] {
-    pointer-events: none;
-  }
-  .thumb-dock[data-mode="browse"] > .thumb-dock-content {
-    padding: 0;
-    animation: none;
-  }
-  .thumb-dock,
-  .safari-dock {
-    --safari-side-size: var(--dock-height);
-    --safari-center-inset: calc(var(--dock-height) + 10px);
-    --safari-ease: cubic-bezier(0.22, 0.82, 0.24, 1);
-    --safari-touch-ease: cubic-bezier(0.16, 1, 0.3, 1);
-    --safari-release-ease: cubic-bezier(0.22, 0.72, 0.18, 1);
-    position: relative;
-    height: var(--dock-height);
-    isolation: isolate;
-    transform-origin: center bottom;
-    transition: transform 900ms var(--safari-release-ease);
-  }
-  .thumb-dock:has(.safari-dock[data-touching="true"]),
-  .thumb-dock:has(.safari-side-button:active),
-  .safari-dock[data-touching="true"]:not(.thumb-dock .safari-dock) {
-    transform: scale(var(--safari-press-scale, 1.06), 1.1);
-    transition-duration: 320ms;
-    transition-timing-function: var(--safari-touch-ease);
-  }
-  .safari-surface,
-  .safari-glass,
-  .safari-surface svg {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-  }
-  .safari-surface svg {
-    /* Override the shared 20px icon rule; SVG attributes do not override CSS. */
-    width: 100%;
-    height: var(--dock-height);
-    display: block;
-    overflow: visible;
-  }
-  .safari-glass {
-    background: var(--dock-glass);
-    -webkit-backdrop-filter: blur(24px) saturate(1.18);
-    backdrop-filter: blur(24px) saturate(1.18);
-  }
-  .thumb-dock-material > .safari-glass,
-  .thumb-dock-material > svg {
-    inset: -12px;
-    width: calc(100% + 24px);
-    height: calc(var(--dock-height) + 24px);
-  }
-  /* The contour paths carry the colour; the glass layer only blurs. */
-  .thumb-dock-material > .safari-glass {
-    background: transparent;
-  }
-  .fluid-dock-fill {
-    fill: var(--dock-glass);
-  }
-  .fluid-dock-accent {
-    fill: var(--dock-accent);
-  }
-  .safari-left {
-    left: 0;
-  }
-  .safari-right {
-    right: 0;
-  }
-  .safari-side {
-    overflow: hidden;
-    border-radius: 50%;
-    position: absolute;
-    top: calc((var(--dock-height) - var(--safari-side-size)) / 2);
-    z-index: 3;
-    width: var(--safari-side-size);
-    height: var(--safari-side-size);
-    transition:
-      transform 420ms var(--safari-ease),
-      opacity 180ms ease;
-  }
-  .safari-side-button {
-    transition:
-      transform 420ms var(--safari-ease),
-      opacity 180ms ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: var(--safari-side-size);
-    height: var(--safari-side-size);
-    padding: 0;
-    border-radius: 50%;
-    pointer-events: auto;
-  }
-  .safari-center {
-    position: absolute;
-    z-index: 2;
-    left: var(--safari-center-inset);
-    right: var(--safari-center-inset);
-    top: calc((var(--dock-height) - var(--safari-side-size)) / 2);
-    height: var(--safari-side-size);
-    transition:
-      left 480ms var(--safari-ease),
-      right 480ms var(--safari-ease),
-      top 480ms var(--safari-ease),
-      height 480ms var(--safari-ease);
-  }
-  .safari-tabs {
-    --selection-extra: 12px;
-    position: relative;
-    display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    height: 100%;
-    /* Match all six tab centers to the widened pill's five travel steps. */
-    padding: 0 calc(4px + var(--selection-extra) * 0.6);
-    touch-action: none;
-    user-select: none;
-    -webkit-touch-callout: none;
-  }
-  .safari-tabs a {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    min-width: 0;
-    border-radius: 24px;
-    color: var(--muted);
-    pointer-events: auto;
-  }
-  .safari-selection {
-    position: absolute;
-    top: 50%;
-    left: 4px;
-    width: calc((100% - 8px) / 6 + var(--selection-extra));
-    height: calc(
-      min(var(--safari-side-size), var(--safari-center-inset) - 4px) - 8px
-    );
-    border-radius: 28px;
-    /* Spread the extra width across five moves, keeping both end insets at 4px. */
-    transform: translateX(
-        calc(var(--selection-tab) * (100% - var(--selection-extra) * 1.2))
-      )
-      translateY(-50%);
-    background: color-mix(in srgb, var(--brand) 13%, transparent);
-    pointer-events: none;
-    transition:
-      transform 420ms var(--safari-touch-ease),
-      width 480ms var(--safari-ease),
-      height 480ms var(--safari-ease),
-      border-radius 480ms var(--safari-ease),
-      background-color 900ms var(--safari-release-ease);
-  }
-  .safari-dock[data-touching="true"] .safari-selection {
-    transition-duration: 240ms, 480ms, 480ms, 480ms, 240ms;
-    background: color-mix(in srgb, var(--brand) 20%, transparent);
-  }
-  .safari-tabs a.active {
-    color: var(--brand);
-  }
-  .safari-tabs[data-scrubbing="true"] a.active {
-    color: var(--muted);
-  }
-  .safari-tabs[data-scrubbing="true"] a[data-preview="true"] {
-    color: var(--brand);
-  }
-  .safari-tabs svg {
-    width: 20px;
-    height: 20px;
-    position: relative;
-    flex-shrink: 0;
-    transition: transform 480ms var(--safari-ease);
-  }
-  .safari-detail-action > button {
-    width: 100%;
-    height: 100%;
-    padding: 0;
-    border-radius: 50%;
-  }
-  .safari-dismiss {
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    width: 100vw;
-    height: 100dvh;
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    pointer-events: auto;
-  }
-  .safari-dock[data-wide="true"] .safari-center {
-    left: 0;
-    right: 0;
-    top: 0;
-    height: var(--dock-height);
-  }
-  .safari-dock[data-wide="true"] .safari-side.safari-left .safari-side-button {
-    transform: translateX(calc(-1 * var(--dock-height)));
-    opacity: 0;
-  }
-  .safari-dock[data-wide="true"] .safari-side.safari-right .safari-side-button {
-    transform: translateX(var(--dock-height));
-    opacity: 0;
-  }
-  .safari-dock[data-wide="true"] .safari-side-button {
-    pointer-events: none;
-  }
-  .safari-dock[data-wide="true"] .safari-tabs a {
-    pointer-events: auto;
-    min-height: 44px;
-  }
-  .safari-dock[data-wide="true"] .safari-selection {
-    height: calc(var(--dock-height) - 8px);
-  }
-  :root:has(.thumb-dock-host) .persistent-add:not([hidden]) {
-    position: fixed;
-    right: max(18px, env(safe-area-inset-right));
-    bottom: calc(
-      var(--dock-height) + 28px + var(--dock-bottom-gap) +
-        env(safe-area-inset-bottom)
-    );
-    z-index: 24;
-    width: 52px;
-    height: 52px;
-    min-height: 52px;
-    padding: 0;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 5px 20px #10203022;
-    background: var(--dock-accent);
-    color: var(--dock-on-accent);
-    view-transition-name: floating-add;
-  }
   :root:has(.thumb-dock-host) .page-add {
     display: none;
   }
@@ -3265,13 +2816,6 @@ input::-webkit-date-and-time-value {
     --menu-glass: var(--paper);
     --dock-accent: var(--brand);
   }
-  .fluid-dock-accent {
-    fill: var(--brand);
-  }
-  .fluid-dock-fill {
-    fill: var(--paper);
-  }
-  .safari-glass,
   .trip-menu-toggle,
   .trip-header,
   .home-header,
@@ -3281,13 +2825,6 @@ input::-webkit-date-and-time-value {
     background: var(--paper);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .safari-dock,
-  .safari-dock *,
-  .safari-dock *::before {
-    transition: none !important;
   }
 }
 
@@ -4335,9 +3872,6 @@ input::-webkit-date-and-time-value {
   --safari-press-scale-y: 1.04;
   transform-origin: center;
 }
-[data-press-card][data-press-active="true"] {
-  transform: scale(1.04);
-}
 
 .place-status-label {
   display: inline-flex;
@@ -4498,41 +4032,6 @@ input::-webkit-date-and-time-value {
   }
   .fullscreen .thumb-dock {
     width: min(100%, var(--dock-max-width));
-  }
-  .fullscreen .thumb-dock-material {
-    display: none;
-  }
-  .fullscreen .context-dock {
-    display: flex;
-    gap: 10px;
-    height: var(--dock-height);
-  }
-  .fullscreen .context-island {
-    pointer-events: auto;
-    border-radius: 999px;
-    background: var(--soft);
-    box-shadow: var(--shadow);
-  }
-  .fullscreen .context-back button {
-    display: grid;
-    place-items: center;
-    width: var(--dock-height);
-    height: var(--dock-height);
-    border-radius: 50%;
-  }
-  .fullscreen .context-primary {
-    flex: 1;
-    background: var(--brand);
-    color: var(--dock-on-accent);
-  }
-  .fullscreen .context-primary a {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    height: 100%;
-    border-radius: 999px;
-    font-size: 14px;
   }
 }
 
@@ -4798,14 +4297,6 @@ label.haptic-touch > input.haptic-touch {
   margin: 0;
   opacity: 0;
   pointer-events: none;
-}
-.safari-tabs > label.safari-tabs-haptic {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  display: block;
-  pointer-events: auto;
-  -webkit-tap-highlight-color: transparent;
 }
 :disabled > label.haptic-touch {
   display: none;

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { useTravel } from "@/data/travel-provider";
 import { toggleNoteCheck, visibleNoteLines } from "@/data/note-lines";
 import type { TravelNote } from "@/data/types";
-import { ContextDock, ThumbDock } from "./thumb-dock";
+import { DockToast, ThumbDock } from "./thumb-dock";
 import { poof, sink, spring } from "./memo-motion";
 import {
   CheckBox,
@@ -294,19 +294,15 @@ export function NotesScreen() {
         </p>
       )}
       {removed && (
-        <ThumbDock mode="context">
-          <ContextDock
+        <ThumbDock mode="toast">
+          <DockToast
             back={
               <button aria-label="旅行一覧へ戻る" onClick={() => navigate("/")}>
                 <BackIcon />
               </button>
             }
-            actions={
-              <button className="memo-undo" onClick={undo}>
-                <span>消しました</span>
-                <b>元に戻す</b>
-              </button>
-            }
+            message="消しました"
+            onUndo={undo}
           />
         </ThumbDock>
       )}

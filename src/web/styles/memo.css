@@ -1,7 +1,6 @@
 /* メモ: two-column tiles, a full-screen line editor and 見せる (kondo-memo mock). */
 .notes-page,
 dialog:has(.memo-editor),
-.thumb-dock:has(.memo-undo),
 .memo-poof-dot {
   --m-paper: var(--canvas);
   --m-ink: #000;
@@ -12,12 +11,7 @@ dialog:has(.memo-editor),
   --m-line: #e8e6e1;
 }
 :root[data-theme="dark"]
-  :is(
-    .notes-page,
-    dialog:has(.memo-editor),
-    .thumb-dock:has(.memo-undo),
-    .memo-poof-dot
-  ) {
+  :is(.notes-page, dialog:has(.memo-editor), .memo-poof-dot) {
   --m-ink: #f5f1e9;
   --m-mid: #b6b0a6;
   --m-pale: #57534d;
@@ -601,44 +595,6 @@ dialog:has(.memo-show) .context-primary {
   padding: 0 24px 0 20px;
   font-size: 15px;
   font-weight: 700;
-}
-
-/* ===== list dock while 元に戻す is offered ===== */
-.thumb-dock:has(.memo-undo) .context-primary:empty {
-  display: none;
-}
-.thumb-dock:has(.memo-undo) .context-actions {
-  flex: 1;
-  min-width: 0;
-}
-:root .context-actions > .memo-undo {
-  display: flex;
-  flex: 1;
-  justify-content: space-between;
-  gap: 8px;
-  width: auto;
-  min-width: 0;
-  padding: 0 5px 0 22px;
-  font-size: 14px;
-  font-weight: 700;
-}
-.memo-undo span {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--m-mute);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.memo-undo b {
-  display: flex;
-  align-items: center;
-  flex: none;
-  height: calc(var(--dock-height) - 10px);
-  padding: 0 18px;
-  border-radius: 99px;
-  background: var(--m-ink);
-  color: var(--m-paper);
-  white-space: nowrap;
 }
 
 .memo-poof-dot {

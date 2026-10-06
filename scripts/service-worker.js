@@ -1,6 +1,8 @@
 /* This template is versioned and populated by build-pwa.mjs after Vite build. */
 const CACHE = 'tabi-shell-__VERSION__';
 const PRECACHE = __PRECACHE__;
+// Font slices: cached best-effort on install and again whenever one is fetched.
+const FONTS = __FONTS__;
 const SHELL = '/';
 // The build's user-facing version (e.g. 2026.10.7); left as a placeholder when unknown.
 const BUILD_LABEL = '__BUILD_LABEL__';
@@ -33,6 +35,8 @@ self.addEventListener('install', (event) => {
     const shell = await cache.match(SHELL);
     if (!shell?.ok) throw new Error('App shell was not cached');
     await cache.put(SHELL, navigationResponse(shell));
+    // A missing slice only falls back to the system face; never fail the install.
+    await Promise.allSettled(FONTS.map((url) => cache.add(url)));
   })());
 });
 // An update waits until the user explicitly accepts it, preserving active forms.
@@ -63,6 +67,16 @@ self.addEventListener('fetch', (event) => {
       } catch { /* Cache access can fail in restricted browsers. Use the network. */ }
       return fetch(request);
     })());
+    return;
+  }
+  if (FONTS.includes(url.pathname)) {
+    event.respondWith(caches.open(CACHE).then(async (cache) => {
+      const hit = await cache.match(url.pathname);
+      if (hit) return hit;
+      const response = await fetch(request);
+      if (response.ok) cache.put(url.pathname, response.clone()).catch(() => {});
+      return response;
+    }));
     return;
   }
   if (PRECACHE.includes(url.pathname) || url.pathname.startsWith('/_expo/static/') || url.pathname.startsWith('/assets/')) event.respondWith(caches.open(CACHE).then(async (cache) => (await cache.match(url.pathname)) || (await caches.match(request)) || fetch(request)));

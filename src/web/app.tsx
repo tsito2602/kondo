@@ -49,7 +49,7 @@ import { TravelProvider, useTravel } from "@/data/travel-provider";
 import type { Trip, TripMember } from "@/data/types";
 import { formatDate, localDate } from "@/utils/dates";
 import { TripEditor } from "./editors";
-import { SafariTabs, tripTabs } from "./safari-tabs";
+import { TripDock, tripTabs } from "./trip-dock";
 import { AnchoredMenu } from "./anchored-menu";
 import { installPressFeedback } from "./press-feedback";
 import { keyboardInset, revealModalField } from "./viewport";
@@ -618,7 +618,7 @@ function TripLayout() {
         >
           {tripTabs.map((tab) => (
             <NavLink key={tab.path} to={`/trips/${trip.id}/${tab.path}`}>
-              <tab.icon size={20} />
+              {tab.icon}
               <span>{tab.label}</span>
             </NavLink>
           ))}
@@ -628,7 +628,10 @@ function TripLayout() {
         <Outlet />
       </main>
       <ThumbDock mode="browse">
-        <SafariTabs tripId={trip.id} onMenu={() => setMenu(true)} />
+        <TripDock
+          tripId={trip.id}
+          onBack={() => startTripTransition(() => navigate("/"), trip.id, true)}
+        />
       </ThumbDock>
       <AnchoredMenu
         anchor={menuTrigger}

@@ -35,7 +35,7 @@ const { outputFiles } = await build({
   stdin: {
     contents:
       "export { guardModalKeyboardFocus } from './src/web/modal-keyboard'; export { lockModalPage } from './src/web/modal-scroll-lock'; " +
-      "export { finishBootScreen } from './src/web/boot'; export { PlaceSheet, placeMapsHref } from './src/web/place-sheet'; export { PlaceStatusLabel } from './src/web/place-status'; export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { DockContent } from './src/web/dock-content'; export { prepareDockMorph, dockContour, dockField, dockFieldPath, dockSlots, joinedDock, morphDock } from './src/web/fluid-dock'; export { keyboardInset, revealModalField } from './src/web/viewport'; export { dockOutline, animateDockPress } from './src/web/dock-surface'; export { AnchoredMenu } from './src/web/anchored-menu'; export { SafariTabs } from './src/web/safari-tabs'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { finishBootScreen } from './src/web/boot'; export { PlaceSheet, placeMapsHref } from './src/web/place-sheet'; export { PlaceStatusLabel } from './src/web/place-status'; export { DayStrip } from './src/web/day-strip'; export { TaskList } from './src/web/task-list'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { keyboardInset, revealModalField } from './src/web/viewport'; export { AnchoredMenu } from './src/web/anchored-menu'; export { TripDock } from './src/web/trip-dock'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -70,19 +70,8 @@ const {
   AppRouter,
   useItineraryScroll,
   startRouteTransition,
-  DockContent,
   AnchoredMenu,
-  SafariTabs,
-  dockOutline,
-  prepareDockMorph,
-  dockContour,
-  dockField,
-  dockFieldPath,
-  dockSlots,
-  joinedDock,
-  morphDock,
   ContextDock,
-  animateDockPress,
   keyboardInset,
   revealModalField,
   SaveButton,
@@ -92,6 +81,7 @@ const {
   ThumbDock,
   ThumbAction,
   ThumbActions,
+  TripDock,
 } = module.exports;
 
 function timeline() {
@@ -695,7 +685,7 @@ test("one dock follows dialog focus scopes, restores the parent, and submits the
   try {
     await act(async () => root.render(h(Harness)));
     const host = document.querySelector(".thumb-dock-host");
-    const surface = host.querySelector(".thumb-dock-material");
+    const surface = host.querySelector(".cdock-islands");
     const dockButton = (text) =>
       [...host.querySelectorAll("button")].find(
         (button) => button.textContent === text,
@@ -710,14 +700,14 @@ test("one dock follows dialog focus scopes, restores the parent, and submits the
       "dock must belong to the active dialog's focus trap",
     );
     assert.equal(
-      host.querySelector(".thumb-dock-material"),
+      host.querySelector(".cdock-islands"),
       surface,
-      "material must not remount",
+      "islands must not remount",
     );
     await act(async () => detail.querySelector(".modal-body button").click());
     const nested = document.querySelectorAll("dialog")[1];
     assert.equal(host.parentElement, nested);
-    await act(async () => dockButton("戻る").click());
+    await act(async () => host.querySelector('[aria-label="戻る"]').click());
     await act(async () => new Promise((resolve) => setTimeout(resolve, 10)));
     assert.equal(host.parentElement, detail);
     await act(async () => dockButton("編集する").click());
@@ -737,14 +727,17 @@ test("one dock follows dialog focus scopes, restores the parent, and submits the
     assert.equal(dockButton("保存中…").disabled, true);
     await act(async () => setBusy(false));
     assert.equal(dockButton("保存する").form, detail.querySelector("form"));
-    assert.equal(host.querySelectorAll(".context-island").length, 2);
-    assert.ok(save.closest(".context-primary"));
+    assert.equal(
+      host.querySelectorAll(".cdock-content > [data-slot]").length,
+      2,
+    );
+    assert.ok(save.closest('[data-slot="r"]'));
     await act(async () =>
       host.querySelector('.context-back [aria-label="戻る"]').click(),
     );
     await act(async () => new Promise((resolve) => setTimeout(resolve, 10)));
     assert.equal(host.parentElement, document.body);
-    assert.equal(host.querySelector(".thumb-dock-material"), surface);
+    assert.equal(host.querySelector(".cdock-islands"), surface);
     assert.ok(dockButton("詳細を開く"));
     assert.equal(document.querySelectorAll(".thumb-dock-host").length, 1);
   } finally {
@@ -767,153 +760,6 @@ function pointer(target, type, x = 0, y = 0, extra = {}) {
   });
   target.dispatchEvent(event);
 }
-
-function layoutTabs(nav, width = () => 360) {
-  const links = [...nav.querySelectorAll("a")];
-  links.forEach((link, index) => {
-    link.getBoundingClientRect = () => ({
-      left: (index * width()) / links.length,
-      right: ((index + 1) * width()) / links.length,
-      top: 100,
-      bottom: 164,
-      width: width() / links.length,
-      height: 64,
-    });
-  });
-  let captured;
-  nav.setPointerCapture = (id) => {
-    captured = id;
-  };
-  nav.hasPointerCapture = (id) => captured === id;
-  nav.releasePointerCapture = (id) => {
-    if (captured === id) captured = undefined;
-  };
-}
-
-test("trip tabs stay joined with names and support one-tap or hold selection", async () => {
-  const root = createRoot(document.getElementById("root"));
-  const h = React.createElement;
-  let menus = 0;
-  let transitions = 0;
-  document.startViewTransition = (update) => {
-    transitions++;
-    update();
-    return {
-      ready: Promise.resolve(),
-      finished: Promise.resolve(),
-      skipTransition() {},
-    };
-  };
-  function Harness() {
-    useMotionNavigation();
-    return h(
-      React.Fragment,
-      null,
-      h("output", null, useLocation().pathname),
-      h(SafariTabs, { tripId: "demo", onMenu: () => menus++ }),
-    );
-  }
-  try {
-    await act(async () =>
-      root.render(
-        h(
-          MemoryRouter,
-          { initialEntries: ["/trips/demo/itinerary"] },
-          h(Harness),
-        ),
-      ),
-    );
-    const nav = document.querySelector(".safari-tabs");
-    layoutTabs(nav);
-    const dock = document.querySelector(".safari-dock");
-    const icons = [...nav.querySelectorAll("svg")];
-    const places = nav.querySelector('a[href$="/places"]');
-    const notes = nav.querySelector('a[href$="/notes"]');
-    assert.equal(icons.length, 6);
-    assert.equal(dock.dataset.level, "trip");
-    assert.equal(dock.dataset.wide, "true");
-    assert.equal(document.querySelectorAll(".safari-side[inert]").length, 2);
-    assert.equal(
-      dock.querySelector('a[href="/"]'),
-      null,
-      "trip-list navigation belongs in the header",
-    );
-    assert.equal(nav.hasAttribute("inert"), false);
-    assert.equal(nav.querySelectorAll('a[tabindex="-1"]').length, 0);
-    await act(async () => places.click());
-    assert.equal(
-      document.querySelector("output").textContent,
-      "/trips/demo/places",
-    );
-    assert.equal(dock.dataset.expanded, "false");
-    await act(async () => pointer(notes, "pointerdown", 324, 130));
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 450)));
-    assert.equal(dock.dataset.expanded, "true");
-    assert.equal(document.querySelectorAll(".safari-side[inert]").length, 2);
-    await act(async () => {
-      pointer(nav, "pointerup", 324, 130);
-      notes.click();
-    });
-    assert.equal(
-      document.querySelector("output").textContent,
-      "/trips/demo/places",
-      "release after a hold must not select a tab",
-    );
-    assert.equal(dock.dataset.expanded, "true");
-    assert.equal(
-      transitions,
-      1,
-      "holding must bypass native route transitions",
-    );
-    await act(async () => notes.click());
-    assert.equal(
-      document.querySelector("output").textContent,
-      "/trips/demo/notes",
-    );
-    assert.equal(dock.dataset.expanded, "false");
-    assert.deepEqual([...nav.querySelectorAll("svg")], icons);
-    for (const dismiss of ["outside", "escape"]) {
-      await act(async () =>
-        notes.dispatchEvent(
-          new dom.window.KeyboardEvent("keydown", {
-            key: "ArrowUp",
-            bubbles: true,
-          }),
-        ),
-      );
-      assert.equal(dock.dataset.expanded, "true");
-      await act(async () => {
-        if (dismiss === "outside")
-          document.querySelector(".safari-dismiss").click();
-        else
-          window.dispatchEvent(
-            new dom.window.KeyboardEvent("keydown", {
-              key: "Escape",
-              cancelable: true,
-            }),
-          );
-      });
-      assert.equal(dock.dataset.expanded, "false");
-    }
-    await act(async () => {
-      pointer(notes, "pointerdown", 324, 130);
-      pointer(notes, "pointermove", 20);
-    });
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 450)));
-    assert.equal(dock.dataset.expanded, "false", "dragging cancels a hold");
-    assert.equal(
-      document
-        .querySelector('[aria-label="旅行メニュー"]')
-        .closest(".safari-side")
-        .hasAttribute("inert"),
-      true,
-    );
-    assert.equal(menus, 0);
-  } finally {
-    await act(async () => root.unmount());
-    delete document.startViewTransition;
-  }
-});
 
 test("details retain the same six tab nodes and close before one-tap navigation, including the current tab", async () => {
   let surface;
@@ -940,7 +786,7 @@ test("details retain the same six tab nodes and close before one-tap navigation,
       h(
         ThumbDock,
         { mode: "browse" },
-        h(SafariTabs, { tripId: "demo", onMenu: () => {} }),
+        h(TripDock, { tripId: "demo", onBack: () => {} }),
       ),
       open &&
         h(
@@ -965,55 +811,29 @@ test("details retain the same six tab nodes and close before one-tap navigation,
         ),
       ),
     );
-    const nav = document.querySelector(".safari-tabs");
-    const dock = document.querySelector(".safari-dock");
-    const material = document.querySelector(
-      ".thumb-dock-material .safari-glass",
-    );
-    assert.ok(material);
-    assert.equal(dock.dataset.wide, "true");
+    const nav = document.querySelector(".cdock-tabs");
+    const islands = document.querySelector(".cdock-islands");
+    assert.ok(islands);
     const icons = [...nav.querySelectorAll("svg")];
     const host = document.querySelector(".thumb-dock-host");
     for (const destination of ["bookings", "places", "notes"]) {
       await act(async () => openDetail());
       const dialog = document.querySelector("dialog");
-      assert.equal(dock.dataset.level, "detail");
-      assert.equal(dock.dataset.wide, "false");
-      assert.equal(
-        document.querySelector(".thumb-dock-material .safari-glass"),
-        material,
-      );
-      assert.equal(dock.querySelectorAll(".safari-side[inert]").length, 0);
+      assert.equal(document.querySelector(".cdock-islands"), islands);
       assert.equal(host.parentElement, dialog);
-      assert.equal(dialog.querySelector(".safari-tabs"), nav);
+      assert.equal(dialog.querySelector(".cdock-tabs"), nav);
       assert.deepEqual([...nav.querySelectorAll("svg")], icons);
       assert.equal(host.querySelector(".thumb-dock").dataset.mode, "browse");
-      assert.ok(host.querySelector('[aria-label="詳細を閉じて戻る"]'));
+      assert.ok(host.querySelector('[data-slot="l"] [aria-label="戻る"]'));
+      // The detail's own action stays in its header.
       await act(async () =>
-        host.querySelector(".safari-detail-action button").click(),
+        [...dialog.querySelectorAll("button")]
+          .find((button) => button.textContent === "編集")
+          .click(),
       );
-      if (destination === "notes") {
-        layoutTabs(nav);
-        const origin = nav.querySelector('a[href$="/places"]');
-        await act(async () => pointer(origin, "pointerdown", 108, 130));
-        await act(
-          async () => new Promise((resolve) => setTimeout(resolve, 450)),
-        );
-        assert.equal(
-          dock.dataset.wide,
-          "true",
-          "holding reunites detail controls with the tab bar",
-        );
-        await act(async () => pointer(nav, "pointermove", 324, 130));
-        await act(async () => {
-          pointer(nav, "pointerup", 324, 130);
-          origin.click();
-        });
-      } else {
-        await act(async () =>
-          nav.querySelector(`a[href$="/${destination}"]`).click(),
-        );
-      }
+      await act(async () =>
+        nav.querySelector(`a[href$="/${destination}"]`).click(),
+      );
       assert.ok(
         dialog.isConnected,
         "close animation gets to finish before routing",
@@ -1025,19 +845,15 @@ test("details retain the same six tab nodes and close before one-tap navigation,
         `/trips/demo/${destination}`,
       );
       assert.equal(host.parentElement, document.body);
-      assert.equal(dock.dataset.level, "trip");
-      assert.equal(dock.dataset.wide, "true");
-      assert.equal(
-        document.querySelector(".thumb-dock-material .safari-glass"),
-        material,
-      );
-      assert.equal(host.querySelector(".safari-tabs"), nav);
+      assert.equal(document.querySelector(".cdock-islands"), islands);
+      assert.equal(host.querySelector(".cdock-tabs"), nav);
       assert.deepEqual([...nav.querySelectorAll("svg")], icons);
+      assert.ok(host.querySelector('[aria-label="旅行一覧へ戻る"]'));
     }
     assert.equal(edits, 3);
     await act(async () => openDetail());
     await act(async () =>
-      host.querySelector('[aria-label="詳細を閉じて戻る"]').click(),
+      host.querySelector('[data-slot="l"] [aria-label="戻る"]').click(),
     );
     await act(async () => surface.finish());
     assert.equal(document.querySelector("dialog"), null);
@@ -1051,270 +867,33 @@ test("details retain the same six tab nodes and close before one-tap navigation,
   }
 });
 
-test("hold and drag previews live tab bounds, commits once on release, and cancels outside or on interruption", async () => {
-  const root = createRoot(document.getElementById("root"));
-  const h = React.createElement;
-  let transitions = 0;
-  document.startViewTransition = (update) => {
-    transitions++;
-    update();
-    return {
-      ready: Promise.resolve(),
-      finished: Promise.resolve(),
-      skipTransition() {},
-    };
-  };
-  function Harness() {
-    useMotionNavigation();
-    return h(
-      React.Fragment,
-      null,
-      h("output", null, useLocation().pathname),
-      h(SafariTabs, { tripId: "demo", onMenu() {} }),
-    );
-  }
-  try {
-    await act(async () =>
-      root.render(
-        h(
-          MemoryRouter,
-          { initialEntries: ["/trips/demo/itinerary"] },
-          h(Harness),
-        ),
-      ),
-    );
-    const nav = document.querySelector(".safari-tabs");
-    const links = [...nav.querySelectorAll("a")];
-    const dock = document.querySelector(".safari-dock");
-    let width = 360;
-    layoutTabs(nav, () => width);
-    const hold = async () => {
-      await act(async () => pointer(links[0], "pointerdown", 36, 130));
-      await act(async () => new Promise((resolve) => setTimeout(resolve, 450)));
-      assert.equal(dock.dataset.expanded, "true");
-      assert.equal(nav.hasPointerCapture(1), true);
-    };
-    await hold();
-    await act(async () => pointer(links[0], "lostpointercapture", 36, 130));
-    assert.equal(
-      dock.dataset.expanded,
-      "true",
-      "transferring implicit touch capture from link to nav is not cancellation",
-    );
-    await act(async () => pointer(nav, "pointermove", 200, 130));
-    assert.equal(links[3].dataset.preview, "true");
-    assert.equal(
-      document.querySelector("output").textContent,
-      "/trips/demo/itinerary",
-    );
-    width = 420;
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 25)));
-    assert.equal(
-      links[2].dataset.preview,
-      "true",
-      "preview follows expanding hit regions even with a stationary finger",
-    );
-    await act(async () =>
-      pointer(nav, "pointermove", 378, 130, { pointerId: 2, isPrimary: false }),
-    );
-    assert.equal(
-      links[2].dataset.preview,
-      "true",
-      "another finger cannot change this gesture",
-    );
-    await act(async () => {
-      pointer(nav, "pointerup", 200, 130);
-      links[0].click(); // Compatibility click may still target the initial link.
-    });
-    assert.equal(
-      document.querySelector("output").textContent,
-      "/trips/demo/tasks",
-    );
-    assert.equal(transitions, 1, "release must navigate exactly once");
-    assert.equal(nav.hasPointerCapture(1), false);
-    assert.equal(dock.dataset.expanded, "false");
-    for (const reason of [
-      "outside",
-      "pointercancel",
-      "lostpointercapture",
-      "escape",
-    ]) {
-      await hold();
-      await act(async () => pointer(nav, "pointermove", 378, 130));
-      assert.equal(links[5].dataset.preview, "true");
-      await act(async () => {
-        if (reason === "outside") {
-          pointer(nav, "pointermove", 378, 70);
-          pointer(nav, "pointerup", 378, 70);
-        } else if (reason === "escape") {
-          window.dispatchEvent(
-            new dom.window.KeyboardEvent("keydown", {
-              key: "Escape",
-              cancelable: true,
-            }),
-          );
-          pointer(nav, "pointerup", 378, 130);
-        } else {
-          pointer(nav, reason, 378, 130);
-        }
-        links[0].click();
-      });
-      assert.equal(
-        document.querySelector("output").textContent,
-        "/trips/demo/tasks",
-        reason,
-      );
-      assert.equal(dock.dataset.expanded, "false", reason);
-      assert.equal(nav.hasPointerCapture(1), false);
-    }
-    assert.equal(transitions, 1);
-    await act(async () => {
-      pointer(links[1], "pointerdown", 126, 130);
-      pointer(links[1], "pointerup", 126, 130);
-      links[1].click();
-    });
-    assert.equal(
-      document.querySelector("output").textContent,
-      "/trips/demo/places",
-      "a fresh tap still navigates immediately",
-    );
-  } finally {
-    await act(async () => root.unmount());
-    delete document.startViewTransition;
-  }
-});
-
-test("contact previews immediately and a short scrub commits once without waiting for a hold", async () => {
-  const root = createRoot(document.getElementById("root"));
-  const h = React.createElement;
-  let updateRoute;
-  let transitions = 0;
-  document.startViewTransition = (update) => {
-    transitions++;
-    updateRoute = update;
-    return {
-      ready: Promise.resolve(),
-      finished: Promise.resolve(),
-      skipTransition() {},
-    };
-  };
-  function Harness() {
-    useMotionNavigation();
-    return h(
-      React.Fragment,
-      null,
-      h("output", null, useLocation().pathname),
-      h(SafariTabs, { tripId: "demo", onMenu() {} }),
-    );
-  }
-  try {
-    await act(async () =>
-      root.render(
-        h(
-          MemoryRouter,
-          { initialEntries: ["/trips/demo/itinerary"] },
-          h(Harness),
-        ),
-      ),
-    );
-    const nav = document.querySelector(".safari-tabs");
-    const dock = document.querySelector(".safari-dock");
-    const links = [...nav.querySelectorAll("a")];
-    const indicator = nav.querySelector(".safari-selection");
-    const pressMotions = [];
-    dock.animate = (frames, options) => {
-      const animation = timeline();
-      pressMotions.push({ animation, options });
-      return animation;
-    };
-    const selected = () => nav.style.getPropertyValue("--selection-tab");
-    layoutTabs(nav);
-    await act(async () => pointer(links[1], "pointerdown", 108, 130));
-    assert.equal(selected(), "1", "feedback starts before the hold timer");
-    assert.equal(dock.dataset.touching, "true");
-    assert.equal(dock.dataset.expanded, "false");
-    assert.equal(
-      document.querySelector("output").textContent,
-      "/trips/demo/itinerary",
-    );
-    await act(async () => pointer(nav, "pointermove", 324, 130));
-    assert.equal(selected(), "5", "short drags track the finger immediately");
-    await act(async () => {
-      pointer(nav, "pointerup", 324, 130);
-      links[1].click();
-    });
-    assert.equal(transitions, 1);
-    assert.equal(dock.dataset.touching, "false");
-    assert.equal(pressMotions.at(-1).options.duration, 900);
-    assert.equal(
-      pressMotions.at(-1).animation.cancelled,
-      false,
-      "routing must retain the release animation",
-    );
-    assert.equal(
-      selected(),
-      "5",
-      "release must not flash the old tab while the route waits",
-    );
-    await act(async () => updateRoute());
-    assert.equal(pressMotions.at(-1).animation.cancelled, false);
-    assert.equal(
-      document.querySelector("output").textContent,
-      "/trips/demo/notes",
-    );
-    assert.equal(selected(), "5");
-    assert.equal(
-      nav.querySelector(".safari-selection"),
-      indicator,
-      "one indicator survives navigation",
-    );
-    await act(async () => pointer(links[0], "pointerdown", 36, 130));
-    assert.equal(selected(), "0");
-    await act(async () => {
-      pointer(nav, "pointerup", 36, 70);
-      links[0].click();
-    });
-    assert.equal(selected(), "5", "outside release restores the current tab");
-    assert.equal(dock.dataset.touching, "false");
-    assert.equal(transitions, 1);
-    await act(async () =>
-      pointer(links[0], "pointerdown", 36, 130, { ctrlKey: true }),
-    );
-    assert.equal(
-      dock.dataset.touching,
-      "false",
-      "modified links retain their browser behavior",
-    );
-  } finally {
-    await act(async () => root.unmount());
-    delete document.startViewTransition;
-  }
-});
-
-test("standalone controls share dock press timing, release on cancellation, and preserve native activation", () => {
+test("standalone controls squish by the mock's amounts, release on cancellation, and preserve native activation", async () => {
   const host = document.createElement("div");
   host.innerHTML =
-    '<a class="icon-button" href="#back"><span>戻る</span></a><button class="icon-button">メニュー</button><button class="primary add-action">追加</button><button class="floating-add">予定追加</button><button class="icon-button" disabled>無効</button><div class="thumb-dock"><button class="icon-button">既存ナビ</button></div>';
+    '<a class="icon-button" href="#back"><span>戻る</span></a><button class="icon-button">メニュー</button><button class="primary add-action">追加</button><button class="floating-add">予定追加</button><button class="icon-button" disabled>無効</button><div class="thumb-dock"><div class="cdock-group"><button>ドック</button></div></div>';
   document.body.append(host);
-  const calls = [];
-  for (const element of host.querySelectorAll("a, button")) {
-    element.style.setProperty("--safari-press-scale", "1.1");
-    element.animate = (frames, options) => {
-      const animation = timeline();
-      calls.push({ element, frames, options, animation });
-      return animation;
-    };
-  }
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const squished = (element, amount) => {
+    const [x, y] = element.style.scale.split(" ").map(Number);
+    return Math.abs(x - (2 - amount)) < 0.004 && Math.abs(y - amount) < 0.004;
+  };
   const cleanup = installPressFeedback();
   try {
-    for (const element of [...host.querySelectorAll("a, button")].slice(0, 4)) {
+    const amounts = [0.9, 0.9, 0.9, 0.88, null, 0.9];
+    const controls = [...host.querySelectorAll("a, button")];
+    for (const [index, element] of controls.entries()) {
+      if (amounts[index] === null) continue;
       pointer(element.firstElementChild ?? element, "pointerdown");
       assert.equal(element.dataset.pressActive, "true");
-      assert.equal(calls.at(-1).options.duration, 320);
-      assert.equal(calls.at(-1).frames[1].transform, "scale(1.1, 1.1)");
+      await wait(450);
+      assert.ok(
+        squished(element, amounts[index]),
+        `${element.textContent}: ${element.style.scale}`,
+      );
       pointer(document, "pointerup");
       assert.equal(element.dataset.pressActive, undefined);
-      assert.equal(calls.at(-1).options.duration, 900);
+      await wait(1100);
+      assert.equal(element.style.scale, "", "springs back to rest");
     }
     const menu = host.querySelector("button");
     pointer(menu, "pointerdown");
@@ -1335,118 +914,26 @@ test("standalone controls share dock press timing, release on cancellation, and 
     menu.onclick = () => activated++;
     menu.click();
     assert.equal(activated, 1);
-    const count = calls.length;
+    await wait(1100);
     pointer(host.querySelector(":disabled"), "pointerdown");
-    pointer(host.querySelector(".thumb-dock button"), "pointerdown");
+    assert.equal(
+      host.querySelector(":disabled").dataset.pressActive,
+      undefined,
+    );
+    pointer(document, "pointerup");
     reduced = true;
     pointer(menu, "pointerdown");
-    assert.equal(
-      calls.length,
-      count,
-      "disabled, existing dock and reduced motion stay untouched",
-    );
+    await wait(60);
+    assert.equal(menu.style.scale, "", "reduced motion stays still");
+    assert.equal(menu.dataset.pressActive, undefined);
     reduced = false;
     pointer(menu, "pointerdown");
     cleanup();
     assert.equal(menu.dataset.pressActive, undefined);
-    assert.equal(calls.at(-1).animation.cancelled, true);
   } finally {
     reduced = false;
     cleanup();
     host.remove();
-  }
-});
-
-test("dock release keeps its full duration after a short tap and retouches continue from the rendered scale", () => {
-  const dock = document.createElement("div");
-  document.body.append(dock);
-  const calls = [];
-  dock.animate = (frames, options) => {
-    calls.push({ frames, options });
-    return {
-      cancel() {
-        dock.style.transform = "scale(1)";
-      },
-    };
-  };
-  dock.style.setProperty("--safari-press-scale", "1.04");
-  try {
-    const press = animateDockPress(dock, true);
-    dock.style.transform = "matrix(1.01, 0, 0, 1.025, 0, 0)";
-    const release = animateDockPress(dock, false, press);
-    assert.equal(
-      calls[1].options.duration,
-      900,
-      "short contact does not shorten the release",
-    );
-    assert.equal(
-      calls[1].frames[0].transform,
-      "matrix(1.01, 0, 0, 1.025, 0, 0)",
-    );
-    assert.equal(calls[1].frames[1].transform, "scale(1)");
-    dock.style.transform = "matrix(1.005, 0, 0, 1.012, 0, 0)";
-    animateDockPress(dock, true, release);
-    assert.equal(
-      calls[2].frames[0].transform,
-      "matrix(1.005, 0, 0, 1.012, 0, 0)",
-      "sample before cancelling the old animation",
-    );
-    assert.equal(calls[2].frames[1].transform, "scale(1.04, 1.1)");
-    reduced = true;
-    assert.equal(animateDockPress(dock, false, release), undefined);
-    assert.equal(calls.length, 3);
-  } finally {
-    reduced = false;
-    dock.remove();
-  }
-});
-
-test("dock contour pinches continuously and separates into three surfaces at mobile widths", async () => {
-  for (const [width, side, inset] of [
-    [308, 44, 44],
-    [336, 44, 52],
-    [366, 52, 60],
-    [420, 52, 60],
-  ]) {
-    const pixel = async (progress, x, y) => {
-      const d = dockOutline(width, side, inset, progress);
-      assert.equal(/NaN|Infinity/.test(d), false);
-      const { data, info } = await sharp(
-        Buffer.from(
-          `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="64"><path d="${d}" fill="white" /></svg>`,
-        ),
-      )
-        .ensureAlpha()
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-      return data[(Math.floor(y) * info.width + Math.floor(x)) * 4 + 3];
-    };
-    const gap = (Math.min(side, inset - 4) + inset) / 2;
-    assert.equal(
-      await pixel(0, gap, 32),
-      255,
-      "trip-level surface is connected",
-    );
-    assert.equal(
-      await pixel(1, gap, 32),
-      0,
-      "detail surface has an actual gap",
-    );
-    assert.equal(await pixel(1, side / 2, 32), 255);
-    assert.equal(await pixel(1, width / 2, 32), 255);
-    assert.equal(await pixel(1, width - side / 2, 32), 255);
-    const r = 32 + (Math.min(side, inset - 4) / 2 - 32) * 0.5;
-    const neck = r + inset / 2;
-    assert.equal(
-      await pixel(0.5, neck, 32),
-      255,
-      "material remains joined while the neck thins",
-    );
-    assert.equal(
-      await pixel(0.5, neck, 8),
-      0,
-      "upper contour forms a visible concave neck",
-    );
   }
 });
 
@@ -1495,542 +982,6 @@ test("keyboard occlusion ignores rubber banding and non-editable focus", () => {
     "checkbox focus does not require a keyboard",
   );
   assert.equal(keyboardInset(800, null, input), 0);
-});
-
-test("all dock layouts morph through a shared contour with real necks and clean separated endpoints", async () => {
-  for (const width of [308, 366, 420]) {
-    const capsule = (left, width, radius = 32) => ({ left, width, radius });
-    const layouts = [
-      joinedDock(width),
-      dockSlots(width, [
-        capsule(0, 64),
-        capsule(74, width - 212),
-        capsule(width - 128, 128),
-      ]),
-      dockSlots(width, [capsule(0, 64), null, capsule(width - 128, 128)]),
-      dockSlots(width, [capsule(0, 64), capsule(74, width - 74), null]),
-      dockSlots(width, [null, capsule(0, width - 74), capsule(width - 64, 64)]),
-      dockSlots(width, [capsule(0, 64), null, null]),
-    ];
-    for (const from of layouts) {
-      for (const to of layouts) {
-        for (const t of [0, 0.25, 0.5, 0.75, 1]) {
-          const shape = morphDock(from, to, 0, t);
-          const field = dockField(width, shape.islands, shape.tension);
-          assert.ok(field.every(Number.isFinite));
-          assert.ok(
-            Math.max(...field) <= 1024.001,
-            "material stays within the dock's height",
-          );
-          assert.equal(/NaN|Infinity/.test(dockFieldPath(width, field)), false);
-          if (t === 1) assert.deepEqual(shape.islands, to);
-        }
-      }
-    }
-    const raster = async (from, to, t) => {
-      const shape = morphDock(from, to, 0, t);
-      const d = dockFieldPath(
-        width,
-        dockField(width, shape.islands, shape.tension),
-      );
-      const { data, info } = await sharp(
-        Buffer.from(
-          `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="64"><path d="${d}" fill="white"/></svg>`,
-        ),
-      )
-        .ensureAlpha()
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-      return (x, y) =>
-        data[(Math.floor(y) * info.width + Math.floor(x)) * 4 + 3];
-    };
-    const joined = await raster(layouts[0], layouts[1], 0);
-    const split = await raster(layouts[0], layouts[1], 1);
-    assert.equal(joined(69, 32), 255);
-    assert.equal(split(69, 32), 0, "back/primary gap is transparent");
-    assert.equal(
-      split(width - 133, 32),
-      0,
-      "primary/actions gap is transparent",
-    );
-    for (const x of [32, width / 2, width - 64])
-      assert.equal(split(x, 32), 255);
-    const neck = await raster(layouts[1], layouts[3], 0.1);
-    assert.equal(neck(69, 32), 0, "stationary back stays detached");
-    assert.equal(
-      neck(width - 133, 32),
-      255,
-      "the changing primary and actions surfaces join",
-    );
-  }
-});
-
-test("shared glass retargets from the rendered shape, survives layout changes, and honors reduced motion", async () => {
-  const h = React.createElement;
-  const originalBounds = HTMLElement.prototype.getBoundingClientRect;
-  const client = Object.getOwnPropertyDescriptor(
-    HTMLElement.prototype,
-    "clientWidth",
-  );
-  const offset = Object.getOwnPropertyDescriptor(
-    HTMLElement.prototype,
-    "offsetWidth",
-  );
-  const originalRAF = globalThis.requestAnimationFrame;
-  const originalCancel = globalThis.cancelAnimationFrame;
-  const originalNow = performance.now;
-  const pending = new Map();
-  let clock = 0,
-    sequence = 0,
-    setMode;
-  const w = 366;
-  function box(element) {
-    const context = element.closest(".context-dock");
-    const back = context?.querySelector(".context-back") ? 56 : 0;
-    const actions = context?.querySelector(".context-actions") ? 112 : 0;
-    if (element.classList.contains("context-back"))
-      return { left: 0, width: back };
-    if (element.classList.contains("context-actions"))
-      return { left: w - actions, width: actions };
-    if (element.classList.contains("context-primary"))
-      return {
-        left: back ? 66 : 0,
-        width: w - back - actions - (back ? 10 : 0) - (actions ? 10 : 0),
-      };
-    return { left: 0, width: w };
-  }
-  Object.defineProperty(HTMLElement.prototype, "clientWidth", {
-    configurable: true,
-    get() {
-      return this.classList.contains("thumb-dock") ? w : 0;
-    },
-  });
-  Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
-    configurable: true,
-    get() {
-      return box(this).width;
-    },
-  });
-  HTMLElement.prototype.getBoundingClientRect = function () {
-    return { ...box(this), top: 0, bottom: 56, height: 56 };
-  };
-  globalThis.requestAnimationFrame = (callback) => {
-    pending.set(++sequence, callback);
-    return sequence;
-  };
-  globalThis.cancelAnimationFrame = (id) => pending.delete(id);
-  performance.now = () => clock;
-  const advance = (ms) => {
-    clock += ms;
-    const callbacks = [...pending.values()];
-    pending.clear();
-    callbacks.forEach((callback) => callback(clock));
-  };
-  const root = createRoot(document.getElementById("root"));
-  function Harness() {
-    const [mode, update] = React.useState("tabs");
-    setMode = update;
-    return h(
-      ThumbDockProvider,
-      null,
-      h(
-        ThumbDock,
-        { mode: mode === "tabs" ? "browse" : "context" },
-        mode === "tabs"
-          ? h("div", { className: "safari-dock", "data-wide": "true" })
-          : h(ContextDock, {
-              back: h("button", null, "戻る"),
-              primary: mode === "place" ? h("button", null, "追加") : null,
-              actions: mode === "place" ? h("button", null, "編集") : null,
-            }),
-      ),
-    );
-  }
-  try {
-    await act(async () => root.render(h(Harness)));
-    const material = document.querySelector(".thumb-dock-material");
-    const glass = material.querySelector(".safari-glass");
-    const border = material.querySelector("path[stroke]");
-    const initial = border.getAttribute("d");
-    assert.ok(initial);
-    assert.equal(
-      material.querySelector("svg").getAttribute("viewBox"),
-      `0 0 ${w + 24} 80`,
-    );
-    await act(async () => setMode("place"));
-    assert.equal(border.getAttribute("d"), initial, "no jump on registration");
-    advance(410);
-    const midway = border.getAttribute("d");
-    assert.notEqual(midway, initial);
-    assert.equal(
-      glass.style.clipPath,
-      `path("${midway}")`,
-      "border and blur follow exactly the same contour",
-    );
-    await act(async () => setMode("settings"));
-    assert.equal(
-      border.getAttribute("d"),
-      midway,
-      "interruptions retain the visible neck",
-    );
-    assert.equal(pending.size, 1, "only the new animation remains active");
-    advance(820);
-    const settings = dockSlots(w, [
-      { left: 0, width: 56, radius: 28 },
-      null,
-      null,
-    ]);
-    assert.equal(
-      border.getAttribute("d"),
-      dockContour(
-        w + 24,
-        settings.map((island) => ({ ...island, left: island.left + 12 })),
-        0,
-        [],
-        40,
-      ),
-    );
-    assert.equal(pending.size, 0);
-    const back = document.querySelector(".context-back");
-    const button = back.querySelector("button");
-    const motions = [];
-    back.animate = (frames, options) => {
-      const animation = timeline();
-      motions.push({ frames, options, animation });
-      return animation;
-    };
-    await act(async () => pointer(button, "pointerdown"));
-    assert.equal(back.dataset.pressed, "true");
-    assert.equal(motions[0].options.duration, 320);
-    back.style.transform = "matrix(1.06, 0, 0, 1.1, 0, 0)";
-    advance(320);
-    const expanded = border.getAttribute("d");
-    assert.notEqual(
-      expanded,
-      dockContour(
-        w + 24,
-        settings.map((island) => ({ ...island, left: island.left + 12 })),
-        0,
-        [],
-        40,
-      ),
-    );
-    await act(async () => pointer(button, "pointerup"));
-    assert.equal(back.dataset.pressed, "false");
-    assert.equal(motions[1].options.duration, 900);
-    assert.equal(
-      motions[1].frames[0].transform,
-      "matrix(1.06, 0, 0, 1.1, 0, 0)",
-    );
-    back.style.transform = "none";
-    advance(920);
-    button.disabled = true;
-    await act(async () => pointer(button, "pointerdown"));
-    assert.equal(motions.length, 2, "disabled controls do not expand");
-    button.disabled = false;
-    await act(async () => pointer(button, "pointerdown"));
-    await act(async () => pointer(button, "pointercancel"));
-    assert.equal(back.dataset.pressed, "false");
-    advance(920);
-    reduced = true;
-    await act(async () => setMode("tabs"));
-    assert.equal(border.getAttribute("d"), initial);
-    assert.equal(pending.size, 0, "reduced motion settles immediately");
-    reduced = false;
-    await act(async () =>
-      document.querySelector(".safari-dock").setAttribute("data-wide", "false"),
-    );
-    advance(820);
-    assert.notEqual(
-      border.getAttribute("d"),
-      initial,
-      "hold expansion is observed without a registry update",
-    );
-    assert.equal(document.querySelectorAll(".safari-glass").length, 1);
-    assert.equal(document.querySelector(".thumb-dock-material"), material);
-  } finally {
-    await act(async () => root.unmount());
-    assert.equal(pending.size, 0);
-    reduced = false;
-    HTMLElement.prototype.getBoundingClientRect = originalBounds;
-    if (client)
-      Object.defineProperty(HTMLElement.prototype, "clientWidth", client);
-    else delete HTMLElement.prototype.clientWidth;
-    if (offset)
-      Object.defineProperty(HTMLElement.prototype, "offsetWidth", offset);
-    else delete HTMLElement.prototype.offsetWidth;
-    globalThis.requestAnimationFrame = originalRAF;
-    globalThis.cancelAnimationFrame = originalCancel;
-    performance.now = originalNow;
-  }
-});
-
-test("dock labels fade out before replacement appears, with inert snapshots and interruption cleanup", async () => {
-  const original = HTMLElement.prototype.animate;
-  const calls = [];
-  HTMLElement.prototype.animate = function (frames, options) {
-    const animation = timeline();
-    calls.push({ node: this, frames, options, animation });
-    return animation;
-  };
-  const root = createRoot(document.getElementById("root"));
-  const h = React.createElement;
-  const render = (identity, label) =>
-    act(async () =>
-      root.render(
-        h(
-          DockContent,
-          { identity, mode: "context" },
-          h("button", { id: "dock-save", form: "editor" }, label),
-        ),
-      ),
-    );
-  try {
-    await render("home", "旅行を作成");
-    await render("save", "保存する");
-    const current = document.querySelector(
-      ".thumb-dock-content:not([data-outgoing])",
-    );
-    const old = document.querySelector("[data-outgoing]");
-    assert.equal(old.textContent, "旅行を作成");
-    assert.equal(old.inert, true);
-    assert.equal(old.getAttribute("aria-hidden"), "true");
-    assert.equal(old.querySelector("[id], [form]"), null);
-    assert.equal(
-      current.inert,
-      true,
-      "invisible incoming controls cannot be activated",
-    );
-    assert.equal(calls[1].frames[0].opacity, 0);
-    assert.ok(calls[1].options.delay >= calls[0].options.duration);
-    await render("save", "保存中…");
-    assert.equal(
-      calls.length,
-      2,
-      "busy/validation updates do not restart the transition",
-    );
-    await render("detail", "編集");
-    assert.equal(old.isConnected, false);
-    assert.equal(calls[1].animation.cancelled, true);
-    assert.equal(document.querySelectorAll("[data-outgoing]").length, 1);
-    await act(async () => {
-      calls.at(-2).animation.finish();
-      calls.at(-1).animation.finish();
-    });
-    assert.equal(document.querySelector("[data-outgoing]"), null);
-    assert.equal(current.inert, false);
-    reduced = true;
-    await render("settings", "戻る");
-    assert.equal(calls.length, 4);
-    assert.equal(current.inert, false);
-  } finally {
-    reduced = false;
-    await act(async () => root.unmount());
-    if (original) HTMLElement.prototype.animate = original;
-    else delete HTMLElement.prototype.animate;
-  }
-});
-
-test("edit/delete stretches left into save without shrinking, rebounding, or moving back", () => {
-  for (const w of [308, 366, 420]) {
-    const back = { left: 0, width: 64, radius: 32 };
-    const actions = { left: w - 128, width: 128, radius: 32 };
-    const save = { left: 74, width: w - 74, radius: 32 };
-    const detail = dockSlots(w, [back, null, actions]);
-    const edit = dockSlots(w, [back, save, null]);
-    for (const [from, to, grows] of [
-      [detail, edit, true],
-      [edit, detail, false],
-    ]) {
-      let previous = grows ? actions.width : save.width;
-      for (let frame = 1; frame <= 120; frame++) {
-        const shape = morphDock(from, to, 0, frame / 120);
-        const visible = shape.islands.filter((island) => island.width > 0);
-        assert.equal(visible.length, 2, "no new droplet is created");
-        assert.deepEqual(
-          {
-            left: visible[0].left,
-            width: visible[0].width,
-            radius: visible[0].radius,
-          },
-          back,
-        );
-        const right = visible[1];
-        assert.ok(
-          Math.abs(right.left + right.width - w) < 0.001,
-          "right edge stays anchored",
-        );
-        assert.equal(right.radius, 32, "height remains 64px throughout");
-        assert.ok(
-          grows ? right.width >= previous : right.width <= previous,
-          "motion never reverses",
-        );
-        assert.equal(shape.tension, 0, "back remains separate");
-        previous = right.width;
-        const d = dockContour(w, shape.islands);
-        assert.equal((d.match(/M /g) ?? []).length, 2);
-        assert.ok(
-          d.length < 500,
-          "simple resizing uses short exact arcs instead of hundreds of samples",
-        );
-      }
-    }
-    const interrupted = morphDock(detail, edit, 0, 0.35);
-    const reverse = morphDock(
-      interrupted.islands,
-      detail,
-      interrupted.tension,
-      0,
-    );
-    assert.equal(
-      dockContour(w, reverse.islands),
-      dockContour(w, interrupted.islands),
-    );
-  }
-});
-
-test("exact dock capsules retain transparent gaps, round edges, and pressed geometry", async () => {
-  const w = 366;
-  const islands = dockSlots(w, [
-    { left: 0, width: 64, radius: 32 },
-    { left: 74, width: w - 74, radius: 32 },
-    null,
-  ]);
-  const d = dockContour(
-    w + 24,
-    islands.map((island) => ({ ...island, left: island.left + 12 })),
-    0,
-    [
-      { x: 1, y: 1 },
-      { x: 1.06, y: 1.1 },
-    ],
-    44,
-  );
-  const { data, info } = await sharp(
-    Buffer.from(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="390" height="88"><path d="${d}" fill="white"/></svg>`,
-    ),
-  )
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  const pixel = (x, y) => data[(y * info.width + x) * 4 + 3];
-  assert.equal(pixel(44, 13), 255);
-  assert.equal(pixel(12, 12), 0, "circular back corner is transparent");
-  assert.equal(pixel(76, 44), 0, "controls do not share an internal fill");
-  assert.equal(
-    pixel(230, 9),
-    255,
-    "pressed save grows above its normal top edge",
-  );
-  assert.equal(
-    (dockContour(w, joinedDock(w)).match(/M /g) ?? []).length,
-    1,
-    "joined tabs have one contour without internal borders",
-  );
-});
-
-test("all colored and neutral dock layouts reshape existing surfaces without zero-size seeds", () => {
-  for (const w of [308, 366, 420]) {
-    const c = (left, width) => ({ left, width, radius: 28 });
-    const tag = (slots) =>
-      dockSlots(w, slots).map((island, slot) => ({
-        ...island,
-        slot,
-        tint: slot === 1 && slots[1] ? 1 : 0,
-      }));
-    const home = tag([null, c(0, w - 66), c(w - 56, 56)]);
-    const tabs = joinedDock(w, 28).map((island) => ({
-      ...island,
-      slot: -1,
-      tint: 0,
-    }));
-    const layouts = [
-      home,
-      tabs,
-      tag([c(0, 56), c(66, w - 188), c(w - 112, 112)]),
-      tag([c(0, 56), null, c(w - 112, 112)]),
-      tag([c(0, 56), c(66, w - 66), null]),
-      tag([c(0, 56), null, null]),
-    ];
-    const sameField = (a, b, label) => {
-      const field = dockField(w, a),
-        other = dockField(w, b);
-      field.forEach((value, i) =>
-        assert.ok(Math.abs(value - other[i]) < 0.00001, label),
-      );
-    };
-    for (const from of layouts)
-      for (const to of layouts) {
-        const plan = prepareDockMorph(from, to);
-        sameField(
-          from,
-          plan.from,
-          "planning preserves the entire source silhouette",
-        );
-        sameField(
-          to,
-          plan.to,
-          "planning preserves the entire destination silhouette",
-        );
-        if (from.some((island) => island.tint > 0))
-          sameField(
-            from.filter((island) => island.tint > 0),
-            plan.from.filter((island) => island.tint > 0),
-            "splitting preserves the whole colored surface",
-          );
-        for (const t of [0.001, 0.1, 0.3, 0.5, 0.75, 0.999]) {
-          const shape = morphDock(from, to, 0, t, plan);
-          for (const island of shape.islands) {
-            assert.equal(island.radius, 28);
-            assert.ok(
-              island.width >= 56 - 0.00001,
-              "a surface never sprouts from a point",
-            );
-            assert.ok(
-              island.left >= -0.00001 &&
-                island.left + island.width <= w + 0.00001,
-            );
-          }
-          const uncolored = morphDock(
-            from.map((island) => ({ ...island, tint: 0 })),
-            to.map((island) => ({ ...island, tint: 0 })),
-            0,
-            t,
-          );
-          sameField(
-            shape.islands,
-            uncolored.islands,
-            "color never changes shape correspondence",
-          );
-        }
-      }
-    for (const [from, to] of [
-      [home, tabs],
-      [tabs, home],
-    ]) {
-      for (const t of [0.001, 0.05, 0.1, 0.4, 0.8]) {
-        const shape = morphDock(from, to, 0, t);
-        assert.equal(
-          Math.min(...shape.islands.map((island) => island.left)),
-          0,
-        );
-        assert.equal(
-          Math.max(
-            ...shape.islands.map((island) => island.left + island.width),
-          ),
-          w,
-        );
-        const colored = shape.islands.filter((island) => island.tint > 0);
-        if (colored.length)
-          assert.equal(
-            Math.min(...colored.map((island) => island.left)),
-            0,
-            "create tint remains on the left edge, never the center",
-          );
-      }
-    }
-  }
 });
 
 test("menu depth keeps scrolled fixed controls in place and reverses from an interrupted opening", () => {
@@ -2196,7 +1147,9 @@ test("the mobile add button survives page replacement and uses the current page 
 });
 
 test("panel and dock geometry stays independent of the keyboard", async () => {
-  const css = await readFile("src/web/styles.css", "utf8");
+  const css =
+    (await readFile("src/web/styles.css", "utf8")) +
+    (await readFile("src/web/styles/dock.css", "utf8"));
   const panelDock = css.match(
     /dialog \.thumb-dock-host:not\(\[hidden\]\)\s*\{([^}]+)\}/,
   )?.[1];
@@ -2313,7 +1266,7 @@ test("calendar floats above its editor, commits ranges only on confirmation and 
     );
     await click(panel.querySelector('[data-date="2028-02-29"]'));
     assert.equal(
-      host.querySelector(".context-primary button").disabled,
+      host.querySelector('[data-slot="r"] button').disabled,
       true,
       "range needs its second date",
     );
@@ -2339,7 +1292,7 @@ test("calendar floats above its editor, commits ranges only on confirmation and 
     await setTime("09:30");
     await click(panel.querySelector(".calendar-summary button"));
     await setTime("13:00");
-    await click(host.querySelector(".context-primary button"));
+    await click(host.querySelector('[data-slot="r"] button'));
     await closeWait();
     assert.match(trigger.textContent, /13:00/);
     assert.match(trigger.textContent, /09:30/);
@@ -2379,7 +1332,7 @@ test("calendar floats above its editor, commits ranges only on confirmation and 
       sameDay.querySelectorAll('.calendar-marker[style*="opacity: 1"]').length,
       1,
     );
-    await click(host.querySelector(".context-primary button"));
+    await click(host.querySelector('[data-slot="r"] button'));
     await closeWait();
     assert.equal(trigger.dataset.dateValue, "2028-02-20");
     assert.equal(trigger.dataset.dateEnd, "2028-02-20");
@@ -2777,31 +1730,20 @@ test("card contact scales the whole surface, keeps actions independent and relea
   host.innerHTML =
     '<button class="timeline-entry"><time>10:00</time><div data-press-card><h3>予定</h3></div></button><button class="timeline-empty"><div data-press-card>追加</div></button><article class="place-card" data-press-card><button class="place-card-main">場所詳細</button><button class="place-card-action">しおりへ</button><button disabled>無効</button></article><button class="booking-ticket" data-press-card>予約</button><button class="note-card" data-press-card>メモ</button><a href="#trip" class="trip-ticket" data-press-card>旅行</a><button class="timeline-empty" disabled><div data-press-card>閲覧のみ</div></button>';
   document.body.append(host);
-  const calls = [];
-  for (const surface of host.querySelectorAll("[data-press-card]")) {
-    surface.style.setProperty("--safari-press-scale", "1.04");
-    surface.style.setProperty("--safari-press-scale-y", "1.04");
-    surface.animate = (frames, options) => {
-      const animation = timeline();
-      calls.push({ surface, frames, options, animation });
-      return animation;
-    };
-  }
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const cleanup = installPressFeedback();
   try {
     const controls = [...host.querySelectorAll("button:not(:disabled), a")];
     for (const control of controls) {
       pointer(control, "pointerdown", 20, 20);
-      const { surface, frames, animation } = calls.at(-1);
-      assert.equal(surface.dataset.pressActive, "true");
-      assert.equal(frames[1].transform, "scale(1.04, 1.04)");
-      assert.equal(
-        surface,
+      const surface =
         control.closest("[data-press-card]") ??
-          control.querySelector("[data-press-card]"),
-      );
-      animation.finish();
-      await Promise.resolve();
+        control.querySelector("[data-press-card]");
+      assert.equal(surface.dataset.pressActive, "true");
+      await wait(450);
+      // The mock's card squish: scale(2 - .97, .97).
+      const [x, y] = surface.style.scale.split(" ").map(Number);
+      assert.ok(Math.abs(x - 1.03) < 0.003 && Math.abs(y - 0.97) < 0.003);
       assert.equal(
         surface.dataset.pressActive,
         "true",
@@ -2819,7 +1761,8 @@ test("card contact scales the whole surface, keeps actions independent and relea
         undefined,
         "scroll releases without blocking the gesture",
       );
-      assert.equal(calls.at(-1).options.duration, 900);
+      await wait(1100);
+      assert.equal(surface.style.scale, "", "springs back to rest");
     }
     const detail = host.querySelector(".place-card-main");
     const add = host.querySelector(".place-card-action");
@@ -2840,10 +1783,16 @@ test("card contact scales the whole surface, keeps actions independent and relea
       new dom.window.KeyboardEvent("keyup", { key: "Enter", bubbles: true }),
     );
     assert.equal(detail.parentElement.dataset.pressActive, undefined);
-    const count = calls.length;
-    for (const disabled of host.querySelectorAll(":disabled"))
+    await wait(1100);
+    for (const disabled of host.querySelectorAll(":disabled")) {
       pointer(disabled, "pointerdown");
-    assert.equal(calls.length, count, "disabled card actions never animate");
+      await wait(60);
+      const surface =
+        disabled.closest("[data-press-card]") ??
+        disabled.querySelector("[data-press-card]");
+      assert.equal(surface.style.scale, "", "disabled card actions never move");
+      pointer(document, "pointerup");
+    }
   } finally {
     cleanup();
     host.remove();

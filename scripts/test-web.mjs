@@ -200,8 +200,8 @@ const fill = async (label, value) => {
         time.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
       });
     }
-    assert.equal(byText(".context-primary button", "決定").disabled, false);
-    await click(byText(".context-primary button", "決定"));
+    assert.equal(byText(".context-actions button", "決定").disabled, false);
+    await click(byText(".context-actions button", "決定"));
     await tick(30);
     return;
   }
@@ -222,7 +222,7 @@ const fill = async (label, value) => {
 };
 const submit = async () => {
   const dock = document.querySelector(".thumb-dock-host");
-  const save = dock.querySelector('.context-primary button[type="submit"]');
+  const save = dock.querySelector('.context-actions button[type="submit"]');
   assert.ok(dock.querySelector('.context-back [aria-label="戻る"]'));
   assert.equal(save?.form, document.querySelector("dialog form"));
   await act(async () =>
@@ -381,7 +381,7 @@ const editInPlace = async (change) => {
     if (save) {
       await change();
       const submitButton = dock.querySelector(
-        '.context-primary button[type="submit"]',
+        '.context-actions button[type="submit"]',
       );
       assert.equal(submitButton?.form, detail.querySelector("form"));
       await act(async () =>
@@ -472,7 +472,7 @@ test("attachment preview uses a fullscreen dialog with close and download contro
     );
     assert.equal(dialog.querySelector(".context-back button").textContent, "");
     assert.equal(
-      dialog.querySelector(".context-primary a").textContent,
+      dialog.querySelector('[data-slot="r"] a').textContent,
       "端末に保存",
     );
     assert.equal(
@@ -719,8 +719,11 @@ test("legacy account cache and pending changes survive React migration; real for
       trip.startsOn,
       "end time supplies same-day end date",
     );
-    assert.equal(document.querySelector(".context-primary").textContent, "");
-    assert.equal(document.querySelector(".thumb-dock-host .safari-tabs"), null);
+    assert.equal(
+      document.querySelector(".context-actions")?.textContent ?? "",
+      "",
+    );
+    assert.equal(document.querySelector(".thumb-dock-host .cdock-tabs"), null);
     // Deleting is quiet: the plan goes at once and 「元に戻す」 brings it back.
     await click(
       document.querySelector('.context-actions [aria-label="予定を削除"]'),
@@ -733,7 +736,9 @@ test("legacy account cache and pending changes survive React migration; real for
       ),
       false,
     );
-    await click(document.querySelector(".it-undo"));
+    await click(
+      document.querySelector('.cdock-group[data-slot="toast"] button'),
+    );
     await tick(30);
     assert.ok(
       [...document.querySelectorAll(".it-ev")].some((entry) =>
@@ -780,10 +785,11 @@ test("legacy account cache and pending changes survive React migration; real for
       document.querySelector("dialog").textContent,
       /long-link-|reservation=private|Google Mapsで開く/,
     );
-    assert.equal(document.querySelector(".thumb-dock-host .safari-tabs"), null);
+    assert.equal(document.querySelector(".thumb-dock-host .cdock-tabs"), null);
+    // Edit and delete, with the primary as an ink pill on the same island.
     assert.equal(
       document.querySelectorAll(".context-actions button").length,
-      2,
+      3,
     );
     assert.ok(
       document.querySelector('.context-actions [aria-label="予約を削除"]'),
@@ -855,9 +861,9 @@ test("legacy account cache and pending changes survive React migration; real for
       "needed",
       "collapsed options survive saving and editing the name",
     );
-    assert.equal(document.querySelector(".thumb-dock-host .safari-tabs"), null);
+    assert.equal(document.querySelector(".thumb-dock-host .cdock-tabs"), null);
     const placeDetail = document.querySelector("dialog[open]");
-    await click(byText(".context-primary button", "しおりへ追加"));
+    await click(byText(".context-actions button", "しおりへ追加"));
     assert.equal(document.querySelectorAll("dialog[open]").length, 2);
     await fill("開始", { time: "16:00" });
     await submit();
@@ -870,7 +876,7 @@ test("legacy account cache and pending changes survive React migration; real for
       "16:00",
     );
     assert.equal(
-      document.querySelector(".context-primary").textContent,
+      document.querySelector(".context-actions").textContent,
       "しおりを見る",
     );
     globalThis.confirm = () => false;
@@ -884,7 +890,7 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     globalThis.confirm = () => true;
     await click(document.querySelector('.context-actions [aria-label="編集"]'));
-    assert.ok(document.querySelector('.context-primary button[type="submit"]'));
+    assert.ok(document.querySelector('.context-actions button[type="submit"]'));
     assert.equal(
       field("予約状況").value,
       "needed",
@@ -894,7 +900,7 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
     assert.equal(
-      document.querySelector(".context-primary").textContent,
+      document.querySelector(".context-actions").textContent,
       "しおりを見る",
     );
     await click(document.querySelector('.context-actions [aria-label="編集"]'));
@@ -937,10 +943,10 @@ test("legacy account cache and pending changes survive React migration; real for
     // やること and 持ち物 are separate icon-only dock pages.
     const dockTab = (label) =>
       document.querySelector(
-        `.thumb-dock-host .safari-tabs a[aria-label="${label}"]`,
+        `.thumb-dock-host .cdock-tabs a[aria-label="${label}"]`,
       );
     assert.deepEqual(
-      [...document.querySelectorAll(".thumb-dock-host .safari-tabs a")].map(
+      [...document.querySelectorAll(".thumb-dock-host .cdock-tabs a")].map(
         (link) => [link.getAttribute("aria-label"), link.textContent],
       ),
       [
@@ -966,7 +972,7 @@ test("legacy account cache and pending changes survive React migration; real for
       await act(async () => document.activeElement?.blur());
       await tick(30);
       const dock = document.querySelector(".thumb-dock-host");
-      const save = dock.querySelector('.context-primary button[type="submit"]');
+      const save = dock.querySelector('.context-actions button[type="submit"]');
       assert.equal(save?.textContent, primary);
       assert.equal(save.form, document.querySelector("dialog form"));
       assert.equal(
@@ -1327,7 +1333,9 @@ test("legacy account cache and pending changes survive React migration; real for
       ),
       "a deleted note leaves the list at once, with no confirm",
     );
-    await click(document.querySelector(".memo-undo"));
+    await click(
+      document.querySelector('.cdock-group[data-slot="toast"] button'),
+    );
     assert.ok(
       [...document.querySelectorAll(".memo-tile")].some((tile) =>
         tile.textContent.includes("削除するメモ"),
@@ -1341,7 +1349,7 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await click(document.querySelector('[aria-label="メモを消す"]'));
     await tick(50);
-    assert.ok(document.querySelector(".memo-undo"));
+    assert.ok(document.querySelector('.cdock-group[data-slot="toast"]'));
     // Leaving the page settles the deletion instead of waiting for the timer.
     await click(byText("nav a", "しおり"));
     await tick(550);
@@ -1358,7 +1366,7 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.ok(document.querySelector(".trip-menu-popover[open]"));
     assert.ok(
-      document.querySelector(".thumb-dock-host .safari-tabs"),
+      document.querySelector(".thumb-dock-host .cdock-tabs"),
       "header menu keeps the trip dock",
     );
     await click(byText(".trip-menu-popover button", "設定"));
@@ -1555,16 +1563,19 @@ test("legacy account cache and pending changes survive React migration; real for
       "旅行を作成",
     );
     assert.equal(
-      document.querySelector(".context-primary.context-island"),
+      document.querySelector('.context-actions[data-tone="ink"]'),
       null,
     );
     await click(document.querySelector('.context-back [aria-label="設定"]'));
-    assert.equal(document.querySelectorAll(".context-island").length, 1);
+    assert.equal(
+      document.querySelectorAll(".cdock-content > [data-slot]").length,
+      1,
+    );
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
     await click(byText(".context-actions button", "旅行を作成"));
     assert.equal(
-      document.querySelector('.context-primary button[type="submit"]').form,
+      document.querySelector('.context-actions button[type="submit"]').form,
       document.querySelector("dialog form"),
     );
     await click(document.querySelector('.context-back [aria-label="戻る"]'));

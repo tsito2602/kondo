@@ -13,7 +13,7 @@ function redirectedShell(body = 'LEGACY SHELL') {
   });
   return response;
 }
-async function fixture({ redirectRoot = false } = {}) {
+async function fixture({ redirectRoot = false, fonts = [], brokenFont = '' } = {}) {
   const listeners = {}, stores = new Map(); let activated = false, claimed = false, online = true;
   const network = [], deleted = [];
   const caches = {
@@ -24,12 +24,13 @@ async function fixture({ redirectRoot = false } = {}) {
         async addAll(urls) { if (!online) throw new Error('offline'); for (const url of urls) store.set(url, url === '/index.html' || (url === '/' && redirectRoot) ? redirectedShell('APP SHELL') : new Response(url === '/' ? 'APP SHELL' : 'asset')); },
         async match(url) { return store.get(keyFor(url))?.clone(); },
         async put(url, response) { store.set(keyFor(url), response.clone()); },
+        async add(url) { if (!online || url === brokenFont) throw new Error('failed'); store.set(url, new Response('font')); },
       };
     },
     async match(request) { for (const key of stores.keys()) { const match = await (await caches.open(key)).match(request); if (match) return match; } },
     async keys() { return [...stores.keys()]; }, async delete(key) { deleted.push(key); return stores.delete(key); },
   };
-  vm.runInNewContext(template.replace('__VERSION__', 'test').replace('__PRECACHE__', JSON.stringify(['/', '/app.js'])), {
+  vm.runInNewContext(template.replace('__VERSION__', 'test').replace('__PRECACHE__', JSON.stringify(['/', '/app.js'])).replace('__FONTS__', JSON.stringify(fonts)), {
     self: { addEventListener: (type, fn) => { listeners[type] = fn; }, skipWaiting: () => { activated = true; }, clients: { claim: async () => { claimed = true; } }, location: { origin: 'https://tabi.test' } },
     caches, URL, Response, fetch: async (request) => { network.push(request.url); if (!online) throw new Error('offline'); return new Response('network'); },
   });
@@ -123,7 +124,21 @@ test('a waiting worker names its build label so the page can show the update', a
     listeners.message({ data: { type: 'GET_VERSION' }, ports: [{ postMessage: (value) => { reply = value; } }] });
     return reply;
   };
-  const filled = template.replace('__VERSION__', 'test').replace('__PRECACHE__', '[]');
+  const filled = template.replace('__VERSION__', 'test').replace('__PRECACHE__', '[]').replace('__FONTS__', '[]');
   assert.equal(answer(filled.replace('__BUILD_LABEL__', '2026.10.7.1432')).version, '2026.10.7.1432');
   assert.equal(answer(filled).version, '', 'an unlabelled build reports no version');
+});
+
+test('font slices are cached for offline use without letting one failed slice block the install', async () => {
+  const f = await fixture({ fonts: ['/assets/a.woff2', '/assets/b.woff2', '/assets/c.woff2'], brokenFont: '/assets/b.woff2' });
+  await f.lifecycle('install');
+  const cache = await f.caches.open('tabi-shell-test');
+  assert.equal(await (await cache.match('/assets/a.woff2')).text(), 'font');
+  assert.equal(await cache.match('/assets/b.woff2'), undefined, 'the broken slice is skipped');
+  // The skipped slice is fetched and kept the first time a page needs it.
+  assert.equal(await (await f.fetch('/assets/b.woff2')).text(), 'network');
+  assert.equal(await (await cache.match('/assets/b.woff2')).text(), 'network');
+  f.offline();
+  assert.equal(await (await f.fetch('/assets/b.woff2')).text(), 'network');
+  assert.equal(await (await f.fetch('/assets/a.woff2')).text(), 'font');
 });
