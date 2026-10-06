@@ -92,7 +92,14 @@ export function dismissModal(
   );
 }
 
-const tabOrder = ["itinerary", "places", "packing", "bookings", "notes"];
+const tabOrder = [
+  "itinerary",
+  "places",
+  "tasks",
+  "packing",
+  "bookings",
+  "notes",
+];
 
 let enterTimer = 0;
 

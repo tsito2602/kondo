@@ -334,7 +334,7 @@ const keyboardWhileEditing = async () => {
     "keyboard dismissal preserves the draft",
   );
   assert.ok(
-    dialog.querySelector('[aria-label="戻る"]'),
+    dialog.querySelector('[aria-label="戻る"], .context-back-label'),
     "Back returns after dismissal",
   );
   panel.getBoundingClientRect = measurePanel;
@@ -673,7 +673,7 @@ test("legacy account cache and pending changes survive React migration; real for
     await editAndReturn("宿泊施設名", "更新したホテル");
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
-    await click(byText("nav a", "行きたい場所"));
+    await click(byText("nav a", "場所"));
     await click(document.querySelector('[aria-label="場所を追加"]'));
     assert.equal(field("訪問ステータス").closest("details"), null);
     assert.equal(field("訪問ステータス").value, "want");
@@ -773,122 +773,182 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(200);
-    await click(byText("nav a", "準備"));
-    await click(document.querySelector('[aria-label="やることを追加"]'));
+    // やること and 持ち物 are separate icon-only dock pages.
+    const dockTab = (label) =>
+      document.querySelector(
+        `.thumb-dock-host .safari-tabs a[aria-label="${label}"]`,
+      );
+    assert.deepEqual(
+      [...document.querySelectorAll(".thumb-dock-host .safari-tabs a")].map(
+        (link) => [link.getAttribute("aria-label"), link.textContent],
+      ),
+      [
+        ["しおり", ""],
+        ["場所", ""],
+        ["やること", ""],
+        ["持ち物", ""],
+        ["予約", ""],
+        ["メモ", ""],
+      ],
+    );
+    const typeInto = async (input, value) => {
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(
+          dom.window.HTMLInputElement.prototype,
+          "value",
+        ).set.call(input, value);
+        input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+      });
+    };
+    const submitSheet = async (primary) => {
+      // While typing, the back island closes the keyboard instead.
+      await act(async () => document.activeElement?.blur());
+      await tick(30);
+      const dock = document.querySelector(".thumb-dock-host");
+      const save = dock.querySelector('.context-primary button[type="submit"]');
+      assert.equal(save?.textContent, primary);
+      assert.equal(save.form, document.querySelector("dialog form"));
+      assert.equal(
+        dock.querySelector(".context-back .context-back-label")?.textContent,
+        "やめる",
+      );
+      await act(async () =>
+        save.form.dispatchEvent(
+          new dom.window.Event("submit", { bubbles: true, cancelable: true }),
+        ),
+      );
+      await tick(30);
+    };
+    const ringCount = () =>
+      document.querySelector('[data-ring="owner"] small').textContent;
+    await click(dockTab("やること"));
     assert.equal(
-      field("担当").querySelector('option[value=""]').textContent,
-      "未指定",
+      document.querySelector(".prep-top h2").textContent,
+      "やること",
+    );
+    assert.equal(
+      document.querySelector('[data-ring="owner"] b').textContent,
+      "あなた",
+    );
+    assert.equal(ringCount(), "あと0");
+    await click(
+      document.querySelector('.prep-top [aria-label="やることを追加"]'),
     );
     assert.equal(document.activeElement, document.querySelector("dialog h2"));
+    assert.equal(
+      document.querySelector("dialog h2").textContent,
+      "やることを追加",
+    );
     assert.equal(document.querySelector("dialog input[autofocus]"), null);
     assert.equal(
-      document.querySelector("dialog").classList.contains("full"),
-      true,
+      document.querySelector(".prep-who-all"),
+      null,
+      "みんな各自 needs more than one member",
     );
-    assert.equal(field("期限"), undefined);
-    assert.equal(
-      byText("label", "期限を設定する").querySelector("input").checked,
-      false,
+    assert.match(
+      document.querySelector('.prep-whos [aria-pressed="true"]').textContent,
+      /あなた$/,
+      "a new task is mine unless I choose someone else",
     );
     await keyboardWhileEditing();
-    await fill("やること", "チケットを予約");
-    await submit();
-    assert.equal(
-      db.prepare("SELECT COUNT(*) AS n FROM travel_tasks").get().n,
-      1,
-    );
-    const preparationPanel = document.querySelector('[role="tabpanel"]');
-    assert.match(document.querySelector(".task-list").textContent, /未指定/);
-    preparationPanel.focus();
-    await click(
-      document.querySelector('[aria-label="チケットを予約の詳細を編集"]'),
-    );
-    assert.equal(document.activeElement, document.querySelector("dialog h2"));
-    assert.equal(
-      document.querySelector("dialog").classList.contains("full"),
-      true,
-    );
-    const deadlineToggle = () =>
-      byText("label", "期限を設定する").querySelector("input");
-    assert.equal(deadlineToggle().checked, false);
-    assert.equal(
-      db.prepare("SELECT due_on FROM travel_tasks").get().due_on,
-      "",
-    );
-    await click(deadlineToggle());
-    assert.equal(field("期限").getAttribute("aria-required"), "true");
-    await submit();
+    await submitSheet("追加する");
     assert.match(
       document.querySelector("dialog .error").textContent,
-      /正しい期限/,
+      /やることの名前を入れてください/,
     );
-    await fill("期限", "2026-11-20");
-    await fill("担当", "member:owner");
-    await submit();
+    assert.equal(
+      db.prepare("SELECT COUNT(*) AS n FROM travel_tasks").get().n,
+      0,
+    );
+    await typeInto(
+      document.querySelector('dialog input[aria-label="やること"]'),
+      "チケットを予約",
+    );
+    const dueDay = new Date();
+    dueDay.setDate(dueDay.getDate() + 40);
+    const due = `${dueDay.getFullYear()}-${String(dueDay.getMonth() + 1).padStart(2, "0")}-${String(dueDay.getDate()).padStart(2, "0")}`;
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const before = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
+    if (document.querySelector(`[data-day="${before}"]`))
+      assert.equal(
+        document.querySelector(`[data-day="${before}"]`).disabled,
+        true,
+        "past days cannot be a deadline",
+      );
+    assert.equal(
+      document.querySelector('.prep-cal [aria-label="前の月"]').disabled,
+      true,
+    );
+    while (!document.querySelector(`[data-day="${due}"]`))
+      await click(document.querySelector('.prep-cal [aria-label="次の月"]'));
+    await click(document.querySelector(`[data-day="${due}"]`));
     assert.equal(
       document
-        .querySelector(".task-list .assignee-avatar")
-        .getAttribute("aria-label"),
-      "テスト",
+        .querySelector(`[data-day="${due}"]`)
+        .getAttribute("aria-pressed"),
+      "true",
     );
-    assert.doesNotMatch(
-      document.querySelector(".task-list .preparation-meta").textContent,
-      /テスト|未指定/,
+    assert.match(
+      document.querySelector(".prep-label").textContent,
+      new RegExp(`期限 · ${+due.slice(5, 7)}/${+due.slice(8)}（`),
     );
-    const avatarImage = document.querySelector(
-      ".task-list .assignee-avatar img",
+    await submitSheet("追加する");
+    assert.equal(document.querySelector("dialog"), null);
+    const savedTask = db
+      .prepare("SELECT id, title, due_on, assignee, done FROM travel_tasks")
+      .get();
+    assert.deepEqual(
+      [savedTask.title, savedTask.due_on, savedTask.assignee, savedTask.done],
+      ["チケットを予約", due, "member:owner", 0],
     );
+    assert.equal(ringCount(), "あと1");
+    assert.equal(
+      document.querySelector(`[data-task="${savedTask.id}"] small`).textContent,
+      `${+due.slice(5, 7)}/${+due.slice(8)}まで`,
+    );
+    const ringAvatar = () =>
+      document.querySelector('[data-ring="owner"] .assignee-avatar');
+    assert.equal(ringAvatar().getAttribute("aria-label"), "テスト");
+    const avatarImage = ringAvatar().querySelector("img");
     assert.equal(avatarImage.src, "https://example.test/avatar.png");
     await act(async () =>
       avatarImage.dispatchEvent(new dom.window.Event("error")),
     );
-    assert.equal(
-      document.querySelector(".task-list .assignee-avatar img"),
-      null,
-    );
-    assert.equal(
-      document.querySelector(".task-list .assignee-avatar").textContent,
-      "テ",
-    );
-    assert.equal(
-      db.prepare("SELECT due_on FROM travel_tasks").get().due_on,
-      "2026-11-20",
-    );
+    assert.equal(ringAvatar().querySelector("img"), null);
+    assert.equal(ringAvatar().textContent, "テ");
     await click(
-      document.querySelector('[aria-label="チケットを予約の詳細を編集"]'),
+      document.querySelector(`[data-task="${savedTask.id}"] [role="checkbox"]`),
     );
-    assert.equal(deadlineToggle().checked, true);
-    assert.equal(field("期限").dataset.dateValue, "2026-11-20");
-    await click(deadlineToggle());
-    assert.equal(field("期限"), undefined);
-    await click(deadlineToggle());
-    assert.equal(
-      field("期限").dataset.dateValue,
-      "2026-11-20",
-      "temporary toggle keeps the draft date",
-    );
-    await click(deadlineToggle());
-    await submit();
-    assert.equal(
-      db.prepare("SELECT due_on FROM travel_tasks").get().due_on,
-      "",
-    );
-    await click(
-      document.querySelector('[aria-label="チケットを予約の詳細を編集"]'),
-    );
-    assert.equal(deadlineToggle().checked, false);
-    assert.equal(field("期限"), undefined);
-    await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
-    assert.equal(document.querySelector("dialog"), null);
-    assert.notEqual(document.activeElement, preparationPanel);
+    assert.equal(db.prepare("SELECT done FROM travel_tasks").get().done, 1);
+    assert.equal(ringCount(), "あと0");
+    assert.ok(
+      document
+        .querySelector('[data-ring="owner"]')
+        .classList.contains("is-closed"),
+      "the ring closes when every task is done",
+    );
+    await click(document.querySelector('[aria-label="チケットを予約を直す"]'));
     assert.equal(
-      document.querySelector('.task-list [aria-label*="削除"]'),
-      null,
+      document.querySelector("dialog h2").textContent,
+      "やることを直す",
     );
-    await click(
-      document.querySelector('[aria-label="チケットを予約の詳細を編集"]'),
+    await click(document.querySelector(".prep-cal-none"));
+    assert.equal(
+      document.querySelector(".prep-label").textContent,
+      "期限 · 期限なし",
     );
+    await submitSheet("保存");
+    const editedTask = db
+      .prepare("SELECT due_on, done FROM travel_tasks")
+      .get();
+    assert.deepEqual([editedTask.due_on, editedTask.done], ["", 1]);
+    assert.equal(
+      document.querySelector(`[data-task="${savedTask.id}"] small`).textContent,
+      "期限なし",
+    );
+    await click(document.querySelector('[aria-label="チケットを予約を直す"]'));
     const taskDelete = document.querySelector(
       '.context-actions [aria-label="やることを削除"]',
     );
@@ -896,7 +956,6 @@ test("legacy account cache and pending changes survive React migration; real for
       taskDelete,
       "delete sits to the right of save in the task editor",
     );
-    assert.ok(document.querySelector('.context-primary button[type="submit"]'));
     globalThis.confirm = () => false;
     await click(taskDelete);
     assert.equal(
@@ -911,33 +970,92 @@ test("legacy account cache and pending changes survive React migration; real for
       0,
     );
     assert.equal(document.querySelector("dialog"), null);
-    await click(document.querySelector('[role="tab"][aria-label="持ち物"]'));
-    assert.doesNotMatch(
-      document.querySelector(".filter-strip").textContent,
-      /未指定/,
-    );
-    await click(document.querySelector('[aria-label="持ち物を追加"]'));
+
+    await click(dockTab("持ち物"));
+    assert.equal(document.querySelector(".prep-top h2").textContent, "持ち物");
+    const addPacking = async (name, kind) => {
+      await click(
+        document.querySelector('.prep-top [aria-label="持ち物を追加"]'),
+      );
+      assert.equal(
+        document.querySelector('[role="radio"][aria-checked="true"] b')
+          .textContent,
+        "みんな各自",
+        "みんな各自 is the default kind",
+      );
+      await typeInto(
+        document.querySelector('dialog input[aria-label="持ち物"]'),
+        name,
+      );
+      await click(byText('[role="radio"] b', kind).closest("button"));
+      await submitSheet("追加する");
+      return db.prepare("SELECT id FROM packing_items WHERE name = ?").get(name)
+        .id;
+    };
+    const kindRow = (id) => document.querySelector(`[data-item="${id}"]`);
+    const charger = await addPacking("充電器", "みんな各自");
     assert.equal(
-      field("担当").querySelector('option[value=""]').textContent,
-      "共用",
+      db
+        .prepare("SELECT kind FROM packing_kinds WHERE item_id = ?")
+        .get(charger).kind,
+      "each",
     );
-    await fill("持ち物", "充電器");
-    await submit();
-    assert.match(
-      document.querySelector(".task-list .preparation-meta").textContent,
-      /共用/,
+    assert.ok(
+      document.querySelector(`[data-kind="each"] [data-item="${charger}"]`),
     );
-    assert.doesNotMatch(
-      document.querySelector(".task-list .preparation-meta").textContent,
-      /未指定/,
+    await click(kindRow(charger).querySelector('[role="checkbox"]'));
+    await tick(30);
+    assert.deepEqual(
+      db
+        .prepare("SELECT user_id FROM packing_marks WHERE item_id = ?")
+        .all(charger)
+        .map((row) => row.user_id),
+      ["owner"],
+      "みんな各自 keeps each member's own tick",
     );
+    const medicine = await addPacking("常備薬", "1つでいい");
+    assert.match(kindRow(medicine).textContent, /まだ誰も持っていない/);
+    assert.equal(kindRow(medicine).querySelector('[role="checkbox"]'), null);
+    await click(byText(`[data-item="${medicine}"] button`, "私が持つ"));
+    await tick(30);
     assert.equal(
-      db.prepare("SELECT shared FROM packing_details").get().shared,
-      1,
+      db
+        .prepare("SELECT assignee FROM packing_details WHERE item_id = ?")
+        .get(medicine).assignee,
+      "member:owner",
+    );
+    assert.match(kindRow(medicine).textContent, /あなたが持つ/);
+    assert.ok(kindRow(medicine).querySelector('[role="checkbox"]'));
+    const diary = await addPacking("日記", "自分だけ");
+    assert.deepEqual(
+      {
+        ...db
+          .prepare("SELECT kind, owner_id FROM packing_kinds WHERE item_id = ?")
+          .get(diary),
+      },
+      { kind: "mine", owner_id: "owner" },
+    );
+    assert.match(kindRow(diary).textContent, /ほかの人には見えない/);
+    await click(document.querySelector('[aria-label="充電器を直す"]'));
+    assert.equal(
+      document.querySelector("dialog h2").textContent,
+      "持ち物を直す",
+    );
+    await click(byText('[role="radio"] b', "1つでいい").closest("button"));
+    await submitSheet("保存");
+    assert.equal(
+      db
+        .prepare("SELECT kind FROM packing_kinds WHERE item_id = ?")
+        .get(charger).kind,
+      "one",
+      "the kind can be changed later",
+    );
+    assert.ok(
+      document.querySelector(`[data-kind="one"] [data-item="${charger}"]`),
     );
     assert.equal(
       db.prepare("SELECT COUNT(*) AS n FROM packing_items").get().n,
-      1,
+      3,
     );
     await click(byText("nav a", "メモ"));
     await click(document.querySelector('[aria-label="メモを書く"]'));

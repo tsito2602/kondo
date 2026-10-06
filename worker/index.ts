@@ -665,6 +665,9 @@ async function deleteBookingDocument(env: Env, user: User, tripId: string, booki
   return new Response(null, { status: 204 });
 }
 
+type PackingKind = 'each' | 'one' | 'mine';
+const packingKinds = new Set<PackingKind>(['each', 'one', 'mine']);
+
 type PackingRow = {
   id: string;
   name: string;
@@ -673,6 +676,8 @@ type PackingRow = {
   packed: number;
   assignee: string;
   shared: number;
+  kind: PackingKind;
+  marks: string | null;
   updatedBy: string;
   updatedAt: number;
 };
@@ -686,19 +691,35 @@ function packingFields(body: Record<string, unknown>) {
   const assignee = body.assignee === undefined ? undefined : typeof body.assignee === 'string' ? textField(body.assignee, 80) : null;
   const shared = body.shared;
   if (assignee === null || (shared !== undefined && typeof shared !== 'boolean')) return null;
-  return { name, category, quantity, packed, assignee, shared };
+  // Older clients omit the kind; the stored kind (or legacy 'one') is kept.
+  const kind = body.kind === undefined ? undefined : packingKinds.has(body.kind as PackingKind) ? body.kind as PackingKind : null;
+  if (kind === null) return null;
+  return { name, category, quantity, packed, assignee, shared, kind };
 }
+
+/** Each member sees their own tick as `packed`; みんな各自 also lists who has packed. */
+function packingView(row: PackingRow, userId: string) {
+  const { marks, ...item } = row;
+  const packedBy = row.kind === 'each' ? (marks ?? '').split('\n').filter(Boolean).sort() : [];
+  return { ...item, packed: row.kind === 'each' ? packedBy.includes(userId) : Boolean(row.packed), shared: Boolean(row.shared), packedBy };
+}
+
+const packingSelect = `
+  SELECT p.id, p.name, p.category, p.quantity, p.packed, p.updated_by AS updatedBy, p.updated_at AS updatedAt,
+    COALESCE(d.assignee, '') AS assignee, COALESCE(d.shared, 0) AS shared, COALESCE(k.kind, 'one') AS kind,
+    (SELECT group_concat(m.user_id, char(10)) FROM packing_marks m
+      JOIN trip_members tm ON tm.trip_id = p.trip_id AND tm.user_id = m.user_id WHERE m.item_id = p.id) AS marks
+  FROM packing_items p LEFT JOIN packing_details d ON d.item_id = p.id LEFT JOIN packing_kinds k ON k.item_id = p.id`;
+// 自分だけ items stay on the server for their owner only, never for the rest of the trip.
+const packingVisible = `(COALESCE(k.kind, 'one') <> 'mine' OR k.owner_id = ?)`;
 
 async function listPacking(env: Env, user: User, tripId: string) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
-  const result = await env.DB.prepare(`
-    SELECT p.id, p.name, p.category, p.quantity, p.packed, p.updated_by AS updatedBy, p.updated_at AS updatedAt,
-      COALESCE(d.assignee, '') AS assignee, COALESCE(d.shared, 0) AS shared
-    FROM packing_items p LEFT JOIN packing_details d ON d.item_id = p.id
-    WHERE p.trip_id = ? ORDER BY p.packed, p.category, p.name, p.id
-  `).bind(tripId).all<PackingRow>();
-  return json({ items: result.results.map((item) => ({ ...item, packed: Boolean(item.packed), shared: Boolean(item.shared) })) });
+  const result = await env.DB.prepare(`${packingSelect}
+    WHERE p.trip_id = ? AND ${packingVisible} ORDER BY p.packed, p.category, p.name, p.id
+  `).bind(tripId, user.id).all<PackingRow>();
+  return json({ items: result.results.map((item) => packingView(item, user.id)) });
 }
 
 async function validatePackingAssignee(env: Env, tripId: string, assignee: string | undefined, itemId: string) {
@@ -716,30 +737,53 @@ async function writePackingItem(request: Request, env: Env, user: User, tripId: 
   const fields = isObject(body) ? packingFields(body) : null;
   if (!fields) return json({ error: '正しい持ち物情報を入力してください' }, 400);
   const id = itemId ?? idField(isObject(body) ? body.id : undefined) ?? crypto.randomUUID();
+  const existing = await env.DB.prepare(`SELECT p.packed, COALESCE(d.assignee, '') AS assignee, COALESCE(k.kind, 'one') AS kind, k.owner_id AS ownerId
+    FROM packing_items p LEFT JOIN packing_details d ON d.item_id = p.id LEFT JOIN packing_kinds k ON k.item_id = p.id WHERE p.id = ?`)
+    .bind(id).first<{ packed: number; assignee: string; kind: PackingKind; ownerId: string | null }>();
+  // Someone else's private item does not exist for this user.
+  if (existing?.kind === 'mine' && existing.ownerId !== user.id) return json({ error: '持ち物が見つからないか、IDが競合しました' }, itemId ? 404 : 409);
   const invalidAssignee = await validatePackingAssignee(env, tripId, fields.assignee, id);
   if (invalidAssignee) return invalidAssignee;
+  const kind = fields.kind ?? existing?.kind ?? 'one';
+  const carrier = fields.assignee ?? existing?.assignee ?? '';
+  // 1つでいい: only the member who took it ticks it. A stale or foreign tick is
+  // ignored rather than rejected so an offline queue is never blocked by it.
+  const packed = kind === 'one' && existing && carrier.startsWith('member:') && carrier !== `member:${user.id}`
+    ? Boolean(existing.packed)
+    : fields.packed;
   const statement = itemId
     ? env.DB.prepare(`UPDATE packing_items SET name = ?, category = ?, quantity = ?, packed = ?, updated_by = ?, updated_at = unixepoch() WHERE id = ? AND trip_id = ?`)
-      .bind(fields.name, fields.category, fields.quantity, fields.packed ? 1 : 0, user.id, id, tripId)
+      .bind(fields.name, fields.category, fields.quantity, packed ? 1 : 0, user.id, id, tripId)
     : env.DB.prepare(`INSERT INTO packing_items (id, trip_id, name, category, quantity, packed, updated_by)
       VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET name = excluded.name, category = excluded.category, quantity = excluded.quantity,
         packed = excluded.packed, updated_by = excluded.updated_by, updated_at = unixepoch()
       WHERE packing_items.trip_id = excluded.trip_id`)
-      .bind(id, tripId, fields.name, fields.category, fields.quantity, fields.packed ? 1 : 0, user.id);
+      .bind(id, tripId, fields.name, fields.category, fields.quantity, packed ? 1 : 0, user.id);
   // Omitted fields from older/offline clients must not clear the assignment.
   const assignee = fields.assignee ?? null;
   const shared = fields.shared === undefined ? null : fields.shared ? 1 : 0;
-  const [result] = await env.DB.batch([
+  const inTrip = 'EXISTS (SELECT 1 FROM packing_items WHERE id = ? AND trip_id = ?)';
+  const statements = [
     statement,
     env.DB.prepare(`INSERT INTO packing_details (item_id, assignee, shared)
-      SELECT ?, COALESCE(?, ''), COALESCE(?, 0) WHERE EXISTS (SELECT 1 FROM packing_items WHERE id = ? AND trip_id = ?)
+      SELECT ?, COALESCE(?, ''), COALESCE(?, 0) WHERE ${inTrip}
       ON CONFLICT(item_id) DO UPDATE SET assignee = COALESCE(?, packing_details.assignee), shared = COALESCE(?, packing_details.shared)`)
       .bind(id, assignee, shared, id, tripId, assignee, shared),
-  ]);
+  ];
+  if (fields.kind)
+    statements.push(env.DB.prepare(`INSERT INTO packing_kinds (item_id, kind, owner_id) SELECT ?, ?, ? WHERE ${inTrip}
+      ON CONFLICT(item_id) DO UPDATE SET kind = excluded.kind, owner_id = excluded.owner_id`)
+      .bind(id, fields.kind, fields.kind === 'mine' ? user.id : null, id, tripId));
+  // みんな各自: `packed` is the caller's own tick.
+  if (kind === 'each')
+    statements.push(packed
+      ? env.DB.prepare(`INSERT INTO packing_marks (item_id, user_id) SELECT ?, ? WHERE ${inTrip} ON CONFLICT DO NOTHING`).bind(id, user.id, id, tripId)
+      : env.DB.prepare('DELETE FROM packing_marks WHERE item_id = ? AND user_id = ? AND ' + inTrip).bind(id, user.id, id, tripId));
+  const [result] = await env.DB.batch(statements);
   if (!result.meta.changes) return json({ error: '持ち物が見つからないか、IDが競合しました' }, itemId ? 404 : 409);
-  const details = await env.DB.prepare('SELECT assignee, shared FROM packing_details WHERE item_id = ?').bind(id).first<{ assignee: string; shared: number }>();
-  return json({ item: { id, ...fields, assignee: details?.assignee ?? '', shared: Boolean(details?.shared), updatedBy: user.id } }, itemId ? 200 : 201);
+  const saved = await env.DB.prepare(`${packingSelect} WHERE p.id = ? AND p.trip_id = ?`).bind(id, tripId).first<PackingRow>();
+  return json({ item: { ...(saved ? packingView(saved, user.id) : { id, ...fields, kind }), updatedBy: user.id } }, itemId ? 200 : 201);
 }
 
 const createPackingItem = (request: Request, env: Env, user: User, tripId: string) => writePackingItem(request, env, user, tripId);
@@ -748,7 +792,9 @@ const updatePackingItem = (request: Request, env: Env, user: User, tripId: strin
 async function deletePackingItem(env: Env, user: User, tripId: string, itemId: string) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
-  const result = await env.DB.prepare('DELETE FROM packing_items WHERE id = ? AND trip_id = ?').bind(itemId, tripId).run();
+  const result = await env.DB.prepare(`DELETE FROM packing_items WHERE id = ? AND trip_id = ?
+    AND NOT EXISTS (SELECT 1 FROM packing_kinds k WHERE k.item_id = packing_items.id AND k.kind = 'mine' AND k.owner_id IS NOT ?)`)
+    .bind(itemId, tripId, user.id).run();
   return result.meta.changes ? new Response(null, { status: 204 }) : json({ error: '持ち物が見つかりません' }, 404);
 }
 

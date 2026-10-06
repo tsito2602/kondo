@@ -72,14 +72,23 @@ export type BookingDocument = {
   createdAt: number;
 };
 
+/** みんな各自 (everyone packs their own), 1つでいい (one member takes it), 自分だけ (private). */
+export type PackingKind = 'each' | 'one' | 'mine';
+
 export type PackingItem = {
   id: string;
   name: string;
   category: string;
   quantity: number;
+  /** For みんな各自 this is the viewer's own tick; otherwise the carrier's. */
   packed: boolean;
+  /** For 1つでいい, the member who said 「私が持つ」 (`member:<id>`). */
   assignee?: string;
   shared?: boolean;
+  /** Missing on legacy items, which read as 'one'. */
+  kind?: PackingKind;
+  /** みんな各自: member ids that have packed it. */
+  packedBy?: string[];
   updatedBy?: string;
   updatedAt?: number;
 };
@@ -186,6 +195,8 @@ export const normalizeTravelCache = (value: TravelCache): TravelCache => ({
         packed: Boolean(item.packed),
         assignee: item.assignee ?? '',
         shared: item.shared ?? false,
+        kind: item.kind ?? 'one',
+        packedBy: item.packedBy ?? [],
       })),
     ]),
   ),

@@ -22,7 +22,6 @@ import {
   referenceUrl,
   mapUrl,
 } from "@/data/places";
-import { assigneeName, memberAssignee } from "@/data/assignee";
 import { localDate, validDate } from "@/utils/dates";
 import type {
   Trip,
@@ -30,8 +29,6 @@ import type {
   BookingKind,
   ItineraryItem,
   Place,
-  TravelTask,
-  PackingItem,
   ItineraryCategory,
   TransportMode,
 } from "@/data/types";
@@ -901,179 +898,6 @@ export function PlaceEditor({
           />
         </Field>
 
-        <ErrorText message={error} />
-        <SaveButton busy={busy} />
-      </form>
-    </Modal>
-  );
-}
-export function PreparationEditor({
-  type,
-  item,
-  onClose,
-}: {
-  type: "task" | "packing";
-  item?: TravelTask | PackingItem;
-  onClose: () => void;
-}) {
-  const travel = useTravel();
-  const task = type === "task";
-  const [name, setName] = useState(
-    item ? ("title" in item ? item.title : item.name) : "",
-  );
-  const [assignee, setAssignee] = useState(item?.assignee ?? "");
-  const [dueOn, setDueOn] = useState(item && "dueOn" in item ? item.dueOn : "");
-  const [hasDueDate, setHasDueDate] = useState(Boolean(dueOn));
-  const [category, setCategory] = useState(
-    item && "category" in item ? item.category : "その他",
-  );
-  const [quantity, setQuantity] = useState(
-    item && "quantity" in item ? item.quantity : 1,
-  );
-  const [shared, setShared] = useState(
-    item && "shared" in item ? (item.shared ?? false) : false,
-  );
-  const { error, busy, submit } = useSubmit(
-    () => {
-      if (task) {
-        const input = {
-          title: name,
-          dueOn: hasDueDate ? dueOn : "",
-          assignee,
-          done: item && "done" in item ? item.done : false,
-        };
-        if (item) travel.updateTask(item.id, input);
-        else travel.createTask(input);
-      } else {
-        const input = {
-          name,
-          category,
-          quantity,
-          assignee,
-          shared: !assignee || shared,
-          packed: item && "packed" in item ? item.packed : false,
-        };
-        if (item) travel.updatePackingItem(item.id, input);
-        else travel.createPackingItem(input);
-      }
-    },
-    () =>
-      !name.trim()
-        ? "名前を入力してください"
-        : task && hasDueDate && !validDate(dueOn)
-          ? "正しい期限を入力してください"
-          : "",
-    onClose,
-  );
-  const { run: runDelete, busy: deleting } = useAction();
-  const deleteButton = item ? (
-    <button
-      type="button"
-      className="icon-button danger"
-      aria-label={`${task ? "やること" : "持ち物"}を削除`}
-      disabled={busy || deleting}
-      onClick={() => {
-        if (!confirm(`「${name}」を削除しますか？`)) return;
-        void runDelete(() => {
-          if (task) travel.deleteTask(item.id);
-          else travel.deletePackingItem(item.id);
-          dismissModal(onClose);
-        });
-      }}
-    >
-      <Trash2 size={20} />
-    </button>
-  ) : undefined;
-  return (
-    <Modal
-      title={`${task ? "やること" : "持ち物"}を${item ? "編集" : "追加"}`}
-      onClose={onClose}
-      full={task}
-      action={deleteButton}
-      dockActions={{ actions: deleteButton }}
-    >
-      <form className="form" onSubmit={submit}>
-        <Field label={task ? "やること" : "持ち物"}>
-          <Input
-            required
-            maxLength={task ? 160 : 120}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-        </Field>
-        <Field label="担当">
-          <select
-            value={assignee}
-            onChange={(event) => setAssignee(event.target.value)}
-          >
-            <option value="">{task ? "未指定" : "共用"}</option>
-            {travel.members.map((member) => (
-              <option key={member.id} value={memberAssignee(member.id)}>
-                {member.name || member.email}
-              </option>
-            ))}
-            {assignee &&
-              !travel.members.some(
-                (member) => memberAssignee(member.id) === assignee,
-              ) && (
-                <option value={assignee}>
-                  {assigneeName(assignee, travel.members)}
-                </option>
-              )}
-          </select>
-        </Field>
-        {task ? (
-          <>
-            <label className="check-line">
-              <input
-                type="checkbox"
-                checked={hasDueDate}
-                onChange={(event) => setHasDueDate(event.target.checked)}
-              />
-              期限を設定する
-            </label>
-            {hasDueDate && (
-              <DatePicker
-                label="期限"
-                required
-                value={dueOn}
-                onChange={(day) => setDueOn(day)}
-              />
-            )}
-          </>
-        ) : (
-          <>
-            <div className="form-grid">
-              <Field label="カテゴリ">
-                <Input
-                  maxLength={40}
-                  value={category}
-                  onChange={(event) => setCategory(event.target.value)}
-                />
-              </Field>
-              <Field label="個数">
-                <Input
-                  type="number"
-                  min={1}
-                  max={99}
-                  required
-                  value={quantity}
-                  onChange={(event) => setQuantity(Number(event.target.value))}
-                />
-              </Field>
-            </div>
-            {assignee && (
-              <label className="check-line">
-                <input
-                  type="checkbox"
-                  checked={shared}
-                  onChange={(event) => setShared(event.target.checked)}
-                />
-                みんなで使う共用品
-              </label>
-            )}
-          </>
-        )}
         <ErrorText message={error} />
         <SaveButton busy={busy} />
       </form>
