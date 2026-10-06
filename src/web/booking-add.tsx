@@ -1,5 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { Check, Paperclip } from "lucide-react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "@/auth/auth-provider";
 import {
   demoImportRows,
@@ -15,15 +21,18 @@ import {
 } from "@/data/booking-import";
 import { useTravel } from "@/data/travel-provider";
 import type { Booking } from "@/data/types";
-import { bookingIcons, monthDay, spring } from "./booking-card";
-import {
-  BookingEditor,
-  BookingForm,
-  bookingKinds,
-  type BookingInput,
-} from "./editors";
-import { dismissModal, reduceMotion } from "./motion";
-import { Modal, useToast } from "./ui";
+import { findAirportByCode, findAirports } from "@/data/airports";
+import { mapUrl } from "@/data/places";
+import type { BookingKind } from "@/data/types";
+import { monthDay, spring } from "./booking-card";
+import { useLayer } from "./booking-detail";
+import { bookingIcons, CheckIcon, ClipIcon } from "./booking-icons";
+import { BookingEditor, bookingKinds, type BookingInput } from "./editors";
+import { anim, RM } from "./cartoon";
+import { reduceMotion } from "./motion";
+import { DockGroup } from "./cartoon-dock";
+import { ThumbDock } from "./thumb-dock";
+import { useToast } from "./ui";
 
 type Travel = ReturnType<typeof useTravel>;
 type Row = {
@@ -172,7 +181,141 @@ async function exampleFiles() {
   ];
 }
 
-const PEOPLE = ["1名", "2名", "3名", "4名"];
+const PEOPLE = ["2名", "3名", "4名"];
+
+// 手で入力: pick a kind, then only that kind's fields (the mock's sheetHTML).
+type ManualForm = {
+  kind: BookingKind | null;
+  title: string;
+  from: string;
+  to: string;
+  start: string;
+  end: string;
+  place: string;
+  code: string;
+  files: File[];
+};
+type FieldKey = Exclude<keyof ManualForm, "kind" | "files">;
+type FieldSpec = [FieldKey, string, string];
+const EMPTY_FORM: ManualForm = {
+  kind: null,
+  title: "",
+  from: "",
+  to: "",
+  start: "",
+  end: "",
+  place: "",
+  code: "",
+  files: [],
+};
+const PLACE: FieldSpec = ["place", "場所", "住所か Google マップのリンク"];
+function manualFields(kind: BookingKind): (FieldSpec[] | [FieldSpec])[] {
+  if (kind === "flight")
+    return [
+      [["title", "便名", "EK 319"]],
+      [
+        ["from", "出発の空港", "成田（NRT）"],
+        ["to", "到着の空港", "ドバイ（DXB）"],
+      ],
+      [
+        ["start", "出発", "10/19 22:20"],
+        ["end", "到着", "10/20 05:30"],
+      ],
+    ];
+  if (kind === "train")
+    return [
+      [["title", "列車", "Railjet 542"]],
+      [
+        ["from", "乗る駅", "ウィーン中央駅"],
+        ["to", "降りる駅", "ザルツブルク中央駅"],
+      ],
+      [
+        ["start", "出発", "10/22 08:30"],
+        ["end", "到着", "10/22 10:52"],
+      ],
+    ];
+  if (kind === "hotel")
+    return [
+      [["title", "宿の名前", "ホテル・ザッハー"]],
+      [
+        ["start", "チェックイン", "10/20 15:00〜"],
+        ["end", "チェックアウト", "10/23 〜11:00"],
+      ],
+      [PLACE],
+    ];
+  return [
+    [
+      [
+        "title",
+        "名前",
+        kind === "restaurant" ? "お店の名前" : "施設・公演の名前",
+      ],
+    ],
+    [["start", "日時", "10/22 14:30"]],
+    [PLACE],
+  ];
+}
+/** "10/19 22:20", "2026/10/19 22:20", "10/20 15:00〜" or "10/23 〜11:00". */
+function parseMoment(text: string, year: number) {
+  const value = text.normalize("NFKC");
+  const date = value.match(/(?:(\d{4})[/-])?(\d{1,2})[/-](\d{1,2})/);
+  const time = value.match(/(\d{1,2}):(\d{2})/);
+  const pad = (n: string | number) => String(n).padStart(2, "0");
+  return {
+    day: date ? `${date[1] ?? year}-${pad(date[2])}-${pad(date[3])}` : "",
+    time: time ? `${pad(time[1])}:${time[2]}` : "",
+  };
+}
+/** "成田（NRT）", "nrt", "成田" or a station's name. */
+function parseStop(text: string, airport: boolean) {
+  const value = text.normalize("NFKC").trim();
+  if (!airport) return { name: value, code: "" };
+  const code = value.match(/\b([A-Za-z]{3})\b/)?.[1] ?? "";
+  const name = value.replace(/[(（]?\s*\b[A-Za-z]{3}\b\s*[)）]?/, "").trim();
+  const found =
+    (code && findAirportByCode(code)) ||
+    (name ? findAirports(name, 1)[0] : undefined);
+  return found
+    ? { name: found.name, code: found.code }
+    : { name: name || value, code: "" };
+}
+function manualInput(form: ManualForm, year: number): BookingInput | string {
+  const kind = form.kind!;
+  const start = parseMoment(form.start, year);
+  const end = parseMoment(form.end, year);
+  if (!start.day) return "日付を「10/19 22:20」のように入れてください";
+  const route = kind === "flight" || kind === "train";
+  const from = route
+    ? parseStop(form.from, kind === "flight")
+    : { name: "", code: "" };
+  const to = route
+    ? parseStop(form.to, kind === "flight")
+    : { name: "", code: "" };
+  const title =
+    form.title.trim() ||
+    (kind === "flight"
+      ? [from.code || from.name, to.code || to.name].filter(Boolean).join(" → ")
+      : "");
+  if (!title) return "名前を入れてください";
+  const place = form.place.trim();
+  return {
+    kind,
+    title: title.slice(0, 160),
+    detail: place && !mapUrl(place) ? place : "",
+    location: place && mapUrl(place) ? place : "",
+    origin: from.name,
+    originCode: kind === "flight" ? from.code : "",
+    destination: to.name,
+    destinationCode: kind === "flight" ? to.code : "",
+    day: start.day,
+    time: start.time,
+    endDay: end.day || start.day,
+    endTime: end.time,
+    durationMinutes: null,
+    confirmationCode: form.code.trim(),
+    note: "",
+  };
+}
 
 export function AddBookingSheet({
   onClose,
@@ -185,6 +328,41 @@ export function AddBookingSheet({
   const { isDemo, requestRaw } = useAuth();
   const notify = useToast();
   const [manual, setManual] = useState(false);
+  const [form, setForm] = useState<ManualForm>(EMPTY_FORM);
+  const [leaving, setLeaving] = useState<null | (() => void)>(null);
+  /** Slide the sheet away, then close (and run what follows a save). */
+  const leave = (after?: () => void) => {
+    run.current?.abort();
+    setLeaving(() => () => {
+      onClose();
+      after?.();
+    });
+  };
+  const layer = useLayer(() => leave());
+  useLayoutEffect(() => {
+    const sheet = body.current;
+    if (sheet?.animate && !RM())
+      sheet.animate(
+        [{ transform: "translateY(100%)" }, { transform: "none" }],
+        { duration: 420, easing: "cubic-bezier(.2,1.2,.4,1)" },
+      );
+  }, []);
+  useEffect(() => {
+    if (!leaving) return;
+    const sheet = body.current;
+    if (!sheet || RM()) return leaving();
+    let done = false;
+    const finish = () => {
+      if (!done) ((done = true), leaving());
+    };
+    void anim(
+      sheet,
+      [{ transform: "none" }, { transform: "translateY(100%)" }],
+      { duration: 260, easing: "cubic-bezier(.5,0,.8,.4)", fill: "forwards" },
+    ).then(finish);
+    const timer = setTimeout(finish, 500);
+    return () => clearTimeout(timer);
+  }, [leaving]);
   const [step, setStep] = useState<"pick" | "run" | "review">("pick");
   const [files, setFiles] = useState<File[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
@@ -346,11 +524,7 @@ export function AddBookingSheet({
         file: files[entry.row.source] ?? files[0],
       };
     });
-    const dialog = body.current?.closest("dialog") ?? null;
-    dismissModal(() => {
-      onClose();
-      onAdded(created.map((entry) => entry.bookingId));
-    }, dialog);
+    leave(() => onAdded(created.map((entry) => entry.bookingId)));
     void attachDocuments(
       travel,
       isDemo,
@@ -358,8 +532,38 @@ export function AddBookingSheet({
       created.filter((entry) => entry.file),
     );
   };
+  const field = ([key, label, placeholder]: FieldSpec) => (
+    <label className="bk-fld" key={key}>
+      <small>{label}</small>
+      <input
+        value={form[key]}
+        placeholder={placeholder}
+        onChange={(event) =>
+          setForm((current) => ({ ...current, [key]: event.target.value }))
+        }
+      />
+    </label>
+  );
+  const saveManual = () => {
+    if (!form.kind) return notify("先に種類を選んでください");
+    const year = Number(
+      (travel.selectedTrip?.startsOn || new Date().toISOString()).slice(0, 4),
+    );
+    const input = manualInput(form, year);
+    if (typeof input === "string") return notify(input);
+    const id = travel.createBooking(input);
+    const chosen = form.files;
+    leave(() => onAdded([id]));
+    void attachDocuments(
+      travel,
+      isDemo,
+      notify,
+      chosen.map((file) => ({ bookingId: id, file })),
+    );
+  };
   const swap = () => {
     run.current?.abort();
+    setForm(EMPTY_FORM);
     setManual((value) => !value);
     setStep("pick");
     setRows([]);
@@ -404,7 +608,7 @@ export function AddBookingSheet({
           setEditing(entry.key);
         }}
       >
-        <Icon size={20} strokeWidth={1.9} aria-hidden="true" />
+        <Icon size={20} />
         <span>
           <b>{importTitle(value)}</b>
           <small>
@@ -472,7 +676,7 @@ export function AddBookingSheet({
         )}
         {file && (
           <span className="bk-src">
-            <Paperclip size={13} aria-hidden="true" />
+            <ClipIcon size={13} />
             {file.name}
             {entry.duplicate
               ? " · 同じ予約がもうあるので入れません"
@@ -483,75 +687,107 @@ export function AddBookingSheet({
     );
   };
 
-  return (
-    <Modal
-      title={title}
-      onClose={() => {
-        run.current?.abort();
-        onClose();
-      }}
-      full
-      dockActions={
-        manual
-          ? undefined
-          : {
-              primary:
-                step === "run" ? (
-                  <button type="button" onClick={stop}>
-                    取り込みを中止
-                  </button>
-                ) : step === "review" ? (
-                  <button
-                    type="button"
-                    className="bk-dock-ink"
-                    disabled={!adding}
-                    onClick={save}
-                  >
-                    <Check size={18} aria-hidden="true" />
-                    {adding}件を入れる
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="bk-dock-ink"
-                    aria-disabled={!files.length}
-                    onClick={() => void read()}
-                  >
-                    読み取る
-                  </button>
-                ),
-            }
-      }
+  const cancel = (
+    <DockGroup slot="l" className="context-back">
+      <button
+        type="button"
+        className="context-back-label"
+        onClick={() => leave()}
+      >
+        やめる
+      </button>
+    </DockGroup>
+  );
+  /** The lone ink action on the right island; dimmed like the mock's .4. */
+  const ink = (label: ReactNode, onClick: () => void, disabled = false) => (
+    <DockGroup slot="r" tone={disabled ? "ink-dim" : "ink"}>
+      <button
+        type="button"
+        aria-disabled={disabled || undefined}
+        onClick={onClick}
+      >
+        {label}
+      </button>
+    </DockGroup>
+  );
+  return createPortal(
+    <dialog
+      ref={layer}
+      className="bk-sheetl"
+      aria-label={title}
+      inert={Boolean(leaving)}
     >
+      <div className="bk-scrim" onClick={() => leave()} />
       <div className="bk-sheet" ref={body}>
+        <h3>{title}</h3>
         {manual ? (
           <>
             <button type="button" className="bk-swap" onClick={swap}>
-              <Paperclip size={16} aria-hidden="true" />
+              <ClipIcon size={16} />
               スクショ・PDFから取り込むに戻る
             </button>
-            <BookingForm
-              pickKind
-              onClose={onClose}
-              onSaved={(id, chosen) => {
-                onAdded([id]);
-                void attachDocuments(
-                  travel,
-                  isDemo,
-                  notify,
-                  chosen.map((file) => ({ bookingId: id, file })),
+            <div className="bk-kinds" role="group" aria-label="種類">
+              {bookingKinds.map((entry) => {
+                const Icon = bookingIcons[entry.value];
+                return (
+                  <button
+                    key={entry.value}
+                    type="button"
+                    aria-pressed={form.kind === entry.value}
+                    onClick={(event) => {
+                      const button = event.currentTarget;
+                      setForm({ ...EMPTY_FORM, kind: entry.value });
+                      requestAnimationFrame(() =>
+                        spring(
+                          button,
+                          [{ transform: "scale(.88)" }, { transform: "none" }],
+                          "boing",
+                        ),
+                      );
+                    }}
+                  >
+                    <Icon size={26} />
+                    {entry.label}
+                  </button>
                 );
-              }}
-            />
+              })}
+            </div>
+            {form.kind && (
+              <>
+                {manualFields(form.kind).map((row, index) =>
+                  row.length === 2 ? (
+                    <div className="bk-two" key={index}>
+                      {row.map(field)}
+                    </div>
+                  ) : (
+                    field(row[0])
+                  ),
+                )}
+                {field(["code", "予約番号", "あれば"])}
+                <label className="bk-attach">
+                  <ClipIcon size={18} />
+                  {form.files.length
+                    ? form.files.map((file) => file.name).join("、")
+                    : "書類（PDF・画像）を付ける"}
+                  <input
+                    hidden
+                    type="file"
+                    multiple
+                    accept="application/pdf,image/jpeg,image/png,image/gif,image/webp,.heic,.heif"
+                    onChange={(event) => {
+                      const chosen = Array.from(event.target.files ?? []);
+                      setForm((current) => ({ ...current, files: chosen }));
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
+              </>
+            )}
           </>
         ) : step === "pick" ? (
           <>
             <label className={`bk-drop${files.length ? " sm" : ""}`}>
-              <Paperclip
-                size={files.length ? 18 : 30}
-                strokeWidth={2}
-                aria-hidden="true"
-              />
+              <ClipIcon size={files.length ? 18 : 30} />
               <b>
                 {files.length ? "ファイルを追加" : "スクショ・PDF・写真を選ぶ"}
               </b>
@@ -711,6 +947,42 @@ export function AddBookingSheet({
           }
         />
       )}
-    </Modal>
+      <ThumbDock
+        mode="context"
+        target={() => layer.current}
+        disabled={Boolean(leaving)}
+      >
+        {step === "run" && !manual ? (
+          <DockGroup slot="r">
+            <button type="button" onClick={stop}>
+              取り込みを中止
+            </button>
+          </DockGroup>
+        ) : (
+          <>
+            {cancel}
+            {manual
+              ? ink(
+                  <>
+                    <CheckIcon size={22} />
+                    追加する
+                  </>,
+                  saveManual,
+                )
+              : step === "review"
+                ? ink(
+                    <>
+                      <CheckIcon size={22} />
+                      {adding}件を入れる
+                    </>,
+                    save,
+                    !adding,
+                  )
+                : ink("読み取る", () => void read(), !files.length)}
+          </>
+        )}
+      </ThumbDock>
+    </dialog>,
+    document.body,
   );
 }

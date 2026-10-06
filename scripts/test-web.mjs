@@ -149,8 +149,8 @@ const click = async (node) => {
   await tick();
 };
 const field = (label) =>
-  [...document.querySelectorAll("dialog .field")]
-    .find((node) => node.querySelector("span")?.textContent === label)
+  [...document.querySelectorAll("dialog .field, dialog .bk-fld")]
+    .find((node) => node.querySelector("span, small")?.textContent === label)
     ?.querySelector("input,select,textarea,.date-trigger");
 const fill = async (label, value) => {
   const input = field(label);
@@ -757,48 +757,57 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(byText("nav a", "予約"));
     await click(document.querySelector('[aria-label="予約を追加"]'));
     assert.equal(
-      document.querySelector("dialog h2").textContent,
+      document.querySelector("dialog.bk-sheetl h3").textContent,
       "予約を取り込む",
     );
     await click(document.querySelector("dialog .bk-swap"));
     assert.equal(
-      field("宿泊施設名"),
+      field("宿の名前"),
       undefined,
       "the manual form shows no fields before a kind is chosen",
     );
     await click(byText("dialog .bk-kinds button", "ホテル"));
-    await fill("宿泊施設名", "テストホテル");
+    await fill("宿の名前", "テストホテル");
     const hotelUrl =
       "https://links.h6.hilton.com/f/a/" +
       "long-link-".repeat(30) +
       "?reservation=private";
-    await fill("予約内容", hotelUrl);
-    await fill("住所・Google MapsのURL", hotelUrl);
-    await fill("宿泊期間", { start: trip.startsOn, end: "2026-11-25" });
-    await submit();
+    const md = (day) => `${Number(day.slice(5, 7))}/${Number(day.slice(8))}`;
+    await fill("チェックイン", `${md(trip.startsOn)} 15:00〜`);
+    await fill("チェックアウト", "11/25 〜11:00");
+    await fill("場所", hotelUrl);
+    // The mock's dock: 「やめる」 on the left island, 「追加する」 in ink.
+    assert.ok(byText(".thumb-dock-host .context-back button", "やめる"));
+    await click(byText(".thumb-dock-host .cdock-group button", "追加する"));
+    await tick(600);
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings").get().n, 1);
+    const saved = db.prepare("SELECT * FROM bookings").get();
+    assert.equal(saved.title, "テストホテル");
     await click(document.querySelector(".bk-card"));
-    const hotelLink = document.querySelector("dialog .reference-link");
-    assert.equal(hotelLink.href, hotelUrl);
-    assert.match(hotelLink.textContent, /サイトを開く/);
-    assert.equal(
-      hotelLink.querySelector("small").textContent,
-      "links.h6.hilton.com",
+    const detail = document.querySelector("dialog.bk-det");
+    const hotelLink = [...detail.querySelectorAll(".bk-kv a")].find(
+      (node) => node.textContent === "地図",
     );
+    assert.equal(hotelLink.href, hotelUrl);
     assert.doesNotMatch(
-      document.querySelector("dialog").textContent,
+      detail.textContent,
       /long-link-|reservation=private|Google Mapsで開く/,
     );
     assert.equal(document.querySelector(".thumb-dock-host .cdock-tabs"), null);
-    // Edit and delete, with the primary as an ink pill on the same island.
+    // The mock's detail dock: the back circle and 「見せる」 in ink.
+    assert.ok(byText(".thumb-dock-host .cdock-group button", "見せる"));
+    await click(byText("dialog.bk-det .bk-acts button", "編集する"));
+    assert.equal(document.querySelectorAll("dialog[open]").length, 2);
+    await fill("宿泊施設名", "更新したホテル");
+    await submit();
     assert.equal(
-      document.querySelectorAll(".context-actions button").length,
-      3,
+      db.prepare("SELECT title FROM bookings").get().title,
+      "更新したホテル",
     );
-    assert.ok(
-      document.querySelector('.context-actions [aria-label="予約を削除"]'),
+    assert.match(
+      document.querySelector("dialog.bk-det .bk-hd").textContent,
+      /更新したホテル/,
     );
-    await editAndReturn("宿泊施設名", "更新したホテル");
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
     await click(byText("nav a", "場所"));
@@ -1482,41 +1491,23 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(document.querySelector('[aria-label="予約を追加"]'));
     await click(document.querySelector("dialog .bk-swap"));
     await click(byText("dialog .bk-kinds button", "航空券"));
-    assert.equal(field("予約名"), undefined);
-    assert.equal(field("出発空港（IATA）"), undefined);
-    await fill("出発地", "成田");
-    await click(document.querySelector('[role="option"]'));
-    assert.equal(field("出発地").value, "成田国際空港");
-    assert.equal(document.querySelector(".airport-code").textContent, "NRT");
-    await fill("出発地", "羽田");
-    assert.equal(
-      document.querySelector(".airport-code"),
-      null,
-      "editing clears the previously selected code",
-    );
-    await fill("出発地", "nrt");
-    await act(async () =>
-      field("出発地").dispatchEvent(
-        new dom.window.KeyboardEvent("keydown", {
-          key: "ArrowDown",
-          bubbles: true,
-        }),
+    // Only the flight's fields, as the mock draws them.
+    assert.deepEqual(
+      [...document.querySelectorAll("dialog .bk-fld small")].map(
+        (node) => node.textContent,
       ),
+      ["便名", "出発の空港", "到着の空港", "出発", "到着", "予約番号"],
     );
-    await act(async () =>
-      field("出発地").dispatchEvent(
-        new dom.window.KeyboardEvent("keydown", {
-          key: "Enter",
-          bubbles: true,
-          cancelable: true,
-        }),
-      ),
+    assert.equal(field("便名").placeholder, "EK 319");
+    await fill("出発の空港", "成田（NRT）");
+    await fill("到着の空港", "kix");
+    await fill(
+      "出発",
+      `${Number(trip.startsOn.slice(5, 7))}/${Number(trip.startsOn.slice(8))} 09:30`,
     );
-    await fill("到着地", "kix");
-    await click(document.querySelector('[role="option"]'));
-    await fill("航空会社・補足（任意）", "Jetstar Japan");
     await fill("予約番号", "JM6EQC");
-    await submit();
+    await click(byText(".thumb-dock-host .cdock-group button", "追加する"));
+    await tick(600);
     const savedFlight = await waitFor(
       () =>
         db
@@ -1540,7 +1531,7 @@ test("legacy account cache and pending changes survive React migration; real for
         entry.textContent.includes("NRT → KIX"),
       ),
     );
-    await click(document.querySelector('.context-actions [aria-label="編集"]'));
+    await click(byText("dialog.bk-det .bk-acts button", "編集する"));
     assert.equal(
       field("便名（任意）").value,
       "",
@@ -2263,9 +2254,14 @@ test("booking cards stack journeys, lead stays with dates and stamp used booking
     "3泊 · いま2泊目 · 旧市街",
   );
   assert.equal(
-    stay.querySelector(".bk-hd span"),
+    stay.querySelector(".bk-hd span:not(.bk-chip)"),
     null,
     "hotels never show a header date",
+  );
+  assert.equal(
+    stay.querySelector(".bk-hd .bk-chip")?.textContent,
+    "滞在中",
+    "a stay in progress wears the mock's 滞在中 chip",
   );
   assert.equal(
     render(hotel, "2026-10-01T09:00").querySelector(".bk-du").textContent,

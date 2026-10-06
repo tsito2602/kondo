@@ -86,6 +86,10 @@
 .cdock-isl[data-tone="ink"] {
   background: var(--p-ink);
 }
+/* A disabled lone primary: the mock's ink pill at opacity .4. */
+.cdock-isl[data-tone="ink-dim"] {
+  background: color-mix(in srgb, var(--p-ink) 40%, var(--p-paper));
+}
 .cdock-seam {
   position: absolute;
   bottom: 30px;
@@ -194,6 +198,10 @@
 .cdock-group[data-tone="ink"],
 .cdock-group[data-tone="ink"] > :is(button, a) {
   color: var(--p-paper);
+}
+.cdock-group[data-tone="ink-dim"] > :is(button, a) {
+  color: var(--p-paper);
+  opacity: 1;
 }
 .cdock-group[data-tone="ink"] svg {
   width: 20px;

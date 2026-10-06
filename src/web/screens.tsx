@@ -8,18 +8,20 @@ import {
 } from "./booking-card";
 import { AddBookingSheet } from "./booking-add";
 import { reduceMotion } from "./motion";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
 import {
-  BookOpen,
-  Plus,
-  Plane,
-  Hotel,
-  TrainFront,
-  Car,
-  Utensils,
-  Ticket,
-} from "lucide-react";
+  Fragment,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { PlusIcon } from "./booking-icons";
+import { PageTop } from "./page-top";
+import { bookingSink } from "./booking-motion";
+import { useJellyScroll } from "./jelly-scroll";
+import { useSearchParams } from "react-router";
+import { BookOpen } from "lucide-react";
 import { useTravel } from "@/data/travel-provider";
 import { durationMinutes } from "@/data/itinerary";
 import {
@@ -32,15 +34,6 @@ import { BookingDetail } from "./details";
 
 export { ItineraryScreen } from "./itinerary-screen";
 export { timelineEntries, type Entry } from "@/data/plan-timeline";
-const bookingIcons = {
-  flight: Plane,
-  hotel: Hotel,
-  train: TrainFront,
-  car: Car,
-  restaurant: Utensils,
-  ticket: Ticket,
-  other: BookOpen,
-};
 export function BookingsScreen() {
   const { bookings, canEdit, selectedTrip } = useTravel();
   const [id, setId] = useState<string | null>(null);
@@ -62,6 +55,14 @@ export function BookingsScreen() {
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState<string[]>([]);
   const now = useClockNow();
+  const page = useRef<HTMLDivElement>(null);
+  useJellyScroll(page, ".bk-card, .bk-dayh, .bk-conn");
+  // The list sinks in, card by card (the mock's first render: 40 ms apart).
+  useLayoutEffect(() => {
+    page.current
+      ?.querySelectorAll<HTMLElement>(".bk-card, .bk-dayh")
+      .forEach((element, index) => bookingSink(element, -20, index * 40));
+  }, []);
   // A stamp spins in only when a booking turns 済 while this screen is open.
   const wasUsed = useRef<Map<string, boolean> | null>(null);
   const previous = wasUsed.current;
@@ -70,6 +71,11 @@ export function BookingsScreen() {
       bookings.map((booking) => [booking.id, isUsed(booking, now)]),
     );
   });
+  const turning = bookings
+    .filter(
+      (booking) => previous?.get(booking.id) === false && isUsed(booking, now),
+    )
+    .map((booking) => booking.id);
   const connections = useMemo(
     () => findFlightConnections(bookings),
     [bookings],
@@ -115,28 +121,28 @@ export function BookingsScreen() {
     return index >= 1 ? `${index}日目` : "";
   };
   return (
-    <div className="page bookings-page">
-      <div className="bk-top">
-        <div>
-          <small>
-            {tripDay(now.slice(0, 10)) &&
-            now.slice(0, 10) <= (selectedTrip?.endsOn ?? "")
-              ? `旅の${tripDay(now.slice(0, 10))} · ${monthDay(now.slice(0, 10))} ${now.slice(11)}`
-              : `${bookings.length}件`}
-          </small>
-          <h2>予約</h2>
-        </div>
-        {canEdit && (
-          <button
-            type="button"
-            className="bk-plus"
-            aria-label="予約を追加"
-            onClick={() => setAdding(true)}
-          >
-            <Plus size={20} aria-hidden="true" />
-          </button>
-        )}
-      </div>
+    <div className="page page-scroll bookings-page" ref={page}>
+      <PageTop
+        sub={
+          tripDay(now.slice(0, 10)) &&
+          now.slice(0, 10) <= (selectedTrip?.endsOn ?? "")
+            ? `旅の${tripDay(now.slice(0, 10))} · ${monthDay(now.slice(0, 10))} ${now.slice(11)}`
+            : `${selectedTrip?.name ? `${selectedTrip.name} · ` : ""}${bookings.length}件`
+        }
+        title="予約"
+        actions={
+          canEdit && (
+            <button
+              type="button"
+              className="page-plus"
+              aria-label="予約を追加"
+              onClick={() => setAdding(true)}
+            >
+              <PlusIcon size={20} />
+            </button>
+          )
+        }
+      />
       {!bookings.length ? (
         <Empty>
           <BookOpen />
@@ -160,10 +166,8 @@ export function BookingsScreen() {
                     <BookingCard
                       booking={booking}
                       now={now}
-                      spinStamp={
-                        previous?.get(booking.id) === false &&
-                        isUsed(booking, now)
-                      }
+                      spinStamp={turning.includes(booking.id)}
+                      spinDelay={300 + turning.indexOf(booking.id) * 180}
                       onOpen={() => setId(booking.id)}
                     />
                     {connection && (

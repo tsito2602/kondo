@@ -166,3 +166,19 @@ export function ItemSchedule({ item }: { item: ItineraryItem }) {
     </div>
   );
 }
+
+/** A flight's departure and arrival in Japan time, when either end is abroad. */
+export function japanTimes(booking: Booking) {
+  if (booking.kind !== "flight") return null;
+  const start = flightClock(booking.day, booking.time, booking.originCode);
+  const end = flightClock(
+    booking.endDay || booking.day,
+    booking.endTime,
+    booking.destinationCode,
+  );
+  if (
+    ![start, end].some((clock) => clock?.japanTime && clock.offset !== "UTC+9")
+  )
+    return null;
+  return [start?.japanTime ?? "", end?.japanTime ?? ""] as const;
+}
