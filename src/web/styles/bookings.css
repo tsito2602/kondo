@@ -1,8 +1,8 @@
 /* 予約: one plain card per booking, grouped by trip day (kondo-bookings mock). */
 :root {
   --bk-card: var(--content-card);
-  --bk-pale: color-mix(in srgb, var(--ink) 20%, var(--bk-card));
-  --bk-mid: color-mix(in srgb, var(--ink) 42%, var(--bk-card));
+  --bk-pale: var(--p-pale);
+  --bk-mid: var(--p-mid);
   --bk-review: #d97706;
   --bk-review-ink: #b45309;
 }
@@ -25,7 +25,7 @@
 }
 .bk-top h2 {
   margin: 0;
-  font-size: 30px;
+  font-size: 28px;
   font-weight: 900;
   line-height: 1.25;
 }
@@ -55,9 +55,6 @@
   justify-content: space-between;
   align-items: baseline;
   margin: 18px 4px 8px;
-}
-.bk-day:first-child .bk-dayh {
-  margin-top: 4px;
 }
 .bk-dayh b {
   font-size: 15px;
@@ -140,11 +137,10 @@ button.bk-card {
 }
 .bk-t b {
   display: block;
+  font-family: var(--f-num);
   font-size: 18px;
   font-weight: 800;
   line-height: 1.2;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
 }
 .bk-t small {
   display: block;
@@ -202,14 +198,15 @@ button.bk-card {
 }
 .bk-cn path {
   fill: none;
-  stroke: var(--bk-mid);
+  stroke: var(--p-mid);
   stroke-width: 2.5;
   stroke-dasharray: 0 6;
   stroke-linecap: round;
 }
 .bk-hv .bk-cn path {
-  stroke: var(--line);
+  stroke: var(--p-line, var(--p-mid));
   stroke-dasharray: none;
+  opacity: 0.45;
 }
 .bk-du {
   grid-column: 3;
@@ -246,7 +243,7 @@ button.bk-card {
 }
 .bk-code b {
   margin-left: 6px;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--f-mono);
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.06em;
@@ -266,7 +263,7 @@ button.bk-card {
   width: 2.5px;
   height: 22px;
   background: repeating-linear-gradient(
-    var(--bk-pale) 0 3px,
+    var(--p-pale) 0 3px,
     transparent 3px 7px
   );
 }
@@ -296,19 +293,21 @@ button.bk-card {
   fill: none;
   stroke: currentColor;
   stroke-width: 1;
+  stroke-linecap: round;
 }
 .bk-stamp text {
   fill: currentColor;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif;
+  font-family: var(--f-body);
   font-weight: 900;
+  font-size: 24px;
 }
-.bk-rt {
+.bk-stamp .bk-rt {
+  font-family: var(--f-num);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.18em;
 }
-.bk-c {
+.bk-stamp .bk-c {
   font-size: 22px;
 }
 
@@ -773,4 +772,12 @@ button.bk-card {
 }
 .context-primary > button[aria-disabled="true"] {
   opacity: 0.45;
+}
+
+/* the mock's scroll area: 8px 18px, the dock clear below */
+@media (max-width: 759px) {
+  .page.bookings-page {
+    padding-top: 8px;
+    padding-inline: 18px;
+  }
 }

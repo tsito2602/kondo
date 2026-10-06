@@ -1,30 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import {
-  BookOpen,
-  Car,
-  Hotel,
-  Plane,
-  TrainFront,
-  Ticket,
-  Utensils,
-  type LucideIcon,
-} from "lucide-react";
 import { findAirportByCode } from "@/data/airports";
 import { bookingDuration } from "@/data/booking-duration";
 import { durationLabel } from "@/data/itinerary";
 import type { Booking, BookingKind } from "@/data/types";
+import { bookingIcons } from "./booking-icons";
 import { localDate } from "@/utils/dates";
 import { reduceMotion } from "./motion";
 
-export const bookingIcons: Record<BookingKind, LucideIcon> = {
-  flight: Plane,
-  hotel: Hotel,
-  train: TrainFront,
-  car: Car,
-  restaurant: Utensils,
-  ticket: Ticket,
-  other: BookOpen,
-};
+export { bookingIcons };
 
 const WEEKDAYS = "日月火水木金土";
 export const monthDay = (day: string) =>
@@ -268,7 +251,11 @@ export function BookingBody({
     <div className="bk-uni">
       <div className="bk-t">
         <b>{booking.time || "--:--"}</b>
-        <small>{singleLabel[kind]}</small>
+        <small>
+          {kind === "ticket" && /劇場|ホール|シアター/.test(where)
+            ? "開演"
+            : singleLabel[kind]}
+        </small>
       </div>
       {where && (
         <div className="bk-w">
