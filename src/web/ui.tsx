@@ -316,7 +316,7 @@ export function Modal({
   title: string;
   /** The ＋ button's floating panel (しおり's 予定を追加 is the reference): all
       corners rounded, inset from the edges, right above the dock, the page
-      blurred and receding behind it; it rises from the bottom like a sheet. */
+      blurred and receding behind it; it grows out of the tapped card or ＋. */
   addPanel?: boolean;
   /** The floating panel always takes the full height, however short its
       content (予約の詳細, Tsubasa 2026-10-06: 「全画面で統一」). */
@@ -353,7 +353,10 @@ export function Modal({
   } | null>(null);
   const origin = useRef<HTMLElement | null>(null);
   const animation = useRef<Animation | null>(null);
-  const cartoon = useRef<{ card: HTMLElement | null } | null>(null);
+  const cartoon = useRef<{
+    card: HTMLElement | null;
+    radius: number;
+  } | null>(null);
   const depth = useRef<ReturnType<typeof menuDepth> | null>(null);
   const backdropAnimation = useRef<Animation | undefined>(undefined);
   const closeCallback = useRef(onClose);
@@ -378,9 +381,15 @@ export function Modal({
       addPanel && panel && !tall ? watchPanelFit(dialog, panel) : undefined;
     const phone =
       panel && !reduceMotion() && matchMedia("(max-width: 759px)").matches;
+    // Every floating panel grows out of what was tapped: the card, or the ＋
+    // circle itself (Tsubasa 2026-10-06: 「もともとのカードから広がってパネル
+    // になるアニメーションに統一して」).
+    const plus = origin.current?.closest<HTMLElement>(".floating-add") ?? null;
+    const source = plain ? null : (cardOrigin(origin.current) ?? plus);
     cartoon.current = phone
       ? {
-          card: plain || addPanel ? null : cardOrigin(origin.current),
+          card: source,
+          radius: source && source === plus ? source.offsetWidth / 2 : 20,
         }
       : null;
     if (phone && transition)
@@ -388,6 +397,7 @@ export function Modal({
     else if (phone && cartoon.current?.card)
       void openFromCard(cartoon.current.card, panel, {
         parent: dialog,
+        radius: cartoon.current.radius,
         parts: [
           ...panel.querySelectorAll<HTMLElement>(
             ":scope > .modal-header, :scope > .modal-body > *",
@@ -477,7 +487,10 @@ export function Modal({
         transition
           ? transition.exit(panel, card)
           : card
-            ? closeToCard(card, panel, { parent: dialog })
+            ? closeToCard(card, panel, {
+                parent: dialog,
+                radius: cartoon.current.radius,
+              })
             : sheetOut(panel)
       ).then(finish);
       const timer = setTimeout(finish, 900);
