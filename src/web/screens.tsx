@@ -122,6 +122,7 @@ export function BookingsScreen() {
   return (
     <div className="page page-scroll bookings-page" ref={page}>
       <PageTop
+        tab="bookings"
         sub={
           tripDay(now.slice(0, 10)) &&
           now.slice(0, 10) <= (selectedTrip?.endsOn ?? "")

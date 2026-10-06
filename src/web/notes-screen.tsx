@@ -229,6 +229,7 @@ export function NotesScreen() {
   return (
     <div className="page notes-page" ref={page}>
       <PageTop
+        tab="notes"
         sub={`${all.length}件`}
         title="メモ"
         actions={

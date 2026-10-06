@@ -141,7 +141,7 @@ function PrepHeader({
   return (
     <>
       <PageTop
-        size={30}
+        tab={title === "やること" ? "tasks" : "packing"}
         sub={left > 0 ? `あと${left}日` : undefined}
         title={title}
       />

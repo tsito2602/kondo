@@ -1,24 +1,31 @@
 import type { ReactNode } from "react";
+import { tripTabs } from "./trip-dock";
 
-/** A screen's opening line, as the trip mocks draw it (.top): a small mute
-    line over the page title, with round actions (PagePlus) at the right. */
+/** A screen's heading as uchiwake draws it (.page-heading in its
+    kondo-style.css): the page's own dock icon at 24 px, 10 px from a 21 px
+    title, the small mute line under it, round actions (PagePlus) at the right
+    (Tsubasa 2026-10-06: 「各ページの見出しの大きさuchiwakeといっしょにして。
+    見出しの左に各ページのアイコン」). */
 export function PageTop({
+  tab,
   sub,
   title,
   actions,
-  size = 28,
 }: {
+  /** The trip tab whose icon leads the title. */
+  tab: (typeof tripTabs)[number]["path"];
   sub?: ReactNode;
   title: ReactNode;
   actions?: ReactNode;
-  /** 28 px (予約, メモ) or 30 px (準備). */
-  size?: 28 | 30;
 }) {
   return (
-    <div className="page-top" data-size={size}>
+    <div className="page-top">
       <div>
+        <h2 className="page-heading">
+          {tripTabs.find((entry) => entry.path === tab)?.icon}
+          {title}
+        </h2>
         {sub && <small>{sub}</small>}
-        <h2>{title}</h2>
       </div>
       {actions && <div className="page-top-acts">{actions}</div>}
     </div>

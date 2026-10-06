@@ -12,6 +12,7 @@ import {
   type Ref,
 } from "react";
 import { MapPin } from "lucide-react";
+import { PageTop } from "./page-top";
 import { useTravel } from "@/data/travel-provider";
 import {
   placeNumbers,
@@ -172,6 +173,7 @@ export function PlacesScreen() {
   if (!model.count && !model.hotels.length)
     return (
       <div className="page places-page">
+        <PageTop tab="places" title="行きたい場所" />
         {travel.canEdit && (
           <AddButton label="場所を追加" onClick={() => setAdding(true)} />
         )}
@@ -186,6 +188,7 @@ export function PlacesScreen() {
 
   return (
     <div className="page places-page" ref={pageRef}>
+      <PageTop tab="places" title="行きたい場所" />
       {travel.canEdit && (
         <AddButton label="場所を追加" onClick={() => setAdding(true)} />
       )}
