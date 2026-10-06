@@ -1,7 +1,7 @@
 // The places map's ground: real roads, buildings, water and parks from
 // OpenStreetMap (OpenFreeMap's free vector tiles), drawn by MapLibre in the
-// app's own warm greys. Only big streets carry a small name (the pins carry
-// the places' names).
+// app's own warm greys. Big streets, landmarks, stations, parks and rivers
+// carry small names to find your way by; the pins stay the loudest names.
 // The pins, edge arrows and gestures stay kondo's own; this layer only
 // follows their camera. MapLibre is loaded only when a map is on screen.
 import type { Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
@@ -20,6 +20,8 @@ type Palette = {
   casing: string;
   rail: string;
   label: string;
+  landmark: string;
+  waterLabel: string;
 };
 
 const LIGHT: Palette = {
@@ -33,6 +35,8 @@ const LIGHT: Palette = {
   casing: "#d3cdc2",
   rail: "#bdb6aa",
   label: "#8a8379",
+  landmark: "#5f5951",
+  waterLabel: "#7f9296",
 };
 const DARK: Palette = {
   ground: "#1b1a18",
@@ -45,12 +49,33 @@ const DARK: Palette = {
   casing: "#141312",
   rail: "#45423c",
   label: "#8f8a82",
+  landmark: "#b3ada4",
+  waterLabel: "#6d8085",
 };
 
 const width = (stops: [number, number][]) =>
   ["interpolate", ["exponential", 1.6], ["zoom"], ...stops.flat()] as never;
 const MAJOR = ["motorway", "trunk", "primary", "secondary", "tertiary"];
 const MINOR = ["minor", "service", "track"];
+// The kinds of places people steer by.
+const LANDMARKS = [
+  "attraction",
+  "museum",
+  "theatre",
+  "music",
+  "place_of_worship",
+  "castle",
+  "monument",
+  "town_hall",
+  "college",
+  "stadium",
+  "zoo",
+  "park",
+  "railway",
+];
+const sized = (low: number, high: number) =>
+  ["interpolate", ["linear"], ["zoom"], 14, low, 18, high] as never;
+const NAME = ["coalesce", ["get", "name:latin"], ["get", "name"]] as never;
 
 export function basemapStyle(dark: boolean): StyleSpecification {
   const c = dark ? DARK : LIGHT;
@@ -221,20 +246,16 @@ export function basemapStyle(dark: boolean): StyleSpecification {
         source: "omt",
         "source-layer": "transportation_name",
         minzoom: 14,
-        filter: ["in", ["get", "class"], ["literal", MAJOR]],
+        filter: [
+          "any",
+          ["in", ["get", "class"], ["literal", MAJOR]],
+          ["all", [">=", ["zoom"], 16], ["==", ["get", "class"], "minor"]],
+        ],
         layout: {
           "symbol-placement": "line",
-          "text-field": ["coalesce", ["get", "name:latin"], ["get", "name"]],
+          "text-field": NAME,
           "text-font": ["Noto Sans Regular"],
-          "text-size": [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            14,
-            9.5,
-            18,
-            12,
-          ] as never,
+          "text-size": sized(9.5, 12),
           "text-letter-spacing": 0.02,
           "symbol-spacing": 280,
           "text-max-angle": 30,
@@ -244,6 +265,63 @@ export function basemapStyle(dark: boolean): StyleSpecification {
           "text-color": c.label,
           "text-halo-color": c.major,
           "text-halo-width": 1.4,
+        },
+      },
+      ...(["line", "point"] as const).map((placement) => ({
+        id: `water-name-${placement}`,
+        type: "symbol" as const,
+        source: "omt",
+        "source-layer": "water_name",
+        minzoom: 13,
+        filter: [
+          placement === "line" ? "==" : "!=",
+          ["geometry-type"],
+          "LineString",
+        ] as never,
+        layout: {
+          "symbol-placement": placement,
+          "text-field": NAME,
+          "text-font": ["Noto Sans Italic"],
+          "text-size": sized(10, 12.5),
+          "text-letter-spacing": 0.06,
+          "symbol-spacing": 360,
+        },
+        paint: {
+          "text-color": c.waterLabel,
+          "text-halo-color": c.water,
+          "text-halo-width": 1.2,
+        },
+      })),
+      {
+        id: "landmark",
+        type: "symbol",
+        source: "omt",
+        "source-layer": "poi",
+        minzoom: 14,
+        filter: [
+          "all",
+          ["in", ["get", "class"], ["literal", LANDMARKS]],
+          // Only the tile's best-known places at first, more as you zoom in.
+          ["<=", ["get", "rank"], ["step", ["zoom"], 4, 15, 8, 16, 16, 17, 40]],
+          [
+            "any",
+            ["!=", ["get", "class"], "railway"],
+            ["==", ["get", "subclass"], "station"],
+          ],
+        ],
+        layout: {
+          "text-field": NAME,
+          "text-font": ["Noto Sans Bold"],
+          "text-size": sized(10, 12.5),
+          "text-max-width": 7,
+          "text-line-height": 1.15,
+          "text-padding": 6,
+          "symbol-sort-key": ["get", "rank"],
+        },
+        paint: {
+          "text-color": c.landmark,
+          "text-halo-color": c.ground,
+          "text-halo-width": 1.6,
         },
       },
     ],
