@@ -52,7 +52,7 @@
   text-overflow: ellipsis;
 }
 :root .trip-header .trip-heading > .icon-button,
-:root .trip-header .trip-menu-toggle:not([aria-expanded="true"]) {
+:root .trip-header .trip-menu-toggle {
   width: 44px;
   height: 44px;
   border: 0;

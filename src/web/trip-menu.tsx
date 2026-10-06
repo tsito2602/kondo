@@ -106,6 +106,7 @@ export function TripMenuButton({ tripId }: { tripId: string }) {
           <>
             <div className="menu-list">
               <button
+                data-menu-item
                 onClick={() => {
                   closeMenu(() => {
                     navigate(`/trips/${trip.id}/members`, {
@@ -114,22 +115,24 @@ export function TripMenuButton({ tripId }: { tripId: string }) {
                   });
                 }}
               >
-                <Users />
-                メンバー管理
+                <span>メンバー管理</span>
+                <Users size={23} />
               </button>
               {travel.canEdit && (
                 <button
+                  data-menu-item
                   onClick={() => {
                     closeMenu(() => {
                       setEditing(true);
                     });
                   }}
                 >
-                  <Pencil />
-                  旅行を編集
+                  <span>旅行を編集</span>
+                  <Pencil size={23} />
                 </button>
               )}
               <button
+                data-menu-item
                 disabled={busy}
                 onClick={() =>
                   void run(async () => {
@@ -141,11 +144,16 @@ export function TripMenuButton({ tripId }: { tripId: string }) {
                   })
                 }
               >
-                <Download />
-                オフライン保存
+                <span>オフライン保存</span>
+                <Download size={23} />
               </button>
-              {progress && <p role="status">{progress}</p>}
+              {progress && (
+                <p role="status" data-menu-item>
+                  {progress}
+                </p>
+              )}
               <button
+                data-menu-item
                 onClick={() =>
                   closeMenu(() =>
                     navigate("/settings", {
@@ -157,11 +165,12 @@ export function TripMenuButton({ tripId }: { tripId: string }) {
                   )
                 }
               >
-                <Settings />
-                設定
+                <span>設定</span>
+                <Settings size={23} />
               </button>
               {trip.role === "owner" && (
                 <button
+                  data-menu-item
                   disabled={busy}
                   className="danger"
                   onClick={() =>
@@ -177,12 +186,12 @@ export function TripMenuButton({ tripId }: { tripId: string }) {
                     })
                   }
                 >
-                  <Trash2 />
-                  旅行を削除
+                  <span>旅行を削除</span>
+                  <Trash2 size={23} />
                 </button>
               )}
             </div>
-            <div className="trip-menu-sync">
+            <div className="trip-menu-sync" data-menu-item>
               <SyncStatus />
             </div>
           </>

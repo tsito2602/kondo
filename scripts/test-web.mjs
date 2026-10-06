@@ -1573,6 +1573,7 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(
       document.querySelector('.trip-heading [aria-label="旅行一覧へ戻る"]'),
     );
+    await tick(150); // the back button's bounce plays before the trip folds
     // Home keeps settings (left) and create (right) in the dock only.
     assert.equal(
       document.querySelector(".context-actions .home-create").textContent,

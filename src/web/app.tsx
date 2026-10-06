@@ -12,8 +12,10 @@ import {
 import {
   captureMotionOrigin,
   dismissModal,
+  reduceMotion,
   useMotionNavigation,
 } from "./motion";
+import { spring } from "./cartoon";
 import type { CSSProperties } from "react";
 import { Button } from "./obsidian/button";
 import { Input } from "./obsidian/input";
@@ -539,7 +541,17 @@ function TripLayout() {
               )
                 return;
               event.preventDefault();
-              startTripTransition(() => navigate("/"), trip.id, true);
+              // The back button's プルン, then the trip folds into its card.
+              const back = event.currentTarget;
+              void spring(
+                back,
+                [{ transform: "scale(1.2, .8)" }, { transform: "none" }],
+                "boing",
+              );
+              setTimeout(
+                () => startTripTransition(() => navigate("/"), trip.id, true),
+                reduceMotion() ? 0 : 120,
+              );
             }}
           >
             <DockBackIcon />

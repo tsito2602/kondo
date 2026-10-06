@@ -723,67 +723,105 @@ strong {
   -webkit-backdrop-filter: blur(28px) saturate(1.18);
   backdrop-filter: blur(28px) saturate(1.18);
   transform: none;
-  transition:
-    width 320ms,
-    height 320ms;
 }
 .trip-menu-toggle svg {
-  position: absolute;
   width: 20px;
   height: 20px;
-  top: 11px;
-  right: 11px;
-}
-.trip-menu-toggle[data-pressed="true"] {
-  width: calc(var(--control-size) * 1.1);
-  height: calc(var(--control-size) * 1.1);
 }
 .trip-menu-toggle:disabled {
   opacity: 1;
 }
-.trip-menu-toggle[aria-expanded="true"] {
-  transition: none;
-}
+/* uchino's space menu: the page blurs behind a pale veil; no panel. */
 .trip-menu-popover::backdrop {
-  background: #0000000a;
+  background: color-mix(in srgb, var(--p-paper, var(--paper)) 46%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 .trip-menu-body {
   position: absolute;
-  top: 0;
+  top: calc(var(--control-size) + 14px);
   right: 0;
-  width: var(--menu-width);
-  padding: 8px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
   max-height: var(--menu-height);
   overflow: auto;
   overscroll-behavior: contain;
   pointer-events: none;
 }
-.trip-menu-body > * {
+.trip-menu-body > *,
+.trip-menu-body .menu-list > * {
   pointer-events: auto;
 }
-@media (prefers-reduced-motion: reduce) {
-  .trip-menu-toggle {
-    transition: none;
-  }
-  .trip-menu-toggle[data-pressed="true"] {
-    width: var(--control-size);
-    height: var(--control-size);
-  }
-}
 .trip-menu-heading {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.trip-menu-body .menu-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+:root .trip-menu-body .menu-list > button {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
+  gap: 16px;
+  width: max-content;
   min-height: 44px;
-  padding: 0 36px 0 10px;
-  margin-right: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--p-ink, var(--ink));
+  font-size: 16px;
+  font-weight: 550;
+  text-align: right;
+  transform-origin: calc(100% - 22px) center;
 }
-.trip-menu-heading h2 {
-  font-size: 15px;
+:root .trip-menu-body .menu-list > button.danger {
+  color: var(--p-danger, var(--danger));
+}
+.trip-menu-body .menu-list > button > svg {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  margin: 0 10px;
+}
+.trip-menu-body .menu-list > p {
+  margin: 0 54px 0 0;
+  font-size: 12px;
+  color: var(--p-mute, var(--muted));
 }
 .trip-menu-sync {
-  padding: 4px 10px;
-  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+  padding-right: 10px;
+  transform-origin: calc(100% - 22px) center;
+}
+/* The menu lives inside the trip heading; undo the heading's icon-only sync. */
+:root .trip-menu-sync .sync-status {
+  width: auto;
+  height: auto;
+  padding: 4px;
+  border: 0;
+  background: none;
+  font-size: 11px;
+  color: var(--p-mute, var(--muted));
+}
+:root .trip-menu-sync .sync-status span {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  white-space: nowrap;
 }
 .trip-heading h1 {
   font-size: 18px;
@@ -3167,7 +3205,7 @@ input::-webkit-date-and-time-value {
   border-bottom-color: color-mix(in srgb, var(--ink) 7%, transparent);
 }
 .trip-heading > .icon-button,
-.trip-menu-toggle:not([aria-expanded="true"]) {
+.trip-menu-toggle {
   background: var(--dock-glass);
   box-shadow:
     inset 0 1px 1px var(--surface-glow),

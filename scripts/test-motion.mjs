@@ -461,7 +461,7 @@ test.afterEach(() => {
   HTMLElement.prototype.animate = () => timeline();
 });
 
-test("header menu retains the actual button and fixed icon through opening, closing and reopening", async () => {
+test("header menu bounces its button and pops its items out of it, then pulls them back before acting", async () => {
   const root = createRoot(document.getElementById("root"));
   const anchor = document.createElement("div");
   document.body.append(anchor);
@@ -475,24 +475,16 @@ test("header menu retains the actual button and fixed icon through opening, clos
   });
   const originalBounds = HTMLElement.prototype.getBoundingClientRect;
   HTMLElement.prototype.getBoundingClientRect = function () {
-    if (this.classList.contains("trip-menu-body"))
-      return { width: 300, height: 340 };
-    if (this.classList.contains("trip-menu-toggle"))
-      return { width: 44, height: 44 };
+    if (this.hasAttribute("data-menu-item"))
+      return { top: 100, height: 44, width: 160 };
     return originalBounds.call(this);
   };
-  let motion,
-    contentMotion,
-    frames,
-    animatedButton,
-    navigated = 0;
-  HTMLElement.prototype.animate = function (keyframes) {
-    if (this.classList.contains("trip-menu-toggle")) {
-      animatedButton = this;
-      frames = keyframes;
-      return (motion = timeline());
-    }
-    return (contentMotion = timeline());
+  const played = [];
+  let navigated = 0;
+  HTMLElement.prototype.animate = function (keyframes, options) {
+    const entry = timeline();
+    played.push({ node: this, keyframes, options, entry });
+    return entry;
   };
   function Harness() {
     const [open, setOpen] = React.useState(false);
@@ -508,7 +500,7 @@ test("header menu retains the actual button and fixed icon through opening, clos
       (close) =>
         React.createElement(
           "button",
-          { onClick: () => close(() => navigated++) },
+          { "data-menu-item": true, onClick: () => close(() => navigated++) },
           "設定",
         ),
     );
@@ -516,57 +508,40 @@ test("header menu retains the actual button and fixed icon through opening, clos
   try {
     await act(async () => root.render(React.createElement(Harness)));
     const trigger = anchor.querySelector("button");
-    const icon = trigger.querySelector("svg");
     trigger.focus();
     await act(async () => trigger.click());
-    assert.equal(
-      animatedButton,
-      trigger,
-      "the original button itself is animated",
-    );
-    assert.equal(trigger.querySelector("svg"), icon, "no replacement dot icon");
-    assert.equal(trigger.style.visibility, "");
-    assert.equal(frames[0].width, "44px");
-    assert.equal(frames[0].height, "44px");
-    assert.equal(
-      frames[0].transform,
-      undefined,
-      "the fixed icon is never translated or scaled",
-    );
-    assert.equal(frames[1].width, "300px");
-    assert.equal(frames[1].height, "340px");
-    assert.equal(document.querySelectorAll(".trip-menu-toggle").length, 1);
     const dialog = document.querySelector("dialog");
+    assert.equal(dialog.open, true);
     assert.equal(dialog.style.left, "926px");
     assert.equal(dialog.style.top, "20px");
-    motion.currentTime = 440;
-    await act(async () => motion.finish());
-    await act(async () =>
-      [...dialog.querySelectorAll("button")]
-        .find((node) => node.textContent === "設定")
-        .click(),
-    );
-    assert.equal(motion.playbackRate, -1);
-    assert.equal(contentMotion.playbackRate, -1);
+    assert.equal(document.querySelector("dialog .trip-menu-toggle"), trigger);
+    const bounce = played.find((entry) => entry.node === trigger);
+    assert.equal(bounce.keyframes[0].transform, "scale(1.2, .8)");
+    const item = dialog.querySelector("[data-menu-item]");
+    const pop = played.find((entry) => entry.node === item);
+    // From the button's centre (42) to the item's (122): lifted 80 px, shrunk.
+    assert.equal(pop.keyframes[0].transform, "translateY(-80px) scale(.4)");
+    assert.equal(pop.keyframes.at(-1).transform, "none");
+    played.length = 0;
+    await act(async () => item.click());
+    const out = played.find((entry) => entry.node === item);
+    assert.equal(out.keyframes.at(-1).transform, "translateY(-80px) scale(.4)");
     assert.equal(navigated, 0);
     assert.equal(dialog.open, true);
-    await act(async () => motion.finish());
+    await act(async () => out.entry.finish());
     assert.equal(navigated, 1);
     assert.equal(dialog.open, false);
     assert.equal(anchor.querySelector("button"), trigger);
-    assert.equal(trigger.querySelector("svg"), icon);
     assert.ok(
       document.activeElement === trigger,
       "focus restored to the same button",
     );
-    assert.equal(trigger.style.width, "");
     reduced = true;
     await act(async () => trigger.click());
     assert.equal(document.querySelector("dialog").open, true);
-    assert.equal(document.querySelector("dialog .trip-menu-toggle"), trigger);
     await act(async () => trigger.click());
     await act(async () => new Promise((resolve) => setTimeout(resolve, 10)));
-    assert.equal(dialog.open, false);
+    assert.equal(document.querySelector("dialog"), null);
     assert.equal(anchor.querySelector("button"), trigger);
   } finally {
     reduced = false;

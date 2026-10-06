@@ -32,9 +32,7 @@ export function installPressFeedback() {
     );
     if (
       !control ||
-      control.closest(
-        '.trip-menu-toggle, [inert], :disabled, [aria-disabled="true"]',
-      )
+      control.closest('[inert], :disabled, [aria-disabled="true"]')
     )
       return null;
     // A card squishes as one surface even when its press lands on a control

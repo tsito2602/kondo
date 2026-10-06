@@ -30,7 +30,9 @@ const cardOf = (tripId: string) =>
   ).find((node) => node.dataset.tripSurface === tripId);
 const onScreen = (box: Box) =>
   box.w > 0 && box.y < window.innerHeight && box.y + box.h > 0;
-const MORPH = { zIndex: 30 } as const; // under the dock (40), as in the mock
+// Under the dock (40), as in the mock. Ink in light mode; black in dark mode,
+// where ink is white (Tsubasa 2026-10-06).
+const MORPH = { zIndex: 30, bg: "var(--trip-morph, var(--p-ink))" } as const;
 
 /** Open a trip from its home card, or go back home into that card. */
 export function startTripTransition(

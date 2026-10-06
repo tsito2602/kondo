@@ -1420,24 +1420,13 @@ dialog:has(.plan-add),
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
-/* The sheet has no title bar: its header is the grab handle you pull down. */
+/* The sheet has no title bar and no grab bar (Tsubasa 2026-10-06); it still closes by pulling down. */
 :root dialog:has(.plan-sheet) .modal-header {
   min-height: 0;
   padding: 9px 0 0;
   border: 0;
   background: none;
   box-shadow: none;
-}
-:root dialog:has(.plan-sheet) .modal-header::before {
-  content: "";
-  position: absolute;
-  top: 9px;
-  left: 50%;
-  width: 40px;
-  height: 5px;
-  margin-left: -20px;
-  border-radius: 3px;
-  background: var(--it-pale);
 }
 :root dialog:has(.plan-sheet) .modal-header h2 {
   position: absolute;
@@ -1929,7 +1918,7 @@ dialog:has(.plan-add),
 }
 
 /* ===== kondo-detail: the plan's detail is a bottom sheet on phones =====
-   88 % of the screen, top corners 32 px, a 40 × 5 grab, over a #0006 scrim. */
+   88 % of the screen, top corners 32 px, no grab bar, over a #0006 scrim. */
 @media (max-width: 759px) {
   :root:root dialog.modal[data-sheet="bottom"] {
     padding: 0;

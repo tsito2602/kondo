@@ -8,8 +8,31 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { MoreHorizontal } from "lucide-react";
+import { ease, linearSupported } from "./cartoon";
 import { reduceMotion } from "./motion";
-import { menuDepth } from "./menu-depth";
+
+// The header's … menu, as uchino's space menu (Tsubasa 2026-10-06): the page
+// blurs behind a veil and the items, label then icon, stand right-aligned
+// under the button. Opening, the button gives a jelly bounce and each item
+// pops out of it on the boing spring, 30 ms apart; closing pulls them back in.
+
+const BOING_FALLBACK = "cubic-bezier(.34,1.56,.64,1)";
+const jelly = (): KeyframeAnimationOptions => {
+  const curve = ease("boing");
+  return {
+    duration: curve.ms,
+    easing: linearSupported() ? curve.easing : BOING_FALLBACK,
+    fill: "both",
+  };
+};
+/** The button's プルン: squashed wide, then wobbling back on boing. */
+const bounce = (control: HTMLElement) => {
+  if (reduceMotion() || typeof control.animate !== "function") return;
+  control.animate([{ transform: "scale(1.2, .8)" }, { transform: "none" }], {
+    ...jelly(),
+    fill: "none",
+  });
+};
 
 /** Keep the same button in a stable portal, including while in the top layer. */
 export function AnchoredMenu({
@@ -29,11 +52,8 @@ export function AnchoredMenu({
   const dialog = useRef<HTMLDialogElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const body = useRef<HTMLDivElement>(null);
-  const animation = useRef<Animation | null>(null);
-  const contentAnimation = useRef<Animation | null>(null);
-  const depth = useRef<ReturnType<typeof menuDepth> | null>(null);
+  const items = useRef<{ node: HTMLElement; from: string }[]>([]);
   const [closing, setClosing] = useState(false);
-  const [pressed, setPressed] = useState(false);
   const pending = useRef<(() => void) | undefined>(undefined);
   const finish = useRef(onClose);
   finish.current = onClose;
@@ -55,77 +75,51 @@ export function AnchoredMenu({
     const node = dialog.current!;
     const control = button.current!;
     const previousFocus = document.activeElement as HTMLElement | null;
-    // Read the live button size before promoting that very same element.
-    const initial = control.getBoundingClientRect();
-    const style = window.getComputedStyle(control);
-    const folded = {
-      width: `${initial.width || 44}px`,
-      height: `${initial.height || 44}px`,
-      borderRadius: style.borderRadius || "22px",
-      backgroundColor: style.backgroundColor,
-      boxShadow: style.boxShadow,
-    };
     node.appendChild(host);
-    const position = () => {
-      // The untransformed layout slot is the anchor; press motion never moves it.
-      const origin = anchor.current!.getBoundingClientRect();
-      node.style.left = `${origin.left}px`;
-      node.style.top = `${origin.top}px`;
-      host.style.setProperty(
-        "--menu-width",
-        `${Math.min(300, origin.right - 12)}px`,
-      );
-      host.style.setProperty(
-        "--menu-height",
-        `${Math.max(44, window.innerHeight - origin.top - 12)}px`,
-      );
-    };
-    position();
+    const origin = anchor.current!.getBoundingClientRect();
+    node.style.left = `${origin.left}px`;
+    node.style.top = `${origin.top}px`;
+    host.style.setProperty(
+      "--menu-height",
+      `${Math.max(44, window.innerHeight - origin.bottom - 24)}px`,
+    );
     node.showModal();
-    const bounds = body.current!.getBoundingClientRect();
-    const panelRadius =
-      window
-        .getComputedStyle(document.documentElement)
-        .getPropertyValue("--radius-panel")
-        .trim() || "28px";
-    const expanded = {
-      width: `${bounds.width}px`,
-      height: `${bounds.height}px`,
-      borderRadius: panelRadius,
-      backgroundColor: window
-        .getComputedStyle(document.documentElement)
-        .getPropertyValue("--menu-glass")
-        .trim(),
-      boxShadow: "inset 0 1px 1px var(--surface-glow), 0 12px 40px #0003",
-    };
-    // The button owns the material. Its icon has fixed top/right coordinates;
-    // neither the button nor the icon is translated or replaced.
-    Object.assign(control.style, expanded);
-    const timing: KeyframeAnimationOptions = {
-      duration: 440,
-      easing: "cubic-bezier(.22,.8,.2,1)",
-      fill: "both",
-    };
-    if (control.animate && !reduceMotion()) {
-      animation.current = control.animate([folded, expanded], timing);
-      contentAnimation.current = body.current!.animate(
-        [
-          {
-            opacity: 0,
-            clipPath: `inset(0px 0px ${bounds.height - 44}px ${bounds.width - 44}px round 22px)`,
-            offset: 0,
-          },
-          { opacity: 0, offset: 0.25 },
-          {
-            opacity: 1,
-            clipPath: `inset(0px round ${panelRadius})`,
-            offset: 1,
-          },
-        ],
-        timing,
-      );
+    const animated = typeof control.animate === "function" && !reduceMotion();
+    if (animated) {
+      bounce(control);
+      try {
+        node.animate([{ opacity: 0 }, { opacity: 1 }], {
+          duration: 300,
+          easing: "cubic-bezier(.22, 1, .36, 1)",
+          pseudoElement: "::backdrop",
+        });
+      } catch {
+        /* no ::backdrop animation here */
+      }
     }
-    depth.current = menuDepth(reduceMotion(), timing);
+    // Each item starts inside the button: lifted to its centre and shrunk.
+    const centre = origin.top + origin.height / 2;
+    items.current = Array.from(
+      body.current!.querySelectorAll<HTMLElement>("[data-menu-item]"),
+    ).map((item) => {
+      const box = item.getBoundingClientRect();
+      const lift = centre - (box.top + box.height / 2);
+      return {
+        node: item,
+        from: `translateY(${Math.round(lift)}px) scale(.4)`,
+      };
+    });
+    if (animated)
+      items.current.forEach(({ node: item, from }, index) =>
+        item.animate(
+          [
+            { opacity: 0, transform: from },
+            { opacity: 1, offset: 0.25 },
+            { opacity: 1, transform: "none" },
+          ],
+          { ...jelly(), delay: index * 30 },
+        ),
+      );
     const resize = () => close();
     const preventBackgroundScroll = (event: Event) => {
       if (
@@ -145,12 +139,7 @@ export function AnchoredMenu({
       window.removeEventListener("resize", resize);
       document.removeEventListener("wheel", preventBackgroundScroll);
       document.removeEventListener("touchmove", preventBackgroundScroll);
-      depth.current?.cancel();
-      depth.current = null;
-      animation.current?.cancel();
-      contentAnimation.current?.cancel();
-      animation.current = contentAnimation.current = null;
-      control.removeAttribute("style");
+      items.current = [];
       anchor.current?.appendChild(host);
       node.close();
       if (previousFocus?.isConnected)
@@ -159,30 +148,48 @@ export function AnchoredMenu({
   }, [anchor, host, open]);
   useLayoutEffect(() => {
     if (!closing) return;
-    const motion = animation.current;
-    if (motion && !reduceMotion()) {
-      motion.playbackRate = -1;
-      motion.play();
-      depth.current?.reverse(motion.currentTime);
-      if (contentAnimation.current) {
-        contentAnimation.current.currentTime = motion.currentTime;
-        contentAnimation.current.playbackRate = -1;
-        contentAnimation.current.play();
-      }
-    }
     let done = false;
     const complete = () => {
       if (done) return;
       done = true;
       setClosing(false);
-      setPressed(false);
       finish.current();
       pending.current?.();
       pending.current = undefined;
     };
-    if (motion && !reduceMotion())
-      void motion.finished.then(complete).catch(() => undefined);
-    const timer = setTimeout(complete, motion && !reduceMotion() ? 600 : 0);
+    if (reduceMotion() || typeof button.current?.animate !== "function") {
+      const timer = setTimeout(complete, 0);
+      return () => clearTimeout(timer);
+    }
+    bounce(button.current);
+    const last = items.current.length - 1;
+    const motions = items.current.map(({ node, from }, index) =>
+      node.animate(
+        [
+          { opacity: 1, transform: "none" },
+          { opacity: 0, transform: from },
+        ],
+        {
+          duration: 200,
+          easing: "cubic-bezier(.5, 0, .75, 0)",
+          delay: (last - index) * 18,
+          fill: "both",
+        },
+      ),
+    );
+    try {
+      dialog.current?.animate([{ opacity: 1 }, { opacity: 0 }], {
+        duration: 200 + Math.max(0, last) * 18,
+        fill: "both",
+        pseudoElement: "::backdrop",
+      });
+    } catch {
+      /* no ::backdrop animation here */
+    }
+    void Promise.all(motions.map((motion) => motion.finished))
+      .then(complete)
+      .catch(() => undefined);
+    const timer = setTimeout(complete, 600);
     return () => {
       done = true;
       clearTimeout(timer);
@@ -212,21 +219,8 @@ export function AnchoredMenu({
             aria-haspopup="dialog"
             aria-expanded={open}
             aria-label={open ? "旅行メニューを閉じる" : "旅行メニュー"}
-            data-pressed={pressed && !open}
             disabled={closing}
-            onPointerDown={() => {
-              if (!open) setPressed(true);
-            }}
-            onPointerUp={() => setPressed(false)}
-            onPointerCancel={() => setPressed(false)}
-            onPointerLeave={() => setPressed(false)}
-            onBlur={() => setPressed(false)}
-            onKeyDown={(event) => {
-              if (!open && ["Enter", " "].includes(event.key)) setPressed(true);
-            }}
-            onKeyUp={() => setPressed(false)}
             onClick={() => {
-              setPressed(false);
               if (open) close();
               else onOpen();
             }}
@@ -235,9 +229,9 @@ export function AnchoredMenu({
           </button>
           {open && (
             <div ref={body} className="trip-menu-body" inert={closing}>
-              <div className="trip-menu-heading">
-                <h2 id={id}>旅行メニュー</h2>
-              </div>
+              <h2 id={id} className="trip-menu-heading">
+                旅行メニュー
+              </h2>
               {children(close)}
             </div>
           )}
