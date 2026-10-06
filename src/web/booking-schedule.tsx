@@ -63,7 +63,14 @@ function ScheduleTime({
     </div>
   );
 }
-export function BookingSchedule({ booking }: { booking: Booking }) {
+export function BookingSchedule({
+  booking,
+  japanOnly = false,
+}: {
+  booking: Booking;
+  /** Only the Japan-time row, under a card that already shows local times. */
+  japanOnly?: boolean;
+}) {
   const [startLabel, endLabel] = labels[booking.kind];
   const endDay = booking.endDay || booking.day;
   const range =
@@ -97,6 +104,22 @@ export function BookingSchedule({ booking }: { booking: Booking }) {
   const showJapan = endpoints.some(
     ({ clock }) => clock?.japanTime && clock.offset !== "UTC+9",
   );
+  const japan = showJapan && (
+    <div className="booking-japan-row">
+      <p className="booking-japan-heading">
+        日本時間 <span>UTC+9</span>
+      </p>
+      <dl>
+        {endpoints.map(({ label, clock, time }) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{clock?.japanTime ?? (time ? "時差未確認" : "時刻未設定")}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+  if (japanOnly) return japan ? <div className="bk-japan">{japan}</div> : null;
   return (
     <div className={`detail-grid booking-schedule${range ? "" : " single"}`}>
       {endpoints.map(({ label, day, time, clock }) => (
@@ -117,23 +140,7 @@ export function BookingSchedule({ booking }: { booking: Booking }) {
           />
         </section>
       ))}
-      {showJapan && (
-        <div className="booking-japan-row">
-          <p className="booking-japan-heading">
-            日本時間 <span>UTC+9</span>
-          </p>
-          <dl>
-            {endpoints.map(({ label, clock, time }) => (
-              <div key={label}>
-                <dt>{label}</dt>
-                <dd>
-                  {clock?.japanTime ?? (time ? "時差未確認" : "時刻未設定")}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      )}
+      {japan}
     </div>
   );
 }

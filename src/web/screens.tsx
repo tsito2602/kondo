@@ -1,7 +1,14 @@
 import { SegmentSelection } from "./segment-selection";
 import { PlaceStatusLabel } from "./place-status";
 import { DayStrip } from "./day-strip";
-import { BookingTicketContent } from "./booking-ticket";
+import {
+  BookingCard,
+  dayLabel,
+  isUsed,
+  spring,
+  useClockNow,
+} from "./booking-card";
+import { AddBookingSheet } from "./booking-add";
 import {
   dayTimeline,
   isJourney,
@@ -18,7 +25,15 @@ import { reduceMotion } from "./motion";
 import { ThumbAction } from "./thumb-dock";
 import { Button } from "./obsidian/button";
 import { Input } from "./obsidian/input";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useSearchParams } from "react-router";
 import {
   Camera,
@@ -421,9 +436,63 @@ export function ItineraryScreen() {
   );
 }
 export function BookingsScreen() {
-  const { bookings, canEdit } = useTravel();
+  const { bookings, canEdit, selectedTrip } = useTravel();
   const [id, setId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState<string[]>([]);
+  const now = useClockNow();
+  // A stamp spins in only when a booking turns 済 while this screen is open.
+  const wasUsed = useRef<Map<string, boolean> | null>(null);
+  const previous = wasUsed.current;
+  useEffect(() => {
+    wasUsed.current = new Map(
+      bookings.map((booking) => [booking.id, isUsed(booking, now)]),
+    );
+  });
+  const connections = useMemo(
+    () => findFlightConnections(bookings),
+    [bookings],
+  );
+  const days = useMemo(() => {
+    const groups: { day: string; bookings: Booking[] }[] = [];
+    for (const booking of bookings) {
+      const last = groups.at(-1);
+      if (last?.day === booking.day) last.bookings.push(booking);
+      else groups.push({ day: booking.day, bookings: [booking] });
+    }
+    return groups;
+  }, [bookings]);
+  useEffect(() => {
+    if (!added.length) return;
+    const cards = added
+      .map((entry) =>
+        document.querySelector(`.bookings-page [data-booking="${entry}"]`),
+      )
+      .filter(Boolean);
+    cards[0]?.scrollIntoView({
+      block: "center",
+      behavior: reduceMotion() ? "auto" : "smooth",
+    });
+    cards.forEach((card, index) =>
+      spring(
+        card,
+        [{ transform: "scale(.8) rotate(-3deg)" }, { transform: "none" }],
+        "boing",
+        { delay: index * 120, fill: "backwards" },
+      ),
+    );
+    setAdded([]);
+  }, [added]);
+  const tripDay = (day: string) => {
+    if (!selectedTrip?.startsOn || !day) return "";
+    const index =
+      Math.round(
+        (new Date(`${day}T12:00:00`).getTime() -
+          new Date(`${selectedTrip.startsOn}T12:00:00`).getTime()) /
+          864e5,
+      ) + 1;
+    return index >= 1 ? `${index}日目` : "";
+  };
   return (
     <div className="page bookings-page">
       <div className="page-toolbar">
@@ -439,45 +508,50 @@ export function BookingsScreen() {
         <Empty>
           <BookOpen />
           <h2>予約はまだありません</h2>
-          <p>航空券やホテルの予約を追加できます。</p>
+          <p>予約確認のスクショやPDFから取り込めます。</p>
         </Empty>
       ) : (
-        <div className="booking-grid">
-          {[...bookings]
-            .sort(
-              (a, b) =>
-                a.day.localeCompare(b.day) || a.time.localeCompare(b.time),
-            )
-            .map((booking) => {
-              const BookingIcon = bookingIcons[booking.kind];
-              return (
-                <button
-                  className="booking-ticket"
-                  data-press-card
-                  key={booking.id}
-                  onClick={() => setId(booking.id)}
-                >
-                  <div className="ticket-main">
-                    <BookingTicketContent booking={booking} />
-                  </div>
-                  <div className="ticket-stub">
-                    <BookingIcon
-                      size={24}
-                      strokeWidth={1.5}
-                      role="img"
-                      aria-label={
-                        bookingKinds.find(
-                          (entry) => entry.value === booking.kind,
-                        )?.label
+        <div className="bk-list">
+          {days.map((group) => (
+            <section key={group.day || "undated"} className="bk-day">
+              <h3 className="bk-dayh">
+                <b>{group.day ? dayLabel(group.day) : "日付未定"}</b>
+                <span>{tripDay(group.day)}</span>
+              </h3>
+              {group.bookings.map((booking) => {
+                const connection = connections.find(
+                  (entry) => entry.arrivalBookingId === booking.id,
+                );
+                return (
+                  <Fragment key={booking.id}>
+                    <BookingCard
+                      booking={booking}
+                      now={now}
+                      spinStamp={
+                        previous?.get(booking.id) === false &&
+                        isUsed(booking, now)
                       }
+                      onOpen={() => setId(booking.id)}
                     />
-                  </div>
-                </button>
-              );
-            })}
+                    {connection && (
+                      <p className="bk-conn">
+                        {connection.airportName}で乗り継ぎ ·{" "}
+                        {formatConnectionDuration(connection.durationMinutes)}
+                      </p>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </section>
+          ))}
         </div>
       )}
-      {adding && <BookingEditor onClose={() => setAdding(false)} />}
+      {adding && (
+        <AddBookingSheet
+          onClose={() => setAdding(false)}
+          onAdded={(ids) => setAdded(ids)}
+        />
+      )}
       {id && <BookingDetail id={id} onClose={() => setId(null)} />}
     </div>
   );
