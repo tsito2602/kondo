@@ -55,6 +55,12 @@
   height: 24px;
   background: linear-gradient(var(--pl-paper), transparent);
   pointer-events: none;
+  /* At rest the map sits right under the chips: no fade over it. */
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+:root[data-scrolled] .places-head::after {
+  opacity: 1;
 }
 .places-chips {
   display: flex;
