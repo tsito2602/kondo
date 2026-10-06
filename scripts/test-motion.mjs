@@ -1454,21 +1454,25 @@ test("place cards separate detail and scheduling actions, and open Google Maps o
   let closed = 0;
   const render = (props = {}) =>
     root.render(
-      React.createElement(PlaceSheet, {
-        title: "美術館",
-        tag: React.createElement("span", null, "候補 · まだ予定なし"),
-        lines: ["展示を見る"],
-        mapsHref: "https://maps.app.goo.gl/demo",
-        onOpen: () => opened++,
-        onClose: () => closed++,
-        onSchedule: () => scheduled++,
-        ...props,
-      }),
+      React.createElement(
+        ThumbDockProvider,
+        null,
+        React.createElement(PlaceSheet, {
+          title: "美術館",
+          tag: React.createElement("span", null, "候補 · まだ予定なし"),
+          lines: ["展示を見る"],
+          mapsHref: "https://maps.app.goo.gl/demo",
+          onOpen: () => opened++,
+          onClose: () => closed++,
+          onSchedule: () => scheduled++,
+          ...props,
+        }),
+      ),
     );
   try {
     await act(async () => render());
     await act(async () =>
-      document.querySelector('[aria-label="美術館の詳細"]').click(),
+      document.querySelector('[aria-label="美術館の詳細を開く"]').click(),
     );
     assert.equal(opened, 1);
     assert.equal(scheduled, 0);
@@ -1484,8 +1488,11 @@ test("place cards separate detail and scheduling actions, and open Google Maps o
       "scheduling precedes the map, as in the mock",
     );
     await act(async () =>
-      document.querySelector('.places-card [aria-label="閉じる"]').click(),
+      document
+        .querySelector('dialog[open] .modal-header [aria-label="閉じる"]')
+        .click(),
     );
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 950)));
     assert.equal(closed, 1);
     assert.equal(opened, 1, "closing does not open the detail panel");
     await act(async () => render({ onSchedule: undefined }));

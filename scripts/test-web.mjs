@@ -1049,7 +1049,12 @@ test("legacy account cache and pending changes survive React migration; real for
         .querySelector(".places-card a.is-primary")
         .href.startsWith("https://www.google.com/maps/place/"),
     );
-    await click(document.querySelector('.places-card [aria-label="閉じる"]'));
+    await click(
+      document.querySelector(
+        'dialog[open] .modal-header [aria-label="閉じる"]',
+      ),
+    );
+    await tick(50);
     assert.equal(document.querySelector(".places-card"), null);
     // やること and 持ち物 are separate icon-only dock pages.
     const dockTab = (label) =>

@@ -1,5 +1,6 @@
 /* 場所: a drawn places map with stable numbers, a list and a place card (kondo-map mock). */
-.places-page {
+.places-page,
+.places-card {
   --pl-paper: #fff;
   --pl-ink: #000;
   --pl-mid: #9c978f;
@@ -12,7 +13,8 @@
   --pl-t2: #ada79c;
   --pl-t4: #67635d;
 }
-:root[data-theme="dark"] .places-page {
+:root[data-theme="dark"] .places-page,
+:root[data-theme="dark"] .places-card {
   --pl-paper: #141312;
   --pl-ink: #f5f1e9;
   --pl-mid: #b6b0a6;
@@ -412,30 +414,15 @@
   text-underline-offset: 3px;
 }
 
-/* ===== place card: rises above the dock, inside thumb reach ===== */
+/* ===== place card: the floating panel's body (place-sheet.tsx) ===== */
 .places-card {
-  position: fixed;
-  z-index: 39;
-  right: max(12px, env(safe-area-inset-right));
-  bottom: calc(max(var(--nav-height), 12px) + env(safe-area-inset-bottom));
-  left: max(12px, env(safe-area-inset-left));
-  max-width: 420px;
-  margin-inline: auto;
-  padding: 16px 16px 14px;
-  border-radius: 26px;
-  background: var(--pl-paper);
-  color: var(--pl-ink);
-  box-shadow:
-    0 0 0 1px var(--pl-line),
-    0 18px 40px -16px #0006;
-  transform-origin: 50% 100%;
+  color: var(--p-ink);
 }
-/* With ＋ on screen the card sits 12 px above it rather than over it
-   (Tsubasa 2026-10-06: 「プラスの上に表示すればいいだけじゃない？」). */
-@media (max-width: 759px) {
-  :root:has(.persistent-add:not([hidden])) .places-card {
-    bottom: calc(var(--add-bottom) + 58px + 12px);
-  }
+.places-card .places-tag {
+  display: inline-flex;
+}
+.places-card-meta {
+  margin-top: 8px;
 }
 .places-card-top {
   display: flex;
