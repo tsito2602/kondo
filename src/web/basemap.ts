@@ -1,11 +1,13 @@
 // The places map's ground: real roads, buildings, water and parks from
 // OpenStreetMap (OpenFreeMap's free vector tiles), drawn by MapLibre in the
-// app's own warm greys, without any labels (the pins carry the names).
+// app's own warm greys. Only big streets carry a small name (the pins carry
+// the places' names).
 // The pins, edge arrows and gestures stay kondo's own; this layer only
 // follows their camera. MapLibre is loaded only when a map is on screen.
 import type { Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
 
 const TILES = "https://tiles.openfreemap.org/planet";
+const GLYPHS = "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf";
 
 type Palette = {
   ground: string;
@@ -17,29 +19,32 @@ type Palette = {
   major: string;
   casing: string;
   rail: string;
+  label: string;
 };
 
 const LIGHT: Palette = {
-  ground: "#f6f5f2",
-  water: "#dfe2e1",
-  park: "#eceae2",
-  building: "#e9e6df",
-  buildingLine: "#dcd8cf",
+  ground: "#f1efea",
+  water: "#cfd8da",
+  park: "#e1e3d3",
+  building: "#e2ddd3",
+  buildingLine: "#cfc8bb",
   minor: "#ffffff",
   major: "#ffffff",
-  casing: "#e1ddd5",
-  rail: "#d6d2c9",
+  casing: "#d3cdc2",
+  rail: "#bdb6aa",
+  label: "#8a8379",
 };
 const DARK: Palette = {
   ground: "#1b1a18",
-  water: "#121313",
-  park: "#1f1f1b",
-  building: "#252421",
-  buildingLine: "#2e2c29",
-  minor: "#2b2926",
-  major: "#36332f",
-  casing: "#1b1a18",
-  rail: "#34312d",
+  water: "#0e1213",
+  park: "#20231d",
+  building: "#2b2a26",
+  buildingLine: "#3a3833",
+  minor: "#3b3934",
+  major: "#4d4a44",
+  casing: "#141312",
+  rail: "#45423c",
+  label: "#8f8a82",
 };
 
 const width = (stops: [number, number][]) =>
@@ -51,6 +56,7 @@ export function basemapStyle(dark: boolean): StyleSpecification {
   const c = dark ? DARK : LIGHT;
   return {
     version: 8,
+    glyphs: GLYPHS,
     sources: { omt: { type: "vector", url: TILES } },
     layers: [
       {
@@ -207,6 +213,37 @@ export function basemapStyle(dark: boolean): StyleSpecification {
             [10, 1],
             [18, 19],
           ]),
+        },
+      },
+      {
+        id: "street-name",
+        type: "symbol",
+        source: "omt",
+        "source-layer": "transportation_name",
+        minzoom: 14,
+        filter: ["in", ["get", "class"], ["literal", MAJOR]],
+        layout: {
+          "symbol-placement": "line",
+          "text-field": ["coalesce", ["get", "name:latin"], ["get", "name"]],
+          "text-font": ["Noto Sans Regular"],
+          "text-size": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            14,
+            9.5,
+            18,
+            12,
+          ] as never,
+          "text-letter-spacing": 0.02,
+          "symbol-spacing": 280,
+          "text-max-angle": 30,
+          "text-padding": 4,
+        },
+        paint: {
+          "text-color": c.label,
+          "text-halo-color": c.major,
+          "text-halo-width": 1.4,
         },
       },
     ],

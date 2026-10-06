@@ -396,12 +396,21 @@ function PlacesMap({
   // Going in or out of 全画面 changes the frame but keeps the camera, so the
   // map grows and shrinks around the same view.
   const keepView = useRef(false);
+  // The view carried into or out of 全画面 counts as a framing of its own:
+  // 全体を表示 waits until the map is moved from it.
+  const [carried, setCarried] = useState<View | null>(null);
   const view =
     camera.base === fitted || keepView.current ? camera.view : fitted;
   useLayoutEffect(() => {
-    if (!keepView.current || camera.base === fitted) return;
+    if (camera.base === fitted) return;
+    if (!keepView.current) {
+      setCarried(null);
+      return;
+    }
     keepView.current = false;
-    setCamera((now) => ({ base: fitted, view: now.view }));
+    setCarried(camera.view);
+    setCamera({ base: fitted, view: camera.view });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitted, camera.base]);
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -830,9 +839,10 @@ function PlacesMap({
     [50, 100, 200, 300, 500, 1000, 2000, 3000, 5000].find(
       (value) => value / mPerPx >= 56,
     ) ?? 5000;
-  const moved =
-    Math.abs(view.k / fitted.k - 1) > 0.04 ||
-    Math.hypot(view.cx - fitted.cx, view.cy - fitted.cy) * view.k > 14;
+  const away = (from: View) =>
+    Math.abs(view.k / from.k - 1) > 0.04 ||
+    Math.hypot(view.cx - from.cx, view.cy - from.cy) * view.k > 14;
+  const moved = away(fitted) && (!carried || away(carried));
 
   const mapView = (
     <div
