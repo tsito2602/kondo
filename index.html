@@ -43,17 +43,17 @@
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
       :root[data-theme="dark"] #initial-boot {
-        --boot-ink: #fff;
+        --boot-ink: #f5f1e9;
         --boot-edge-opacity: 0;
-        background: #000;
-        color: #f3f3f3;
+        background: #141312;
+        color: #f5f1e9;
       }
       @media (prefers-color-scheme: dark) {
         :root:not([data-theme]) #initial-boot {
-          --boot-ink: #fff;
+          --boot-ink: #f5f1e9;
           --boot-edge-opacity: 0;
-          background: #000;
-          color: #f3f3f3;
+          background: #141312;
+          color: #f5f1e9;
         }
       }
       .boot-brand {
@@ -334,18 +334,44 @@
               <circle cx="393" cy="395" r="32" fill="currentColor" />
             </g>
             <g class="boot-pin">
-              <use class="boot-edge" href="#boot-marker" fill="white" stroke="white" stroke-width="8" />
-              <path d="M705 528C682 528 665 545 665 567C665 588 683 612 705 637C727 612 745 588 745 567C745 545 728 528 705 528ZM719 567A14 14 0 1 0 691 567A14 14 0 1 0 719 567Z" fill="currentColor" fill-rule="evenodd" />
+              <use
+                class="boot-edge"
+                href="#boot-marker"
+                fill="white"
+                stroke="white"
+                stroke-width="8"
+              />
+              <path
+                d="M705 528C682 528 665 545 665 567C665 588 683 612 705 637C727 612 745 588 745 567C745 545 728 528 705 528ZM719 567A14 14 0 1 0 691 567A14 14 0 1 0 719 567Z"
+                fill="currentColor"
+                fill-rule="evenodd"
+              />
             </g>
           </g>
         </svg>
         <!-- Custom rounded wordmark, inline for a font-independent offline first paint. -->
         <strong class="boot-name" aria-label="kondo">
-          <span style="--letter: 0"><svg viewBox="0 0 74 102" aria-hidden="true"><path d="M12 12V90M58 38L12 70M29 59L60 90" /></svg></span>
-          <span style="--letter: 1"><svg viewBox="0 0 74 102" aria-hidden="true"><circle cx="37" cy="64" r="26" /></svg></span>
-          <span style="--letter: 2"><svg viewBox="0 0 74 102" aria-hidden="true"><path d="M12 90V64A25 25 0 0 1 62 64V90" /></svg></span>
-          <span style="--letter: 3"><svg viewBox="0 0 74 102" aria-hidden="true"><circle cx="37" cy="64" r="26" /><path d="M63 12V64" /></svg></span>
-          <span style="--letter: 4"><svg viewBox="0 0 74 102" aria-hidden="true"><circle cx="37" cy="64" r="26" /></svg></span>
+          <span style="--letter: 0"
+            ><svg viewBox="0 0 74 102" aria-hidden="true">
+              <path d="M12 12V90M58 38L12 70M29 59L60 90" /></svg
+          ></span>
+          <span style="--letter: 1"
+            ><svg viewBox="0 0 74 102" aria-hidden="true">
+              <circle cx="37" cy="64" r="26" /></svg
+          ></span>
+          <span style="--letter: 2"
+            ><svg viewBox="0 0 74 102" aria-hidden="true">
+              <path d="M12 90V64A25 25 0 0 1 62 64V90" /></svg
+          ></span>
+          <span style="--letter: 3"
+            ><svg viewBox="0 0 74 102" aria-hidden="true">
+              <circle cx="37" cy="64" r="26" />
+              <path d="M63 12V64" /></svg
+          ></span>
+          <span style="--letter: 4"
+            ><svg viewBox="0 0 74 102" aria-hidden="true">
+              <circle cx="37" cy="64" r="26" /></svg
+          ></span>
         </strong>
       </div>
     </div>

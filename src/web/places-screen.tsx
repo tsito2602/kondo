@@ -11,7 +11,7 @@ import {
   type ReactNode,
   type Ref,
 } from "react";
-import { MapPin } from "lucide-react";
+import { MapPin, Plus } from "lucide-react";
 import { useTravel } from "@/data/travel-provider";
 import { placeNumbers } from "@/data/place-numbers";
 import { ordinaryPlans } from "@/data/itinerary";
@@ -34,6 +34,7 @@ import { ItemEditor, PlaceEditor } from "./editors";
 import { BookingDetail, PlaceDetail } from "./details";
 import { reduceMotion } from "./motion";
 import { boing, hop, sink } from "./places-motion";
+import { useJellyScroll } from "./jelly-scroll";
 import { PlaceSheet, placeMapsHref } from "./place-sheet";
 
 /* ---------- model ---------- */
@@ -51,6 +52,7 @@ type Mark = {
 type View = { cx: number; cy: number; k: number };
 
 const MAP_HEIGHT = 420;
+const JELLY_ITEMS = ".places-map, .places-honest, .places-list h3, .places-row";
 const PAD = 52;
 // Day tones for 全日程: pale, ink, dark, repeating for longer trips.
 const TONES = ["var(--pl-t2)", "var(--pl-ink)", "var(--pl-t4)"];
@@ -137,6 +139,7 @@ function previousStop(model: Model, mark: Mark) {
 
 export function PlacesScreen() {
   const travel = useTravel();
+  const trip = travel.selectedTrip!;
   const model = usePlacesModel();
   const [day, setDay] = useState(() => {
     const today = localDate();
@@ -148,6 +151,9 @@ export function PlacesScreen() {
   const [adding, setAdding] = useState(false);
   const [scheduling, setScheduling] = useState<Place | null>(null);
   const mapRef = useRef<PlacesMapHandle>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  // The map, the note and the list trail a fast scroll and settle (jelly scroll).
+  useJellyScroll(pageRef, JELLY_ITEMS);
   const selectedMark = selected ? model.byKey.get(selected) : undefined;
 
   const select = useCallback(
@@ -174,33 +180,43 @@ export function PlacesScreen() {
     );
 
   return (
-    <div className="page places-page">
+    <div className="page places-page" ref={pageRef}>
       <div className="places-head">
-        <p>場所 · {model.count}</p>
-        {model.days.length > 0 && (
+        <h1>
+          {trip.name}
+          <small>場所 · {model.count}</small>
+        </h1>
+        {(model.days.length > 0 || travel.canEdit) && (
           <div className="places-chips" role="group" aria-label="表示する日">
-            {["all", ...model.days].map((entry) => (
+            {model.days.length > 0 &&
+              ["all", ...model.days].map((entry) => (
+                <button
+                  key={entry}
+                  aria-pressed={activeDay === entry}
+                  onClick={() => {
+                    setDay(entry);
+                    setSelected(null);
+                  }}
+                >
+                  {entry !== "all" && (
+                    <i
+                      style={{ color: model.tone(entry) } as CSSProperties}
+                      aria-hidden="true"
+                    />
+                  )}
+                  {entry === "all" ? "全日程" : shortDate(entry)}
+                </button>
+              ))}
+            {travel.canEdit && (
               <button
-                key={entry}
-                aria-pressed={activeDay === entry}
-                onClick={() => {
-                  setDay(entry);
-                  setSelected(null);
-                }}
+                className="places-add"
+                aria-label="場所を追加"
+                onClick={() => setAdding(true)}
               >
-                {entry !== "all" && (
-                  <i
-                    style={{ color: model.tone(entry) } as CSSProperties}
-                    aria-hidden="true"
-                  />
-                )}
-                {entry === "all" ? "全日程" : shortDate(entry)}
+                <Plus size={14} strokeWidth={2.6} aria-hidden="true" />
               </button>
-            ))}
+            )}
           </div>
-        )}
-        {travel.canEdit && !selected && (
-          <AddButton label="場所を追加" onClick={() => setAdding(true)} />
         )}
       </div>
       <PlacesMap
@@ -544,7 +560,20 @@ function PlacesMap({
     let index = 0;
     for (const pin of pins) {
       const element = pinEls.current.get(pin.mark.key);
-      if (element && pin.inside) sink(element, 120 + index++ * 70);
+      if (!element || !pin.inside) continue;
+      const delay = 120 + index++ * 70;
+      sink(element, delay);
+      // As in kondo-cartoon.html (7): a label springs out once its pin has landed.
+      const label = element.querySelector<HTMLElement>(".places-pin-label");
+      if (label && label.style.opacity !== "0")
+        boing(
+          label,
+          [
+            { transform: "scale(.4)", opacity: 0 },
+            { transform: "none", opacity: 1 },
+          ],
+          delay + 400,
+        );
     }
     root.querySelectorAll(".places-edge").forEach((edge) =>
       boing(
