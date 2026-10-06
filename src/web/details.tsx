@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useTravel } from "@/data/travel-provider";
 import { bookingDurationLabel } from "@/data/booking-duration";
+import { ordinaryPlans } from "@/data/itinerary";
 import { findAirportByCode } from "@/data/airports";
 import {
   findFlightConnections,
@@ -392,7 +393,7 @@ export function PlaceDetail({
   const { run } = useAction();
   const place = travel.places.find((entry) => entry.id === id);
   if (!place) return null;
-  const linked = travel.items.find(
+  const linked = ordinaryPlans(travel.items).find(
     (entry) => entry.id === place.itineraryItemId,
   );
   const itineraryAction = linked ? (

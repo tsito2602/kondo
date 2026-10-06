@@ -1,3 +1,4 @@
+import { ordinaryPlans } from './itinerary';
 import type { Booking, BookingKind, ItineraryItem } from './types';
 
 type BookingMatchInput = Pick<Booking, 'kind' | 'title' | 'detail' | 'origin' | 'originCode' | 'destination' | 'destinationCode' | 'day' | 'time'>;
@@ -58,7 +59,7 @@ export function findMatchingItineraryItem(items: ItineraryItem[], booking: Booki
   const bookingMinutes = minutes(booking.time);
   if (!booking.day || bookingMinutes === null) return null;
 
-  const matches = items.flatMap((item) => {
+  const matches = ordinaryPlans(items).flatMap((item) => {
     if (item.day !== booking.day) return [];
     const itemMinutes = minutes(item.time);
     if (itemMinutes === null) return [];

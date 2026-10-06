@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./obsidian/tabs";
 import { useTravel } from "@/data/travel-provider";
+import { ordinaryPlans } from "@/data/itinerary";
 import { formatDate } from "@/utils/dates";
 import { placeStatuses } from "@/data/places";
 import {
@@ -181,7 +182,7 @@ export function PlacesScreen() {
             <PlaceCard
               key={place.id}
               place={place}
-              linked={travel.items.find(
+              linked={ordinaryPlans(travel.items).find(
                 (item) => item.id === place.itineraryItemId,
               )}
               tripId={travel.selectedTrip!.id}

@@ -1497,6 +1497,73 @@ test("journeys and hotel endpoints retain chronological order; only ongoing stay
     );
 });
 
+test("our own hotel in/out times stay out of every plan list", async () => {
+  const { ordinaryPlans, isStayRecord, findMatchingItineraryItem } =
+    await bundle(
+      "export { ordinaryPlans, isStayRecord } from './src/data/itinerary'; export { findMatchingItineraryItem } from './src/data/booking-match';",
+    );
+  const day = "2026-11-22";
+  const stay = {
+    id: "stay",
+    day,
+    time: "15:00",
+    kind: "その他",
+    title: "チェックイン",
+    note: "",
+    details: {
+      category: "other",
+      location: "",
+      endDay: "",
+      endTime: "",
+      stay: { bookingId: "hotel", endpoint: "start" },
+    },
+  };
+  const plan = {
+    id: "plan",
+    day,
+    time: "18:00",
+    kind: "食事",
+    title: "夕食",
+    note: "",
+  };
+  assert.equal(isStayRecord(stay), true);
+  assert.equal(isStayRecord(plan), false);
+  assert.deepEqual(
+    ordinaryPlans([stay, plan]).map((item) => item.id),
+    ["plan"],
+  );
+  assert.equal(
+    findMatchingItineraryItem([stay], {
+      kind: "hotel",
+      title: "チェックイン",
+      detail: "",
+      origin: "",
+      originCode: "",
+      destination: "",
+      destinationCode: "",
+      day,
+      time: "15:00",
+    }),
+    null,
+    "a new hotel booking never links to our own check-in time",
+  );
+  assert.equal(
+    findMatchingItineraryItem([{ ...stay, details: undefined }], {
+      kind: "hotel",
+      title: "チェックイン",
+      detail: "",
+      origin: "",
+      originCode: "",
+      destination: "",
+      destinationCode: "",
+      day,
+      time: "15:00",
+    })?.item.id,
+    "stay",
+    "the same item without details.stay is an ordinary plan",
+  );
+});
+
 test("しおり: walks between places, lateness and いま", async () => {
   const { buildTimeline, walkBetween, timelineEntries } = await bundle(
     "export { buildTimeline, walkBetween, timelineEntries } from './src/data/plan-timeline';",
