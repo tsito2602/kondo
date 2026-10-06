@@ -1,3 +1,4 @@
+import { TimeField } from "./time-field";
 import { useId, useRef, useState } from "react";
 import { CalendarDays, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { RangeHighlight } from "./calendar/range-highlight";
@@ -349,15 +350,12 @@ export function CalendarPanel({
                   ? `${timePhase === "start" ? startLabel : endLabel}の時刻`
                   : "時刻"}
               </span>
-              <input
-                type="time"
-                step={60}
+              <TimeField
                 value={timePhase === "start" ? times.startTime : times.endTime}
-                onChange={(event) =>
+                onChange={(value) =>
                   setTimes((current) => ({
                     ...current,
-                    [timePhase === "start" ? "startTime" : "endTime"]:
-                      event.target.value,
+                    [timePhase === "start" ? "startTime" : "endTime"]: value,
                   }))
                 }
               />

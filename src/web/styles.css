@@ -9,6 +9,7 @@
 @import "./styles/itinerary.css";
 @import "./styles/dock.css";
 @import "./styles/chrome.css";
+@import "./styles/timeline-picker.css";
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 @theme inline {
   --color-brand: var(--brand);

@@ -36,6 +36,7 @@ import { watchPanelFit } from "./panel-fit";
 import { ThumbDock } from "./thumb-dock";
 import { FormBackButton, useToast } from "./ui";
 import { menuDepth } from "./menu-depth";
+import { TimeField } from "./time-field";
 
 type Travel = ReturnType<typeof useTravel>;
 type Row = {
@@ -194,11 +195,17 @@ type ManualForm = {
   to: string;
   start: string;
   end: string;
+  /** The times, typed in their own numeric fields (「2220」 → 22:20). */
+  startTime: string;
+  endTime: string;
   place: string;
   code: string;
   files: File[];
 };
-type FieldKey = Exclude<keyof ManualForm, "kind" | "files">;
+type FieldKey = Exclude<
+  keyof ManualForm,
+  "kind" | "files" | "startTime" | "endTime"
+>;
 type FieldSpec = [FieldKey, string, string];
 const EMPTY_FORM: ManualForm = {
   kind: null,
@@ -207,6 +214,8 @@ const EMPTY_FORM: ManualForm = {
   to: "",
   start: "",
   end: "",
+  startTime: "",
+  endTime: "",
   place: "",
   code: "",
   files: [],
@@ -286,6 +295,9 @@ function manualInput(form: ManualForm, year: number): BookingInput | string {
   const kind = form.kind!;
   const start = parseMoment(form.start, year);
   const end = parseMoment(form.end, year);
+  // The time fields win over a time typed after the date.
+  if (form.startTime) start.time = form.startTime;
+  if (form.endTime) end.time = form.endTime;
   if (!start.day) return "日付を「10/19 22:20」のように入れてください";
   const route = kind === "flight" || kind === "train";
   const from = route
@@ -551,23 +563,54 @@ export function AddBookingSheet({
       created.filter((entry) => entry.file),
     );
   };
-  const field = ([key, label, placeholder]: FieldSpec) => (
-    <label className="bk-fld" key={key}>
-      <small>{label}</small>
-      <input
-        value={form[key]}
-        placeholder={placeholder}
-        list={
-          key === "place" && form.kind !== "hotel" && travel.places.length
-            ? "booking-add-places"
-            : undefined
-        }
-        onChange={(event) =>
-          setForm((current) => ({ ...current, [key]: event.target.value }))
-        }
-      />
-    </label>
-  );
+  const field = ([key, label, placeholder]: FieldSpec) =>
+    key === "start" || key === "end" ? (
+      moment(key, label, placeholder)
+    ) : (
+      <label className="bk-fld" key={key}>
+        <small>{label}</small>
+        <input
+          value={form[key]}
+          placeholder={placeholder}
+          list={
+            key === "place" && form.kind !== "hotel" && travel.places.length
+              ? "booking-add-places"
+              : undefined
+          }
+          onChange={(event) =>
+            setForm((current) => ({ ...current, [key]: event.target.value }))
+          }
+        />
+      </label>
+    );
+  /** A date and its time, from a ticket: the time on the numeric keypad. */
+  const moment = (key: "start" | "end", label: string, placeholder: string) => {
+    const timeKey = key === "start" ? "startTime" : "endTime";
+    const [date, clock = ""] = placeholder.split(" ");
+    return (
+      <div className="bk-fld bk-moment" key={key}>
+        <small>{label}</small>
+        <span>
+          <input
+            value={form[key]}
+            placeholder={date}
+            aria-label={`${label}の日付`}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, [key]: event.target.value }))
+            }
+          />
+          <TimeField
+            value={form[timeKey]}
+            placeholder={clock.replace(/[〜]/g, "") || "--:--"}
+            aria-label={`${label}の時刻`}
+            onChange={(value) =>
+              setForm((current) => ({ ...current, [timeKey]: value }))
+            }
+          />
+        </span>
+      </div>
+    );
+  };
   const saveManual = () => {
     if (!form.kind) return notify("先に種類を選んでください");
     const year = Number(

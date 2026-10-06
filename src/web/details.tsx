@@ -3,6 +3,7 @@ import { DocumentPreview } from "./document-preview";
 import { LinkedNotes } from "./linked-notes";
 import { BookingSchedule, ItemSchedule } from "./booking-schedule";
 import { BookingCard, useClockNow } from "./booking-card";
+import { PlanTimePicker } from "./timeline-picker";
 import { dismissModal } from "./motion";
 import { Button } from "./obsidian/button";
 import { useEffect, useState } from "react";
@@ -12,7 +13,6 @@ import {
   FileText,
   Trash2,
   Download,
-  Pencil,
   Plus,
   BookOpen,
   BookPlus,
@@ -92,7 +92,9 @@ export function PlaceDetail({
 }) {
   const travel = useTravel();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"view" | "edit" | "schedule">("view");
+  const [mode, setMode] = useState<"view" | "edit" | "schedule" | "time">(
+    "view",
+  );
   const { run } = useAction();
   const place = travel.places.find((entry) => entry.id === id);
   if (!place) return null;
@@ -206,17 +208,10 @@ export function PlaceDetail({
                 <BookOpen size={15} />
                 しおりの予定
               </p>
-              <ItemSchedule item={linked} />
-              {travel.canEdit && (
-                <Button
-                  variant="ghost"
-                  className="secondary"
-                  onClick={() => setMode("schedule")}
-                >
-                  <Pencil size={16} />
-                  予定の日時を編集
-                </Button>
-              )}
+              <ItemSchedule
+                item={linked}
+                onEditTime={travel.canEdit ? () => setMode("time") : undefined}
+              />
             </div>
           )}
           <section className="detail-section">
@@ -291,6 +286,9 @@ export function PlaceDetail({
       </Modal>
       {mode === "edit" && (
         <PlaceEditor place={place} onClose={() => setMode("view")} />
+      )}
+      {mode === "time" && linked && (
+        <PlanTimePicker item={linked} onClose={() => setMode("view")} />
       )}
       {mode === "schedule" && (
         <ItemEditor

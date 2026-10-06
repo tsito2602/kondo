@@ -1200,7 +1200,7 @@ test("calendar floats above its editor, commits ranges only on confirmation and 
     );
     const setTime = async (value) =>
       act(async () => {
-        const input = panel.querySelector('input[type="time"]');
+        const input = panel.querySelector("input[data-time-field]");
         Object.getOwnPropertyDescriptor(
           dom.window.HTMLInputElement.prototype,
           "value",

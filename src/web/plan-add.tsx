@@ -11,6 +11,8 @@ import { dismissModal } from "./motion";
 import { ErrorText, Modal, useAction } from "./ui";
 import { categoryGlyph, Glyph, MapPin } from "./itinerary-icons";
 import { previewPlace, savePlanPlace } from "./plan-place";
+import { shiftDay, TimelinePicker, TimeRangeButton } from "./timeline-picker";
+import { coordsFromLink } from "@/data/geo";
 
 const weekday = (day: string) =>
   new Intl.DateTimeFormat("ja-JP", { weekday: "short" }).format(
@@ -38,6 +40,9 @@ export function PlanAddSheet({
   const [category, setCategory] = useState<ItineraryCategory>("sightseeing");
   const [title, setTitle] = useState("");
   const [time, setTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [endDayOffset, setEndDayOffset] = useState(0);
+  const [picking, setPicking] = useState(false);
   const [place, setPlace] = useState("");
   const [error, setError] = useState("");
   const { busy, run } = useAction();
@@ -50,6 +55,9 @@ export function PlanAddSheet({
     const dialog = event.currentTarget.closest("dialog");
     const details: ItineraryDetails = {
       ...emptyItineraryDetails(category),
+      ...(endTime
+        ? { endTime, endDay: shiftDay(selectedDay, endDayOffset) }
+        : {}),
       ...(category === "transport"
         ? {
             transport: { mode: "other", origin: "", destination: place.trim() },
@@ -146,16 +154,16 @@ export function PlanAddSheet({
           />
         </label>
         <div className="it-row2">
-          <label className="field">
+          <div className="field">
             <span className="it-sr">時刻</span>
-            <input
+            <TimeRangeButton
               className="it-inp"
-              type="time"
-              aria-label="時刻"
-              value={time}
-              onChange={(event) => setTime(event.target.value)}
+              time={time}
+              endTime={endTime}
+              nextDay={endDayOffset === 1}
+              onOpen={() => setPicking(true)}
             />
-          </label>
+          </div>
           <label className="field">
             <span className="it-sr">場所</span>
             <input
@@ -184,6 +192,23 @@ export function PlanAddSheet({
         </p>
         <ErrorText message={error} />
       </form>
+      {picking && (
+        <TimelinePicker
+          title={title.trim() || "新しい予定"}
+          day={selectedDay}
+          time={time}
+          endTime={endTime}
+          endDayOffset={endDayOffset}
+          self={category === "transport" ? null : coordsFromLink(place)}
+          allowClear
+          onSave={(picked) => {
+            setTime(picked.time);
+            setEndTime(picked.endTime);
+            setEndDayOffset(picked.endDayOffset);
+          }}
+          onClose={() => setPicking(false)}
+        />
+      )}
     </Modal>
   );
 }
