@@ -461,7 +461,7 @@ test.afterEach(() => {
   HTMLElement.prototype.animate = () => timeline();
 });
 
-test("header menu bounces its button and pops its items out of it, then pulls them back before acting", async () => {
+test("header menu hides its button under the first item, pops the items out of it, then pulls them back and bounces it before acting", async () => {
   const root = createRoot(document.getElementById("root"));
   const anchor = document.createElement("div");
   document.body.append(anchor);
@@ -515,8 +515,9 @@ test("header menu bounces its button and pops its items out of it, then pulls th
     assert.equal(dialog.style.left, "926px");
     assert.equal(dialog.style.top, "20px");
     assert.equal(document.querySelector("dialog .trip-menu-toggle"), trigger);
-    const bounce = played.find((entry) => entry.node === trigger);
-    assert.equal(bounce.keyframes[0].transform, "scale(1.2, .8)");
+    // The … squashes away; the first item takes its place.
+    const away = played.find((entry) => entry.node === trigger);
+    assert.equal(away.keyframes.at(-1).opacity, 0);
     const item = dialog.querySelector("[data-menu-item]");
     const pop = played.find((entry) => entry.node === item);
     // From the button's centre (42) to the item's (122): lifted 80 px, shrunk.
@@ -525,6 +526,8 @@ test("header menu bounces its button and pops its items out of it, then pulls th
     played.length = 0;
     await act(async () => item.click());
     const out = played.find((entry) => entry.node === item);
+    const back = played.find((entry) => entry.node === trigger);
+    assert.equal(back.keyframes[0].transform, "scale(1.2, .8)");
     assert.equal(out.keyframes.at(-1).transform, "translateY(-80px) scale(.4)");
     assert.equal(navigated, 0);
     assert.equal(dialog.open, true);

@@ -13,7 +13,7 @@ import { reduceMotion } from "./motion";
 
 // The header's … menu, as uchino's space menu (Tsubasa 2026-10-06): the page
 // blurs behind a veil and the items, label then icon, stand right-aligned
-// under the button. Opening, the button gives a jelly bounce and each item
+// from the button down; the … hides and the first item sits where it was. Opening, the button gives a jelly bounce and each item
 // pops out of it on the boing spring, 30 ms apart; closing pulls them back in.
 
 const BOING_FALLBACK = "cubic-bezier(.34,1.56,.64,1)";
@@ -81,12 +81,20 @@ export function AnchoredMenu({
     node.style.top = `${origin.top}px`;
     host.style.setProperty(
       "--menu-height",
-      `${Math.max(44, window.innerHeight - origin.bottom - 24)}px`,
+      `${Math.max(44, window.innerHeight - origin.top - 24)}px`,
     );
     node.showModal();
     const animated = typeof control.animate === "function" && !reduceMotion();
     if (animated) {
-      bounce(control);
+      // The … gives way: it squashes and fades as the first item takes its place.
+      control.animate(
+        [
+          { opacity: 1, transform: "none" },
+          { opacity: 0, transform: "scale(1.25, .6)" },
+        ],
+        { duration: 160, easing: "cubic-bezier(.5, 0, .75, 0)", fill: "both" },
+      ).onfinish = (event) =>
+        (event.currentTarget as Animation | null)?.cancel();
       try {
         node.animate([{ opacity: 0 }, { opacity: 1 }], {
           duration: 300,
@@ -161,6 +169,7 @@ export function AnchoredMenu({
       const timer = setTimeout(complete, 0);
       return () => clearTimeout(timer);
     }
+    // The … comes back where the first item was, with its プルン.
     bounce(button.current);
     const last = items.current.length - 1;
     const motions = items.current.map(({ node, from }, index) =>
@@ -217,7 +226,7 @@ export function AnchoredMenu({
             ref={button}
             className="icon-button trip-menu-toggle"
             aria-haspopup="dialog"
-            aria-expanded={open}
+            aria-expanded={open && !closing}
             aria-label={open ? "旅行メニューを閉じる" : "旅行メニュー"}
             disabled={closing}
             onClick={() => {

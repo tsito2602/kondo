@@ -737,9 +737,14 @@ strong {
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
+/* While open, the … is gone and the first item stands in its place. */
+.trip-menu-toggle[aria-expanded="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
 .trip-menu-body {
   position: absolute;
-  top: calc(var(--control-size) + 14px);
+  top: 0;
   right: 0;
   width: max-content;
   max-width: calc(100vw - 32px);
