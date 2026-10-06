@@ -353,7 +353,7 @@ export class CartoonDock extends Component<Props> {
           "boing",
         ),
       );
-    } else if (wasMerged) {
+    } else if (wasMerged && t.a[1] > t.a[0]) {
       // tear the one island apart where the back circle will be
       this.tearAt((t.a[1] + t.b[0]) / 2);
       landB = sleep(120).then(() => {

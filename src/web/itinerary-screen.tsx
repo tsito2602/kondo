@@ -20,7 +20,6 @@ import { addDays, formatDate } from "@/utils/dates";
 import { DayStrip } from "./day-strip";
 import { registerSquish, spring } from "./cartoon";
 import { useJellyScroll } from "./jelly-scroll";
-import { TripMenuButton, tripSpan } from "./trip-menu";
 import { useItineraryScroll } from "./itinerary-scroll";
 import { reduceMotion } from "./motion";
 import { AddButton } from "./ui";
@@ -91,7 +90,6 @@ export function ItineraryScreen() {
     const off = [
       registerSquish(".it-ev", 0.97),
       registerSquish(".it-conn, .it-empty button", 0.93),
-      registerSquish(".itinerary-screen .floating-add", 0.88),
       registerSquish(".date-strip button", 0.9),
     ];
     return () => off.forEach((undo) => undo());
@@ -253,13 +251,6 @@ export function ItineraryScreen() {
   return (
     <div className="itinerary-screen" ref={root}>
       <div className="it-top" ref={top}>
-        <header className="it-head">
-          <h1>
-            {trip.name}
-            <small>{tripSpan(trip, now)}</small>
-          </h1>
-          <TripMenuButton tripId={trip.id} />
-        </header>
         <DayStrip
           days={days}
           selectedDay={selectedDay}
@@ -302,11 +293,7 @@ export function ItineraryScreen() {
         ))}
       </div>
       {travel.canEdit && (
-        <AddButton
-          floating
-          label="予定を追加"
-          onClick={() => setAdding(selectedDay)}
-        />
+        <AddButton label="予定を追加" onClick={() => setAdding(selectedDay)} />
       )}
       {adding && (
         <PlanAddSheet

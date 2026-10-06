@@ -14,12 +14,12 @@ import { DockToast, ThumbDock } from "./thumb-dock";
 import { poof, sink, spring } from "./memo-motion";
 import { PageTop } from "./page-top";
 import { useJellyScroll } from "./jelly-scroll";
+import { AddButton } from "./ui";
 import {
   CheckBox,
   NoteMeta,
   PinFilledIcon,
   PlaceChip,
-  PlusIcon,
   SearchIcon,
   useNotePlaces,
   type NotePlace,
@@ -229,7 +229,7 @@ export function NotesScreen() {
   return (
     <div className="page notes-page" ref={page}>
       <PageTop
-        sub={`${travel.selectedTrip?.name ?? ""} · ${all.length}件`}
+        sub={`${all.length}件`}
         title="メモ"
         actions={
           <>
@@ -241,28 +241,25 @@ export function NotesScreen() {
             >
               <SearchIcon />
             </button>
-            {travel.canEdit && (
-              <button
-                className="page-plus"
-                aria-label="メモを書く"
-                onClick={() =>
-                  setOpen({
-                    fresh: true,
-                    note: {
-                      id: crypto.randomUUID(),
-                      body: "",
-                      title: "",
-                      updatedAt: Date.now() / 1000,
-                    },
-                  })
-                }
-              >
-                <PlusIcon />
-              </button>
-            )}
           </>
         }
       />
+      {travel.canEdit && (
+        <AddButton
+          label="メモを書く"
+          onClick={() =>
+            setOpen({
+              fresh: true,
+              note: {
+                id: crypto.randomUUID(),
+                body: "",
+                title: "",
+                updatedAt: Date.now() / 1000,
+              },
+            })
+          }
+        />
+      )}
       {query !== null && (
         <label
           className="memo-search"
