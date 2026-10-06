@@ -42,7 +42,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export * from './src/web/cartoon'; export { CartoonDock, DockGroup } from './src/web/cartoon-dock'; export { morphDock, dockContour } from './src/web/dock-morph'; export { TripDock, tripTabs, moveEdges } from './src/web/trip-dock'; export { ThumbDockProvider, ThumbDock, ContextDock, DockToast } from './src/web/thumb-dock'; export { jellyScroll } from './src/web/jelly-scroll'; export { openFromCard, closeToCard, sheetIn, sheetOut, cardOrigin } from './src/web/transitions'; export { installPressFeedback } from './src/web/press-feedback';",
+      "export * from './src/web/cartoon'; export { CartoonDock, DockGroup } from './src/web/cartoon-dock'; export { morphDock, dockContour, prepareDockMorph } from './src/web/dock-morph'; export { watchPanelFit } from './src/web/panel-fit'; export { TripDock, tripTabs, moveEdges } from './src/web/trip-dock'; export { ThumbDockProvider, ThumbDock, ContextDock, DockToast } from './src/web/thumb-dock'; export { jellyScroll } from './src/web/jelly-scroll'; export { openFromCard, closeToCard, sheetIn, sheetOut, cardOrigin } from './src/web/transitions'; export { installPressFeedback } from './src/web/press-feedback';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -95,6 +95,8 @@ const BOX = {
   "tabs-full": [16, 358],
   toast: [16, 358],
   "toast-r": [90, 284],
+  // しおりで見る's own island, 12 px left of 編集 削除 (238).
+  m: [123, 103],
 };
 function rightBox(el) {
   const n = el.querySelectorAll(":scope > button, :scope > a").length;
@@ -191,6 +193,32 @@ function DockHarness({ mode }) {
           h("button", { "aria-label": "編集" }, "e"),
           h("button", { "aria-label": "削除", className: "danger" }, "d"),
         ),
+      }),
+    );
+  if (mode === "three")
+    // A detail with a separate function: ‹ | しおり | 編集 削除.
+    return h(
+      M.ThumbDock,
+      { mode: "context" },
+      h(M.ContextDock, {
+        back,
+        secondary: h("button", { "aria-label": "しおりで見る" }, "しおり"),
+        actions: h(
+          React.Fragment,
+          null,
+          h("button", { "aria-label": "編集" }, "e"),
+          h("button", { "aria-label": "削除", className: "danger" }, "d"),
+        ),
+      }),
+    );
+  if (mode === "lone")
+    // A separate function with nothing beside it: no island of its own.
+    return h(
+      M.ThumbDock,
+      { mode: "context" },
+      h(M.ContextDock, {
+        back,
+        secondary: h("button", { "aria-label": "しおりで見る" }, "しおり"),
       }),
     );
   if (mode === "back")
@@ -462,5 +490,132 @@ test("a dock that is hidden while its controls change (a closing dialog) still m
   } finally {
     dockHidden = false;
     await act(async () => dock.root.unmount());
+  }
+});
+
+test("a separate function gets its own island: the tabs part into three and join back into one", async () => {
+  stubAnimate();
+  const dock = await mountDock();
+  const watch = async (mode, ms = 1100) => {
+    const seen = [];
+    await act(async () => dock.go(mode, 0));
+    for (let t = 0; t < ms; t += 16) {
+      await act(async () => wait(16));
+      seen.push(islands());
+    }
+    return seen;
+  };
+  try {
+    assert.ok(near(islands(), [[16, 374]]), "full-width tabs");
+    const parting = await watch("three");
+    assert.ok(
+      parting.every((shape) => shape.length <= 3),
+      "never more than three pieces",
+    );
+    assert.ok(
+      near(islands(), [
+        [16, 78],
+        [123, 226],
+        [238, 374],
+      ]),
+      "‹, the function, then 編集 削除 at the right edge",
+    );
+    const groups = [
+      ...document.querySelectorAll(".cdock-content > [data-slot]"),
+    ];
+    assert.deepEqual(
+      groups.map((g) => g.dataset.slot),
+      ["l", "m", "r"],
+    );
+    // Equal counts only move: from three islands to the two of a plain
+    // detail, and back to three, with no neck while they stay apart.
+    await dock.go("ctx", 1100);
+    assert.ok(
+      near(islands(), [
+        [16, 78],
+        [238, 374],
+      ]),
+    );
+    await dock.go("three", 1100);
+    const joining = await watch("tabs");
+    assert.ok(joining.every((shape) => shape.length <= 3));
+    assert.ok(near(islands(), [[16, 374]]), "one island at the end");
+    await dock.go("lone", 1100);
+    assert.equal(document.querySelector('[data-slot="m"]'), null);
+    assert.ok(near(islands(), [[16, 78]]), "only the back circle");
+  } finally {
+    await act(async () => dock.root.unmount());
+  }
+});
+
+test("islands that only move and resize morph without a neck, whatever their number", () => {
+  const three = [
+    { left: 16, width: 62, radius: 31 },
+    { left: 123, width: 103, radius: 31 },
+    { left: 238, width: 136, radius: 31 },
+  ];
+  const moved = [
+    { left: 16, width: 62, radius: 31 },
+    { left: 176, width: 118, radius: 31 },
+    { left: 306, width: 68, radius: 31 },
+  ];
+  const plan = M.prepareDockMorph(three, moved);
+  assert.equal(plan.simple, true);
+  for (const t of [0.2, 0.5, 0.8])
+    assert.equal(M.morphDock(three, moved, 0, t, plan).tension, 0);
+  assert.equal(
+    M.prepareDockMorph([{ left: 16, width: 358, radius: 31 }], three).simple,
+    false,
+    "one island parting into three draws necks",
+  );
+});
+
+test("a floating panel whose content would scroll takes the full height, and gives it back", async () => {
+  const host = document.createElement("dialog");
+  const panel = document.createElement("div");
+  const body = document.createElement("div");
+  panel.style.border = "0";
+  panel.append(body);
+  host.append(panel);
+  document.body.append(host);
+  let content = 300;
+  const room = 500;
+  const tall = () => host.dataset.tall === "true";
+  const sizes = new Map([
+    [panel, () => (tall() ? 700 : Math.min(content, room))],
+    [body, () => content],
+  ]);
+  const height = Object.getOwnPropertyDescriptor(
+    dom.window.HTMLElement.prototype,
+    "offsetHeight",
+  );
+  Object.defineProperty(dom.window.HTMLElement.prototype, "offsetHeight", {
+    configurable: true,
+    get() {
+      return sizes.get(this)?.() ?? 0;
+    },
+  });
+  Object.defineProperty(panel, "offsetParent", { get: () => document.body });
+  try {
+    const stop = M.watchPanelFit(host, panel);
+    assert.equal(tall(), false, "short content: the compact panel");
+    content = 640;
+    window.dispatchEvent(new window.Event("resize"));
+    await wait(40);
+    assert.equal(tall(), true, "content that would scroll: the full height");
+    content = 420;
+    window.dispatchEvent(new window.Event("resize"));
+    await wait(40);
+    assert.equal(tall(), false, "short again: compact again");
+    stop();
+  } finally {
+    if (height)
+      Object.defineProperty(
+        dom.window.HTMLElement.prototype,
+        "offsetHeight",
+        height,
+      );
+    else delete dom.window.HTMLElement.prototype.offsetHeight;
+    host.remove();
   }
 });

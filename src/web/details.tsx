@@ -15,6 +15,7 @@ import {
   Pencil,
   Plus,
   BookOpen,
+  BookPlus,
   MapPin,
   Clock,
   Link as LinkIcon,
@@ -44,6 +45,7 @@ import {
 } from "./editors";
 import {
   DetailDockActions,
+  DockFunction,
   Modal,
   Field,
   MapLink,
@@ -118,6 +120,29 @@ export function PlaceDetail({
       しおりへ追加
     </button>
   ) : null;
+  // On a phone the dock carries it, on its own island (Tsubasa 2026-10-06).
+  const itineraryDock = linked ? (
+    <DockFunction
+      label="しおりを見る"
+      short="しおり"
+      icon={<BookOpen aria-hidden="true" />}
+      onClick={() =>
+        dismissModal(() => {
+          onClose();
+          navigate(
+            `/trips/${travel.selectedTrip!.id}/itinerary?day=${linked.day}&item=${linked.id}`,
+          );
+        })
+      }
+    />
+  ) : travel.canEdit ? (
+    <DockFunction
+      label="しおりへ追加"
+      short="追加"
+      icon={<BookPlus aria-hidden="true" />}
+      onClick={() => setMode("schedule")}
+    />
+  ) : undefined;
   const remove = () =>
     void run(() => {
       if (confirm("この場所を削除しますか？")) {
@@ -133,14 +158,18 @@ export function PlaceDetail({
         title="場所の詳細"
         addPanel
         dockActions={{
-          // Every detail panel's dock: ‹ closes, 編集 then 削除 at the right edge.
+          // Every detail panel's dock: ‹ closes, 編集 then 削除 at the right
+          // edge, and しおり on its own island left of them.
           actions: travel.canEdit ? (
             <DetailDockActions
               onEdit={() => setMode("edit")}
               deleteLabel="場所を削除"
               onDelete={remove}
             />
-          ) : undefined,
+          ) : (
+            itineraryDock
+          ),
+          secondary: travel.canEdit ? itineraryDock : undefined,
         }}
         onClose={onClose}
         action={

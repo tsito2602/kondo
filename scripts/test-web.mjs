@@ -905,12 +905,20 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.equal(document.querySelector(".thumb-dock-host .cdock-tabs"), null);
     const placeDetail = document.querySelector("dialog[open]");
-    // The dock holds only 編集 and 削除; しおり's action sits in the panel.
+    // 編集 and 削除 share the right island; しおり's action is a function of
+    // its own on the island left of them (the panel repeats it for wide
+    // screens without the dock).
     assert.deepEqual(
       [...document.querySelectorAll(".context-actions button")].map((node) =>
         node.getAttribute("aria-label"),
       ),
       ["編集", "場所を削除"],
+    );
+    assert.deepEqual(
+      [...document.querySelectorAll(".context-secondary button")].map((node) =>
+        node.getAttribute("aria-label"),
+      ),
+      ["しおりへ追加"],
     );
     await click(
       byText("dialog .detail-itinerary-action button", "しおりへ追加"),
@@ -928,6 +936,12 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.equal(
       document.querySelector("dialog .detail-itinerary-action").textContent,
+      "しおりを見る",
+    );
+    assert.equal(
+      document
+        .querySelector(".context-secondary button")
+        .getAttribute("aria-label"),
       "しおりを見る",
     );
     globalThis.confirm = () => false;

@@ -114,7 +114,9 @@ export function prepareDockMorph(
 ): DockMorphPlan {
   let a = visibleDock(from),
     b = visibleDock(to);
-  const simple = a.length === b.length && a.length <= 2;
+  // The same number of islands only move and resize: they keep their order
+  // and their gaps, so no neck is needed (three islands: ‹, しおり, 編集 削除).
+  const simple = a.length === b.length;
   if (!a.length || !b.length) return { from, to, simple };
   if (a.length < b.length) a = splitDock(a, b);
   else if (b.length < a.length) b = splitDock(b, a);

@@ -1807,6 +1807,18 @@ dialog[data-panel="add"],
     );
   }
 }
+/* Content that would scroll takes the full height (panel-fit.ts): the top
+   10 px below the status bar, over the trip header; the bottom stays. */
+@media (max-width: 759px) {
+  :root:root:has(.thumb-dock-host) dialog.modal[data-panel="add"][data-tall] {
+    padding-top: calc(10px + env(safe-area-inset-top));
+  }
+  :root:root:has(.thumb-dock-host)
+    dialog.modal[data-panel="add"][data-tall]
+    .modal-inner {
+    height: 100%;
+  }
+}
 :root {
   /* 12 px below the trip header (58 px), plus the demo banner when shown. */
   --add-panel-top: 70px;
@@ -1964,10 +1976,6 @@ dialog[data-panel="add"],
 }
 :root .cdock-group > button.ps-dock-ticket {
   width: auto;
-  gap: 8px;
-  padding: 0 18px 0 16px;
-  font-size: 15px;
-  font-weight: 700;
 }
 
 @media (prefers-reduced-motion: reduce) {

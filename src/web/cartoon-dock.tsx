@@ -20,9 +20,11 @@ import {
 // and pressing anywhere on an island squishes the whole island (2-v, v).
 //
 // What sits on the islands is plain markup in groups ([data-slot]): l (back),
-// tabs, r (context actions) and toast. The islands follow the groups' boxes.
+// tabs, m (a separate function beside the context actions, such as しおりで見る
+// or 券を開く: its own island), r (context actions) and toast. The islands
+// follow the groups' boxes.
 
-export type DockSlot = "l" | "tabs" | "r" | "toast";
+export type DockSlot = "l" | "tabs" | "m" | "r" | "toast";
 
 /** One group of dock controls; its CSS box decides where its island goes. */
 export function DockGroup({
@@ -278,6 +280,7 @@ export class CartoonDock extends Component<Props> {
       )?.el;
     const toast = find("toast"),
       left = find("l"),
+      middle = find("m"),
       right = find("tabs", "r");
     // Controls that carry their own pills (a plan's 削除 and 編集 circles)
     // need no island under them.
@@ -289,9 +292,10 @@ export class CartoonDock extends Component<Props> {
       return { islands: a ? [a, t] : [t], merged: !a, tone: "" };
     }
     const b = box(right);
+    const m = right ? box(middle) : null;
     const tone = right?.dataset.tone ?? "";
     return {
-      islands: [a, b].filter((span): span is Span => Boolean(span)),
+      islands: [a, m, b].filter((span): span is Span => Boolean(span)),
       merged: false,
       tone: tones.has(tone) ? tone : "",
     };
@@ -311,6 +315,12 @@ export class CartoonDock extends Component<Props> {
     }
     this.tries = 0;
     this.width = root.clientWidth;
+    // The middle island sits 12 px left of the right one, whatever its width.
+    const right = this.groups().find(({ el }) => el.dataset.slot === "r")?.el;
+    this.ui.current?.style.setProperty(
+      "--cdock-r-w",
+      `${right?.offsetWidth ?? 0}px`,
+    );
     const t = this.targets();
     if (!t) return;
     const key = JSON.stringify([this.width, t.islands, t.tone]);
@@ -399,9 +409,24 @@ export class CartoonDock extends Component<Props> {
       goo = this.goo.current;
     if (!shape || !fill || !ink || !goo) return;
     const w = this.width || this.root.current?.clientWidth || 0;
-    const scales = shape.islands.map((_, i) => {
+    const scales = shape.islands.map((island, i) => {
       const v = this.J.v * (i === this.pressed ? this.Q.v : 1);
-      return Math.abs(v - 1) > 0.0005 ? { x: 2 - v, y: v } : { x: 1, y: 1 };
+      if (Math.abs(v - 1) <= 0.0005) return { x: 1, y: 1 };
+      // A squish widens an island, but never into a separate neighbour: with
+      // three islands 12 px apart the landing would otherwise join them.
+      const gap = Math.min(
+        ...shape.islands.map((other) =>
+          other === island
+            ? Infinity
+            : Math.max(
+                other.left - island.left - island.width,
+                island.left - other.left - other.width,
+              ),
+        ),
+      );
+      const room =
+        gap > 0 && island.width > 0 ? 1 + (gap - 6) / island.width : Infinity;
+      return { x: Math.min(2 - v, Math.max(1, room)), y: v };
     });
     const d = dockContour(w, shape.islands, shape.tension, scales, CENTER);
     const tinted = shape.islands

@@ -14,6 +14,7 @@ import { createPortal } from "react-dom";
 import { referenceUrl, registeredGoogleMapsUrl } from "@/data/places";
 import { menuDepth } from "./menu-depth";
 import { lockModalPage } from "./modal-scroll-lock";
+import { watchPanelFit } from "./panel-fit";
 import {
   animateDialog,
   dismissModal,
@@ -230,7 +231,9 @@ export function FormBackButton({
 }
 
 /** Every card's detail panel has the same dock (Tsubasa 2026-10-06): ‹ on the
-    left closes it, and on the right 編集 sits just left of 削除 at the edge. */
+    left closes it, and on the right 編集 sits just left of 削除 at the edge.
+    A separate function (しおりで見る, 券を開く) goes on its own island left of
+    them (`dockActions.secondary`, DockFunction). */
 export function DetailDockActions({
   onEdit,
   onDelete,
@@ -260,6 +263,35 @@ export function DetailDockActions({
         </button>
       )}
     </>
+  );
+}
+
+/** A dock control for a separate function: an icon and a short word, the
+    whole name for screen readers. On a narrow phone, where three islands
+    would not fit with the word, only the icon shows (dock.css). */
+export function DockFunction({
+  label,
+  short,
+  icon,
+  onClick,
+  className,
+}: {
+  label: string;
+  short: string;
+  icon: ReactNode;
+  onClick: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      className={`cdock-function${className ? ` ${className}` : ""}`}
+      onClick={onClick}
+    >
+      {icon}
+      <span className="cdock-function-label">{short}</span>
+    </button>
   );
 }
 
@@ -293,6 +325,8 @@ export function Modal({
   dockActions?: {
     primary?: ReactNode;
     actions?: ReactNode;
+    /** A separate function on its own island left of the actions. */
+    secondary?: ReactNode;
     backLabel?: string;
     /** Replaces the back circle on the left island. */
     back?: ReactNode;
@@ -335,6 +369,8 @@ export function Modal({
     // Phones get the mocks' moves: out of the pressed card (kondo-cartoon §4)
     // or up from the bottom as a sheet; wider screens keep the panel unfold.
     const panel = dialog.querySelector<HTMLElement>(".modal-inner");
+    // A floating panel whose content would scroll takes the full height.
+    const unfit = addPanel && panel ? watchPanelFit(dialog, panel) : undefined;
     const phone =
       panel && !reduceMotion() && matchMedia("(max-width: 759px)").matches;
     cartoon.current = phone
@@ -383,6 +419,7 @@ export function Modal({
     };
     dialog.addEventListener("tabi:modal-close", requestClose);
     return () => {
+      unfit?.();
       const card = cartoon.current?.card;
       if (card) card.style.visibility = "";
       dialog.removeEventListener("tabi:modal-close", requestClose);
@@ -579,6 +616,7 @@ export function Modal({
                 )
               }
               actions={dockActions?.actions}
+              secondary={saveAction ? undefined : dockActions?.secondary}
               wide={dockActions?.wide}
             />
           ) : (
