@@ -232,8 +232,8 @@ const fill = async (label, value) => {
         time.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
       });
     }
-    assert.equal(byText(".context-actions button", "保存する").disabled, false);
-    await click(byText(".context-actions button", "保存する"));
+    assert.equal(byText(".context-actions button", "決定").disabled, false);
+    await click(byText(".context-actions button", "決定"));
     await tick(30);
     return;
   }
