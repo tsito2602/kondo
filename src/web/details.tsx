@@ -43,6 +43,7 @@ import {
   bookingKinds,
 } from "./editors";
 import {
+  DetailDockActions,
   Modal,
   Field,
   MapLink,
@@ -130,25 +131,18 @@ export function PlaceDetail({
     <>
       <Modal
         title="場所の詳細"
+        addPanel
         dockActions={{
-          primary: itineraryAction,
-          actions: travel.canEdit && (
-            <>
-              <button aria-label="編集" onClick={() => setMode("edit")}>
-                <Pencil />
-              </button>
-              <button
-                aria-label="場所を削除"
-                className="danger"
-                onClick={remove}
-              >
-                <Trash2 />
-              </button>
-            </>
-          ),
+          // Every detail panel's dock: ‹ closes, 編集 then 削除 at the right edge.
+          actions: travel.canEdit ? (
+            <DetailDockActions
+              onEdit={() => setMode("edit")}
+              deleteLabel="場所を削除"
+              onDelete={remove}
+            />
+          ) : undefined,
         }}
         onClose={onClose}
-        full
         action={
           travel.canEdit && (
             <Button
@@ -252,7 +246,9 @@ export function PlaceDetail({
               })}
             </section>
           ) : null}
-          <div className="detail-inline-action">{itineraryAction}</div>
+          {itineraryAction && (
+            <div className="detail-itinerary-action">{itineraryAction}</div>
+          )}
           {travel.canEdit && (
             <button
               className="danger subtle detail-inline-action"

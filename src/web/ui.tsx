@@ -40,7 +40,7 @@ import {
 } from "./thumb-dock";
 import { Button } from "./obsidian/button";
 import { DockBackIcon } from "./cartoon-dock";
-import { spring } from "./cartoon";
+import { Glyph } from "./itinerary-icons";
 import {
   cardOrigin,
   closeToCard,
@@ -229,6 +229,40 @@ export function FormBackButton({
   );
 }
 
+/** Every card's detail panel has the same dock (Tsubasa 2026-10-06): ‹ on the
+    left closes it, and on the right 編集 sits just left of 削除 at the edge. */
+export function DetailDockActions({
+  onEdit,
+  onDelete,
+  editLabel = "編集",
+  deleteLabel = "削除",
+}: {
+  onEdit?: () => void;
+  onDelete?: () => void;
+  editLabel?: string;
+  deleteLabel?: string;
+}) {
+  return (
+    <>
+      {onEdit && (
+        <button type="button" aria-label={editLabel} onClick={onEdit}>
+          <Glyph name="edit" className="ps-dock-glyph" />
+        </button>
+      )}
+      {onDelete && (
+        <button
+          type="button"
+          aria-label={deleteLabel}
+          className="ps-dock-danger"
+          onClick={onDelete}
+        >
+          <Glyph name="trash" className="ps-dock-glyph" />
+        </button>
+      )}
+    </>
+  );
+}
+
 export type ModalTransition = {
   enter: (panel: HTMLElement, card: HTMLElement | null) => unknown;
   exit: (panel: HTMLElement, card: HTMLElement | null) => Promise<unknown>;
@@ -243,7 +277,6 @@ export function Modal({
   preserveNavigation = false,
   dockActions,
   plain = false,
-  sheet,
   transition,
   addPanel = false,
 }: PropsWithChildren<{
@@ -252,10 +285,6 @@ export function Modal({
       corners rounded, inset from the edges, right above the dock, the page
       blurred and receding behind it; it rises from the bottom like a sheet. */
   addPanel?: boolean;
-  /** "bottom": kondo-detail's sheet on phones: it rises from the bottom edge
-      on the split spring and drops on lead, instead of opening out of the
-      pressed card. */
-  sheet?: "bottom";
   onClose: () => void;
   full?: boolean;
   fullscreen?: boolean;
@@ -265,8 +294,7 @@ export function Modal({
     primary?: ReactNode;
     actions?: ReactNode;
     backLabel?: string;
-    /** Replaces the back circle on the left island (kondo-detail's 削除 and
-        編集 circles). */
+    /** Replaces the back circle on the left island. */
     back?: ReactNode;
     /** Many tools in a row where the tabs sit (a note's editor). */
     wide?: boolean;
@@ -311,20 +339,11 @@ export function Modal({
       panel && !reduceMotion() && matchMedia("(max-width: 759px)").matches;
     cartoon.current = phone
       ? {
-          card:
-            plain || addPanel || sheet === "bottom"
-              ? null
-              : cardOrigin(origin.current),
+          card: plain || addPanel ? null : cardOrigin(origin.current),
         }
       : null;
     if (phone && transition)
       void transition.enter(panel, cartoon.current!.card);
-    else if (phone && sheet === "bottom")
-      void spring(
-        panel,
-        [{ transform: "translateY(105%)" }, { transform: "none" }],
-        "split",
-      );
     else if (phone && cartoon.current?.card)
       void openFromCard(cartoon.current.card, panel, {
         parent: dialog,
@@ -337,10 +356,9 @@ export function Modal({
     else if (phone) void sheetIn(panel);
     const enter = phone ? null : animateDialog(dialog, origin.current);
     animation.current = enter;
-    // kondo-detail's sheet slides over a plain #0006 scrim, and a screen's
-    // own move draws over the page as it is: no receding page.
+    // A screen's own move draws over the page as it is: no receding page.
     depth.current =
-      plain || (phone && (sheet === "bottom" || transition))
+      plain || (phone && transition)
         ? null
         : menuDepth(
             reduceMotion(),
@@ -416,16 +434,9 @@ export function Modal({
       void (
         transition
           ? transition.exit(panel, card)
-          : sheet === "bottom"
-            ? spring(
-                panel,
-                [{ transform: "none" }, { transform: "translateY(105%)" }],
-                "lead",
-                { fill: "forwards" },
-              )
-            : card
-              ? closeToCard(card, panel, { parent: dialog })
-              : sheetOut(panel)
+          : card
+            ? closeToCard(card, panel, { parent: dialog })
+            : sheetOut(panel)
       ).then(finish);
       const timer = setTimeout(finish, 900);
       return () => {
@@ -467,7 +478,6 @@ export function Modal({
     <dialog
       ref={ref}
       aria-labelledby={id}
-      data-sheet={sheet}
       data-panel={addPanel ? "add" : undefined}
       className={`modal ${full || fullscreen ? "full" : ""} ${fullscreen ? "fullscreen" : ""} ${closing ? "closing" : ""}`}
       onCancel={(event) => {

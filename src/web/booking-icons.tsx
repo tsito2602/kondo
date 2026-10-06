@@ -104,17 +104,6 @@ export const CheckIcon = glyph(
     strokeLinejoin="round"
   />,
 );
-export const ShowIcon = glyph(
-  <>
-    <rect x="6" y="2.5" width="12" height="19" rx="3" {...stroke(2)} />
-    <path
-      d="M10 18h4"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-    />
-  </>,
-);
 export const CopyIcon = glyph(
   <>
     <rect x="8" y="8" width="12" height="12" rx="3" {...stroke(2)} />

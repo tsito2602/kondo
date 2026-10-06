@@ -279,36 +279,7 @@ button.bk-card {
   font-size: 22px;
 }
 
-/* detail: a full page over the list (the mock's .det) */
-.bk-det,
-.bk-showl {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  max-width: none;
-  height: 100dvh;
-  max-height: none;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: var(--p-paper);
-  color: var(--p-ink);
-  overflow: hidden;
-}
-.bk-det::backdrop,
-.bk-showl::backdrop {
-  background: transparent;
-}
-.bk-det-in {
-  height: 100%;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
-  padding: calc(8px + env(safe-area-inset-top)) 18px 140px;
-}
-.bk-det-in::-webkit-scrollbar {
-  display: none;
-}
+/* detail: the floating panel (Modal addPanel), like every card's detail */
 .bk-detail {
   width: min(100%, 640px);
   margin: 0 auto;
@@ -424,107 +395,6 @@ button.bk-card {
 }
 .bk-acts .danger {
   color: var(--p-danger);
-}
-
-/* 見せる: the counter screen (the mock's .show) */
-.bk-show {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  padding: calc(12px + env(safe-area-inset-top)) 22px 120px;
-  text-align: center;
-}
-.bk-show-k {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--p-mute);
-}
-.bk-show h3 {
-  margin: 4px 0 0;
-  font-size: 24px;
-  font-weight: 900;
-}
-.bk-show-big {
-  margin: 18px 0 4px;
-  font-family: var(--f-num);
-  font-size: 38px;
-  font-weight: 800;
-  line-height: 1;
-}
-.bk-show-big .words {
-  font-size: 24px;
-}
-.bk-show-big small {
-  display: block;
-  margin-top: 8px;
-  font-family: var(--f-body);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--p-mute);
-}
-.bk-show-code {
-  margin: 22px 0 0;
-  padding: 16px;
-  border-radius: 24px;
-  background: var(--p-soft);
-}
-.bk-show-code small {
-  display: block;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--p-mute);
-}
-.bk-show-code b {
-  display: block;
-  margin-top: 4px;
-  font-family: var(--f-mono);
-  font-size: 34px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  overflow-wrap: anywhere;
-}
-.bk-show-seat {
-  margin-top: 12px;
-  font-size: 15px;
-  font-weight: 700;
-}
-.bk-show-page {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 6px;
-  width: 150px;
-  max-height: 200px;
-  margin: 16px auto 0;
-  padding: 14px 12px;
-  border: 0;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow:
-    0 0 0 1.5px var(--p-line),
-    0 10px 24px -14px #0006;
-  color: #111;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.bk-show-page b {
-  overflow: hidden;
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.bk-show-page i {
-  display: block;
-  height: 6px;
-  border-radius: 3px;
-  background: #ddd;
-}
-.bk-show-page small {
-  margin-top: auto;
-  font-size: 10px;
-  color: #777;
-  text-align: center;
 }
 
 /* add: import from screenshots / PDFs, or type it in */

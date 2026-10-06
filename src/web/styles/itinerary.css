@@ -1836,6 +1836,23 @@ dialog[data-panel="add"],
 :root dialog.modal[data-panel="add"] .modal-body {
   padding: 0 18px 18px;
 }
+/* A card's detail in the same panel (予約・場所; 予定 above) leads with the
+   card itself: the panel's name stays for screen readers only. */
+:root
+  dialog.modal[data-panel="add"]:is(:has(.bk-detail), :has(.detail-stack))
+  .modal-header {
+  padding-top: 18px;
+}
+:root
+  dialog.modal[data-panel="add"]:is(:has(.bk-detail), :has(.detail-stack))
+  .modal-header
+  h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
 .plan-add {
   color: var(--it-ink);
 }
@@ -1935,45 +1952,7 @@ dialog[data-panel="add"],
   margin: 8px 2px 0;
 }
 
-/* ===== kondo-detail: the plan's detail is a bottom sheet on phones =====
-   88 % of the screen, top corners 32 px, no grab bar, over a #0006 scrim. */
-@media (max-width: 759px) {
-  :root:root dialog.modal[data-sheet="bottom"] {
-    padding: 0;
-    align-items: flex-end;
-  }
-  :root:root dialog.modal[data-sheet="bottom"] .modal-inner {
-    height: 88%;
-    max-height: 88%;
-    border-radius: 32px 32px 0 0;
-    box-shadow: 0 -10px 40px -10px #0005;
-  }
-  :root:root dialog.modal[data-sheet="bottom"]::backdrop {
-    background: #0006;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    animation-duration: 250ms;
-  }
-  :root dialog[data-sheet="bottom"]:has(.plan-sheet) .modal-body {
-    padding: 10px 22px 130px;
-  }
-  :root dialog[data-sheet="bottom"]:has(.plan-sheet) .modal-header {
-    height: 14px;
-    padding: 0;
-  }
-}
-/* The detail's dock: separate 削除 and 編集 circles (left 16 and 86); the
-   dock draws no island under them (CartoonDock.targets) and each circle is
-   its own pill. */
-:root .cdock-group[data-slot="l"]:has(> .ps-dock-circle) {
-  gap: 8px;
-}
-:root .cdock-group[data-slot="l"] > .ps-dock-circle {
-  width: 62px;
-  border-radius: 31px;
-  background: var(--p-dock);
-  box-shadow: var(--p-dock-shadow);
-}
+/* A detail panel's 削除 (DetailDockActions in ui.tsx). */
 :root .cdock-group > .ps-dock-danger {
   color: #c2410c;
 }

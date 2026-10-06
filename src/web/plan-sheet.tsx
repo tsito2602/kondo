@@ -45,7 +45,13 @@ import type {
 import { dismissModal } from "./motion";
 import { LinkedNotes } from "./linked-notes";
 import { ContextDock, ThumbDock } from "./thumb-dock";
-import { ErrorText, FormBackButton, Modal, useAction } from "./ui";
+import {
+  DetailDockActions,
+  ErrorText,
+  FormBackButton,
+  Modal,
+  useAction,
+} from "./ui";
 import { categoryGlyph, Glyph, MapPin } from "./itinerary-icons";
 import {
   bookingLabel,
@@ -694,39 +700,22 @@ export function PlanSheet({
   return (
     <Modal
       title="予定の詳細"
-      full
-      sheet="bottom"
+      addPanel
       onClose={onClose}
       dockActions={{
-        // kondo-detail: 削除 and 編集 circles at the left, 「閉じる」 at the right.
-        back: travel.canEdit ? (
-          <>
-            <button
-              aria-label="予定を削除"
-              className="ps-dock-circle ps-dock-danger"
-              onClick={() =>
-                dismissModal(() => {
-                  onClose();
-                  onDelete(item);
-                })
-              }
-            >
-              <Glyph name="trash" className="ps-dock-glyph" />
-            </button>
-            <button
-              aria-label="編集"
-              className="ps-dock-circle"
-              onClick={() => setEditing(true)}
-            >
-              <Glyph name="edit" className="ps-dock-glyph" />
-            </button>
-          </>
+        // Every detail panel's dock: ‹ closes, 編集 then 削除 at the right edge.
+        actions: travel.canEdit ? (
+          <DetailDockActions
+            onEdit={() => setEditing(true)}
+            deleteLabel="予定を削除"
+            onDelete={() =>
+              dismissModal(() => {
+                onClose();
+                onDelete(item);
+              })
+            }
+          />
         ) : undefined,
-        actions: (
-          <button type="button" onClick={() => dismissModal(onClose)}>
-            閉じる
-          </button>
-        ),
       }}
     >
       {editing ? (
@@ -1050,7 +1039,7 @@ export function BookingSheet({
   return (
     <Modal
       title="予約の詳細"
-      full
+      addPanel
       onClose={onClose}
       dockActions={{
         actions: (
