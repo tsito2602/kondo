@@ -173,7 +173,7 @@ export function PlacesScreen() {
   return (
     <div className="page places-page">
       <div className="places-head">
-        <p>行きたい場所 · {model.count}</p>
+        <p>場所 · {model.count}</p>
         {model.days.length > 0 && (
           <div className="places-chips" role="group" aria-label="表示する日">
             {["all", ...model.days].map((entry) => (
@@ -660,7 +660,7 @@ function PlacesMap({
       ref={mapEl}
       className="places-map"
       role="group"
-      aria-label="行きたい場所の地図"
+      aria-label="場所の地図"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
