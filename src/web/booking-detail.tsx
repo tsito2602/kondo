@@ -1,7 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
-import { findAirportByCode } from "@/data/airports";
 import {
   findFlightConnections,
   flightConnectionCandidates,
@@ -9,25 +7,16 @@ import {
 } from "@/data/flight-connections";
 import { mapUrl, referenceUrl } from "@/data/places";
 import { useTravel } from "@/data/travel-provider";
-import type { Booking, BookingDocument } from "@/data/types";
-import { addDays } from "@/utils/dates";
-import { BookingCard, dayLabel, monthDay, useClockNow } from "./booking-card";
-import {
-  ArrowIcon,
-  ClipIcon,
-  CopyIcon,
-  PinIcon,
-  ShowIcon,
-} from "./booking-icons";
-import { bookingSink } from "./booking-motion";
+import type { BookingDocument } from "@/data/types";
+import { BookingCard, dayLabel, useClockNow } from "./booking-card";
+import { ArrowIcon, ClipIcon, CopyIcon, PinIcon } from "./booking-icons";
 import { japanTimes } from "./booking-schedule";
-import { anim, ease, linearSupported, RM, spring } from "./cartoon";
-import { DockBackIcon } from "./cartoon-dock";
+import { spring } from "./cartoon";
 import { DocumentPreview } from "./document-preview";
-import { BookingEditor, bookingKinds } from "./editors";
+import { BookingEditor } from "./editors";
 import { lockModalPage } from "./modal-scroll-lock";
-import { ContextDock, ThumbDock } from "./thumb-dock";
-import { copyText, useAction, useToast } from "./ui";
+import { dismissModal } from "./motion";
+import { copyText, DetailDockActions, Modal, useAction, useToast } from "./ui";
 
 const DOC_TYPES = [
   "application/pdf",
@@ -39,8 +28,8 @@ const DOC_TYPES = [
   "image/heif",
 ];
 
-/** A full-screen layer of its own (the mock's .det and .show): a modal
-    <dialog> so focus, Escape and the dock's top layer behave like a sheet. */
+/** A layer of its own (予約を追加's import sheet): a modal <dialog> so
+    focus, Escape and the dock's top layer behave like a sheet. */
 export function useLayer(onEscape: () => void) {
   const ref = useRef<HTMLDialogElement>(null);
   const escape = useRef(onEscape);
@@ -78,8 +67,6 @@ export function BookingDetail({
   const { busy, run } = useAction();
   const now = useClockNow();
   const [editing, setEditing] = useState(false);
-  const [showing, setShowing] = useState(false);
-  const [closing, setClosing] = useState(false);
   const [preview, setPreview] = useState<{
     url: string;
     file: BookingDocument;
@@ -90,70 +77,7 @@ export function BookingDetail({
     },
     [preview],
   );
-  // The card it was opened from, measured before the page is locked.
-  const [from] = useState(() =>
-    [...document.querySelectorAll<HTMLElement>("[data-booking]")]
-      .find((element) => element.dataset.booking === id)
-      ?.getBoundingClientRect(),
-  );
-  const close = () => setClosing(true);
-  const ref = useLayer(close);
   const booking = travel.bookings.find((entry) => entry.id === id);
-  useLayoutEffect(() => {
-    const dialog = ref.current;
-    const card = dialog?.querySelector<HTMLElement>(".bk-card");
-    if (!dialog?.animate || !card || RM()) return;
-    // The card flies from where it sat in the list, on split.
-    if (from) {
-      const to = card.getBoundingClientRect();
-      const split = ease("split");
-      card.animate(
-        [
-          {
-            transform: `translate(${from.left - to.left}px,${from.top - to.top}px) scale(${from.width / to.width})`,
-          },
-          { transform: "none" },
-        ],
-        {
-          duration: split.ms,
-          easing: linearSupported()
-            ? split.easing
-            : "cubic-bezier(.3,1.3,.5,1)",
-        },
-      );
-    }
-    dialog.animate(
-      [
-        { backgroundColor: "transparent" },
-        { backgroundColor: getComputedStyle(dialog).backgroundColor },
-      ],
-      { duration: 220 },
-    );
-    dialog
-      .querySelectorAll(".bk-kv")
-      .forEach((element) => bookingSink(element, 30, 120));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  useEffect(() => {
-    if (!closing) return;
-    const dialog = ref.current;
-    if (!dialog || RM()) return onClose();
-    let done = false;
-    const finish = () => {
-      if (!done) ((done = true), onClose());
-    };
-    void anim(
-      dialog.querySelector(".bk-det-in") ?? dialog,
-      [
-        { opacity: 1, transform: "none" },
-        { opacity: 0, transform: "translateY(40px)" },
-      ],
-      { duration: 200, easing: "ease-in", fill: "forwards" },
-    ).then(finish);
-    const timer = setTimeout(finish, 400);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [closing]);
   useEffect(() => {
     if (!booking) onClose();
   }, [booking, onClose]);
@@ -207,10 +131,11 @@ export function BookingDetail({
     });
   const remove = () =>
     void run(() => {
-      if (confirm("この予約を削除しますか？")) {
-        travel.deleteBooking(id);
-        onClose();
-      }
+      if (confirm("この予約を削除しますか？"))
+        dismissModal(() => {
+          travel.deleteBooking(id);
+          onClose();
+        });
     });
   const press = (element: Element) =>
     spring(
@@ -220,14 +145,23 @@ export function BookingDetail({
     );
   const seatLabel = booking.kind === "hotel" ? "部屋" : "メモ";
 
-  return createPortal(
-    <dialog
-      ref={ref}
-      className="bk-det"
-      aria-label={booking.title}
-      inert={closing}
-    >
-      <div className="bk-det-in">
+  return (
+    <>
+      <Modal
+        title="予約の詳細"
+        addPanel
+        onClose={onClose}
+        dockActions={{
+          // Every detail panel's dock: ‹ closes, 編集 then 削除 at the right edge.
+          actions: travel.canEdit ? (
+            <DetailDockActions
+              onEdit={() => setEditing(true)}
+              deleteLabel="予約を削除"
+              onDelete={remove}
+            />
+          ) : undefined,
+        }}
+      >
         <div className="bk-detail">
           <BookingCard booking={booking} now={now} showDate />
           {connection && (
@@ -372,9 +306,11 @@ export function BookingDetail({
                   type="button"
                   onClick={() => {
                     const trip = travel.selectedTrip?.id;
-                    onClose();
-                    if (trip)
-                      navigate(`/trips/${trip}/itinerary?day=${booking.day}`);
+                    dismissModal(() => {
+                      onClose();
+                      if (trip)
+                        navigate(`/trips/${trip}/itinerary?day=${booking.day}`);
+                    });
                   }}
                 >
                   <ArrowIcon size={16} />
@@ -400,7 +336,8 @@ export function BookingDetail({
                   }}
                 />
               </label>
-              <div className="bk-acts">
+              {/* Wide screens have no dock: 編集 and 削除 stay in the panel. */}
+              <div className="bk-acts detail-inline-action">
                 <button type="button" onClick={() => setEditing(true)}>
                   編集する
                 </button>
@@ -411,184 +348,13 @@ export function BookingDetail({
             </>
           )}
         </div>
-      </div>
-      <ThumbDock mode="context" target={() => ref.current} disabled={closing}>
-        <ContextDock
-          back={
-            <button type="button" aria-label="戻る" onClick={close}>
-              <DockBackIcon />
-            </button>
-          }
-          primary={
-            <button type="button" onClick={() => setShowing(true)}>
-              <ShowIcon size={22} />
-              見せる
-            </button>
-          }
-        />
-      </ThumbDock>
+      </Modal>
       {editing && (
         <BookingEditor booking={booking} onClose={() => setEditing(false)} />
-      )}
-      {showing && (
-        <BookingShow
-          booking={booking}
-          documents={documents}
-          onOpen={open}
-          onClose={() => setShowing(false)}
-        />
       )}
       {preview && (
         <DocumentPreview {...preview} onClose={() => setPreview(null)} />
       )}
-    </dialog>,
-    document.body,
-  );
-}
-
-/** 見せる: the booking big enough to hold up at a counter (the mock's .show). */
-export function BookingShow({
-  booking,
-  documents,
-  onOpen,
-  onClose,
-}: {
-  booking: Booking;
-  documents: BookingDocument[];
-  onOpen: (document: BookingDocument) => void;
-  onClose: () => void;
-}) {
-  const [closing, setClosing] = useState(false);
-  const ref = useLayer(() => setClosing(true));
-  useLayoutEffect(() => {
-    const dialog = ref.current;
-    if (!dialog?.animate || RM()) return;
-    dialog.animate(
-      [
-        { clipPath: "circle(0% at 80% 95%)" },
-        { clipPath: "circle(150% at 80% 95%)" },
-      ],
-      { duration: 420, easing: "cubic-bezier(.3,0,.2,1)" },
-    );
-    const code = dialog.querySelector(".bk-show-code");
-    if (code)
-      void spring(
-        code,
-        [{ transform: "scale(.7)" }, { transform: "none" }],
-        "boing",
-        { delay: 160, fill: "backwards" },
-      );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  useEffect(() => {
-    if (!closing) return;
-    const dialog = ref.current;
-    if (!dialog || RM()) return onClose();
-    void anim(dialog, [{ opacity: 1 }, { opacity: 0 }], {
-      duration: 160,
-      fill: "forwards",
-    }).then(onClose);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [closing]);
-  const kind = bookingKinds.find(
-    (entry) => entry.value === booking.kind,
-  )?.label;
-  const route = ["flight", "train", "car"].includes(booking.kind);
-  const detail =
-    booking.detail && !/^https?:/i.test(booking.detail) ? booking.detail : "";
-  // Vehicles lead with the number and name the carrier; the rest lead with their name.
-  const kicker = [kind, route ? booking.title : detail]
-    .filter(Boolean)
-    .join(" · ");
-  const heading = route ? detail : booking.title;
-  const place = (name: string, airportCode: string) =>
-    booking.kind === "flight"
-      ? findAirportByCode(airportCode)?.code || airportCode || name
-      : name || airportCode;
-  const end = booking.endDay || booking.day;
-  const nextDay = end > booking.day;
-  const document = documents[0];
-  return createPortal(
-    <dialog
-      ref={ref}
-      className="bk-showl"
-      aria-label={`${booking.title}を見せる`}
-      inert={closing}
-    >
-      <div className="bk-show">
-        <span className="bk-show-k">{kicker}</span>
-        {heading && <h3>{heading}</h3>}
-        <div className="bk-show-big">
-          {route ? (
-            <>
-              {booking.kind === "flight" ? (
-                place(booking.origin, booking.originCode)
-              ) : (
-                <span className="words">
-                  {place(booking.origin, booking.originCode)}
-                </span>
-              )}{" "}
-              →{" "}
-              {booking.kind === "flight" ? (
-                place(booking.destination, booking.destinationCode)
-              ) : (
-                <span className="words">
-                  {place(booking.destination, booking.destinationCode)}
-                </span>
-              )}
-              <small>
-                {dayLabel(booking.day)} {booking.time} 発 →{" "}
-                {nextDay
-                  ? end === addDays(booking.day, 1)
-                    ? "翌日 "
-                    : `${monthDay(end)} `
-                  : ""}
-                {booking.endTime} 着
-              </small>
-            </>
-          ) : (
-            <>
-              {booking.time || monthDay(booking.day)}
-              <small>
-                {dayLabel(booking.day)}
-                {booking.kind === "hotel"
-                  ? ` チェックイン · ${monthDay(end)} チェックアウト`
-                  : ""}
-              </small>
-            </>
-          )}
-        </div>
-        {booking.confirmationCode && (
-          <div className="bk-show-code">
-            <small>予約番号</small>
-            <b>{booking.confirmationCode}</b>
-          </div>
-        )}
-        {document && (
-          <button
-            type="button"
-            className="bk-show-page"
-            onClick={() => onOpen(document)}
-          >
-            <b>{document.filename}</b>
-            <i style={{ width: "80%" }} />
-            <i style={{ width: "60%" }} />
-            <i style={{ width: "90%" }} />
-            <i style={{ width: "45%" }} />
-            <small>押すと書類を全画面で開く</small>
-          </button>
-        )}
-      </div>
-      <ThumbDock mode="context" target={() => ref.current} disabled={closing}>
-        <ContextDock
-          primary={
-            <button type="button" onClick={() => setClosing(true)}>
-              閉じる
-            </button>
-          }
-        />
-      </ThumbDock>
-    </dialog>,
-    window.document.body,
+    </>
   );
 }

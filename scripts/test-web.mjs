@@ -371,9 +371,8 @@ const setTime = async (label, value) => {
 const editInPlace = async (change) => {
   const detail = document.querySelector("dialog[open]");
   const dock = document.querySelector(".thumb-dock-host");
-  // The plan detail keeps 編集 beside 削除 at the left (kondo-detail).
-  const edit =
-    '.context-actions [aria-label="編集"], .context-back [aria-label="編集"]';
+  // Every detail panel keeps 編集 just left of 削除 on the right island.
+  const edit = '.context-actions [aria-label="編集"]';
   for (const save of [false, true]) {
     await click(document.querySelector(edit));
     assert.equal(document.querySelectorAll("dialog[open]").length, 1);
@@ -704,8 +703,10 @@ test("legacy account cache and pending changes survive React migration; real for
         entry.textContent.includes("市内を歩く"),
       ),
     );
+    // The plan's detail is the ＋ button's floating panel.
+    assert.equal(document.querySelector("dialog[open]").dataset.panel, "add");
     assert.ok(
-      document.querySelector('.context-back [aria-label="予定を削除"]'),
+      document.querySelector('.context-actions [aria-label="予定を削除"]'),
     );
     await editInPlace(async () => {
       await fill("タイトル", "市内を散策");
@@ -722,15 +723,18 @@ test("legacy account cache and pending changes survive React migration; real for
       trip.startsOn,
       "end time supplies same-day end date",
     );
-    // kondo-detail's dock: 削除 and 編集 circles at the left, 「閉じる」 at the right.
-    assert.equal(
-      document.querySelector(".context-actions")?.textContent ?? "",
-      "閉じる",
+    // Every detail panel's dock: ‹ on the left, 編集 then 削除 at the right edge.
+    assert.ok(document.querySelector('.context-back [aria-label="戻る"]'));
+    assert.deepEqual(
+      [...document.querySelectorAll(".context-actions button")].map((node) =>
+        node.getAttribute("aria-label"),
+      ),
+      ["編集", "予定を削除"],
     );
     assert.equal(document.querySelector(".thumb-dock-host .cdock-tabs"), null);
     // Deleting is quiet: the plan goes at once and 「元に戻す」 brings it back.
     await click(
-      document.querySelector('.context-back [aria-label="予定を削除"]'),
+      document.querySelector('.context-actions [aria-label="予定を削除"]'),
     );
     await waitFor(
       () => !document.querySelector("dialog[open]"),
@@ -801,7 +805,8 @@ test("legacy account cache and pending changes survive React migration; real for
     const saved = db.prepare("SELECT * FROM bookings").get();
     assert.equal(saved.title, "テストホテル");
     await click(document.querySelector(".bk-card"));
-    const detail = document.querySelector("dialog.bk-det");
+    const detail = document.querySelector("dialog[open]");
+    assert.equal(detail.dataset.panel, "add");
     const hotelLink = [...detail.querySelectorAll(".bk-kv a")].find(
       (node) => node.textContent === "地図",
     );
@@ -811,9 +816,19 @@ test("legacy account cache and pending changes survive React migration; real for
       /long-link-|reservation=private|Google Mapsで開く/,
     );
     assert.equal(document.querySelector(".thumb-dock-host .cdock-tabs"), null);
-    // The mock's detail dock: the back circle and 「見せる」 in ink.
-    assert.ok(byText(".thumb-dock-host .cdock-group button", "見せる"));
-    await click(byText("dialog.bk-det .bk-acts button", "編集する"));
+    // The detail panel's dock: ‹, then 編集 and 削除 at the right; no 「見せる」.
+    assert.ok(document.querySelector('.context-back [aria-label="戻る"]'));
+    assert.deepEqual(
+      [...document.querySelectorAll(".context-actions button")].map((node) =>
+        node.getAttribute("aria-label"),
+      ),
+      ["編集", "予約を削除"],
+    );
+    assert.equal(
+      byText(".thumb-dock-host .cdock-group button", "見せる"),
+      undefined,
+    );
+    await click(document.querySelector('.context-actions [aria-label="編集"]'));
     assert.equal(document.querySelectorAll("dialog[open]").length, 2);
     await fill("宿泊施設名", "更新したホテル");
     await submit();
@@ -821,10 +836,7 @@ test("legacy account cache and pending changes survive React migration; real for
       db.prepare("SELECT title FROM bookings").get().title,
       "更新したホテル",
     );
-    assert.match(
-      document.querySelector("dialog.bk-det .bk-hd").textContent,
-      /更新したホテル/,
-    );
+    assert.match(detail.querySelector(".bk-hd").textContent, /更新したホテル/);
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
     await click(byText("nav a", "場所"));
@@ -893,7 +905,16 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.equal(document.querySelector(".thumb-dock-host .cdock-tabs"), null);
     const placeDetail = document.querySelector("dialog[open]");
-    await click(byText(".context-actions button", "しおりへ追加"));
+    // The dock holds only 編集 and 削除; しおり's action sits in the panel.
+    assert.deepEqual(
+      [...document.querySelectorAll(".context-actions button")].map((node) =>
+        node.getAttribute("aria-label"),
+      ),
+      ["編集", "場所を削除"],
+    );
+    await click(
+      byText("dialog .detail-itinerary-action button", "しおりへ追加"),
+    );
     assert.equal(document.querySelectorAll("dialog[open]").length, 2);
     await fill("開始", { time: "16:00" });
     await submit();
@@ -906,7 +927,7 @@ test("legacy account cache and pending changes survive React migration; real for
       "16:00",
     );
     assert.equal(
-      document.querySelector(".context-actions").textContent,
+      document.querySelector("dialog .detail-itinerary-action").textContent,
       "しおりを見る",
     );
     globalThis.confirm = () => false;
@@ -930,7 +951,7 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
     assert.equal(
-      document.querySelector(".context-actions").textContent,
+      document.querySelector("dialog .detail-itinerary-action").textContent,
       "しおりを見る",
     );
     await click(document.querySelector('.context-actions [aria-label="編集"]'));
@@ -1596,7 +1617,7 @@ test("legacy account cache and pending changes survive React migration; real for
         entry.textContent.includes("NRT → KIX"),
       ),
     );
-    await click(byText("dialog.bk-det .bk-acts button", "編集する"));
+    await click(document.querySelector('.context-actions [aria-label="編集"]'));
     assert.equal(
       field("便名（任意）").value,
       "",
