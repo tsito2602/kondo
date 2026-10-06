@@ -201,6 +201,15 @@ export function useMotionNavigation() {
         "--route-direction",
         String(from >= 0 && to >= 0 && to < from ? -1 : 1),
       );
+      // Between one trip's tabs the mocks swap the page at once (only its
+      // parts drop in), so no page cross-fade or slide.
+      const trip = (path: string) => path.split("/").slice(0, 3).join("/");
+      if (
+        from >= 0 &&
+        to >= 0 &&
+        trip(url.pathname) === trip(window.location.pathname)
+      )
+        return;
       if (!document.startViewTransition || reduceMotion()) return;
       event.preventDefault();
       active?.skipTransition();
