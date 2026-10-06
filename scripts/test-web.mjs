@@ -371,8 +371,11 @@ const setTime = async (label, value) => {
 const editInPlace = async (change) => {
   const detail = document.querySelector("dialog[open]");
   const dock = document.querySelector(".thumb-dock-host");
+  // The plan detail keeps 編集 beside 削除 at the left (kondo-detail).
+  const edit =
+    '.context-actions [aria-label="編集"], .context-back [aria-label="編集"]';
   for (const save of [false, true]) {
-    await click(document.querySelector('.context-actions [aria-label="編集"]'));
+    await click(document.querySelector(edit));
     assert.equal(document.querySelectorAll("dialog[open]").length, 1);
     assert.equal(document.querySelector("dialog[open]"), detail);
     assert.equal(dock.parentElement, detail);
@@ -400,7 +403,7 @@ const editInPlace = async (change) => {
     }
     assert.equal(document.querySelector("dialog[open]"), detail);
     assert.equal(detail.querySelector("form"), null, "back to the details");
-    assert.ok(document.querySelector('.context-actions [aria-label="編集"]'));
+    assert.ok(document.querySelector(edit));
   }
 };
 
@@ -702,7 +705,7 @@ test("legacy account cache and pending changes survive React migration; real for
       ),
     );
     assert.ok(
-      document.querySelector('.context-actions [aria-label="予定を削除"]'),
+      document.querySelector('.context-back [aria-label="予定を削除"]'),
     );
     await editInPlace(async () => {
       await fill("タイトル", "市内を散策");
@@ -719,14 +722,15 @@ test("legacy account cache and pending changes survive React migration; real for
       trip.startsOn,
       "end time supplies same-day end date",
     );
+    // kondo-detail's dock: 削除 and 編集 circles at the left, 「閉じる」 at the right.
     assert.equal(
       document.querySelector(".context-actions")?.textContent ?? "",
-      "",
+      "閉じる",
     );
     assert.equal(document.querySelector(".thumb-dock-host .cdock-tabs"), null);
     // Deleting is quiet: the plan goes at once and 「元に戻す」 brings it back.
     await click(
-      document.querySelector('.context-actions [aria-label="予定を削除"]'),
+      document.querySelector('.context-back [aria-label="予定を削除"]'),
     );
     await tick(400);
     assert.equal(document.querySelector("dialog[open]"), null);
