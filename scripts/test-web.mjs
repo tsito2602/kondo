@@ -653,7 +653,17 @@ test("legacy account cache and pending changes survive React migration; real for
     await tick(30);
     await click(byText("nav a", "予約"));
     await click(document.querySelector('[aria-label="予約を追加"]'));
-    await fill("種類", "hotel");
+    assert.equal(
+      document.querySelector("dialog h2").textContent,
+      "予約を取り込む",
+    );
+    await click(document.querySelector("dialog .bk-swap"));
+    assert.equal(
+      field("宿泊施設名"),
+      undefined,
+      "the manual form shows no fields before a kind is chosen",
+    );
+    await click(byText("dialog .bk-kinds button", "ホテル"));
     await fill("宿泊施設名", "テストホテル");
     const hotelUrl =
       "https://links.h6.hilton.com/f/a/" +
@@ -664,7 +674,7 @@ test("legacy account cache and pending changes survive React migration; real for
     await fill("宿泊期間", { start: trip.startsOn, end: "2026-11-25" });
     await submit();
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM bookings").get().n, 1);
-    await click(document.querySelector(".booking-ticket"));
+    await click(document.querySelector(".bk-card"));
     const hotelLink = document.querySelector("dialog .reference-link");
     assert.equal(hotelLink.href, hotelUrl);
     assert.match(hotelLink.textContent, /サイトを開く/);
@@ -1321,6 +1331,8 @@ test("legacy account cache and pending changes survive React migration; real for
 
     await click(byText("nav a", "予約"));
     await click(document.querySelector('[aria-label="予約を追加"]'));
+    await click(document.querySelector("dialog .bk-swap"));
+    await click(byText("dialog .bk-kinds button", "航空券"));
     assert.equal(field("予約名"), undefined);
     assert.equal(field("出発空港（IATA）"), undefined);
     await fill("出発地", "成田");
@@ -1375,7 +1387,7 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.equal(savedFlight.destination_code, "KIX");
     assert.equal(savedFlight.confirmation_code, "JM6EQC");
     await click(
-      [...document.querySelectorAll(".booking-ticket")].find((entry) =>
+      [...document.querySelectorAll(".bk-card")].find((entry) =>
         entry.textContent.includes("NRT → KIX"),
       ),
     );
@@ -1745,14 +1757,16 @@ test("booking details use kind-specific labels and keep single-date reservations
   );
 });
 
-test("compact reservation tickets retain airport names and both dates", async () => {
-  const { BookingTicketContent } = await bundle(
-    "export { BookingTicketContent } from './src/web/booking-ticket';",
+test("booking cards stack journeys, lead stays with dates and stamp used bookings", async () => {
+  const { BookingCard } = await bundle(
+    "export { BookingCard } from './src/web/booking-card';",
   );
   const { renderToStaticMarkup } = await import("react-dom/server");
   const booking = {
+    id: "f1",
     kind: "flight",
     title: "GK211",
+    detail: "",
     origin: "",
     originCode: "NRT",
     destination: "",
@@ -1762,68 +1776,103 @@ test("compact reservation tickets retain airport names and both dates", async ()
     endDay: "2027-01-01",
     endTime: "01:00",
     confirmationCode: "JM6EQC",
+    note: "",
   };
-  const render = (value) =>
+  const render = (value, now = "2026-12-01T09:00", showDate = false) =>
     new JSDOM(
       renderToStaticMarkup(
-        React.createElement(BookingTicketContent, { booking: value }),
+        React.createElement(BookingCard, { booking: value, now, showDate }),
       ),
     ).window.document;
   const flight = render(booking);
   assert.deepEqual(
-    [...flight.querySelectorAll(".ticket-place strong")].map(
-      (node) => node.textContent,
-    ),
+    [...flight.querySelectorAll(".bk-pl b")].map((node) => node.textContent),
     ["NRT", "KIX"],
   );
   assert.deepEqual(
-    [...flight.querySelectorAll(".ticket-place span")].map(
+    [...flight.querySelectorAll(".bk-pl small")].map(
       (node) => node.textContent,
     ),
     ["成田国際空港", "関西国際空港"],
   );
-  assert.equal(flight.querySelector(".ticket-service").textContent, "GK211");
+  assert.deepEqual(
+    [...flight.querySelectorAll(".bk-t")].map((node) => node.textContent),
+    ["19:00発", "01:00翌日 着"],
+    "each big time sits on its stop row with its label below",
+  );
   assert.equal(
-    flight.querySelector(".ticket-reference strong").textContent,
-    "JM6EQC",
+    flight.querySelector(".bk-cn path").getAttribute("d"),
+    "M7 0 Q19 50 7 100",
+    "flights join their stops with an arc",
   );
-  assert.match(
-    flight.querySelector(".ticket-schedule").textContent,
-    /12\/31.*19:00.*2027\/1\/1.*01:00/,
+  assert.equal(flight.querySelector(".bk-code b").textContent, "JM6EQC");
+  assert.equal(
+    flight.querySelector(".bk-hd span"),
+    null,
+    "no date under a day heading",
   );
-  const hotel = render({
+  assert.equal(
+    render(booking, undefined, true).querySelector(".bk-hd span").textContent,
+    "12/31（木）",
+  );
+  assert.equal(flight.querySelector(".bk-stamp"), null);
+  const train = render({
+    ...booking,
+    kind: "train",
+    origin: "東京",
+    originCode: "",
+    destination: "新大阪",
+    destinationCode: "",
+    endDay: "2026-12-31",
+    endTime: "21:30",
+  });
+  assert.equal(
+    train.querySelector(".bk-cn path").getAttribute("d"),
+    "M7 0 V100",
+  );
+  assert.equal(train.querySelector(".bk-du").textContent, "2時間30分");
+  const hotel = {
     ...booking,
     kind: "hotel",
     title: "星の宿",
-    time: "22:30",
+    detail: "旧市街",
+    day: "2026-10-20",
+    time: "15:00",
+    endDay: "2026-10-23",
     endTime: "11:00",
-  });
-  assert.equal(hotel.querySelector(".ticket-title").textContent, "星の宿");
-  assert.equal(hotel.querySelector(".ticket-route"), null);
-  assert.match(
-    hotel.querySelector(".ticket-schedule").textContent,
-    /チェックイン.*22:30〜.*チェックアウト.*〜11:00/,
-  );
-  assert.equal(
-    render({
-      ...booking,
-      kind: "hotel",
-      time: "",
-      endTime: "",
-      confirmationCode: "",
-    }).querySelector(".ticket-reference"),
-    null,
+  };
+  const stay = render(hotel, "2026-10-21T13:00", true);
+  assert.deepEqual(
+    [...stay.querySelectorAll(".bk-t b")].map((node) => node.textContent),
+    ["10/20", "10/23"],
   );
   assert.deepEqual(
-    [
-      ...render({
-        ...booking,
-        kind: "hotel",
-        time: "",
-        endTime: "",
-      }).querySelectorAll("time"),
-    ].map((node) => node.textContent),
-    ["時刻未定", "時刻未定"],
+    [...stay.querySelectorAll(".bk-pl")].map((node) => node.textContent),
+    ["チェックイン15:00から", "チェックアウト11:00まで"],
+  );
+  assert.equal(
+    stay.querySelector(".bk-du").textContent,
+    "3泊 · いま2泊目 · 旧市街",
+  );
+  assert.equal(
+    stay.querySelector(".bk-hd span"),
+    null,
+    "hotels never show a header date",
+  );
+  assert.equal(
+    render(hotel, "2026-10-01T09:00").querySelector(".bk-du").textContent,
+    "3泊 · 旧市街",
+  );
+  const used = render(hotel, "2026-10-23T11:01");
+  assert.ok(used.querySelector(".bk-card.used"));
+  assert.match(
+    used.querySelector(".bk-stamp textPath").textContent,
+    /USED · USED · USED · USED/,
+  );
+  assert.equal(used.querySelector(".bk-stamp .bk-c").textContent, "済");
+  assert.equal(
+    render({ ...hotel, confirmationCode: "" }).querySelector(".bk-code"),
+    null,
   );
 });
 
@@ -1943,4 +1992,161 @@ test("home trip cards: destination lines, countdown and companion icons", async 
   );
   assert.equal(photo.querySelector(".home-trip-place"), null);
   assert.equal(photo.querySelector("small").textContent, "2025.12");
+});
+
+test("booking import reads streamed rows, flags duplicates and needs the OpenAI secret", async () => {
+  const {
+    findDuplicateBooking,
+    normalizeImportedBooking,
+    receiveBookingImport,
+    importedBookingInput,
+  } = await bundle("export * from './src/data/booking-import';");
+  const { startBookingImport, BookingDecoder } = await bundle(
+    "export * from './worker/booking-import';",
+  );
+  const existing = [
+    {
+      id: "a",
+      kind: "flight",
+      title: "EK 319",
+      day: "2026-10-19",
+      time: "22:20",
+      originCode: "NRT",
+      destinationCode: "DXB",
+    },
+  ];
+  const row = normalizeImportedBooking(
+    {
+      kind: "flight",
+      title: "EK319",
+      day: "2026-10-19",
+      time: "22:20",
+      origin_code: "nrt",
+      destination_code: "dxb",
+      review_reason: "none",
+      source_file: 4,
+    },
+    2,
+  );
+  assert.equal(row.originCode, "NRT");
+  assert.equal(
+    row.source,
+    0,
+    "an unknown file index falls back to the first file",
+  );
+  assert.equal(findDuplicateBooking(row, existing)?.id, "a");
+  assert.equal(
+    findDuplicateBooking({ ...row, title: "EK 128", time: "14:40" }, existing),
+    undefined,
+  );
+  assert.equal(
+    normalizeImportedBooking(
+      { kind: "ticket", title: "魔笛", day: "10/20", review_reason: "none" },
+      1,
+    ).review,
+    "missing_date",
+    "an unreadable date is never guessed",
+  );
+  assert.equal(
+    importedBookingInput({ ...row, party: "34A" }).note,
+    "人数・座席：34A",
+  );
+
+  const decoder = new BookingDecoder(1);
+  const text = JSON.stringify({
+    bookings: [
+      {
+        kind: "hotel",
+        title: "宿 {本館}",
+        day: "2026-10-20",
+        review_reason: "none",
+      },
+      {
+        kind: "ticket",
+        title: "魔笛",
+        day: "2026-10-20",
+        review_reason: "none",
+      },
+    ],
+  });
+  const rows = [
+    ...decoder.append(text.slice(0, 60)),
+    ...decoder.append(text.slice(60)),
+  ];
+  assert.deepEqual(
+    rows.map((entry) => entry.title),
+    ["宿 {本館}", "魔笛"],
+  );
+  decoder.finish();
+
+  const request = (body) =>
+    new Request("https://tabi.test/v1/trips/t/booking-import", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  const png =
+    "data:image/png;base64," +
+    Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0,
+    ]).toString("base64");
+  const files = {
+    files: [{ name: "a.png", kind: "image", data: png, size: 12 }],
+  };
+  const trip = { startsOn: "2026-10-19", endsOn: "2026-10-23" };
+  assert.equal(
+    (await startBookingImport(request(files), undefined, trip)).status,
+    503,
+  );
+  assert.equal(
+    (
+      await startBookingImport(
+        request({
+          files: [
+            {
+              name: "a.png",
+              kind: "image",
+              data: "data:image/png;base64,AAAA",
+              size: 3,
+            },
+          ],
+        }),
+        "key",
+        trip,
+      )
+    ).status,
+    400,
+  );
+  let sent;
+  const sse = [
+    { type: "response.output_text.delta", delta: text.slice(0, 50) },
+    { type: "response.output_text.delta", delta: text.slice(50) },
+    { type: "response.completed", response: { status: "completed" } },
+  ]
+    .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+    .join("");
+  const response = await startBookingImport(
+    request(files),
+    "secret-key",
+    trip,
+    async (url, init) => {
+      sent = { url, init };
+      return new Response(sse, {
+        headers: { "content-type": "text/event-stream" },
+      });
+    },
+  );
+  assert.equal(sent.url, "https://api.openai.com/v1/responses");
+  assert.equal(sent.init.headers.authorization, "Bearer secret-key");
+  const payload = JSON.parse(sent.init.body);
+  assert.equal(payload.stream, true);
+  assert.equal(payload.store, false);
+  assert.equal(payload.text.format.type, "json_schema");
+  const received = [];
+  await receiveBookingImport(
+    response,
+    (entry) => received.push(entry.title),
+    new AbortController().signal,
+    1,
+  );
+  assert.deepEqual(received, ["宿 {本館}", "魔笛"]);
 });

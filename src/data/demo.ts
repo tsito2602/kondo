@@ -81,7 +81,18 @@ export function createDemoCache(): TravelCache {
     trip('sample-seoul', 'ソウルの冬', 'Seoul, Korea', addDays(today, -300), 5),
   ];
   const ago = (days: number) => Math.floor(Date.now() / 1000) - days * 86400;
-  const flight: Booking = { id: 'sample-flight-1', kind: 'flight', title: 'サンプル航空 101', detail: '', origin: '成田国際空港', originCode: 'NRT', destination: 'ドバイ国際空港', destinationCode: 'DXB', day: start, time: '22:20', endDay: next, endTime: '05:30', confirmationCode: 'SAMPLE', note: 'サンプルの予約です。実際の搭乗には使えません。' };
+  const flight: Booking = { id: 'sample-flight-1', kind: 'flight', title: 'サンプル航空 101', detail: 'サンプル航空', origin: '成田国際空港', originCode: 'NRT', destination: 'ドバイ国際空港', destinationCode: 'DXB', day: start, time: '22:20', endDay: next, endTime: '05:30', confirmationCode: 'SAMPLE', note: 'サンプルの予約です。実際の搭乗には使えません。' };
+  const plain = { origin: '', originCode: '', destination: '', destinationCode: '', note: 'サンプルの予約です。' };
+  const bookings: Booking[] = [
+    flight,
+    { ...flight, id: 'sample-flight-2', title: 'サンプル航空 202', origin: 'ドバイ国際空港', originCode: 'DXB', destination: 'ウィーン国際空港', destinationCode: 'VIE', day: next, time: '08:55', endDay: next, endTime: '12:25' },
+    { ...flight, ...plain, id: 'sample-hotel', kind: 'hotel', title: '旧市街のホテル', detail: 'ウィーン旧市街', day: next, time: '15:00', endDay: last, endTime: '11:00' },
+    { ...flight, ...plain, id: 'sample-opera', kind: 'ticket', title: '魔笛', detail: 'ウィーン国立歌劇場', day: next, time: '19:00', endDay: next, endTime: '', confirmationCode: 'WSO-7781' },
+    { ...flight, ...plain, id: 'sample-belvedere', kind: 'ticket', title: 'ベルヴェデーレ宮殿 上宮', detail: '時間指定券', day: addDays(start, 2), time: '10:00', endDay: addDays(start, 2), endTime: '', confirmationCode: 'BLV-55120' },
+    { ...flight, ...plain, id: 'sample-dinner', kind: 'restaurant', title: 'フィグルミュラー', detail: 'ヴォルツァイレ通り', day: addDays(start, 2), time: '19:30', endDay: addDays(start, 2), endTime: '', confirmationCode: '' },
+    { ...flight, ...plain, id: 'sample-train', kind: 'train', title: 'CAT 空港特急', detail: 'シティ・エアポート・トレイン', origin: 'ウィーン・ミッテ駅', destination: 'ウィーン国際空港', day: last, time: '12:06', endDay: last, endTime: '12:22', confirmationCode: 'CAT-88412' },
+    { ...flight, id: 'sample-flight-3', title: 'サンプル航空 102', origin: 'ウィーン国際空港', originCode: 'VIE', destination: 'ドバイ国際空港', destinationCode: 'DXB', day: last, time: '14:40', endDay: last, endTime: '22:05' },
+  ];
   return {
     ...emptyTravelCache(),
     selectedTripId: tripId,
@@ -93,7 +104,7 @@ export function createDemoCache(): TravelCache {
       [tripId]: [...demoMembers],
       ...Object.fromEntries(extraTrips.map((trip) => [trip.id, extraMembers[trip.id]])),
     },
-    bookingsByTrip: { [tripId]: [flight, { ...flight, id: 'sample-flight-2', title: 'サンプル航空 202', origin: 'ドバイ国際空港', originCode: 'DXB', destination: 'ウィーン国際空港', destinationCode: 'VIE', day: next, time: '08:55', endDay: next, endTime: '12:25' }, { ...flight, id: 'sample-hotel', kind: 'hotel', title: '旧市街のホテル', origin: '', originCode: '', destination: '', destinationCode: '', detail: 'ウィーン旧市街', day: next, time: '15:00', endDay: last, endTime: '11:00' }] },
+    bookingsByTrip: { [tripId]: bookings },
     itemsByTrip: { [tripId]: [{ id: 'sample-walk', day: next, time: '16:00', kind: '予定', title: '旧市街を散歩', note: '気になった通りへ、ゆっくり歩く。' }, { id: 'sample-cafe', day: addDays(start, 2), time: '10:00', kind: '予定', title: 'カフェで朝ごはん', note: '' }] },
     tasksByTrip: { [tripId]: tasks },
     placesByTrip: { [tripId]: [

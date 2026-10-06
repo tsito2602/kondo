@@ -8,6 +8,7 @@ import { validNoteContent, notePlainText, NOTE_TITLE_LIMIT, NOTE_BODY_LIMIT } fr
 
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { connectionBetween, createsFlightConnectionCycle, type FlightConnectionInput } from '../src/data/flight-connections';
+import { startBookingImport } from './booking-import';
 
 type Env = {
   DB: D1Database;
@@ -15,6 +16,8 @@ type Env = {
   ASSETS: Fetcher;
   GOOGLE_CLIENT_IDS: string;
   ALLOWED_ORIGINS?: string;
+  /** Worker secret for reading booking documents with OpenAI. Import is off without it. */
+  OPENAI_API_KEY?: string;
 };
 
 type User = { id: string; email: string; name: string | null; avatarUrl: string | null };
@@ -606,6 +609,14 @@ async function listBookingDocuments(env: Env, user: User, tripId: string) {
   return json({ documents: result.results });
 }
 
+async function importBookings(request: Request, env: Env, user: User, tripId: string) {
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  const trip = await env.DB.prepare('SELECT starts_on AS startsOn, ends_on AS endsOn FROM trips WHERE id = ?').bind(tripId).first<{ startsOn: string; endsOn: string }>();
+  if (!trip) return json({ error: '旅行が見つかりません' }, 404);
+  return startBookingImport(request, env.OPENAI_API_KEY, trip);
+}
+
 async function uploadBookingDocument(request: Request, env: Env, user: User, tripId: string, bookingId: string) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
@@ -1005,6 +1016,7 @@ app.post('/v1/trips/:tripId/bookings', (c) => createBooking(c.req.raw, c.env, c.
 app.patch('/v1/trips/:tripId/bookings/:bookingId', (c) => updateBooking(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId')));
 app.delete('/v1/trips/:tripId/bookings/:bookingId', (c) => deleteBooking(c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId')));
 app.patch('/v1/trips/:tripId/bookings/:bookingId/connection', (c) => updateFlightConnection(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId')));
+app.post('/v1/trips/:tripId/booking-import', (c) => importBookings(c.req.raw, c.env, c.get('user'), c.req.param('tripId')));
 app.get('/v1/trips/:tripId/booking-documents', (c) => listBookingDocuments(c.env, c.get('user'), c.req.param('tripId')));
 app.post('/v1/trips/:tripId/bookings/:bookingId/documents', (c) => uploadBookingDocument(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId')));
 app.get('/v1/trips/:tripId/bookings/:bookingId/documents/:documentId', (c) => getBookingDocument(c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId'), c.req.param('documentId')));
