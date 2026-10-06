@@ -301,7 +301,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     const tripId = cacheRef.current.selectedTripId;
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) return;
-    commit((current) => ({ ...current, placesByTrip: { ...current.placesByTrip, [tripId]: (current.placesByTrip[tripId] ?? []).map((place) => place.id === id ? { ...place, ...input } : place) } }));
+    commit((current) => ({ ...current, placesByTrip: { ...current.placesByTrip, [tripId]: (current.placesByTrip[tripId] ?? []).map((place) => place.id === id ? { ...place, ...input, ...(input.location !== place.location ? { lat: null, lng: null } : {}) } : place) } }));
     enqueue({ method: 'PATCH', path: `/v1/trips/${tripId}/places/${id}`, body: input });
   }, [commit, enqueue]);
   const deletePlace = useCallback((id: string) => {

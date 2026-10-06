@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { validDate } from '../src/utils/dates';
 import { itineraryCategories, transportModes, itineraryDetailsError } from '../src/data/itinerary';
 import type { ItineraryDetails } from '../src/data/types';
-import { mapUrl, referenceUrl } from '../src/data/places';
+import { isShortMapsLink, mapCoordinates, mapUrl, referenceUrl, type Coordinates } from '../src/data/places';
 import { validNoteContent, notePlainText, NOTE_TITLE_LIMIT, NOTE_BODY_LIMIT } from '../src/data/notes';
 
 import { createRemoteJWKSet, jwtVerify } from 'jose';
@@ -224,11 +224,23 @@ function placeFields(body: Record<string, unknown>) {
   if (/^[a-z][a-z0-9+.-]*:/i.test(location) && !/^https?:\/\//i.test(location)) return null;
   return { title, note, openingHours, location, status, reservationStatus, ...(referenceLinks === undefined ? {} : { referenceLinks }), ...(itineraryItemId === undefined ? {} : { itineraryItemId }) };
 }
+/** Coordinates from a pasted Google Maps link; a short share link is followed one redirect. */
+async function placeCoordinates(location: string): Promise<Coordinates | null> {
+  const direct = mapCoordinates(location);
+  if (direct || !isShortMapsLink(location)) return direct;
+  try {
+    const response = await fetch(new URL(location.trim()).href, { redirect: 'manual', signal: AbortSignal.timeout(4000) });
+    const target = response.headers.get('location');
+    return target ? mapCoordinates(new URL(target, location.trim()).href) : null;
+  } catch {
+    return null;
+  }
+}
 async function placesRoute(request: Request, env: Env, user: User, tripId: string, placeId?: string) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
   if (!placeId && request.method === 'GET') {
-    const rows = await env.DB.prepare(`SELECT p.id, p.title, p.note, p.opening_hours AS openingHours, COALESCE(d.reservation_status, p.reservation_status) AS reservationStatus, p.location, p.status, p.updated_at AS updatedAt, COALESCE(d.reference_links, '[]') AS referenceLinks, l.item_id AS itineraryItemId FROM places p LEFT JOIN place_itinerary_links l ON l.place_id = p.id LEFT JOIN place_details d ON d.place_id = p.id WHERE p.trip_id = ? ORDER BY p.updated_at DESC, p.id`).bind(tripId).all();
+    const rows = await env.DB.prepare(`SELECT p.id, p.title, p.note, p.opening_hours AS openingHours, COALESCE(d.reservation_status, p.reservation_status) AS reservationStatus, p.location, p.status, p.updated_at AS updatedAt, COALESCE(d.reference_links, '[]') AS referenceLinks, l.item_id AS itineraryItemId, c.lat, c.lng FROM places p LEFT JOIN place_itinerary_links l ON l.place_id = p.id LEFT JOIN place_details d ON d.place_id = p.id LEFT JOIN place_coordinates c ON c.place_id = p.id WHERE p.trip_id = ? ORDER BY p.updated_at DESC, p.id`).bind(tripId).all();
     return json({ places: rows.results.map((row) => ({ ...row, referenceLinks: JSON.parse(row.referenceLinks as string) })) });
   }
   if (placeId && request.method === 'DELETE') {
@@ -256,16 +268,27 @@ async function placesRoute(request: Request, env: Env, user: User, tripId: strin
       ON CONFLICT(place_id) DO UPDATE SET item_id = CASE WHEN ? THEN excluded.item_id ELSE place_itinerary_links.item_id END
     `).bind(id, fields.itineraryItemId ?? null, id, tripId, fields.itineraryItemId !== undefined ? 1 : 0);
     const linksJson = referenceLinks === undefined ? null : JSON.stringify(referenceLinks);
+    // Re-read coordinates only when the link changed, so a failed redirect never drops a known pin.
+    const previous = await env.DB.prepare('SELECT p.location, c.lat, c.lng FROM places p LEFT JOIN place_coordinates c ON c.place_id = p.id WHERE p.id = ? AND p.trip_id = ?').bind(id, tripId).first<{ location: string; lat: number | null; lng: number | null }>();
+    const coordinates = previous && previous.location === location && previous.lat != null && previous.lng != null
+      ? { lat: previous.lat, lng: previous.lng }
+      : await placeCoordinates(location);
+    const coordinateStatement = coordinates
+      ? env.DB.prepare(`INSERT INTO place_coordinates (place_id, lat, lng)
+          SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM places WHERE id = ? AND trip_id = ?)
+          ON CONFLICT(place_id) DO UPDATE SET lat = excluded.lat, lng = excluded.lng`).bind(id, coordinates.lat, coordinates.lng, id, tripId)
+      : env.DB.prepare('DELETE FROM place_coordinates WHERE place_id = ? AND EXISTS (SELECT 1 FROM places WHERE id = ? AND trip_id = ?)').bind(id, id, tripId);
     const [result] = await env.DB.batch([
       statement,
       itemLink,
+      coordinateStatement,
       env.DB.prepare(`INSERT INTO place_details (place_id, reference_links, reservation_status)
         SELECT ?, COALESCE(?, '[]'), ? WHERE EXISTS (SELECT 1 FROM places WHERE id = ? AND trip_id = ?)
         ON CONFLICT(place_id) DO UPDATE SET reference_links = COALESCE(?, place_details.reference_links), reservation_status = excluded.reservation_status
       `).bind(id, linksJson, reservationStatus === 'unavailable' ? reservationStatus : null, id, tripId, linksJson),
     ]);
     if (!result.meta.changes) return json({ error: '場所が見つからないか、IDが競合しました' }, placeId ? 404 : 409);
-    return json({ place: { id, ...fields } }, placeId ? 200 : 201);
+    return json({ place: { id, ...fields, lat: coordinates?.lat ?? null, lng: coordinates?.lng ?? null } }, placeId ? 200 : 201);
   }
   return json({ error: 'Not found' }, 404);
 }

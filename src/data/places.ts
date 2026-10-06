@@ -39,3 +39,46 @@ export function registeredGoogleMapsUrl(location: string): string | null {
     (new RegExp(`^(?:www\\.)?${googleDomain}$`).test(host) && /^\/maps(?:\/|$)/.test(url.pathname));
   return isMaps ? href : null;
 }
+
+export type Coordinates = { lat: number; lng: number };
+const coordinate = (lat: string, lng: string): Coordinates | null => {
+  const point = { lat: Number(lat), lng: Number(lng) };
+  return Number.isFinite(point.lat) && Number.isFinite(point.lng) && Math.abs(point.lat) <= 90 && Math.abs(point.lng) <= 180 && (point.lat || point.lng) ? point : null;
+};
+
+/**
+ * Reads coordinates from a pasted Google Maps link. The place's own pin
+ * (`!3d…!4d…`) wins over the camera (`@lat,lng`); `q`/`query`/`ll` cover
+ * search and share links. Short links (maps.app.goo.gl) carry none; the
+ * Worker follows their redirect once (see `isShortMapsLink`).
+ */
+export function mapCoordinates(location: string | null | undefined): Coordinates | null {
+  const href = registeredGoogleMapsUrl(location ?? '');
+  if (!href) return null;
+  let text = href;
+  try { text = decodeURIComponent(href); } catch { /* keep the raw link */ }
+  const number = '(-?\\d{1,3}(?:\\.\\d+)?)';
+  const pins = [...text.matchAll(new RegExp(`!3d${number}!4d${number}`, 'g'))];
+  const pin = pins.at(-1);
+  if (pin) return coordinate(pin[1], pin[2]);
+  const url = new URL(href);
+  for (const key of ['q', 'query', 'll', 'destination', 'center']) {
+    const match = url.searchParams.get(key)?.trim().match(new RegExp(`^(?:loc:)?${number}\\s*,\\s*${number}$`));
+    if (match) return coordinate(match[1], match[2]);
+  }
+  const camera = text.match(new RegExp(`@${number},${number}`));
+  return camera ? coordinate(camera[1], camera[2]) : null;
+}
+
+/** Share links that hide their coordinates behind one redirect. */
+export function isShortMapsLink(location: string): boolean {
+  const href = registeredGoogleMapsUrl(location);
+  if (!href) return false;
+  const url = new URL(href);
+  return url.hostname.toLowerCase() === 'maps.app.goo.gl' || url.hostname.toLowerCase() === 'goo.gl';
+}
+
+/** Stored coordinates first; a long link still places a pin offline before sync. */
+export function placeCoordinates(place: { lat?: number | null; lng?: number | null; location?: string }): Coordinates | null {
+  return place.lat != null && place.lng != null ? { lat: place.lat, lng: place.lng } : mapCoordinates(place.location);
+}

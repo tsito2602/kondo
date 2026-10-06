@@ -116,9 +116,12 @@ export type Place = {
   referenceLinks?: PlaceReferenceLink[];
   itineraryItemId?: string | null;
   status: PlaceStatus;
+  /** Read from the Google Maps link by the Worker; absent on older rows and offline edits. */
+  lat?: number | null;
+  lng?: number | null;
   updatedAt?: number;
 };
-export type PlaceInput = Omit<Place, 'id' | 'updatedAt'>;
+export type PlaceInput = Omit<Place, 'id' | 'updatedAt' | 'lat' | 'lng'>;
 
 /** placeId links the note to a numbered place (and through it, a day's plan). Both optional for older rows. */
 export type TravelNote = { id: string; title?: string; body: string; content?: import('./notes').NoteContent | null; pinned?: boolean; placeId?: string | null; updatedBy?: string | null; updatedAt: number };

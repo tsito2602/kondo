@@ -23,6 +23,7 @@ const people = (...keys: string[]) => keys.map((key) => DEMO_PEOPLE[key]);
 
 /** The demo trip's three travellers; the provider lists them as members. */
 export const demoMembers = people('self', 'companion', 'friend');
+import { withDemoPlaces } from './demo-places';
 
 export function createDemoCache(): TravelCache {
   const start = addDays(localDate(), 14);
@@ -93,7 +94,7 @@ export function createDemoCache(): TravelCache {
     { ...flight, ...plain, id: 'sample-train', kind: 'train', title: 'CAT 空港特急', detail: 'シティ・エアポート・トレイン', origin: 'ウィーン・ミッテ駅', destination: 'ウィーン国際空港', day: last, time: '12:06', endDay: last, endTime: '12:22', confirmationCode: 'CAT-88412' },
     { ...flight, id: 'sample-flight-3', title: 'サンプル航空 102', origin: 'ウィーン国際空港', originCode: 'VIE', destination: 'ドバイ国際空港', destinationCode: 'DXB', day: last, time: '14:40', endDay: last, endTime: '22:05' },
   ];
-  return {
+  return withDemoPlaces({
     ...emptyTravelCache(),
     selectedTripId: tripId,
     trips: [
@@ -119,5 +120,5 @@ export function createDemoCache(): TravelCache {
       { id: 'sample-note-money', title: '両替と支払い', body: '## お金\nカードはほぼどこでも使える\nチップは端数を切り上げて5〜10%\n## 小銭\nトイレ用に50セント硬貨を何枚か', updatedBy: 'demo-self', updatedAt: ago(13) },
     ] },
     packingByTrip: { [tripId]: packing },
-  };
+  }, tripId, start);
 }

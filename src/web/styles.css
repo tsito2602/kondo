@@ -4,6 +4,7 @@
 @import "./styles/settings.css";
 @import "./styles/memo.css";
 @import "./styles/bookings.css";
+@import "./styles/places.css";
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 @theme inline {
   --color-brand: var(--brand);
