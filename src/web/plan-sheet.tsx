@@ -43,6 +43,7 @@ import type {
   TransportMode,
 } from "@/data/types";
 import { dismissModal } from "./motion";
+import { LinkedNotes } from "./linked-notes";
 import { ContextDock, ThumbDock } from "./thumb-dock";
 import { ErrorText, FormBackButton, Modal, useAction } from "./ui";
 import { categoryGlyph, Glyph, MapPin } from "./itinerary-icons";
@@ -197,12 +198,15 @@ function PlanView({
   item,
   days,
   numbers,
+  onClose,
 }: {
   item: ItineraryItem;
   days: string[];
   numbers: ReadonlyMap<string, number>;
+  onClose: () => void;
 }) {
   const travel = useTravel();
+  const navigate = useNavigate();
   const details = itemDetails(item);
   const category = itemCategory(item);
   const minutes = durationMinutes(item.day, item.time, details);
@@ -318,6 +322,19 @@ function PlanView({
           <p className="ps-hint">なし</p>
         )}
       </section>
+      {place && (
+        <LinkedNotes
+          placeId={place.id}
+          onOpen={(noteId) =>
+            dismissModal(() => {
+              onClose();
+              navigate(
+                `/trips/${travel.selectedTrip!.id}/notes?note=${noteId}`,
+              );
+            })
+          }
+        />
+      )}
     </div>
   );
 }
@@ -667,7 +684,7 @@ export function PlanSheet({
           onDone={() => setEditing(false)}
         />
       ) : (
-        <PlanView item={item} days={days} numbers={numbers} />
+        <PlanView item={item} days={days} numbers={numbers} onClose={onClose} />
       )}
     </Modal>
   );
