@@ -15,8 +15,7 @@ import { useItineraryScroll } from "./itinerary-scroll";
 import { reduceMotion } from "./motion";
 import { ThumbAction } from "./thumb-dock";
 import { Button } from "./obsidian/button";
-import { Input } from "./obsidian/input";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import {
   Camera,
@@ -28,7 +27,6 @@ import {
   Plane,
   PlaneLanding,
   PlaneTakeoff,
-  Search,
   CircleCheck,
   Route as RouteIcon,
   Clock,
@@ -60,7 +58,6 @@ import type {
   Place,
   ItineraryItem,
   ItineraryCategory,
-  TravelNote,
 } from "@/data/types";
 import { AddButton, Empty, ThumbTools, Field } from "./ui";
 import {
@@ -560,110 +557,4 @@ export function PlacesScreen() {
     </div>
   );
 }
-const loadNoteEditor = () =>
-  import("./note-editor").then((module) => ({ default: module.NoteEditor }));
-const NoteEditor = lazy(loadNoteEditor);
-export function NotesScreen() {
-  const travel = useTravel();
-  const [search, setSearch] = useState("");
-  const [note, setNote] = useState<TravelNote | null>(null);
-  useEffect(() => {
-    void loadNoteEditor().catch(() => undefined);
-  }, []);
-  const notes = travel.notes
-    .filter((note) =>
-      `${note.title ?? ""}\n${note.body}`
-        .toLowerCase()
-        .includes(search.trim().toLowerCase()),
-    )
-    .sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id));
-  return (
-    <div className="page notes-page">
-      <ThumbTools title="メモを検索" label="検索">
-        <Field label="検索キーワード">
-          <Input
-            placeholder="メモを検索"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </Field>
-        <p className="muted">{notes.length}件のメモ</p>
-      </ThumbTools>
-      <div className="page-toolbar">
-        <div>
-          <h2>メモ</h2>
-          <span className="muted">{travel.notes.length}件</span>
-        </div>
-        {travel.canEdit && (
-          <AddButton
-            label="メモを書く"
-            onClick={() =>
-              setNote({
-                id: crypto.randomUUID(),
-                body: "",
-                title: "",
-                updatedAt: Date.now() / 1000,
-              })
-            }
-          />
-        )}
-      </div>
-      <label className="search">
-        <Search />
-        <Input
-          aria-label="メモを検索"
-          placeholder="メモを検索"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-      </label>
-      {!notes.length ? (
-        <Empty>
-          <FileNoteIcon />
-          <h2>
-            {search ? "該当するメモはありません" : "メモはまだありません"}
-          </h2>
-          <p>
-            {search
-              ? "別のキーワードで検索してください。"
-              : "メモやチェックリストを残せます。"}
-          </p>
-        </Empty>
-      ) : (
-        <div className="note-list">
-          {notes.map((note) => (
-            <button
-              className="note-card"
-              data-press-card
-              key={note.id}
-              onClick={() => setNote(note)}
-            >
-              <div className="row between">
-                <h2>{note.title?.trim() || "無題のメモ"}</h2>
-              </div>
-              <p className="clamp muted">
-                {note.body
-                  .trim()
-                  .replace(/^- \[([ x])\] /gim, (_, checked) =>
-                    checked.toLowerCase() === "x" ? "☑ " : "☐ ",
-                  )
-                  .replace(/^- /gm, "• ") || "本文なし"}
-              </p>
-              <small>
-                {new Date(note.updatedAt * 1000).toLocaleDateString("ja-JP")}
-              </small>
-            </button>
-          ))}
-        </div>
-      )}
-      {note && (
-        <Suspense fallback={<p role="status">メモを開いています…</p>}>
-          <NoteEditor initial={note} onClose={() => setNote(null)} />
-        </Suspense>
-      )}
-    </div>
-  );
-}
-function FileNoteIcon() {
-  return <BookOpen />;
-}
+export { NotesScreen } from "./notes-screen";

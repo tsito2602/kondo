@@ -272,11 +272,14 @@ export function TravelProvider({ children }: PropsWithChildren) {
     const tripId = targetTripId ?? cacheRef.current.selectedTripId;
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
-    const note = { id, ...input, updatedAt: Math.floor(Date.now() / 1000) };
+    // Pin and place survive edits that only send text; the writer is whoever saved last.
+    const previous = cacheRef.current.notesByTrip?.[tripId]?.find((entry) => entry.id === id);
+    const note: TravelNote = { ...previous, id, ...input, updatedBy: user?.id ?? null, updatedAt: Math.floor(Date.now() / 1000) };
     commit((current) => ({ ...current, notesByTrip: { ...current.notesByTrip, [tripId]: [...(current.notesByTrip?.[tripId] ?? []).filter((entry) => entry.id !== id), note] } }));
     // Upsert keeps a replayed offline draft idempotent, including its first save.
-    enqueue({ method: 'POST', path: `/v1/trips/${tripId}/notes`, body: note });
-  }, [commit, enqueue]);
+    const { title, body, content, pinned, placeId } = note;
+    enqueue({ method: 'POST', path: `/v1/trips/${tripId}/notes`, body: { id, title, body, content, pinned: Boolean(pinned), placeId: placeId ?? null } });
+  }, [commit, enqueue, user?.id]);
   const deleteNote = useCallback((id: string) => {
     const tripId = cacheRef.current.selectedTripId;
     assertTripEditable(cacheRef.current, tripId);

@@ -1,0 +1,693 @@
+/* メモ: two-column tiles, a full-screen line editor and 見せる (kondo-memo mock). */
+.notes-page,
+dialog:has(.memo-editor),
+.thumb-dock:has(.memo-undo),
+.memo-poof-dot {
+  --m-paper: var(--canvas);
+  --m-ink: #000;
+  --m-mid: #9c978f;
+  --m-pale: #cbc5bb;
+  --m-soft: #f3f2ef;
+  --m-mute: #77726b;
+  --m-line: #e8e6e1;
+}
+:root[data-theme="dark"]
+  :is(
+    .notes-page,
+    dialog:has(.memo-editor),
+    .thumb-dock:has(.memo-undo),
+    .memo-poof-dot
+  ) {
+  --m-ink: #f5f1e9;
+  --m-mid: #b6b0a6;
+  --m-pale: #57534d;
+  --m-soft: #23221f;
+  --m-mute: #aaa49b;
+  --m-line: #2d2b29;
+}
+
+/* ===== list ===== */
+:root .notes-page {
+  max-width: 880px;
+  padding-inline: 18px;
+  padding-top: 8px;
+  color: var(--m-ink);
+}
+.memo-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 4px 8px;
+}
+.memo-top h2 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+.memo-acts {
+  display: flex;
+  gap: 8px;
+}
+.memo-round {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--m-soft);
+  color: var(--m-ink);
+  cursor: pointer;
+}
+.memo-round svg {
+  width: 20px;
+  height: 20px;
+}
+.memo-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  margin: 4px 0 6px;
+  padding: 0 14px;
+  border-radius: 16px;
+  background: var(--m-soft);
+}
+.memo-search svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--m-mute);
+}
+.memo-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--m-ink);
+  font: inherit;
+  font-size: 16px;
+  outline: none;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.memo-lab {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 16px 4px 8px;
+}
+.memo-lab b {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  font-weight: 900;
+}
+.memo-lab b svg {
+  width: 14px;
+  height: 14px;
+}
+.memo-lab span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--m-mute);
+}
+.memo-top + .memo-tiles,
+.memo-search + .memo-tiles {
+  margin-top: 8px;
+}
+.memo-empty {
+  padding: 40px 0;
+  text-align: center;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--m-mute);
+}
+
+/* tiles: masonry columns, so short notes don't leave holes */
+.memo-tiles {
+  columns: 2;
+  column-gap: 10px;
+}
+@media (min-width: 760px) {
+  .memo-tiles {
+    columns: 3;
+  }
+}
+.memo-tile {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 13px 13px 11px;
+  border-radius: 20px;
+  background: var(--m-soft);
+  color: var(--m-ink);
+  break-inside: avoid;
+}
+.memo-tile-open {
+  display: block;
+  width: 100%;
+  margin: 0 0 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+/* The whole tile opens the note; the boxes sit above this layer. */
+.memo-tile-open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.memo-tile-open:focus-visible {
+  outline: none;
+}
+.memo-tile-open:focus-visible::after {
+  outline: 2px solid var(--m-ink);
+  outline-offset: 2px;
+}
+.memo-tile-open b {
+  display: block;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.memo-lines {
+  display: flex;
+  flex-direction: column;
+}
+.memo-ln {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.memo-ln > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.memo-ln.done > span,
+.memo-ln.done > textarea {
+  color: var(--m-mute);
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+.memo-ln.h {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 900;
+}
+.memo-ln.h:first-child {
+  margin-top: 0;
+}
+.memo-tile .memo-ln {
+  gap: 7px;
+  font-size: 12.5px;
+}
+.memo-tile .memo-ln.h {
+  font-size: 12.5px;
+}
+.memo-more {
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--m-mute);
+}
+.memo-tile > .memo-chip {
+  margin-top: 8px;
+}
+.memo-tile > .memo-meta {
+  margin-top: 9px;
+}
+
+/* shared bits */
+.memo-cb {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  box-shadow: inset 0 0 0 2px var(--m-ink);
+  color: var(--m-paper);
+  cursor: pointer;
+}
+/* A larger hit area than the drawn box. */
+.memo-cb::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+.memo-cb svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0;
+}
+.memo-cb.on {
+  background: var(--m-ink);
+}
+.memo-cb.on svg {
+  opacity: 1;
+}
+.memo-cb:disabled {
+  cursor: default;
+}
+.memo-tile .memo-cb {
+  width: 17px;
+  height: 17px;
+  border-radius: 6px;
+}
+.memo-tile .memo-cb svg {
+  width: 12px;
+  height: 12px;
+}
+.memo-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--m-mute);
+  white-space: nowrap;
+}
+.memo-meta .assignee-avatar {
+  width: 22px;
+  height: 22px;
+  font-size: 10px;
+  font-weight: 900;
+  background: var(--m-soft);
+  box-shadow: inset 0 0 0 1.5px var(--m-pale);
+}
+.memo-tile .memo-meta .assignee-avatar {
+  background: var(--m-paper);
+}
+.memo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 3px 9px 3px 3px;
+  border-radius: 99px;
+  background: var(--m-paper);
+  box-shadow: inset 0 0 0 1.5px var(--m-line);
+  color: var(--m-ink);
+  font-size: 11.5px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+/* The map's numbered pin: a teardrop pointing down. */
+.memo-chip-no {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: var(--m-ink);
+  color: var(--m-paper);
+}
+.memo-chip-no span {
+  transform: rotate(45deg);
+  font-size: 10px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.memo-chip em {
+  min-width: 0;
+  overflow: hidden;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===== editor: the whole screen is paper ===== */
+:root .modal.full:has(.memo-editor),
+:root:has(.thumb-dock-host) .modal.full:has(.memo-editor) {
+  inset: 0;
+  top: 0;
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--m-paper);
+  box-shadow: none;
+  overflow: hidden;
+}
+:root .modal.full:has(.memo-editor) .modal-inner,
+:root:has(.thumb-dock-host) .modal.full:has(.memo-editor) .modal-inner {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  border-radius: 0;
+  background: var(--m-paper);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+/* The title on the page names the dialog; keep the heading for screen readers. */
+:root .modal.full:has(.memo-editor) .modal-header {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+:root .modal.full:has(.memo-editor) .modal-body,
+:root:has(.thumb-dock-host) .modal.full:has(.memo-editor) .modal-body {
+  padding: calc(12px + env(safe-area-inset-top)) 22px
+    calc(
+      var(--dock-height) + var(--dock-bottom-gap) + 60px +
+        env(safe-area-inset-bottom) + var(--panel-keyboard-inset, 0px)
+    );
+}
+.memo-editor {
+  max-width: 640px;
+  margin: 0 auto;
+  color: var(--m-ink);
+}
+.memo-editor > .memo-meta {
+  margin-bottom: 10px;
+}
+.memo-editor textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  resize: none;
+  overflow: hidden;
+  outline: none;
+  box-shadow: none;
+}
+.memo-editor textarea::placeholder {
+  color: var(--m-pale);
+  opacity: 1;
+}
+.memo-editor .memo-title {
+  margin: 0 0 12px;
+  font-size: 25px;
+  font-weight: 900;
+  line-height: 1.3;
+}
+.memo-link-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+.memo-link-row small {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--m-mute);
+}
+.memo-chip-button {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 99px;
+  background: none;
+  cursor: pointer;
+}
+.memo-chip-button:disabled {
+  cursor: default;
+  color: inherit;
+  opacity: 1;
+}
+.memo-link-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--m-mute);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.memo-link-add svg {
+  width: 15px;
+  height: 15px;
+}
+.memo-picks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding: 10px;
+  border-radius: 18px;
+  background: var(--m-soft);
+}
+.memo-picks button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 5px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--m-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.memo-picks button[aria-pressed="true"] {
+  background: var(--m-paper);
+}
+.memo-picks button small {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--m-mute);
+}
+.memo-picks .memo-unlink {
+  color: var(--m-mute);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+.memo-editor .memo-lines {
+  gap: 7px;
+}
+.memo-editor .memo-ln {
+  gap: 11px;
+  font-size: 16px;
+}
+.memo-editor .memo-ln.h {
+  margin-top: 10px;
+  font-size: 17px;
+}
+.memo-editor .memo-ln.h:first-child {
+  margin-top: 0;
+}
+.memo-editor .memo-cb {
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+}
+.memo-editor .memo-ln > textarea {
+  flex: 1;
+  line-height: 1.5;
+}
+.memo-editor .danger {
+  margin-top: 16px;
+}
+
+/* editor dock: back, then the note's tools */
+dialog:has(.memo-editor) .context-primary:empty {
+  display: none;
+}
+dialog:has(.memo-editor) .context-actions {
+  flex: 1;
+  justify-content: space-around;
+  padding: 0 4px;
+}
+:root dialog:has(.memo-editor) .context-actions > button {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  color: var(--m-mute);
+}
+:root dialog:has(.memo-editor) .context-actions > button.on {
+  color: var(--m-ink);
+}
+dialog:has(.memo-editor) .context-actions > button svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* ===== 見せる: big type for a taxi driver or shop staff ===== */
+.memo-show {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: calc(60px + env(safe-area-inset-top)) 26px
+    calc(130px + env(safe-area-inset-bottom));
+  background: var(--m-paper);
+  color: var(--m-ink);
+  overflow-y: auto;
+}
+.memo-show small {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--m-mute);
+}
+.memo-show-big {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+.memo-show-big span {
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.memo-show-big span:first-child {
+  font-size: 38px;
+}
+dialog:has(.memo-show) .context-back {
+  display: none;
+}
+dialog:has(.memo-show) .context-primary {
+  flex: none;
+  margin-left: auto;
+}
+:root dialog:has(.memo-show) .context-primary > .memo-show-close {
+  width: auto;
+  padding: 0 24px 0 20px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* ===== list dock while 元に戻す is offered ===== */
+.thumb-dock:has(.memo-undo) .context-primary:empty {
+  display: none;
+}
+.thumb-dock:has(.memo-undo) .context-actions {
+  flex: 1;
+  min-width: 0;
+}
+:root .context-actions > .memo-undo {
+  display: flex;
+  flex: 1;
+  justify-content: space-between;
+  gap: 8px;
+  width: auto;
+  min-width: 0;
+  padding: 0 5px 0 22px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.memo-undo span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--m-mute);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.memo-undo b {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: calc(var(--dock-height) - 10px);
+  padding: 0 18px;
+  border-radius: 99px;
+  background: var(--m-ink);
+  color: var(--m-paper);
+  white-space: nowrap;
+}
+
+.memo-poof-dot {
+  position: fixed;
+  z-index: 50;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--m-mid);
+  pointer-events: none;
+}
+
+/* しおり / 場所 sheet: notes tied to this place */
+.memo-linked {
+  --m-ink: var(--ink);
+  --m-paper: var(--paper);
+  --m-mute: var(--muted);
+  gap: 8px;
+}
+.memo-linked > button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--soft);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.memo-linked > button > b {
+  margin-bottom: 4px;
+  font-size: 14px;
+  font-weight: 900;
+}
+.memo-linked .memo-ln {
+  gap: 7px;
+  font-size: 13px;
+}
+.memo-linked .memo-cb {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  cursor: inherit;
+}
+.memo-linked .memo-cb svg {
+  width: 11px;
+  height: 11px;
+}

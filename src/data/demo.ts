@@ -80,6 +80,7 @@ export function createDemoCache(): TravelCache {
     trip('sample-osaka', '大阪の週末', 'Osaka, Japan', addDays(today, -150), 3),
     trip('sample-seoul', 'ソウルの冬', 'Seoul, Korea', addDays(today, -300), 5),
   ];
+  const ago = (days: number) => Math.floor(Date.now() / 1000) - days * 86400;
   const flight: Booking = { id: 'sample-flight-1', kind: 'flight', title: 'サンプル航空 101', detail: '', origin: '成田国際空港', originCode: 'NRT', destination: 'ドバイ国際空港', destinationCode: 'DXB', day: start, time: '22:20', endDay: next, endTime: '05:30', confirmationCode: 'SAMPLE', note: 'サンプルの予約です。実際の搭乗には使えません。' };
   return {
     ...emptyTravelCache(),
@@ -97,7 +98,14 @@ export function createDemoCache(): TravelCache {
     tasksByTrip: { [tripId]: tasks },
     placesByTrip: { [tripId]: [
       { id: 'sample-place-cafe', title: '旧市街でカフェ巡り', note: '窓際の席で、コーヒーとケーキ。', openingHours: '訪問前に確認', reservationStatus: 'not_needed', location: 'https://www.google.com/maps/search/?api=1&query=Vienna+cafe', status: 'want' },
-      { id: 'sample-place-museum', title: '美術史美術館', note: '気になる展示をゆっくり見る。', openingHours: '', reservationStatus: 'needed', location: 'https://www.google.com/maps/search/?api=1&query=Kunsthistorisches+Museum', status: 'want' },
+      { id: 'sample-place-museum', title: '美術史美術館', note: '気になる展示をゆっくり見る。', openingHours: '', reservationStatus: 'needed', location: 'https://www.google.com/maps/search/?api=1&query=Kunsthistorisches+Museum', status: 'planned', itineraryItemId: 'sample-museum' },
+    ] },
+    notesByTrip: { [tripId]: [
+      { id: 'sample-note-address', title: 'タクシーに見せる住所', body: 'Hotel Sacher Wien\nPhilharmoniker Str. 4\n1010 Wien', pinned: true, updatedBy: 'demo-companion', updatedAt: ago(5) },
+      { id: 'sample-note-gifts', title: 'お土産リスト', body: '- [x] ザッハトルテ（空港で買う）\n- [ ] マンナーのウエハース\n- [ ] ユリウス・マインルのコーヒー豆\n- [x] モーツァルトクーゲル\n- [ ] 会社に配るお菓子\n- [ ] ポストカード', updatedBy: 'demo-self', updatedAt: ago(1) },
+      { id: 'sample-note-museum', title: '美術史美術館で見たいもの', body: '- [ ] ブリューゲル「バベルの塔」\n- [ ] フェルメール「絵画芸術」\n- [ ] 丸天井のカフェで休憩', placeId: 'sample-place-museum', updatedBy: 'demo-companion', updatedAt: ago(7) },
+      { id: 'sample-note-german', title: 'ドイツ語のひとこと', body: 'Danke schön ― ありがとう\nDie Rechnung, bitte. ― お会計お願いします\nEine Melange, bitte. ― メランジェをください', updatedBy: 'demo-companion', updatedAt: ago(8) },
+      { id: 'sample-note-money', title: '両替と支払い', body: '## お金\nカードはほぼどこでも使える\nチップは端数を切り上げて5〜10%\n## 小銭\nトイレ用に50セント硬貨を何枚か', updatedBy: 'demo-self', updatedAt: ago(13) },
     ] },
     packingByTrip: { [tripId]: packing },
   };

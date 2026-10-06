@@ -2,6 +2,7 @@
 @import "./styles/prep.css";
 @import "./styles/home.css";
 @import "./styles/settings.css";
+@import "./styles/memo.css";
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 @theme inline {
   --color-brand: var(--brand);
