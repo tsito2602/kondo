@@ -33,7 +33,7 @@
 4. マスク定義内の白い矩形はマスクを通す領域であり、表示する白背景ではない。SVGを書き出す際は`<defs>`と`mask`参照を両方残す。単色アイコンへの変換でも、マスク内部の黒／白を塗り替えない。
 5. `scripts/render-touch-icon.mjs`で、SVGをdensity 384で読み込み、180×180へ縮小。PNGはcompressionLevel 9、palette falseのRGBA。`flatten()`や`removeAlpha()`を使わない。
 6. `apple-touch-icon`でその透過PNGを指定する。比較ページではmanifestも同じ画像を指す。アプリ内のテーマ切替で別画像へ交換しない。
-7. `node scripts/test-icon-check.mjs`で、成功したIのSVGからPNGを完全再現できること、成功版Iの背景と模様の穴が透明なことを確認する。
+7. 書き出したPNGは実機（iPhoneのホーム画面、ライト／ダーク）で確認する。`node --test scripts/test-icons.mjs`は、ページ・ビルド・manifestが指すアイコンが存在し宣言どおりの大きさであること、本番ビルドに比較ページが残らないことだけを確かめる（画素の比較はしない）。
 
 ### 確認結果と限界
 
