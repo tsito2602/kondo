@@ -1,6 +1,6 @@
 import { DatePicker } from "./date-picker";
-import { DateTimeRows } from "./datetime-rows";
-import { withTime } from "@/data/datetime-rows";
+import { shiftDay, TimelinePicker, TimeRangeButton } from "./timeline-picker";
+import { coordsFromLink } from "@/data/geo";
 import { dismissModal } from "./motion";
 import { Button } from "./obsidian/button";
 import { Input } from "./obsidian/input";
@@ -224,21 +224,26 @@ export function ItemEditor({
     title: item?.title ?? place?.title ?? "",
     note: item?.note ?? place?.note ?? "",
   });
-  const [details, setDetails] = useState(() => {
-    const initial = item
+  const [details, setDetails] = useState(
+    item
       ? itemDetails(item)
       : {
           ...emptyItineraryDetails("sightseeing"),
           location: place?.location ?? "",
-        };
-    // A timed plan always has an end here, an hour by default (Google Calendar).
-    if (!item?.time || initial.endTime) return initial;
-    const when = withTime(
-      { day: item.day, time: item.time, endDay: "", endTime: "" },
-      item.time,
-    );
-    return { ...initial, endDay: when.endDay, endTime: when.endTime };
-  });
+        },
+  );
+  const [picking, setPicking] = useState(false);
+  const trip = travel.selectedTrip;
+  const days: string[] = [];
+  if (trip?.startsOn && trip.endsOn)
+    for (let at = trip.startsOn; at <= trip.endsOn; at = shiftDay(at, 1))
+      days.push(at);
+  if (!days.includes(draft.day)) (days.push(draft.day), days.sort());
+  const endDayOffset = details.endDay
+    ? Math.round(
+        (Date.parse(details.endDay) - Date.parse(draft.day)) / 86_400_000,
+      )
+    : 0;
   const { error, busy, submit } = useSubmit(
     () => {
       const input = {
@@ -283,7 +288,7 @@ export function ItemEditor({
       onClose={onClose}
       full
     >
-      <form className="form" onSubmit={submit}>
+      <form className="form item-editor" onSubmit={submit}>
         <Field label="カテゴリ">
           <select
             value={details.category}
@@ -315,26 +320,39 @@ export function ItemEditor({
           />
         </Field>
         <div className="field">
-          <span>日時</span>
-          <DateTimeRows
-            startLabel={details.category === "transport" ? "出発" : "開始"}
-            endLabel={details.category === "transport" ? "到着" : "終了"}
-            min={travel.selectedTrip?.startsOn}
-            max={travel.selectedTrip?.endsOn}
-            value={{
-              day: draft.day,
-              time: draft.time,
-              endDay: details.endDay ?? "",
-              endTime: details.endTime ?? "",
-            }}
-            onChange={(when) => {
-              setDraft({ ...draft, day: when.day, time: when.time });
-              setDetails({
-                ...details,
-                endDay: when.endDay,
-                endTime: when.endTime,
-              });
-            }}
+          <span>日にち</span>
+          <div className="it-chips" role="group" aria-label="日にち">
+            {days.map((value) => (
+              <button
+                type="button"
+                key={value}
+                aria-pressed={draft.day === value}
+                onClick={() => {
+                  setDraft({ ...draft, day: value });
+                  if (details.endDay)
+                    setDetails({
+                      ...details,
+                      endDay: shiftDay(value, endDayOffset),
+                    });
+                }}
+              >
+                {Number(value.slice(5, 7))}/{Number(value.slice(8, 10))}
+                <small>
+                  {new Intl.DateTimeFormat("ja-JP", {
+                    weekday: "short",
+                  }).format(new Date(`${value}T12:00:00`))}
+                </small>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="field">
+          <span>時刻</span>
+          <TimeRangeButton
+            time={draft.time}
+            endTime={details.endTime}
+            nextDay={endDayOffset === 1}
+            onOpen={() => setPicking(true)}
           />
         </div>
         {details.category === "transport" ? (
@@ -432,6 +450,36 @@ export function ItemEditor({
         <ErrorText message={error} />
         <SaveButton busy={busy} />
       </form>
+      {picking && (
+        <TimelinePicker
+          title={draft.title.trim() || "新しい予定"}
+          day={draft.day}
+          time={draft.time}
+          endTime={details.endTime}
+          endDayOffset={endDayOffset}
+          point={endDayOffset > 1}
+          pointLabel="開始"
+          exclude={item ? [`item-${item.id}`] : []}
+          self={
+            details.category === "transport"
+              ? null
+              : coordsFromLink(details.location)
+          }
+          allowClear
+          onSave={(picked) => {
+            setDraft({ ...draft, time: picked.time });
+            if (endDayOffset > 1 && picked.time) return;
+            setDetails({
+              ...details,
+              endTime: picked.endTime,
+              endDay: picked.endTime
+                ? shiftDay(draft.day, picked.endDayOffset)
+                : "",
+            });
+          }}
+          onClose={() => setPicking(false)}
+        />
+      )}
     </Modal>
   );
 }

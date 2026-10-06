@@ -2,6 +2,7 @@
 .itinerary-screen,
 dialog:has(.plan-sheet),
 dialog:has(.plan-add),
+dialog:has(.item-editor),
 dialog[data-panel="add"],
 .itinerary-poof-dot {
   --it-paper: #fff;
@@ -47,6 +48,7 @@ dialog[data-panel="add"],
     .itinerary-screen,
     dialog:has(.plan-sheet),
     dialog:has(.plan-add),
+    dialog:has(.item-editor),
     dialog[data-panel="add"],
     .itinerary-poof-dot
   ) {
@@ -636,6 +638,7 @@ dialog[data-panel="add"],
     .itinerary-screen,
     dialog:has(.plan-sheet),
     dialog:has(.plan-add),
+    dialog:has(.item-editor),
     dialog[data-panel="add"],
     .itinerary-poof-dot
   ) {
@@ -1817,4 +1820,16 @@ dialog[data-panel="add"],
   .itinerary-screen .date-strip[data-ready="true"] .date-selection {
     transition: none;
   }
+}
+
+/* しおりに追加 / 予定を編集: the add sheet's day chips and the 時刻 button
+   that opens the day timeline, with the form's own field look. */
+:root:root .modal .item-editor .field .tlp-trigger {
+  align-items: center;
+  min-height: 46px;
+  background: var(--field-tint);
+}
+.item-editor .it-chips {
+  margin: 0;
+  padding: 0;
 }

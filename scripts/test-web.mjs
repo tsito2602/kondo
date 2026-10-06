@@ -182,26 +182,7 @@ const pickTime = async (trigger, values) => {
   await waitFor(() => !picker.isConnected || !picker.open, "the picker closes");
   await tick(30);
 };
-// しおりに追加's Google Calendar-style rows: the 未定 switch, then a tap on
-// the time and a tap on an option in the list that opens under it.
-const pickRowTime = async (rows, label, time) => {
-  const untimed = rows.querySelector('[role="switch"]');
-  if (untimed.getAttribute("aria-checked") === "true") await click(untimed);
-  await click(rows.querySelector(`[aria-label^="${label}時刻"]`));
-  const option = [...rows.querySelectorAll('[role="option"]')].find(
-    (node) => node.querySelector("b")?.textContent === time,
-  );
-  assert.ok(option, `time option ${time} exists`);
-  await click(option);
-  assert.ok(
-    rows.querySelector(`[aria-label="${label}時刻 ${time}"]`),
-    `${label} is ${time}`,
-  );
-};
 const fill = async (label, value) => {
-  const rows = [...document.querySelectorAll("dialog[open] .dtr")].at(-1);
-  if (rows && /^(開始|終了|出発|到着)$/.test(label) && value.time)
-    return pickRowTime(rows, label, value.time);
   const input = field(label);
   assert.ok(input, `field ${label} exists`);
   if (input.matches("[data-time-trigger]"))
@@ -969,7 +950,7 @@ test("legacy account cache and pending changes survive React migration; real for
       byText("dialog .detail-itinerary-action button", "しおりへ追加"),
     );
     assert.equal(document.querySelectorAll("dialog[open]").length, 2);
-    await fill("開始", { time: "16:00" });
+    await fill("時刻", "16:00");
     await submit();
     assert.equal(document.querySelector("dialog[open]"), placeDetail);
     assert.match(document.querySelector("dialog").textContent, /しおりを見る/);
