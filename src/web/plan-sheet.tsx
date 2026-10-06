@@ -1,3 +1,4 @@
+import { BookingDetail } from "./booking-detail";
 import { type FormEvent, useId, useMemo, useRef, useState } from "react";
 import { FileText } from "lucide-react";
 import { useNavigate } from "react-router";
@@ -1126,7 +1127,7 @@ function BookingView({
   );
 }
 
-/** A booking seen from the しおり: 「詳細を開く」 hands over to the 予約 tab, where it is changed. */
+/** A booking seen from the しおり: its own detail; a hotel's check-in/out row adds the stay time, with 「詳細を開く」 to the 予約 tab. */
 export function BookingSheet({
   id,
   endpoint,
@@ -1143,6 +1144,11 @@ export function BookingSheet({
   const [editing, setEditing] = useState(false);
   const booking = travel.bookings.find((entry) => entry.id === id);
   if (!booking) return null;
+  // A booking card opens the booking's own detail, as the 予約 tab does
+  // (Tsubasa 2026-10-06: 「予約の詳細を直接表示でいいんじゃない？」). A hotel's
+  // check-in/out row stays here: it carries the travellers' own time.
+  if (!(booking.kind === "hotel" && endpoint))
+    return <BookingDetail id={booking.id} onClose={onClose} inItinerary />;
   const plan =
     booking.kind === "hotel" && endpoint
       ? travel.items.find(

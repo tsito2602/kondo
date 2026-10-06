@@ -65,9 +65,12 @@ export function useLayer(onEscape: () => void) {
 export function BookingDetail({
   id,
   onClose,
+  inItinerary = false,
 }: {
   id: string;
   onClose: () => void;
+  /** Opened from the しおり itself: no しおりで見る. */
+  inItinerary?: boolean;
 }) {
   const travel = useTravel();
   const notify = useToast();
@@ -160,14 +163,15 @@ export function BookingDetail({
     });
   };
   // しおりで見る is a function of its own: its own island in the dock.
-  const itineraryButton = booking.day ? (
-    <DockFunction
-      label="しおりで見る"
-      short="しおり"
-      icon={<BookOpen aria-hidden="true" />}
-      onClick={showInItinerary}
-    />
-  ) : undefined;
+  const itineraryButton =
+    booking.day && !inItinerary ? (
+      <DockFunction
+        label="しおりで見る"
+        short="しおり"
+        icon={<BookOpen aria-hidden="true" />}
+        onClick={showInItinerary}
+      />
+    ) : undefined;
 
   return (
     <>
