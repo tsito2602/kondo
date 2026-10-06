@@ -108,11 +108,17 @@ export function DayStrip({
     }
     // Faces arriving late change the tabs' widths: settle without motion.
     let alive = true;
-    void document.fonts?.ready.then(() => alive && place(false));
+    if (first) void document.fonts?.ready.then(() => alive && place(false));
+    // Only a real change of size re-places it (the first callback is not one).
+    let width = rail.clientWidth;
     const observer =
       typeof ResizeObserver === "undefined"
         ? null
-        : new ResizeObserver(() => place(false));
+        : new ResizeObserver(() => {
+            if (rail.clientWidth === width) return;
+            width = rail.clientWidth;
+            place(false);
+          });
     observer?.observe(rail);
     return () => {
       alive = false;

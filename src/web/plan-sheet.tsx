@@ -346,6 +346,26 @@ function PlanView({
   );
 }
 
+/** 「930」「9:30」「09:30」 → "09:30"; 「18」 → "18:00"; empty stays empty.
+    Anything else is returned as typed so validation can say so. */
+export function clockTime(value: string) {
+  const text = value
+    .trim()
+    .replace(/[０-９：]/g, (c) =>
+      String.fromCharCode(c.charCodeAt(0) - 0xfee0),
+    );
+  if (!text) return "";
+  const match =
+    text.match(/^(\d{1,2}):(\d{2})$/) ??
+    text.match(/^(\d{1,2})(\d{2})$/) ??
+    text.match(/^(\d{1,2})$/);
+  if (!match) return value;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2] ?? 0);
+  if (hours > 23 || minutes > 59) return value;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
 /** E1: every field of the plan, saved with 「保存」 or dropped with ✕ in the dock. */
 function PlanEditForm({
   item,
@@ -364,8 +384,11 @@ function PlanEditForm({
   const [category, setCategory] = useState<ItineraryCategory>(initial.category);
   const [title, setTitle] = useState(item.title);
   const [day, setDay] = useState(item.day);
-  const [time, setTime] = useState(item.time);
-  const [endTime, setEndTime] = useState(initial.endTime);
+  // kondo-detail types times as text (「--:--」); 930 or 9:30 reads as 09:30.
+  const [typedTime, setTime] = useState(item.time);
+  const [typedEndTime, setEndTime] = useState(initial.endTime);
+  const time = typedTime;
+  const endTime = typedEndTime;
   // An own place reads as its name; pasting another link replaces it.
   const shownLocation =
     initial.ownPlace && place ? place.title : initial.location;
@@ -406,6 +429,8 @@ function PlanEditForm({
         );
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    const time = clockTime(typedTime);
+    const endTime = clockTime(typedEndTime);
     const details: ItineraryDetails = {
       ...emptyItineraryDetails(category),
       ...(initial.stay ? { stay: initial.stay } : {}),
@@ -421,9 +446,12 @@ function PlanEditForm({
           }
         : {}),
     };
+    const clock = /^\d{2}:\d{2}$/;
     const message = !title.trim()
       ? "なにをするか入れてください"
-      : itineraryDetailsError(day, time, details);
+      : (time && !clock.test(time)) || (endTime && !clock.test(endTime))
+        ? "時刻は 9:30 のように入れてください"
+        : itineraryDetailsError(day, time, details);
     setError(message);
     if (message) return;
     void run(() => {
@@ -507,18 +535,24 @@ function PlanEditForm({
         <div className="ps-times">
           <input
             className="ps-inp"
-            type="time"
+            inputMode="numeric"
+            maxLength={5}
+            placeholder="--:--"
             aria-label="開始"
             value={time}
             onChange={(event) => setTime(event.target.value)}
+            onBlur={(event) => setTime(clockTime(event.target.value))}
           />
           <span aria-hidden="true">–</span>
           <input
             className="ps-inp"
-            type="time"
+            inputMode="numeric"
+            maxLength={5}
+            placeholder="--:--"
             aria-label="終了"
             value={endTime}
             onChange={(event) => setEndTime(event.target.value)}
+            onBlur={(event) => setEndTime(clockTime(event.target.value))}
           />
         </div>
         <p className="ps-hint">
@@ -609,7 +643,7 @@ function PlanEditForm({
         <span>メモ</span>
         <textarea
           className="ps-inp"
-          rows={4}
+          rows={2}
           maxLength={4000}
           value={note}
           onChange={(event) => setNote(event.target.value)}

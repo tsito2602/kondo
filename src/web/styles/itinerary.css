@@ -998,10 +998,9 @@ dialog:has(.plan-add),
 .ps-form {
   display: grid;
   gap: 14px;
-  margin-top: 6px;
 }
 :root .ps-form .ps-old-h {
-  margin: 2px 0 0;
+  margin: 2px 0 -4px;
   font-size: 13px;
   font-weight: 700;
   color: var(--it-mute);
@@ -1070,10 +1069,14 @@ dialog:has(.plan-add),
 .ps-days button {
   padding: 6px 0 5px;
   border-radius: 14px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
   line-height: 1.2;
 }
 .ps-days b {
   display: block;
+  line-height: 1.2;
   font-family: var(--it-num);
   font-size: 17px;
   font-weight: 800;
@@ -1097,6 +1100,9 @@ dialog:has(.plan-add),
   grid-template-columns: 1fr auto 1fr;
   gap: 8px;
   align-items: center;
+}
+.ps-form .ps-times + .ps-hint {
+  font-weight: 700;
 }
 .ps-times > span {
   font-weight: 700;
@@ -1130,6 +1136,15 @@ dialog:has(.plan-add),
 }
 
 /* ===== add sheet: right above the dock, every field within thumb reach ===== */
+@media (max-width: 759px) {
+  /* .add{bottom:104px}: 12 px above the dock's islands. */
+  :root:root:has(.thumb-dock-host) dialog.modal:has(.plan-add) {
+    padding-bottom: calc(
+      var(--dock-height) + var(--dock-bottom-gap) + 12px +
+        env(safe-area-inset-bottom)
+    );
+  }
+}
 :root dialog:has(.plan-add) .modal-header {
   justify-content: flex-start;
   min-height: 0;
@@ -1225,6 +1240,9 @@ dialog:has(.plan-add),
   font-family: var(--it-num);
   font-size: 17px;
 }
+.it-row2 > .field {
+  display: flex;
+}
 .it-row2 {
   display: grid;
   grid-template-columns: 132px minmax(0, 1fr);
@@ -1234,8 +1252,11 @@ dialog:has(.plan-add),
 :root .plan-add .it-hint {
   margin: 6px 0 0;
   font-size: 11px;
-  line-height: 1.6;
+  line-height: 1.7;
   color: var(--it-mute);
+}
+:root .plan-add .it-hint:not(.is-booking) {
+  margin: 14px 0 11px;
 }
 :root .plan-add .it-hint.is-booking {
   margin: 8px 2px 0;
