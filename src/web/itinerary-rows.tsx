@@ -34,7 +34,7 @@ export const bookingLabel: Record<Booking["kind"], string> = {
   train: "鉄道",
   hotel: "宿",
   car: "レンタカー",
-  restaurant: "食事の予約",
+  restaurant: "食事",
   ticket: "チケット",
   other: "予約",
 };
