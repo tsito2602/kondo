@@ -1,72 +1,46 @@
-import { addDays } from '@/utils/dates';
-import type { ItineraryItem, Place, TravelCache } from './types';
+import type { Place } from './types';
 
 /** A Google Maps place link as pasted from the app's share sheet. */
-const pin = (name: string, lat: number, lng: number) =>
+export const pin = (name: string, lat: number, lng: number) =>
   `https://www.google.com/maps/place/${encodeURIComponent(name)}/@${lat},${lng},17z/data=!4m6!3m5!8m2!3d${lat}!4d${lng}`;
 
+/** The sample trip's spots in Vienna, with their Google Maps coordinates. */
+export const VIENNA = {
+  sacher: pin('ホテル・ザッハー・ウィーン', 48.20393, 16.3695),
+  stephan: pin('シュテファン大聖堂', 48.20849, 16.37314),
+  figl: pin('フィグルミュラー', 48.20925, 16.37524),
+  musikverein: pin('楽友協会', 48.20052, 16.37256),
+  central: pin('カフェ・ツェントラル', 48.21043, 16.36547),
+  khm: pin('美術史美術館', 48.20379, 16.36166),
+  schoenbrunn: pin('シェーンブルン宮殿', 48.18486, 16.31224),
+  oper: pin('ウィーン国立歌劇場', 48.20278, 16.36885),
+  belvedere: pin('ベルヴェデーレ宮殿 上宮', 48.19149, 16.38085),
+  naschmarkt: pin('ナッシュマルクト', 48.19838, 16.36277),
+  prater: pin('プラーター大観覧車', 48.21665, 16.39585),
+};
+
 /**
- * Places for the sample trip, with real Vienna coordinates, so demo mode
- * shows the places map: three days of plans around the hotel plus candidates.
- * Kept apart from demo.ts and applied by id, so other demo edits merge cleanly.
+ * The places map: the しおり's plans with a place come first (numbered by
+ * place-numbers.ts in day and time order), then the venues of the trip's
+ * bookings and the spots we may still fit in.
  */
-export function withDemoPlaces(cache: TravelCache, tripId: string, start: string): TravelCache {
-  const day2 = addDays(start, 1);
-  const day3 = addDays(start, 2);
-  const day4 = addDays(start, 3);
-  const items = cache.itemsByTrip[tripId] ?? [];
-  const places = cache.placesByTrip[tripId] ?? [];
-  const sight = (location: string) => ({ category: 'sightseeing' as const, location, endDay: '', endTime: '' });
-  const meal = (location: string) => ({ category: 'meal' as const, location, endDay: '', endTime: '' });
-  const extraItems: ItineraryItem[] = [
-    { id: 'sample-stephan', day: day2, time: '16:00', kind: '予定', title: 'シュテファン大聖堂', note: '', details: sight('') },
-    { id: 'sample-figl', day: day2, time: '18:30', kind: '予定', title: 'フィグルミュラーで夕食', note: '', details: meal('') },
-    { id: 'sample-museum', day: day3, time: '14:00', kind: '予定', title: '美術史美術館', note: '', details: sight('') },
-    { id: 'sample-concert', day: day3, time: '19:30', kind: '予定', title: '楽友協会でコンサート', note: '', details: sight('') },
-    { id: 'sample-belvedere', day: day4, time: '09:15', kind: '予定', title: 'ベルヴェデーレ宮殿', note: '', details: sight('') },
-  ];
-  const known: Record<string, Partial<Place>> = {
-    'sample-place-cafe': { title: 'カフェ・ツェントラル', note: 'メランジェとアプフェルシュトゥルーデル', location: pin('Café Central', 48.21043, 16.36547), status: 'planned', itineraryItemId: 'sample-cafe' },
-    'sample-place-museum': { note: 'ブリューゲルの部屋から回る', location: pin('Kunsthistorisches Museum', 48.20379, 16.36166), status: 'planned', itineraryItemId: 'sample-museum' },
-  };
-  const place = (id: string, title: string, note: string, lat: number, lng: number, itineraryItemId?: string): Place => ({
-    id, title, note, openingHours: '', reservationStatus: 'not_needed', location: pin(title, lat, lng), status: itineraryItemId ? 'planned' : 'want', itineraryItemId,
+export function demoPlaces(): Place[] {
+  const place = (id: string, title: string, location: string, note: string, itineraryItemId: string | null, extra: Partial<Place> = {}): Place => ({
+    id, title, note, openingHours: '', reservationStatus: 'not_needed', location, status: itineraryItemId ? 'planned' : 'want', itineraryItemId, ...extra,
   });
-  const extraPlaces = [
-    place('sample-place-stephan', 'シュテファン大聖堂', '南塔に登る（343段）', 48.20849, 16.37314, 'sample-stephan'),
-    { ...place('sample-place-figl', 'フィグルミュラー', 'シュニッツェル。予約済み', 48.20925, 16.37524, 'sample-figl'), reservationStatus: 'confirmed' as const },
-    { ...place('sample-place-concert', '楽友協会', '予約番号 WM-2047 · 2階 R12・13', 48.20052, 16.37256, 'sample-concert'), reservationStatus: 'confirmed' as const },
-    place('sample-place-belvedere', 'ベルヴェデーレ宮殿', '上宮のクリムト「接吻」', 48.19149, 16.38085, 'sample-belvedere'),
-    place('sample-place-naschmarkt', 'ナッシュマルクト', '土曜は蚤の市も', 48.1984, 16.363),
-    place('sample-place-prater', 'プラーター大観覧車', '夕方がきれいらしい', 48.21665, 16.39585),
-    place('sample-place-schoenbrunn', 'シェーンブルン宮殿', '行けたら。U4で約20分', 48.18486, 16.31224),
+  return [
+    // Plans in the しおり.
+    place('sample-place-stephan', 'シュテファン大聖堂', VIENNA.stephan, '南塔に登る（343段）。', 'sample-stephan'),
+    place('sample-place-central', 'カフェ・ツェントラル', VIENNA.central, 'メランジェとアプフェルシュトゥルーデル。朝は並ばずに入れる。', 'sample-cafe'),
+    place('sample-place-museum', '美術史美術館', VIENNA.khm, 'ブリューゲルの部屋から回る。2階のカフェのドームも見る。', 'sample-museum', { openingHours: '10:00〜18:00（木曜は21:00まで）', reservationStatus: 'needed' }),
+    place('sample-place-schoenbrunn', 'シェーンブルン宮殿', VIENNA.schoenbrunn, '宮殿の中を見たあと、グロリエッテまで丘を登る。U4で約20分。', 'sample-schoenbrunn', { reservationStatus: 'needed' }),
+    // Venues of the bookings (their times are in 予約).
+    place('sample-place-belvedere', 'ベルヴェデーレ宮殿 上宮', VIENNA.belvedere, '時間指定券（9:00）は予約済み。クリムト「接吻」を見る。', null, { openingHours: '9:00〜18:00', reservationStatus: 'confirmed', status: 'planned' }),
+    place('sample-place-figl', 'フィグルミュラー', VIENNA.figl, '着いた日の夕食、17:30に予約済み。シュニッツェルはお皿からはみ出す大きさ。', null, { reservationStatus: 'confirmed', status: 'planned' }),
+    place('sample-place-musikverein', '楽友協会', VIENNA.musikverein, '着いた日の夜、黄金のホールでモーツァルト。チケットは予約済み。', null, { reservationStatus: 'confirmed', status: 'planned' }),
+    place('sample-place-oper', 'ウィーン国立歌劇場', VIENNA.oper, '3日目の夜に「魔笛」。ホテルから歩いて2分。', null, { reservationStatus: 'confirmed', status: 'planned' }),
+    // Still candidates.
+    place('sample-place-naschmarkt', 'ナッシュマルクト', VIENNA.naschmarkt, '美術史美術館から歩いて10分。お昼をここで食べるかも。', null, { openingHours: '日曜休み' }),
+    place('sample-place-prater', 'プラーター大観覧車', VIENNA.prater, '時間が余ったら。夕方がきれいらしい。', null),
   ];
-  // The しおり's sample (demo-itinerary) may already plan some of these places:
-  // a place, plan or booking that exists by id is kept, and nothing is added twice.
-  const bookings = cache.bookingsByTrip[tripId] ?? [];
-  const linked = new Set(places.map((entry) => entry.itineraryItemId).filter(Boolean));
-  const taken = (itemId?: string | null) =>
-    !!itemId && (linked.has(itemId) || bookings.some((booking) => booking.id === itemId) || items.some((item) => item.id === itemId));
-  const addedPlaces = extraPlaces.filter((entry) => !places.some((existing) => existing.id === entry.id) && !taken(entry.itineraryItemId));
-  const addedItems = extraItems.filter((item) => addedPlaces.some((entry) => entry.itineraryItemId === item.id));
-  const update = (entry: Place): Place => {
-    const change = known[entry.id];
-    // Leave a place alone when it is already planned, or its plan already has a place.
-    if (!change || entry.itineraryItemId || (change.itineraryItemId && linked.has(change.itineraryItemId))) return entry;
-    return { ...entry, ...change };
-  };
-  return {
-    ...cache,
-    bookingsByTrip: {
-      ...cache.bookingsByTrip,
-      [tripId]: (cache.bookingsByTrip[tripId] ?? []).map((booking) =>
-        booking.id === 'sample-hotel' && !booking.location ? { ...booking, location: pin('旧市街のホテル', 48.2087, 16.3697) } : booking,
-      ),
-    },
-    itemsByTrip: { ...cache.itemsByTrip, [tripId]: [...items, ...addedItems] },
-    placesByTrip: {
-      ...cache.placesByTrip,
-      [tripId]: [...places.map(update), ...addedPlaces],
-    },
-  };
 }
