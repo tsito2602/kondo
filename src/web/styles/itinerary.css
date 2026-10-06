@@ -1623,7 +1623,7 @@ dialog[data-panel="add"],
     padding-top: calc(var(--add-panel-top) + env(safe-area-inset-top));
     padding-bottom: calc(
       var(--dock-height) + var(--dock-bottom-gap) + 12px +
-        env(safe-area-inset-bottom)
+        var(--dock-safe-bottom)
     );
   }
 }

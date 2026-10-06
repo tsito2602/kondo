@@ -425,14 +425,14 @@ dialog .update-notice-host {
   :root:has(.thumb-dock-host:not([hidden])) .update-notice-host {
     bottom: calc(
       var(--dock-bottom-gap) + var(--dock-height) + 12px +
-        env(safe-area-inset-bottom)
+        var(--dock-safe-bottom)
     );
   }
   :root[data-app-update="waiting"]:has(.thumb-dock-host) .modal,
   :root[data-app-update="waiting"]:has(.thumb-dock-host) .modal.full {
     padding-bottom: calc(
       var(--dock-height) + var(--dock-bottom-gap) + 16px +
-        var(--update-notice-space) + env(safe-area-inset-bottom)
+        var(--update-notice-space) + var(--dock-safe-bottom)
     );
   }
 }

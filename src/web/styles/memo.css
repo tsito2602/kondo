@@ -345,7 +345,7 @@ dialog:has(.memo-editor),
   padding: calc(12px + env(safe-area-inset-top)) 22px
     calc(
       var(--dock-height) + var(--dock-bottom-gap) + 60px +
-        env(safe-area-inset-bottom) + var(--panel-keyboard-inset, 0px)
+        var(--dock-safe-bottom) + var(--panel-keyboard-inset, 0px)
     );
 }
 .memo-editor {
@@ -648,7 +648,7 @@ dialog:has(.memo-show) .context-back {
 .memo-bub {
   position: fixed;
   left: 0;
-  bottom: calc(var(--dock-bottom-gap) + 74px + env(safe-area-inset-bottom));
+  bottom: calc(var(--dock-bottom-gap) + 74px + var(--dock-safe-bottom));
   z-index: 90;
   padding: 7px 12px;
   border-radius: 12px;

@@ -513,12 +513,12 @@ button.bk-card {
     right: max(10px, env(safe-area-inset-right));
     bottom: calc(
       var(--dock-height) + var(--dock-bottom-gap) + 12px +
-        env(safe-area-inset-bottom)
+        var(--dock-safe-bottom)
     );
     max-height: calc(
       100% - var(--add-panel-top) - env(safe-area-inset-top) -
         var(--dock-height) - var(--dock-bottom-gap) - 12px -
-        env(safe-area-inset-bottom)
+        var(--dock-safe-bottom)
     );
     padding: 20px 18px 18px;
     border-radius: 30px;
@@ -530,7 +530,7 @@ button.bk-card {
   :root:has(.thumb-dock-host) .bk-sheet[data-tall] {
     height: calc(
       100% - 10px - env(safe-area-inset-top) - var(--dock-height) -
-        var(--dock-bottom-gap) - 12px - env(safe-area-inset-bottom)
+        var(--dock-bottom-gap) - 12px - var(--dock-safe-bottom)
     );
     max-height: none;
   }

@@ -2770,7 +2770,7 @@ input::-webkit-date-and-time-value {
       max(10px, env(safe-area-inset-right))
       calc(
         var(--dock-height) + var(--dock-bottom-gap) + 18px +
-          env(safe-area-inset-bottom)
+          var(--dock-safe-bottom)
       )
       max(10px, env(safe-area-inset-left));
     background: transparent;
@@ -2853,7 +2853,7 @@ input::-webkit-date-and-time-value {
   :root:has(.thumb-dock-host) .page,
   :root:has(.thumb-dock-host) .timeline {
     padding-bottom: calc(
-      162px + var(--dock-bottom-gap) + env(safe-area-inset-bottom)
+      162px + var(--dock-bottom-gap) + var(--dock-safe-bottom)
     );
   }
 }
@@ -4041,7 +4041,7 @@ input::-webkit-date-and-time-value {
   padding: 0 env(safe-area-inset-right)
     calc(
       var(--dock-height) + var(--dock-bottom-gap) + 12px +
-        env(safe-area-inset-bottom)
+        var(--dock-safe-bottom)
     )
     env(safe-area-inset-left);
   overflow: hidden;
@@ -4072,7 +4072,7 @@ input::-webkit-date-and-time-value {
     position: absolute;
     left: 12px;
     right: 12px;
-    bottom: var(--dock-bottom-gap);
+    bottom: calc(var(--dock-bottom-gap) + var(--dock-safe-bottom));
     justify-content: center;
     pointer-events: none;
   }

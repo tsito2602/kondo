@@ -394,8 +394,7 @@
   position: fixed;
   left: 0;
   bottom: calc(
-    var(--dock-height) + var(--dock-bottom-gap) + 12px +
-      env(safe-area-inset-bottom)
+    var(--dock-height) + var(--dock-bottom-gap) + 12px + var(--dock-safe-bottom)
   );
   z-index: 30;
   padding: 7px 12px;
