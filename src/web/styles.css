@@ -8,6 +8,7 @@
 @import "./styles/places.css";
 @import "./styles/itinerary.css";
 @import "./styles/dock.css";
+@import "./styles/chrome.css";
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 @theme inline {
   --color-brand: var(--brand);
