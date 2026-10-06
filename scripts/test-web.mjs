@@ -923,7 +923,7 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.ok(pin.classList.contains("plan"));
     assert.equal(
-      [...document.querySelectorAll(".places-chips button")]
+      [...document.querySelectorAll(".places-chips button[aria-pressed]")]
         .map((chip) => chip.textContent)
         .join(","),
       "全日程,11/22",

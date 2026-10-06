@@ -52,8 +52,7 @@ type Mark = {
 type View = { cx: number; cy: number; k: number };
 
 const MAP_HEIGHT = 420;
-const JELLY_ITEMS =
-  ".places-map, .places-honest, .places-list h3, .places-row";
+const JELLY_ITEMS = ".places-map, .places-honest, .places-list h3, .places-row";
 const PAD = 52;
 // Day tones for 全日程: pale, ink, dark, repeating for longer trips.
 const TONES = ["var(--pl-t2)", "var(--pl-ink)", "var(--pl-t4)"];
