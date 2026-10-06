@@ -132,8 +132,15 @@ export function useAction() {
   };
   return { busy, run };
 }
-/** Keep the pointer-down action stable even when the browser blurs on tap. */
-function FormBackButton({ onBack }: { onBack: () => void }) {
+/** Keep the pointer-down action stable even when the browser blurs on tap.
+    A sheet may name its way out (「やめる」) instead of showing an arrow. */
+function FormBackButton({
+  onBack,
+  label,
+}: {
+  onBack: () => void;
+  label?: string;
+}) {
   const [editor, setEditor] = useState<HTMLElement | null>(null);
   const button = useRef<HTMLButtonElement>(null);
   const pressedEditor = useRef<HTMLElement | null>(null);
@@ -172,7 +179,8 @@ function FormBackButton({ onBack }: { onBack: () => void }) {
     <button
       ref={button}
       type="button"
-      aria-label={editor ? "キーボードを閉じる" : "戻る"}
+      aria-label={editor ? "キーボードを閉じる" : label ? undefined : "戻る"}
+      className={label && !editor ? "context-back-label" : undefined}
       onPointerDown={(event) => {
         pressedEditor.current = editor;
         if (editor) event.preventDefault();
@@ -195,7 +203,7 @@ function FormBackButton({ onBack }: { onBack: () => void }) {
           <ChevronDown size={12} />
         </span>
       ) : (
-        <ArrowLeft size={22} />
+        (label ?? <ArrowLeft size={22} />)
       )}
     </button>
   );
@@ -217,7 +225,11 @@ export function Modal({
   fullscreen?: boolean;
   action?: ReactNode;
   preserveNavigation?: boolean;
-  dockActions?: { primary?: ReactNode; actions?: ReactNode };
+  dockActions?: {
+    primary?: ReactNode;
+    actions?: ReactNode;
+    backLabel?: string;
+  };
 }>) {
   const ref = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -409,7 +421,10 @@ export function Modal({
                     <X size={22} />
                   </button>
                 ) : (
-                  <FormBackButton onBack={close} />
+                  <FormBackButton
+                    onBack={close}
+                    label={dockActions?.backLabel}
+                  />
                 )
               }
               primary={

@@ -3,7 +3,7 @@ import { PropsWithChildren, createContext, useCallback, useContext, useEffect, u
 import { useAuth } from '@/auth/auth-provider';
 
 import { readOfflineFile, saveOfflineFile } from './offline-files';
-import { createDemoCache } from './demo';
+import { createDemoCache, demoMembers } from './demo';
 import { loadDemoDocument, saveDemoDocument } from './demo-documents';
 import { loadTravelCache, saveTravelCache } from './cache';
 import { connectionBetween, createsFlightConnectionCycle } from './flight-connections';
@@ -12,7 +12,13 @@ import { Booking, BookingDocument, emptyTravelCache, ItineraryItem, PackingItem,
 type TripInput = Pick<Trip, 'name' | 'destination' | 'startsOn' | 'endsOn' | 'coverImage'>;
 type ItemInput = Pick<ItineraryItem, 'day' | 'time' | 'kind' | 'title' | 'note' | 'details'>;
 type BookingInput = Pick<Booking, 'kind' | 'title' | 'detail' | 'location' | 'origin' | 'originCode' | 'destination' | 'destinationCode' | 'day' | 'time' | 'endDay' | 'endTime' | 'confirmationCode' | 'note' | 'durationMinutes'>;
-type PackingInput = Pick<PackingItem, 'name' | 'category' | 'quantity' | 'packed' | 'assignee' | 'shared'>;
+type PackingInput = Pick<PackingItem, 'name' | 'category' | 'quantity' | 'packed' | 'assignee' | 'shared' | 'kind'>;
+/** みんな各自 keeps one tick per member; `packed` is always the viewer's own. */
+const withOwnTick = (item: PackingItem, self: string | undefined): PackingItem => {
+  if (item.kind !== 'each' || !self) return item;
+  const others = (item.packedBy ?? []).filter((id) => id !== self);
+  return { ...item, packedBy: item.packed ? [...others, self].sort() : others };
+};
 type TaskInput = Pick<TravelTask, 'title' | 'dueOn' | 'assignee' | 'done'>;
 type BookingDocumentInput = { filename: string; contentType: string; size: number; bytes: ArrayBuffer };
 
@@ -482,14 +488,14 @@ export function TravelProvider({ children }: PropsWithChildren) {
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
     const id = crypto.randomUUID();
-    const item: PackingItem = { id, ...input };
+    const item = withOwnTick({ id, ...input }, user?.id);
     commit((current) => ({
       ...current,
       packingByTrip: { ...current.packingByTrip, [tripId]: [...(current.packingByTrip[tripId] ?? []), item] },
     }));
     enqueue({ method: 'POST', path: `/v1/trips/${tripId}/packing`, body: { id, ...input } });
     return id;
-  }, [commit, enqueue]);
+  }, [commit, enqueue, user?.id]);
 
   const updatePackingItem = useCallback((id: string, input: PackingInput) => {
     const tripId = cacheRef.current.selectedTripId;
@@ -499,11 +505,11 @@ export function TravelProvider({ children }: PropsWithChildren) {
       ...current,
       packingByTrip: {
         ...current.packingByTrip,
-        [tripId]: (current.packingByTrip[tripId] ?? []).map((item) => item.id === id ? { ...item, ...input } : item),
+        [tripId]: (current.packingByTrip[tripId] ?? []).map((item) => item.id === id ? withOwnTick({ ...item, ...input }, user?.id) : item),
       },
     }));
     enqueue({ method: 'PATCH', path: `/v1/trips/${tripId}/packing/${id}`, body: input });
-  }, [commit, enqueue]);
+  }, [commit, enqueue, user?.id]);
 
   const deletePackingItem = useCallback((id: string) => {
     const tripId = cacheRef.current.selectedTripId;
@@ -585,7 +591,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
   const tasks = [...(selectedTrip ? cache.tasksByTrip[selectedTrip.id] ?? [] : [])]
     .sort((a, b) => `${a.done ? 1 : 0} ${a.dueOn || '9999-12-31'} ${a.title} ${a.id}`.localeCompare(`${b.done ? 1 : 0} ${b.dueOn || '9999-12-31'} ${b.title} ${b.id}`));
   const members = useMemo<TripMember[]>(() => {
-    const entries: TripMember[] = isDemo ? [{ id: 'demo-self', name: 'あなた', email: '', role: 'owner' }, { id: 'demo-companion', name: '同行者', email: '', role: 'editor' }] : cache.membersByTrip?.[cache.selectedTripId ?? ''] ?? [];
+    const entries: TripMember[] = isDemo ? demoMembers.map((member) => ({ ...member })) : cache.membersByTrip?.[cache.selectedTripId ?? ''] ?? [];
     return entries.map((member) => member.id === user?.id ? { ...member, name: user.name, avatarUrl: user.avatarUrl } : member);
   }, [cache.membersByTrip, cache.selectedTripId, isDemo, user]);
   const value = useMemo<TravelContextValue>(() => ({

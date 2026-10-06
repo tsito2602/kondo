@@ -1,4 +1,3 @@
-import { SegmentSelection } from "./segment-selection";
 import { PlaceStatusLabel } from "./place-status";
 import { DayStrip } from "./day-strip";
 import { BookingTicketContent } from "./booking-ticket";
@@ -10,7 +9,6 @@ import {
   StayCard,
 } from "./itinerary-bookings";
 import { PlaceCard } from "./place-card";
-import { TaskList } from "./task-list";
 import { CalendarPanel } from "./date-picker";
 import { TripCover } from "./trip-cover";
 import { useItineraryScroll } from "./itinerary-scroll";
@@ -34,7 +32,6 @@ import {
   CircleCheck,
   Route as RouteIcon,
   Clock,
-  ListChecks,
   Hotel,
   TrainFront,
   Car,
@@ -42,7 +39,6 @@ import {
   Ticket,
   CalendarDays,
 } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "./obsidian/tabs";
 import { Badge } from "./obsidian/badge";
 import { useTravel } from "@/data/travel-provider";
 import { addDays, formatDate } from "@/utils/dates";
@@ -59,26 +55,18 @@ import {
   formatConnectionDuration,
 } from "@/data/flight-connections";
 import { placeStatuses } from "@/data/places";
-import {
-  matchesPreparationFilter,
-  preparationFilterOptions,
-} from "@/data/preparation-filter";
-import { AssigneeAvatar } from "./assignee-avatar";
 import type {
   Booking,
   Place,
   ItineraryItem,
   ItineraryCategory,
-  PackingItem,
-  TravelTask,
   TravelNote,
 } from "@/data/types";
-import { AddButton, Empty, ThumbTools, Field, useAction } from "./ui";
+import { AddButton, Empty, ThumbTools, Field } from "./ui";
 import {
   BookingEditor,
   ItemEditor,
   PlaceEditor,
-  PreparationEditor,
   bookingKinds,
 } from "./editors";
 import { BookingDetail, ItemDetail, PlaceDetail } from "./details";
@@ -570,197 +558,6 @@ export function PlacesScreen() {
       {adding && <PlaceEditor onClose={() => setAdding(false)} />}
       {id && <PlaceDetail id={id} onClose={() => setId(null)} />}
     </div>
-  );
-}
-export function PackingScreen() {
-  const travel = useTravel();
-  const [tab, setTab] = useState<"task" | "packing">("task");
-  const [filter, setFilter] = useState("all");
-  const [editing, setEditing] = useState<{
-    item?: TravelTask | PackingItem;
-    type: "task" | "packing";
-  } | null>(null);
-  const { run } = useAction();
-  const all = tab === "task" ? travel.tasks : travel.packingItems;
-  const options = preparationFilterOptions(
-    travel.members,
-    all,
-    tab === "packing",
-  );
-  const selected = options.find((option) => option.key === filter)?.filter ?? {
-    kind: "all" as const,
-  };
-  const items = all.filter((item) => matchesPreparationFilter(item, selected));
-  const complete = (item: TravelTask | PackingItem) =>
-    "done" in item ? item.done : item.packed;
-  const done = items.filter(complete).length;
-  return (
-    <Tabs
-      className="page preparation-page"
-      value={tab}
-      onValueChange={(value) => {
-        setTab(value as "task" | "packing");
-        setFilter("all");
-      }}
-    >
-      <ThumbTools title="準備の表示" label="表示">
-        <div className="form">
-          <div className="segmented preparation-tabs has-selection">
-            {(["task", "packing"] as const).map((value) => (
-              <button
-                key={value}
-                aria-pressed={tab === value}
-                className={tab === value ? "selected" : ""}
-                onClick={() => {
-                  setTab(value);
-                  setFilter("all");
-                }}
-              >
-                {value === "task" ? "やること" : "持ち物"}
-              </button>
-            ))}
-            <SegmentSelection index={tab === "task" ? 0 : 1} />
-          </div>
-          <Field label="担当者">
-            <select
-              value={filter}
-              onChange={(event) => setFilter(event.target.value)}
-            >
-              {options.map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-      </ThumbTools>
-      <div className="page-toolbar">
-        <div>
-          <h2>準備</h2>
-        </div>
-        {travel.canEdit && (
-          <AddButton
-            label={tab === "task" ? "やることを追加" : "持ち物を追加"}
-            onClick={() => setEditing({ type: tab })}
-          />
-        )}
-      </div>
-      <TabsList
-        className="segmented preparation-tabs has-selection"
-        data-active-tab={tab}
-        aria-label="旅の準備"
-      >
-        <TabsTrigger value="task" aria-label="やること">
-          やること<span className="tab-count">{travel.tasks.length}</span>
-        </TabsTrigger>
-        <TabsTrigger value="packing" aria-label="持ち物">
-          持ち物<span className="tab-count">{travel.packingItems.length}</span>
-        </TabsTrigger>
-        <SegmentSelection index={tab === "task" ? 0 : 1} />
-      </TabsList>
-      <TabsContent
-        key={tab}
-        value={tab}
-        data-motion-direction={tab === "packing" ? "forward" : "back"}
-      >
-        <div className="preparation-summary">
-          <div>
-            <h2>{tab === "task" ? "完了したやること" : "準備できた持ち物"}</h2>
-            <p className="muted">
-              {done} / {items.length} {tab === "task" ? "完了" : "準備済み"}
-            </p>
-          </div>
-          <strong>
-            {items.length ? Math.round((done / items.length) * 100) : 0}
-            <small>%</small>
-          </strong>
-        </div>
-        <progress
-          max={items.length || 1}
-          value={done}
-          aria-label="準備の完了率"
-        />
-        <div className="filter-strip" aria-label="担当者">
-          {options.map((option) => (
-            <button
-              key={option.key}
-              className={filter === option.key ? "selected" : ""}
-              aria-pressed={filter === option.key}
-              onClick={() => setFilter(option.key)}
-            >
-              {option.filter.kind === "assignee" && option.filter.value ? (
-                <AssigneeAvatar
-                  value={option.filter.value}
-                  members={travel.members}
-                />
-              ) : (
-                option.label
-              )}
-            </button>
-          ))}
-        </div>
-        {!items.length ? (
-          <Empty>
-            <ListChecks />
-            <p>{tab === "task" ? "やること" : "持ち物"}を追加しましょう。</p>
-          </Empty>
-        ) : (
-          <TaskList
-            key={tab + filter}
-            canEdit={travel.canEdit}
-            items={items.map((item) => ({
-              id: item.id,
-              title: "title" in item ? item.title : item.name,
-              done: complete(item),
-              meta: (
-                <span className="preparation-meta">
-                  <span>
-                    {"quantity" in item
-                      ? `${item.category} · ${item.quantity}個`
-                      : item.dueOn
-                        ? `${formatDate(item.dueOn)}まで`
-                        : "期限なし"}
-                  </span>
-                  {"quantity" in item && (item.shared || !item.assignee) && (
-                    <span>共用</span>
-                  )}
-                  {item.assignee ? (
-                    <AssigneeAvatar
-                      value={item.assignee}
-                      members={travel.members}
-                    />
-                  ) : !("quantity" in item) ? (
-                    <span>未指定</span>
-                  ) : null}
-                </span>
-              ),
-            }))}
-            onToggle={(id, checked) => {
-              const item = items.find((item) => item.id === id)!;
-              void run(() =>
-                "done" in item
-                  ? travel.updateTask(id, { ...item, done: checked })
-                  : travel.updatePackingItem(id, { ...item, packed: checked }),
-              );
-            }}
-            onEdit={(id) =>
-              setEditing({
-                item: items.find((item) => item.id === id),
-                type: tab,
-              })
-            }
-          />
-        )}
-        {editing && (
-          <PreparationEditor
-            type={editing.type}
-            item={editing.item}
-            onClose={() => setEditing(null)}
-          />
-        )}
-      </TabsContent>
-    </Tabs>
   );
 }
 const loadNoteEditor = () =>

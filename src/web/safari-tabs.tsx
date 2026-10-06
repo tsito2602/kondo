@@ -10,6 +10,7 @@ import { NavLink, useLocation, useNavigate } from "react-router";
 import {
   ArrowLeft,
   BookOpen,
+  createLucideIcon,
   ListChecks,
   MapPin,
   MoreHorizontal,
@@ -22,10 +23,18 @@ import { ios } from "./haptics";
 import { animateDockPress, DockSurface } from "./dock-surface";
 import { DockNavigationContext, SharedDockSurfaceContext } from "./thumb-dock";
 
+/** The 持ち物 bag: a soft case with one handle, as drawn in the prep mock. */
+const PackingBag = createLucideIcon("PackingBag", [
+  ["rect", { x: "4", y: "8", width: "16", height: "12", rx: "3", key: "case" }],
+  ["path", { d: "M9 8a3 3 0 0 1 6 0", key: "handle" }],
+]);
+
+// The dock shows icons only; each label stays as the tab's accessible name.
 export const tripTabs = [
   { path: "itinerary", label: "しおり", icon: BookOpen },
-  { path: "places", label: "行きたい場所", icon: MapPin },
-  { path: "packing", label: "準備", icon: ListChecks },
+  { path: "places", label: "場所", icon: MapPin },
+  { path: "tasks", label: "やること", icon: ListChecks },
+  { path: "packing", label: "持ち物", icon: PackingBag },
   { path: "bookings", label: "予約", icon: Ticket },
   { path: "notes", label: "メモ", icon: NotebookPen },
 ];
@@ -401,8 +410,7 @@ export function SafariTabs({
                   selectTab(index);
                 }}
               >
-                <tab.icon size={21} />
-                <span>{tab.label}</span>
+                <tab.icon size={21} aria-hidden="true" />
               </NavLink>
             ))}
           </nav>

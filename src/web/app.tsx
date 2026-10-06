@@ -65,9 +65,9 @@ import {
   BookingsScreen,
   ItineraryScreen,
   NotesScreen,
-  PackingScreen,
   PlacesScreen,
 } from "./screens";
+import { PackingScreen, TasksScreen } from "./prep";
 import {
   Empty,
   Field,
@@ -308,6 +308,7 @@ function TravelApp() {
           <Route path="itinerary" element={<ItineraryScreen />} />
           <Route path="bookings" element={<BookingsScreen />} />
           <Route path="places" element={<PlacesScreen />} />
+          <Route path="tasks" element={<TasksScreen />} />
           <Route path="packing" element={<PackingScreen />} />
           <Route path="notes" element={<NotesScreen />} />
         </Route>

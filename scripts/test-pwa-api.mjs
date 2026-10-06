@@ -113,6 +113,57 @@ test('packing assignment and shared status survive old clients, membership chang
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM packing_details WHERE item_id = ?').get(id).n, 0);
   } finally { db.close(); }
 });
+test('packing kinds: legacy rows read as 1つでいい, みんな各自 ticks per member, 自分だけ stays private on the server', async () => {
+  const { db, call, trip } = await fixture();
+  try {
+    const base = `/trips/${trip.id}/packing`;
+    const list = async (user = 'owner') => (await (await call(base, 'GET', undefined, user)).json()).items;
+    const find = async (id, user) => (await list(user)).find((item) => item.id === id);
+    const legacy = { id: randomUUID(), name: '変換プラグ', category: '電子機器', quantity: 1, packed: false, assignee: 'member:editor', shared: false };
+    assert.equal((await call(base, 'POST', legacy)).status, 201);
+    assert.equal((await find(legacy.id)).kind, 'one', 'items without a kind are 1つでいい with their old carrier');
+    assert.deepEqual((await find(legacy.id)).packedBy, []);
+    // Only the carrier ticks a 1つでいい item; others' ticks are ignored, not rejected.
+    assert.equal((await call(`${base}/${legacy.id}`, 'PATCH', { ...legacy, packed: true })).status, 200);
+    assert.equal((await find(legacy.id)).packed, false);
+    assert.equal((await call(`${base}/${legacy.id}`, 'PATCH', { ...legacy, packed: true }, 'editor')).status, 200);
+    assert.equal((await find(legacy.id)).packed, true);
+
+    const each = { id: randomUUID(), name: 'パスポート', category: '書類', quantity: 1, packed: false, assignee: '', shared: false, kind: 'each' };
+    assert.equal((await call(base, 'POST', each)).status, 201);
+    const ticked = await call(`${base}/${each.id}`, 'PATCH', { ...each, packed: true }, 'editor');
+    assert.deepEqual((await ticked.json()).item.packedBy, ['editor']);
+    assert.equal((await find(each.id, 'editor')).packed, true, 'packed is the reader’s own tick');
+    assert.equal((await find(each.id, 'owner')).packed, false);
+    assert.deepEqual((await find(each.id, 'owner')).packedBy, ['editor']);
+    // An older client omits the kind and sends the reader's own tick back.
+    const { kind: _kind, ...old } = each;
+    assert.equal((await call(`${base}/${each.id}`, 'PATCH', { ...old, packed: true }, 'owner')).status, 200);
+    assert.equal((await find(each.id)).kind, 'each');
+    assert.deepEqual((await find(each.id)).packedBy, ['editor', 'owner']);
+    db.prepare("DELETE FROM trip_members WHERE trip_id = ? AND user_id = 'editor'").run(trip.id);
+    assert.deepEqual((await find(each.id)).packedBy, ['owner'], 'a departed member no longer shows as packed');
+    db.prepare("INSERT INTO trip_members (trip_id,user_id,role) VALUES (?, 'editor', 'editor')").run(trip.id);
+
+    const mine = { id: randomUUID(), name: 'コンタクトレンズ', category: 'その他', quantity: 1, packed: false, assignee: '', shared: false, kind: 'mine' };
+    assert.equal((await call(base, 'POST', mine, 'editor')).status, 201);
+    assert.equal((await find(mine.id, 'editor')).kind, 'mine');
+    assert.equal(await find(mine.id, 'owner'), undefined, 'another member never receives a private item');
+    assert.equal((await call(`${base}/${mine.id}`, 'PATCH', { ...mine, name: '覗き見' }, 'owner')).status, 404);
+    assert.equal((await call(base, 'POST', { ...mine, name: '上書き' }, 'owner')).status, 409);
+    assert.equal((await call(`${base}/${mine.id}`, 'DELETE', undefined, 'owner')).status, 404);
+    assert.equal((await find(mine.id, 'editor')).name, 'コンタクトレンズ');
+    // Sharing it again is the owner's choice.
+    assert.equal((await call(`${base}/${mine.id}`, 'PATCH', { ...mine, kind: 'each' }, 'editor')).status, 200);
+    assert.equal((await find(mine.id, 'owner')).kind, 'each');
+    assert.equal((await call(`${base}/${mine.id}`, 'PATCH', { ...mine, kind: 'secret' }, 'editor')).status, 400);
+    db.exec(await readFile('worker/schema.sql', 'utf8'));
+    assert.equal((await find(each.id)).kind, 'each', 'kinds survive schema reruns');
+    assert.equal((await call(`${base}/${each.id}`, 'DELETE')).status, 204);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM packing_marks WHERE item_id = ?').get(each.id).n, 0);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM packing_kinds WHERE item_id = ?').get(each.id).n, 0);
+  } finally { db.close(); }
+});
 test('multiple place links and unavailable reservations round-trip without losing legacy data', async () => {
   const { db, call, trip } = await fixture();
   try {

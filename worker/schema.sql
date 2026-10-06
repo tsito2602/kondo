@@ -248,3 +248,19 @@ CREATE TABLE IF NOT EXISTS booking_durations (
   booking_id TEXT PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
   duration_minutes INTEGER
 );
+
+-- Packing kinds: みんな各自 (each), 1つでいい (one) and 自分だけ (mine). Items
+-- without a row are legacy items and read as 'one' with their old carrier.
+-- owner_id is set only for 'mine'; nobody else can read or change those rows.
+CREATE TABLE IF NOT EXISTS packing_kinds (
+  item_id TEXT PRIMARY KEY REFERENCES packing_items(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL DEFAULT 'one' CHECK(kind IN ('each', 'one', 'mine')),
+  owner_id TEXT REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Per-member packed marks for みんな各自 items: one row per member who packed it.
+CREATE TABLE IF NOT EXISTS packing_marks (
+  item_id TEXT NOT NULL REFERENCES packing_items(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  PRIMARY KEY (item_id, user_id)
+);

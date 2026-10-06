@@ -767,13 +767,14 @@ function pointer(target, type, x = 0, y = 0, extra = {}) {
 }
 
 function layoutTabs(nav, width = () => 360) {
-  [...nav.querySelectorAll("a")].forEach((link, index) => {
+  const links = [...nav.querySelectorAll("a")];
+  links.forEach((link, index) => {
     link.getBoundingClientRect = () => ({
-      left: (index * width()) / 5,
-      right: ((index + 1) * width()) / 5,
+      left: (index * width()) / links.length,
+      right: ((index + 1) * width()) / links.length,
       top: 100,
       bottom: 164,
-      width: width() / 5,
+      width: width() / links.length,
       height: 64,
     });
   });
@@ -826,7 +827,7 @@ test("trip tabs stay joined with names and support one-tap or hold selection", a
     const icons = [...nav.querySelectorAll("svg")];
     const places = nav.querySelector('a[href$="/places"]');
     const notes = nav.querySelector('a[href$="/notes"]');
-    assert.equal(icons.length, 5);
+    assert.equal(icons.length, 6);
     assert.equal(dock.dataset.level, "trip");
     assert.equal(dock.dataset.wide, "true");
     assert.equal(document.querySelectorAll(".safari-side[inert]").length, 2);
@@ -912,7 +913,7 @@ test("trip tabs stay joined with names and support one-tap or hold selection", a
   }
 });
 
-test("details retain the same five tab nodes and close before one-tap navigation, including the current tab", async () => {
+test("details retain the same six tab nodes and close before one-tap navigation, including the current tab", async () => {
   let surface;
   HTMLElement.prototype.animate = function () {
     const animation = timeline();
@@ -1098,7 +1099,7 @@ test("hold and drag previews live tab bounds, commits once on release, and cance
       "true",
       "transferring implicit touch capture from link to nav is not cancellation",
     );
-    await act(async () => pointer(nav, "pointermove", 225, 130));
+    await act(async () => pointer(nav, "pointermove", 200, 130));
     assert.equal(links[3].dataset.preview, "true");
     assert.equal(
       document.querySelector("output").textContent,
@@ -1120,12 +1121,12 @@ test("hold and drag previews live tab bounds, commits once on release, and cance
       "another finger cannot change this gesture",
     );
     await act(async () => {
-      pointer(nav, "pointerup", 225, 130);
+      pointer(nav, "pointerup", 200, 130);
       links[0].click(); // Compatibility click may still target the initial link.
     });
     assert.equal(
       document.querySelector("output").textContent,
-      "/trips/demo/packing",
+      "/trips/demo/tasks",
     );
     assert.equal(transitions, 1, "release must navigate exactly once");
     assert.equal(nav.hasPointerCapture(1), false);
@@ -1138,7 +1139,7 @@ test("hold and drag previews live tab bounds, commits once on release, and cance
     ]) {
       await hold();
       await act(async () => pointer(nav, "pointermove", 378, 130));
-      assert.equal(links[4].dataset.preview, "true");
+      assert.equal(links[5].dataset.preview, "true");
       await act(async () => {
         if (reason === "outside") {
           pointer(nav, "pointermove", 378, 70);
@@ -1158,7 +1159,7 @@ test("hold and drag previews live tab bounds, commits once on release, and cance
       });
       assert.equal(
         document.querySelector("output").textContent,
-        "/trips/demo/packing",
+        "/trips/demo/tasks",
         reason,
       );
       assert.equal(dock.dataset.expanded, "false", reason);
@@ -1235,7 +1236,7 @@ test("contact previews immediately and a short scrub commits once without waitin
       "/trips/demo/itinerary",
     );
     await act(async () => pointer(nav, "pointermove", 324, 130));
-    assert.equal(selected(), "4", "short drags track the finger immediately");
+    assert.equal(selected(), "5", "short drags track the finger immediately");
     await act(async () => {
       pointer(nav, "pointerup", 324, 130);
       links[1].click();
@@ -1250,7 +1251,7 @@ test("contact previews immediately and a short scrub commits once without waitin
     );
     assert.equal(
       selected(),
-      "4",
+      "5",
       "release must not flash the old tab while the route waits",
     );
     await act(async () => updateRoute());
@@ -1259,7 +1260,7 @@ test("contact previews immediately and a short scrub commits once without waitin
       document.querySelector("output").textContent,
       "/trips/demo/notes",
     );
-    assert.equal(selected(), "4");
+    assert.equal(selected(), "5");
     assert.equal(
       nav.querySelector(".safari-selection"),
       indicator,
@@ -1271,7 +1272,7 @@ test("contact previews immediately and a short scrub commits once without waitin
       pointer(nav, "pointerup", 36, 70);
       links[0].click();
     });
-    assert.equal(selected(), "4", "outside release restores the current tab");
+    assert.equal(selected(), "5", "outside release restores the current tab");
     assert.equal(dock.dataset.touching, "false");
     assert.equal(transitions, 1);
     await act(async () =>

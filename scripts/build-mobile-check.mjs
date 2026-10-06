@@ -20,7 +20,7 @@ export async function buildMobileCheck(root, enabled) {
 <script>
 const phone=document.getElementById('phone');
 document.getElementById('size').onchange=e=>{const [w,h]=e.target.value.split('×');phone.width=w;phone.height=h;};
-const routes=[['旅行一覧','/'],['設定','/settings'],...['itinerary','bookings','places','packing','notes','members'].map((p,i)=>[['しおり','予約','行きたい場所','準備','メモ','メンバー'][i],'/trips/sample-vienna/'+p])];
+const routes=[['旅行一覧','/'],['設定','/settings'],...['itinerary','bookings','places','tasks','packing','notes','members'].map((p,i)=>[['しおり','予約','場所','やること','持ち物','メモ','メンバー'][i],'/trips/sample-vienna/'+p])];
 for(const [name,url] of routes){const b=document.createElement('button');b.textContent=name;b.onclick=()=>phone.src=url;document.getElementById('routes').append(b);}
 document.getElementById('measure').onclick=()=>{
  const w=phone.contentWindow,d=phone.contentDocument;
