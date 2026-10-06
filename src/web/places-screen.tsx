@@ -231,9 +231,9 @@ export function PlacesScreen() {
         model={model}
         day={activeDay}
         selected={selected}
-        onSelect={(mark) =>
-          mark.point ? select(mark.key, "list") : setDetail(mark)
-        }
+        // A row opens the place's detail straight away (Tsubasa 2026-10-06:
+        // 「リストから直接詳細が開くようにして」); the map's pins keep the card.
+        onSelect={(mark) => setDetail(mark)}
       />
       {selectedMark && (
         <PlaceSheetFor
