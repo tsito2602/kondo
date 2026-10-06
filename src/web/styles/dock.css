@@ -26,6 +26,26 @@
     justify-content: center;
     pointer-events: none;
   }
+  /* The page fades out behind the dock and ＋, as uchiwake's
+     .floating-nav-host::before (Tsubasa 2026-10-06: 「ふわっと消えるやつ、
+     ボトムナビや追加ボタンにも」). Not inside a sheet: its panel ends there. */
+  :root:has(body > .thumb-dock-host:not([hidden])) body::after {
+    content: "";
+    position: fixed;
+    /* under ＋ (24) and the dock (40), over the page */
+    z-index: 23;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(var(--add-bottom, 112px) + 58px + 16px);
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--p-paper) 0%, transparent) 0%,
+      color-mix(in srgb, var(--p-paper) 55%, transparent) 45%,
+      color-mix(in srgb, var(--p-paper) 92%, transparent) 100%
+    );
+    pointer-events: none;
+  }
   dialog .thumb-dock-host:not([hidden]) {
     /* Keep controls at the layout bottom, underneath the software keyboard. */
     position: absolute;
