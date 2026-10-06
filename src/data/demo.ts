@@ -27,6 +27,9 @@ const people = (...keys: string[]) => keys.map((key) => DEMO_PEOPLE[key]);
 /** The Vienna trip's two travellers; the provider lists them as members. */
 export const demoMembers = people('self', 'misaki');
 
+/** Bump when the sample content changes, so devices drop an older saved sample. */
+export const DEMO_REVISION = '2026-10-06-vienna';
+
 /**
  * Demo mode's data: one five-day trip to Vienna starting 13 days from today
  * (night flight from Narita via Dubai, two nights in the old town), plus the

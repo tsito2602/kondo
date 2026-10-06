@@ -3,7 +3,7 @@ import { PropsWithChildren, createContext, useCallback, useContext, useEffect, u
 import { useAuth } from '@/auth/auth-provider';
 
 import { readOfflineFile, saveOfflineFile } from './offline-files';
-import { createDemoCache, demoMembers } from './demo';
+import { createDemoCache, demoMembers, DEMO_REVISION } from './demo';
 import { loadDemoDocument, saveDemoDocument } from './demo-documents';
 import { loadTravelCache, saveTravelCache } from './cache';
 import { connectionBetween, createsFlightConnectionCycle } from './flight-connections';
@@ -195,7 +195,10 @@ export function TravelProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     let active = true;
     void loadTravelCache(isDemo ? 'demo' : user?.id).then((value) => {
-      const stored = isDemo && !value.trips.length ? createDemoCache() : value;
+      let stale = false;
+      try { stale = isDemo && localStorage.getItem('kondo.demo-revision') !== DEMO_REVISION; } catch { /* storage blocked */ }
+      const stored = isDemo && (!value.trips.length || stale) ? createDemoCache() : value;
+      if (stale) { try { localStorage.setItem('kondo.demo-revision', DEMO_REVISION); } catch { /* storage blocked */ } if (value.trips.length) void saveTravelCache(stored, 'demo').catch(() => {}); }
       if (!active) return;
       cacheRef.current = stored;
       setCache(stored);
