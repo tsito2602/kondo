@@ -512,6 +512,9 @@ export function BookingForm({
     ticket: "施設・イベント名",
     other: "予約のタイトル",
   }[kind];
+  const carrier = kind === "flight" || kind === "train";
+  const carrierLabel =
+    kind === "flight" ? "航空会社・補足（任意）" : "鉄道会社・補足（任意）";
   const displayTitle =
     draft.title.trim() || (kind === "flight" ? flightTitle(draft) : "");
   const [mergeId, setMergeId] = useState<string | null>(null);
@@ -658,15 +661,14 @@ export function BookingForm({
       </div>
       {draft.kind && (
         <>
+          {/* The carrier comes before the flight or train it runs
+              (Tsubasa 2026-10-06: 「航空会社・鉄道会社を便名より上にして」). */}
+          {carrier && field("detail", carrierLabel)}
           {field("title", titleLabel, kind !== "flight")}
           {kind === "flight" && (
             <p className="muted form-hint">
               例：GK211。空欄の場合は出発地・到着地を表示します。
             </p>
-          )}
-          {field(
-            "detail",
-            kind === "flight" ? "航空会社・補足（任意）" : "予約内容",
           )}
           {route && (
             <div className={kind === "flight" ? "airport-fields" : "form-grid"}>
