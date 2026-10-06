@@ -1084,7 +1084,7 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(byText("nav a", "メモ"));
     const noteCount = () =>
       db.prepare("SELECT COUNT(*) AS n FROM travel_notes").get().n;
-    const typeInto = async (node, value) => {
+    const typeIntoNote = async (node, value) => {
       assert.ok(node, "text field exists");
       await act(async () => {
         Object.getOwnPropertyDescriptor(
@@ -1116,16 +1116,16 @@ test("legacy account cache and pending changes survive React migration; real for
       document.querySelector('[aria-label="メモのタイトル"]'),
       "＋ starts on the title",
     );
-    await typeInto(
+    await typeIntoNote(
       document.querySelector('[aria-label="メモのタイトル"]'),
       "旅先の買い物",
     );
-    await typeInto(
+    await typeIntoNote(
       document.querySelector('textarea[aria-label="1行目"]'),
       "お土産",
     );
     await click(document.querySelector('[aria-label="チェックを足す"]'));
-    await typeInto(
+    await typeIntoNote(
       document.querySelector('textarea[aria-label="2行目"]'),
       "待ち合わせ場所",
     );
@@ -1178,7 +1178,7 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await closeNote();
     await click(document.querySelector('[aria-label="メモを書く"]'));
-    await typeInto(
+    await typeIntoNote(
       document.querySelector('[aria-label="メモのタイトル"]'),
       "削除するメモ",
     );
