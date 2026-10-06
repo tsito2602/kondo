@@ -9,6 +9,8 @@ import { Link } from "react-router";
 import type { Trip, TripMember } from "@/data/types";
 import { TripCover } from "./trip-cover";
 import { reduceMotion } from "./motion";
+import { registerSquish, spring } from "./cartoon";
+import { useJellyScroll } from "./jelly-scroll";
 
 /** Places typed into one destination. 「・」 stays inside a single name. */
 export function destinationPlaces(destination: string) {
@@ -286,5 +288,40 @@ export function useTripListEntrance(list: React.RefObject<HTMLElement | null>) {
         },
       ),
     );
+  }, [list]);
+}
+
+/**
+ * kondo-home.html's press: a tapped card or the join link gives one squish
+ * (scale .95 × .97 back to rest on the squish spring) instead of the shared
+ * hold-to-squish, and the list trails a fast scroll (jelly scroll).
+ */
+export function useHomeMotion(list: React.RefObject<HTMLElement | null>) {
+  useJellyScroll(
+    list,
+    ".home-toolbar, .home-group-heading, .home-trip, .home-join",
+  );
+  useLayoutEffect(() => {
+    const node = list.current;
+    if (!node) return;
+    // Amount 1: the shared press feedback leaves these to the handler below.
+    const unregister = registerSquish(".home-trip, .home-join", 1);
+    const down = (event: PointerEvent) => {
+      if (event.button !== 0 || !(event.target instanceof Element)) return;
+      const target = event.target.closest<HTMLElement>(
+        ".home-trip, .home-join",
+      );
+      if (target)
+        void spring(
+          target,
+          [{ transform: "scale(.95,.97)" }, { transform: "none" }],
+          "squish",
+        );
+    };
+    node.addEventListener("pointerdown", down);
+    return () => {
+      unregister();
+      node.removeEventListener("pointerdown", down);
+    };
   }, [list]);
 }
