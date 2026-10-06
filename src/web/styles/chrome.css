@@ -1,0 +1,60 @@
+/* Shared page chrome from the mocks.
+   No trip mock draws a shared header: 予約, やること, 持ち物 and メモ start
+   right under the status bar with their own .page-top, and the しおり
+   title is that screen's own (with TripMenuButton). So on phones the
+   TripLayout header goes; wide layouts keep it. */
+@media (max-width: 759px) {
+  .trip-header {
+    display: none;
+  }
+}
+
+/* .page-top: a screen's opening line (kondo-prep3 / bookings / memo):
+   a 12 px mute line over a 28 px black title, actions at the right. */
+.page-top {
+  padding: 6px 4px 8px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+}
+.page-top small {
+  display: block;
+  font-size: 12px;
+  color: var(--p-mute);
+  font-weight: 700;
+}
+.page-top h2 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+.page-top[data-size="30"] h2 {
+  font-size: 30px;
+}
+.page-top-acts {
+  display: flex;
+  gap: 8px;
+}
+/* The mocks' round soft buttons beside a title (.plus). */
+.page-plus {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 50%;
+  border: 0;
+  background: var(--p-soft);
+  color: var(--p-ink);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.page-plus svg {
+  width: 20px;
+  height: 20px;
+}
+/* A screen's scrolling body: the mocks' .scroll padding. */
+.page-scroll {
+  padding: 8px 18px 150px;
+}
