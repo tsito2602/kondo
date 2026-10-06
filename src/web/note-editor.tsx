@@ -17,9 +17,9 @@ import {
   type NoteLine,
   type NoteLineKind,
 } from "@/data/note-lines";
-import { Modal, useToast } from "./ui";
+import { Modal } from "./ui";
 import { dismissModal } from "./motion";
-import { sink, spring } from "./memo-motion";
+import { bubble, memoEditorTransition, sink, spring } from "./memo-motion";
 import {
   AddCheckIcon,
   AddHeadingIcon,
@@ -105,7 +105,6 @@ export function NoteEditor({
     error: syncError,
   } = useTravel();
   const { user } = useAuth();
-  const notify = useToast();
   const places = useNotePlaces();
   const [draft, setDraft] = useState(initial);
   const [lines, setLines] = useState<NoteLine[]>(() => {
@@ -124,6 +123,18 @@ export function NoteEditor({
   const lineRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
   const focusNext = useRef<{ index: number; caret: number } | null>(null);
   const dialogBody = useRef<HTMLDivElement>(null);
+  const deleting = useRef(false);
+  const [transition] = useState(() =>
+    memoEditorTransition(
+      () =>
+        fresh
+          ? document.querySelector('.notes-page [aria-label="メモを書く"]')
+          : document.querySelector(
+              `.memo-tile[data-note-id="${CSS.escape(initial.id)}"]`,
+            ),
+      () => deleting.current,
+    ),
+  );
   const flush = () => {
     if (timer.current) clearTimeout(timer.current);
     if (!dirty.current || !canEdit) return;
@@ -275,10 +286,10 @@ export function NoteEditor({
       row?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     });
   };
-  const togglePin = () => {
+  const togglePin = (button: Element) => {
     const pinned = !latest.current.pinned;
     change({ pinned });
-    notify(pinned ? "上にピン留めしました" : "ピン留めを外しました");
+    bubble(button, pinned ? "上にピン留めしました" : "ピン留めを外しました");
   };
   const link = (placeId: string | null) => {
     change({ placeId });
@@ -291,6 +302,7 @@ export function NoteEditor({
     );
   };
   const remove = () => {
+    deleting.current = true;
     flush();
     const note = latest.current;
     const saved = exists.current;
@@ -300,6 +312,8 @@ export function NoteEditor({
     });
   };
 
+  // The mock offers the trip's planned places: a day and a place.
+  const planned = places.filter((entry) => entry.plan);
   const linked = places.find((entry) => entry.place.id === draft.placeId);
   const live = notes.find((note) => note.id === initial.id);
   const meta: TravelNote = live ?? {
@@ -323,7 +337,7 @@ export function NoteEditor({
             aria-label="ピン留め"
             aria-pressed={Boolean(draft.pinned)}
             className={draft.pinned ? "on" : ""}
-            onClick={togglePin}
+            onClick={(event) => togglePin(event.currentTarget)}
           >
             {draft.pinned ? <PinFilledIcon /> : <PinIcon />}
           </button>
@@ -344,6 +358,7 @@ export function NoteEditor({
     <Modal
       title={draft.title?.trim() || "メモ"}
       full
+      transition={transition}
       onClose={close}
       dockActions={
         showing
@@ -384,7 +399,7 @@ export function NoteEditor({
             lineRefs.current[0]?.focus();
           }}
         />
-        {(linked || (canEdit && places.length > 0)) && (
+        {(linked || (canEdit && planned.length > 0)) && (
           <div className="memo-link-row">
             {linked ? (
               <>
@@ -415,7 +430,7 @@ export function NoteEditor({
         )}
         {picking && (
           <div className="memo-picks" role="group" aria-label="ひもづける場所">
-            {places.map((entry) => (
+            {planned.map((entry) => (
               <button
                 type="button"
                 key={entry.place.id}
@@ -428,9 +443,7 @@ export function NoteEditor({
                   </span>
                   <em>{entry.place.title}</em>
                 </span>
-                <small>
-                  {entry.plan ? planDayLabel(entry.plan.day) : "候補"}
-                </small>
+                <small>{entry.plan && planDayLabel(entry.plan.day)}</small>
               </button>
             ))}
             {linked && (

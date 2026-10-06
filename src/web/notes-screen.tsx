@@ -1,10 +1,19 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useTravel } from "@/data/travel-provider";
 import { toggleNoteCheck, visibleNoteLines } from "@/data/note-lines";
 import type { TravelNote } from "@/data/types";
 import { DockToast, ThumbDock } from "./thumb-dock";
 import { poof, sink, spring } from "./memo-motion";
+import { PageTop } from "./page-top";
+import { useJellyScroll } from "./jelly-scroll";
 import {
   CheckBox,
   NoteMeta,
@@ -90,6 +99,15 @@ export function NotesScreen() {
   );
   const removedRef = useRef<TravelNote | null>(null);
   const order = useRef<string[]>([]);
+  const page = useRef<HTMLDivElement>(null);
+  // Fast scrolls leave the tiles a little behind (kondo-cartoon jelly scroll).
+  useJellyScroll(page, ".memo-tile, .memo-lab");
+  // On arrival the labels and tiles land one after another, 40 ms apart.
+  useLayoutEffect(() => {
+    page.current
+      ?.querySelectorAll(".memo-tile, .memo-lab")
+      .forEach((element, index) => sink(element, -20, index * 40));
+  }, []);
   const deleteNote = travel.deleteNote;
   const commitRemoval = useRef(() => {});
   commitRemoval.current = () => {
@@ -209,41 +227,42 @@ export function NotesScreen() {
     </div>
   );
   return (
-    <div className="page notes-page">
-      <div className="memo-top">
-        <div>
-          <h2>メモ</h2>
-        </div>
-        <div className="memo-acts">
-          <button
-            className="memo-round"
-            aria-label="メモを探す"
-            aria-pressed={query !== null}
-            onClick={() => setQuery(query === null ? "" : null)}
-          >
-            <SearchIcon />
-          </button>
-          {travel.canEdit && (
+    <div className="page notes-page" ref={page}>
+      <PageTop
+        sub={`${travel.selectedTrip?.name ?? ""} · ${all.length}件`}
+        title="メモ"
+        actions={
+          <>
             <button
-              className="memo-round"
-              aria-label="メモを書く"
-              onClick={() =>
-                setOpen({
-                  fresh: true,
-                  note: {
-                    id: crypto.randomUUID(),
-                    body: "",
-                    title: "",
-                    updatedAt: Date.now() / 1000,
-                  },
-                })
-              }
+              className="page-plus"
+              aria-label="メモを探す"
+              aria-pressed={query !== null}
+              onClick={() => setQuery(query === null ? "" : null)}
             >
-              <PlusIcon />
+              <SearchIcon />
             </button>
-          )}
-        </div>
-      </div>
+            {travel.canEdit && (
+              <button
+                className="page-plus"
+                aria-label="メモを書く"
+                onClick={() =>
+                  setOpen({
+                    fresh: true,
+                    note: {
+                      id: crypto.randomUUID(),
+                      body: "",
+                      title: "",
+                      updatedAt: Date.now() / 1000,
+                    },
+                  })
+                }
+              >
+                <PlusIcon />
+              </button>
+            )}
+          </>
+        }
+      />
       {query !== null && (
         <label
           className="memo-search"
@@ -279,12 +298,10 @@ export function NotesScreen() {
       )}
       {rest.length > 0 && (
         <>
-          {pins.length > 0 && (
-            <div className="memo-lab">
-              <b>メモ</b>
-              <span>{rest.length}件</span>
-            </div>
-          )}
+          <div className="memo-lab">
+            <b>メモ</b>
+            <span>{rest.length}件</span>
+          </div>
           {tiles(rest)}
         </>
       )}

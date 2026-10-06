@@ -229,6 +229,10 @@ export function FormBackButton({
   );
 }
 
+export type ModalTransition = {
+  enter: (panel: HTMLElement, card: HTMLElement | null) => unknown;
+  exit: (panel: HTMLElement, card: HTMLElement | null) => Promise<unknown>;
+};
 export function Modal({
   title,
   children,
@@ -240,6 +244,7 @@ export function Modal({
   dockActions,
   plain = false,
   sheet,
+  transition,
 }: PropsWithChildren<{
   title: string;
   /** "bottom": kondo-detail's sheet on phones: it rises from the bottom edge
@@ -264,6 +269,8 @@ export function Modal({
   /** kondo-prep3's sheets: always rise from the bottom edge, and the page
       stays put under the scrim (no card stretch, no receding). */
   plain?: boolean;
+  /** A screen's own phone move in place of the shared card/sheet one. */
+  transition?: ModalTransition;
 }>) {
   const ref = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -302,7 +309,9 @@ export function Modal({
           card: plain || sheet === "bottom" ? null : cardOrigin(origin.current),
         }
       : null;
-    if (phone && sheet === "bottom")
+    if (phone && transition)
+      void transition.enter(panel, cartoon.current!.card);
+    else if (phone && sheet === "bottom")
       void spring(
         panel,
         [{ transform: "translateY(105%)" }, { transform: "none" }],
@@ -320,9 +329,10 @@ export function Modal({
     else if (phone) void sheetIn(panel);
     const enter = phone ? null : animateDialog(dialog, origin.current);
     animation.current = enter;
-    // kondo-detail's sheet slides over a plain #0006 scrim; the page stays.
+    // kondo-detail's sheet slides over a plain #0006 scrim, and a screen's
+    // own move draws over the page as it is: no receding page.
     depth.current =
-      plain || (phone && sheet === "bottom")
+      plain || (phone && (sheet === "bottom" || transition))
         ? null
         : menuDepth(
             reduceMotion(),
@@ -396,16 +406,18 @@ export function Modal({
         (pendingClose.current ?? closeCallback.current)();
       };
       void (
-        sheet === "bottom"
-          ? spring(
-              panel,
-              [{ transform: "none" }, { transform: "translateY(105%)" }],
-              "lead",
-              { fill: "forwards" },
-            )
-          : card
-            ? closeToCard(card, panel, { parent: dialog })
-            : sheetOut(panel)
+        transition
+          ? transition.exit(panel, card)
+          : sheet === "bottom"
+            ? spring(
+                panel,
+                [{ transform: "none" }, { transform: "translateY(105%)" }],
+                "lead",
+                { fill: "forwards" },
+              )
+            : card
+              ? closeToCard(card, panel, { parent: dialog })
+              : sheetOut(panel)
       ).then(finish);
       const timer = setTimeout(finish, 900);
       return () => {

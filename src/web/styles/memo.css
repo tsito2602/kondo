@@ -2,64 +2,22 @@
 .notes-page,
 dialog:has(.memo-editor),
 .memo-poof-dot {
-  --m-paper: var(--canvas);
-  --m-ink: #000;
-  --m-mid: #9c978f;
-  --m-pale: #cbc5bb;
-  --m-soft: #f3f2ef;
-  --m-mute: #77726b;
-  --m-line: #e8e6e1;
-}
-:root[data-theme="dark"]
-  :is(.notes-page, dialog:has(.memo-editor), .memo-poof-dot) {
-  --m-ink: #f5f1e9;
-  --m-mid: #b6b0a6;
-  --m-pale: #57534d;
-  --m-soft: #23221f;
-  --m-mute: #aaa49b;
-  --m-line: #2d2b29;
+  --m-paper: var(--p-paper);
+  --m-ink: var(--p-ink);
+  --m-mid: var(--p-mid);
+  --m-pale: var(--p-pale);
+  --m-soft: var(--p-soft);
+  --m-mute: var(--p-mute);
+  --m-line: var(--p-line);
+  font-family: var(--f-body);
 }
 
 /* ===== list ===== */
 :root .notes-page {
   max-width: 880px;
   padding-inline: 18px;
-  padding-top: 8px;
+  padding-top: calc(8px + env(safe-area-inset-top));
   color: var(--m-ink);
-}
-.memo-top {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 6px 4px 8px;
-}
-.memo-top h2 {
-  margin: 0;
-  font-size: 28px;
-  font-weight: 900;
-  line-height: 1.25;
-}
-.memo-acts {
-  display: flex;
-  gap: 8px;
-}
-.memo-round {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: var(--m-soft);
-  color: var(--m-ink);
-  cursor: pointer;
-}
-.memo-round svg {
-  width: 20px;
-  height: 20px;
 }
 .memo-search {
   display: flex;
@@ -112,7 +70,7 @@ dialog:has(.memo-editor),
   font-weight: 700;
   color: var(--m-mute);
 }
-.memo-top + .memo-tiles,
+.page-top + .memo-tiles,
 .memo-search + .memo-tiles {
   margin-top: 8px;
 }
@@ -307,7 +265,7 @@ dialog:has(.memo-editor),
   color: var(--m-ink);
   font-size: 11.5px;
   font-weight: 800;
-  line-height: 1.5;
+  line-height: 1.7;
 }
 /* The map's numbered pin: a teardrop pointing down. */
 .memo-chip-no {
@@ -323,6 +281,7 @@ dialog:has(.memo-editor),
 }
 .memo-chip-no span {
   transform: rotate(45deg);
+  font-family: var(--f-num);
   font-size: 10px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -348,9 +307,15 @@ dialog:has(.memo-editor),
   padding: 0;
   border: 0;
   border-radius: 0;
-  background: var(--m-paper);
+  /* The paper is the panel's, so the list shows while it grows in. */
+  background: transparent;
   box-shadow: none;
   overflow: hidden;
+}
+:root .modal.full:has(.memo-editor)::backdrop {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 :root .modal.full:has(.memo-editor) .modal-inner,
 :root:has(.thumb-dock-host) .modal.full:has(.memo-editor) .modal-inner {
@@ -447,7 +412,6 @@ dialog:has(.memo-editor),
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  min-height: 32px;
   padding: 0;
   border: 0;
   background: none;
@@ -526,19 +490,16 @@ dialog:has(.memo-editor),
   margin-top: 16px;
 }
 
-/* editor dock: back, then the note's tools */
-dialog:has(.memo-editor) .context-primary:empty {
-  display: none;
-}
-dialog:has(.memo-editor) .context-actions {
-  flex: 1;
+/* editor dock: back, then the note's tools (the mock's .tb) */
+dialog:has(.memo-editor):not(:has(.memo-show)) .context-actions {
   justify-content: space-around;
   padding: 0 4px;
 }
-:root dialog:has(.memo-editor) .context-actions > button {
+:root dialog:has(.memo-editor):not(:has(.memo-show)) .context-actions > button {
   flex: 1;
   min-width: 0;
-  width: auto;
+  height: 54px;
+  border-radius: 27px;
   color: var(--m-mute);
 }
 :root dialog:has(.memo-editor) .context-actions > button.on {
@@ -557,8 +518,9 @@ dialog:has(.memo-editor) .context-actions > button svg {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: calc(60px + env(safe-area-inset-top)) 26px
-    calc(130px + env(safe-area-inset-bottom));
+  /* The mock's 60 / 130 px count its status bar and home bar. */
+  padding: calc(10px + env(safe-area-inset-top)) 26px
+    calc(96px + env(safe-area-inset-bottom));
   background: var(--m-paper);
   color: var(--m-ink);
   overflow-y: auto;
@@ -583,18 +545,9 @@ dialog:has(.memo-editor) .context-actions > button svg {
 .memo-show-big span:first-child {
   font-size: 38px;
 }
+/* 見せる's dock is the one ink 「閉じる」 (the mock's .r.ink). */
 dialog:has(.memo-show) .context-back {
   display: none;
-}
-dialog:has(.memo-show) .context-primary {
-  flex: none;
-  margin-left: auto;
-}
-:root dialog:has(.memo-show) .context-primary > .memo-show-close {
-  width: auto;
-  padding: 0 24px 0 20px;
-  font-size: 15px;
-  font-weight: 700;
 }
 
 .memo-poof-dot {
@@ -646,4 +599,23 @@ dialog:has(.memo-show) .context-primary {
 .memo-linked .memo-cb svg {
   width: 11px;
   height: 11px;
+}
+
+/* The mock's bubble over the dock (memo-motion bubble()). */
+.memo-bub {
+  position: fixed;
+  left: 0;
+  bottom: calc(var(--dock-bottom-gap) + 74px + env(safe-area-inset-bottom));
+  z-index: 90;
+  padding: 7px 12px;
+  border-radius: 12px;
+  background: var(--p-ink);
+  color: var(--p-paper);
+  font-family: var(--f-body);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.7;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
 }
