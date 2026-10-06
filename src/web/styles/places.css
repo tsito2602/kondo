@@ -2,6 +2,7 @@
 .places-page,
 .places-card,
 .places-map.is-full {
+  will-change: transform, clip-path;
   --pl-paper: #fff;
   --pl-ink: #000;
   --pl-mid: #9c978f;
@@ -608,6 +609,7 @@
   cursor: pointer;
 }
 .places-map.is-full {
+  will-change: transform, clip-path;
   translate: none !important;
   position: fixed;
   z-index: 35;
@@ -615,14 +617,6 @@
   height: auto;
   border-radius: 0;
   box-shadow: none;
-  animation: places-full-in 0.42s
-    var(--spring-boing, cubic-bezier(0.3, 1.4, 0.5, 1)) both;
-}
-@keyframes places-full-in {
-  from {
-    opacity: 0;
-    transform: scale(0.94);
-  }
 }
 .places-map.is-full .places-full-toggle,
 .places-map.is-full .places-compass {

@@ -11,7 +11,11 @@ import {
   type ReactNode,
   type Ref,
 } from "react";
-import { Maximize2, MapPin, Minimize2 } from "lucide-react";
+import { ExternalLink, Maximize2, MapPin } from "lucide-react";
+import { spring } from "./cartoon";
+import { DockBackIcon } from "./cartoon-dock";
+import { ContextDock, ThumbDock } from "./thumb-dock";
+import { mapsViewHref } from "./basemap";
 import { createPortal } from "react-dom";
 import { createBasemap, lngLatFor, zoomFor } from "./basemap";
 import { PageTop } from "./page-top";
@@ -389,7 +393,16 @@ function PlacesMap({
   );
   // A new day (or a changed width or data) frames its places again.
   const [camera, setCamera] = useState({ base: fitted, view: fitted });
-  const view = camera.base === fitted ? camera.view : fitted;
+  // Going in or out of 全画面 changes the frame but keeps the camera, so the
+  // map grows and shrinks around the same view.
+  const keepView = useRef(false);
+  const view =
+    camera.base === fitted || keepView.current ? camera.view : fitted;
+  useLayoutEffect(() => {
+    if (!keepView.current || camera.base === fitted) return;
+    keepView.current = false;
+    setCamera((now) => ({ base: fitted, view: now.view }));
+  }, [fitted, camera.base]);
   const viewRef = useRef(view);
   viewRef.current = view;
   const fittedRef = useRef(fitted);
@@ -422,13 +435,69 @@ function PlacesMap({
     return () => observer.disconnect();
   }, [full]);
 
+  /* 全画面: the map grows out of its place on the page to the whole screen
+     and shrinks back into it, keeping its camera. */
+  const spot = useRef<HTMLDivElement>(null);
+  const growFrom = useRef<DOMRect | null>(null);
+  const leaving = useRef(false);
+  const frameOf = (rect: DOMRect): Keyframe => {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const x = (w - rect.width) / 2;
+    const y = (h - rect.height) / 2;
+    return {
+      clipPath: `inset(${y}px ${x}px round 26px)`,
+      transform: `translate(${rect.left + rect.width / 2 - w / 2}px, ${rect.top + rect.height / 2 - h / 2}px)`,
+    };
+  };
+  const enterFull = () => {
+    if (!mapEl.current) return;
+    growFrom.current = mapEl.current.getBoundingClientRect();
+    keepView.current = true;
+    setFull(true);
+  };
+  const exitFull = () => {
+    const element = mapEl.current;
+    const rect = spot.current?.getBoundingClientRect();
+    if (leaving.current) return;
+    leaving.current = true;
+    const done = () => {
+      leaving.current = false;
+      keepView.current = true;
+      setFull(false);
+    };
+    if (!element || !rect) return done();
+    void spring(
+      element,
+      [
+        { clipPath: "inset(0px 0px round 0px)", transform: "none" },
+        frameOf(rect),
+      ],
+      "split",
+      { fill: "forwards" },
+    ).then(done);
+  };
+  useLayoutEffect(() => {
+    const rect = growFrom.current;
+    growFrom.current = null;
+    if (!full || !rect || !mapEl.current) return;
+    void spring(
+      mapEl.current,
+      [
+        frameOf(rect),
+        { clipPath: "inset(0px 0px round 0px)", transform: "none" },
+      ],
+      "split",
+    );
+  }, [full]);
+
   /* 全画面: the page under it stays still; Esc closes it */
   useEffect(() => {
     if (!full) return;
     const root = document.documentElement;
     root.classList.add("places-full");
     const key = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setFull(false);
+      if (event.key === "Escape") exitFull();
     };
     window.addEventListener("keydown", key);
     return () => {
@@ -864,21 +933,50 @@ function PlacesMap({
             .join("·")}
         </button>
       ))}
-      <button
-        className="places-full-toggle"
-        aria-label={full ? "全画面をとじる" : "地図を全画面で見る"}
-        aria-pressed={full}
-        onClick={(event) => {
-          event.stopPropagation();
-          setFull((value) => !value);
-        }}
-      >
-        {full ? (
-          <Minimize2 size={17} aria-hidden="true" />
-        ) : (
+      {!full && (
+        <button
+          className="places-full-toggle"
+          aria-label="地図を全画面で見る"
+          onClick={(event) => {
+            event.stopPropagation();
+            enterFull();
+          }}
+        >
           <Maximize2 size={17} aria-hidden="true" />
-        )}
-      </button>
+        </button>
+      )}
+      {full && (
+        // 全画面's dock: ‹ shrinks the map back; Googleマップ opens the place
+        // picked, or else the area in view.
+        <ThumbDock mode="context">
+          <ContextDock
+            back={
+              <button aria-label="全画面をとじる" onClick={exitFull}>
+                <DockBackIcon />
+              </button>
+            }
+            primary={
+              <button
+                type="button"
+                onClick={() => {
+                  const mark = selected ? model.byKey.get(selected) : null;
+                  const href =
+                    (mark?.point &&
+                      placeMapsHref(
+                        mark.place?.location ?? mark.booking?.location ?? "",
+                        mark.point,
+                      )) ||
+                    mapsViewHref(view.cx, view.cy, view.k);
+                  window.open(href, "_blank", "noopener");
+                }}
+              >
+                <ExternalLink size={18} aria-hidden="true" />
+                Googleマップで見る
+              </button>
+            }
+          />
+        </ThumbDock>
+      )}
       {grounded && (
         <a
           className="places-attribution"
@@ -919,7 +1017,11 @@ function PlacesMap({
   // 全画面 goes to <body>, over the header and ＋; the dock stays over it.
   return full ? (
     <>
-      <div className="places-map-spot" style={{ height: MAP_HEIGHT }} />
+      <div
+        ref={spot}
+        className="places-map-spot"
+        style={{ height: MAP_HEIGHT }}
+      />
       {createPortal(mapView, document.body)}
     </>
   ) : (

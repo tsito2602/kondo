@@ -227,6 +227,13 @@ export const lngLatFor = (cx: number, cy: number): [number, number] => [
   ((2 * Math.atan(Math.exp(cy)) - Math.PI / 2) * 180) / Math.PI,
 ];
 
+/** Google Maps at the same place and scale (its tiles are 256 px: one zoom up). */
+export function mapsViewHref(cx: number, cy: number, k: number) {
+  const [lng, lat] = lngLatFor(cx, cy);
+  const zoom = Math.max(3, Math.min(21, zoomFor(k) + 1));
+  return `https://www.google.com/maps/@${lat.toFixed(6)},${lng.toFixed(6)},${zoom.toFixed(1)}z`;
+}
+
 export async function createBasemap(container: HTMLElement) {
   const { Map } = await import("maplibre-gl");
   const map: MapLibreMap = new Map({
