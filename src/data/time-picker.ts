@@ -16,19 +16,31 @@ export const LAST_START = 24 * 60 - STEP;
 export const snap = (minutes: number, step = STEP) => Math.round(minutes / step) * step;
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
-/** Moves both ends together; the length is kept and the block stays on the day. */
-export function moveSpan(span: Span, start: number, step = STEP): Span {
+/**
+ * The timeline's reach. One day runs 00:00 to 翌02:00; a trip's timeline runs
+ * from its first day's 00:00 through 翌02:00 after its last, so a plan can be
+ * dragged from one day into the next and run past midnight.
+ */
+export type Bounds = { end: number; lastStart: number };
+export const ONE_DAY: Bounds = { end: DAY_END, lastStart: LAST_START };
+export const daysBounds = (count: number): Bounds => ({
+  end: (Math.max(1, count) - 1) * 24 * 60 + DAY_END,
+  lastStart: Math.max(1, count) * 24 * 60 - STEP,
+});
+
+/** Moves both ends together; the length is kept and the block stays on the timeline. */
+export function moveSpan(span: Span, start: number, step = STEP, bounds = ONE_DAY): Span {
   const length = span.end - span.start;
-  const next = clamp(snap(start, step), DAY_START, Math.min(LAST_START, DAY_END - length));
+  const next = clamp(snap(start, step), DAY_START, Math.min(bounds.lastStart, bounds.end - length));
   return { start: next, end: next + length };
 }
 /** Drags the top edge: never closer than MIN_LENGTH to the end. */
-export function resizeStart(span: Span, start: number): Span {
-  return { start: clamp(snap(start), DAY_START, Math.min(LAST_START, span.end - MIN_LENGTH)), end: span.end };
+export function resizeStart(span: Span, start: number, bounds = ONE_DAY): Span {
+  return { start: clamp(snap(start), DAY_START, Math.min(bounds.lastStart, span.end - MIN_LENGTH)), end: span.end };
 }
 /** Drags the bottom edge: never closer than MIN_LENGTH to the start. */
-export function resizeEnd(span: Span, end: number): Span {
-  return { start: span.start, end: clamp(snap(end), span.start + MIN_LENGTH, DAY_END) };
+export function resizeEnd(span: Span, end: number, bounds = ONE_DAY): Span {
+  return { start: span.start, end: clamp(snap(end), span.start + MIN_LENGTH, bounds.end) };
 }
 
 /** A typed start (exact minutes): the plan keeps its length, shortened only where the day ends. */
@@ -46,11 +58,11 @@ export function typedEnd(span: Span, end: number): Span | null {
  * Keyboard: ↑/↓ move the plan 5 minutes (15 with Shift); with Alt/Option they
  * stretch or shorten the end instead. PageUp/PageDown move an hour.
  */
-export function keySpan(span: Span, key: string, { shift = false, alt = false } = {}): Span | null {
+export function keySpan(span: Span, key: string, { shift = false, alt = false } = {}, bounds = ONE_DAY): Span | null {
   const step = shift ? 15 : STEP;
   const delta = key === 'ArrowUp' ? -step : key === 'ArrowDown' ? step : key === 'PageUp' ? -60 : key === 'PageDown' ? 60 : 0;
   if (!delta) return null;
-  return alt ? resizeEnd(span, span.end + delta) : moveSpan(span, span.start + delta);
+  return alt ? resizeEnd(span, span.end + delta, bounds) : moveSpan(span, span.start + delta, STEP, bounds);
 }
 
 /** "08:30" for 510, "01:00" for 25:00 (shown with 翌 by the caller). */

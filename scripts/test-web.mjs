@@ -703,9 +703,7 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.ok(emptyDay && !emptyDay.disabled);
     await click(emptyDay);
     assert.match(
-      document.querySelector(
-        'dialog [aria-label="日にち"] [aria-pressed="true"]',
-      ).textContent,
+      document.querySelector("dialog [data-time-trigger]").textContent,
       /^11\/24/,
       "an empty day's button adds on that day",
     );
@@ -950,7 +948,7 @@ test("legacy account cache and pending changes survive React migration; real for
       byText("dialog .detail-itinerary-action button", "しおりへ追加"),
     );
     assert.equal(document.querySelectorAll("dialog[open]").length, 2);
-    await fill("時刻", "16:00");
+    await fill("日時", "16:00");
     await submit();
     assert.equal(document.querySelector("dialog[open]"), placeDetail);
     assert.match(document.querySelector("dialog").textContent, /しおりを見る/);

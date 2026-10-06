@@ -548,27 +548,13 @@ function PlanEditForm({
       </label>
       <div className="field">
         <span>日時</span>
-        <div className="ps-days" role="group" aria-label="日">
-          {days.map((value, index) => (
-            <button
-              type="button"
-              key={value}
-              aria-pressed={day === value}
-              onClick={() => setDay(value)}
-            >
-              <b>{index + 1}</b>
-              <small>
-                {md(value)} {weekday(value)}
-              </small>
-            </button>
-          ))}
-        </div>
         <div className="ps-times">
           <TimeRangeButton
             className="ps-inp"
+            day={day}
             time={clockTime(time)}
             endTime={clockTime(endTime)}
-            nextDay={span === 1}
+            endDayOffset={span}
             onOpen={() => setPicking(true)}
           />
         </div>
@@ -576,11 +562,10 @@ function PlanEditForm({
           <TimelinePicker
             title={title.trim() || "予定"}
             day={day}
+            days={days}
             time={clockTime(time)}
             endTime={clockTime(endTime)}
             endDayOffset={span}
-            point={span > 1}
-            pointLabel="開始"
             exclude={[`item-${item.id}`]}
             self={entryCoords(
               {
@@ -594,8 +579,8 @@ function PlanEditForm({
             )}
             allowClear
             onSave={(picked) => {
+              setDay(picked.day);
               setTime(picked.time);
-              if (span > 1 && picked.time) return;
               setEndTime(picked.endTime);
               setSpan(picked.endTime ? picked.endDayOffset : 0);
             }}
@@ -603,7 +588,7 @@ function PlanEditForm({
           />
         )}
         <p className="ps-hint">
-          時刻を空けると「未定」でその日の最後に入ります。
+          日付と時刻は、タイムラインで予定を動かして決めます。時刻を空けると「未定」でその日の最後に入ります。
         </p>
       </div>
       {category === "transport" ? (

@@ -1,5 +1,10 @@
 import { DatePicker } from "./date-picker";
-import { shiftDay, TimelinePicker, TimeRangeButton } from "./timeline-picker";
+import {
+  shiftDay,
+  TimelinePicker,
+  TimeRangeButton,
+  tripDays,
+} from "./timeline-picker";
 import { coordsFromLink } from "@/data/geo";
 import { dismissModal } from "./motion";
 import { Button } from "./obsidian/button";
@@ -233,12 +238,7 @@ export function ItemEditor({
         },
   );
   const [picking, setPicking] = useState(false);
-  const trip = travel.selectedTrip;
-  const days: string[] = [];
-  if (trip?.startsOn && trip.endsOn)
-    for (let at = trip.startsOn; at <= trip.endsOn; at = shiftDay(at, 1))
-      days.push(at);
-  if (!days.includes(draft.day)) (days.push(draft.day), days.sort());
+  const days = tripDays(travel.selectedTrip, draft.day);
   const endDayOffset = details.endDay
     ? Math.round(
         (Date.parse(details.endDay) - Date.parse(draft.day)) / 86_400_000,
@@ -320,38 +320,12 @@ export function ItemEditor({
           />
         </Field>
         <div className="field">
-          <span>日にち</span>
-          <div className="it-chips" role="group" aria-label="日にち">
-            {days.map((value) => (
-              <button
-                type="button"
-                key={value}
-                aria-pressed={draft.day === value}
-                onClick={() => {
-                  setDraft({ ...draft, day: value });
-                  if (details.endDay)
-                    setDetails({
-                      ...details,
-                      endDay: shiftDay(value, endDayOffset),
-                    });
-                }}
-              >
-                {Number(value.slice(5, 7))}/{Number(value.slice(8, 10))}
-                <small>
-                  {new Intl.DateTimeFormat("ja-JP", {
-                    weekday: "short",
-                  }).format(new Date(`${value}T12:00:00`))}
-                </small>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="field">
-          <span>時刻</span>
+          <span>日時</span>
           <TimeRangeButton
+            day={draft.day}
             time={draft.time}
             endTime={details.endTime}
-            nextDay={endDayOffset === 1}
+            endDayOffset={endDayOffset}
             onOpen={() => setPicking(true)}
           />
         </div>
@@ -454,11 +428,10 @@ export function ItemEditor({
         <TimelinePicker
           title={draft.title.trim() || "新しい予定"}
           day={draft.day}
+          days={days}
           time={draft.time}
           endTime={details.endTime}
           endDayOffset={endDayOffset}
-          point={endDayOffset > 1}
-          pointLabel="開始"
           exclude={item ? [`item-${item.id}`] : []}
           self={
             details.category === "transport"
@@ -467,13 +440,12 @@ export function ItemEditor({
           }
           allowClear
           onSave={(picked) => {
-            setDraft({ ...draft, time: picked.time });
-            if (endDayOffset > 1 && picked.time) return;
+            setDraft({ ...draft, day: picked.day, time: picked.time });
             setDetails({
               ...details,
               endTime: picked.endTime,
               endDay: picked.endTime
-                ? shiftDay(draft.day, picked.endDayOffset)
+                ? shiftDay(picked.day, picked.endDayOffset)
                 : "",
             });
           }}

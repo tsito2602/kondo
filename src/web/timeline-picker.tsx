@@ -19,8 +19,8 @@ import {
 import {
   type Block,
   clockOf,
-  DAY_END,
-  DAY_START,
+  type Bounds,
+  daysBounds,
   freeStart,
   keySpan,
   lengthLabel,
@@ -30,7 +30,6 @@ import {
   resizeStart,
   type Span,
   typedEnd,
-  typedStart,
   walkFlags,
 } from "@/data/time-picker";
 import type { ItineraryItem } from "@/data/types";
@@ -44,7 +43,9 @@ import { Modal } from "./ui";
 /** px per minute, as in the mock. */
 const PXM = 1.15;
 const PAD = 10;
-const y = (minutes: number) => (minutes - DAY_START) * PXM + PAD;
+const DAY = 1440;
+/** Minutes from the timeline's first midnight. */
+const y = (minutes: number) => minutes * PXM + PAD;
 const POINT = 30;
 const EDGE = 56;
 
@@ -59,25 +60,52 @@ const dayCount = (from: string, to: string) =>
   );
 const dayLabel = (day: string) =>
   `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))}（${new Intl.DateTimeFormat("ja-JP", { weekday: "short" }).format(new Date(`${day}T12:00:00`))}）`;
-const hourLabel = (hour: number) =>
-  `${hour >= 24 ? "翌" : ""}${String(hour % 24).padStart(2, "0")}:00`;
+const md = (day: string) =>
+  `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))}`;
+const weekdayOf = (day: string) =>
+  new Intl.DateTimeFormat("ja-JP", { weekday: "short" }).format(
+    new Date(`${day}T12:00:00`),
+  );
+const hourLabel = (hour: number) => `${String(hour % 24).padStart(2, "0")}:00`;
+/** The end's day beside its time: 翌 for the next day, else the date. */
+export const endDayMark = (day: string, offset: number) =>
+  offset <= 0
+    ? ""
+    : offset === 1
+      ? "翌"
+      : `${Number(addDays(day, offset).slice(5, 7))}/${Number(addDays(day, offset).slice(8, 10))}`;
+
+/** The trip's days, first to last (with `day` added when it lies outside). */
+export function tripDays(
+  trip: { startsOn?: string; endsOn?: string } | null | undefined,
+  day?: string,
+) {
+  const days: string[] = [];
+  if (trip?.startsOn && trip.endsOn && trip.startsOn <= trip.endsOn)
+    for (let at = trip.startsOn; at <= trip.endsOn; at = addDays(at, 1))
+      days.push(at);
+  if (day && !days.includes(day)) (days.push(day), days.sort());
+  return days;
+}
 
 export type PickedTime = {
+  /** The day the plan starts on (where the block was left). */
+  day: string;
   /** "" = 未定 (no time). */
   time: string;
   endTime: string;
-  /** 1 when the end is after midnight. */
+  /** Days from the start's day to the end's (1 = 翌). */
   endDayOffset: number;
 };
 
-/** An entry's end on its own day's clock (翌 as +24h), when it has one. */
+/** An entry's end in minutes from its own day's midnight, when it has one. */
 function entryEnd(entry: Entry, day: string) {
   if (entry.item) {
     const details = itemDetails(entry.item);
     const end = minutesOf(details.endTime);
     if (end === null) return null;
     const offset = details.endDay ? dayCount(entry.day, details.endDay) : 0;
-    return offset === 0 ? end : offset === 1 ? end + 1440 : DAY_END;
+    return end + offset * DAY;
   }
   const booking = entry.booking;
   if (
@@ -90,39 +118,44 @@ function entryEnd(entry: Entry, day: string) {
   return null;
 }
 
-/** The day's other plans as faint blocks, with the walk from/to this plan. */
-function useDayBlocks(
-  day: string,
+/**
+ * Every other plan on the timeline's days as faint blocks (minutes from the
+ * first day's midnight), with the walk from/to this plan.
+ */
+function useTrackBlocks(
+  days: readonly string[],
   exclude: readonly string[],
   self: LatLng | null,
 ) {
   const travel = useTravel();
   return useMemo(() => {
-    const entries = dayTimeline(
-      timelineEntries(travel.items, travel.bookings),
-      day,
+    const entries = timelineEntries(travel.items, travel.bookings);
+    return days.flatMap((day, index) =>
+      dayTimeline(entries, day).flatMap((entry): Block[] => {
+        const start = minutesOf(entry.time);
+        if (start === null || exclude.includes(entry.key)) return [];
+        const end = entryEnd(entry, day);
+        const coords = self && entryCoords(entry, travel.places);
+        return [
+          {
+            key: entry.key,
+            title: entry.stage ? `${entry.title} ${entry.stage}` : entry.title,
+            start: start + index * DAY,
+            end: end !== null && end > start ? end + index * DAY : null,
+            walk: coords ? walkMinutes(distanceMeters(self, coords)) : null,
+          },
+        ];
+      }),
     );
-    return entries.flatMap((entry): Block[] => {
-      const start = minutesOf(entry.time);
-      if (start === null || exclude.includes(entry.key)) return [];
-      const end = entryEnd(entry, day);
-      const coords = self && entryCoords(entry, travel.places);
-      return [
-        {
-          key: entry.key,
-          title: entry.stage ? `${entry.title} ${entry.stage}` : entry.title,
-          start,
-          end: end !== null && end > start ? end : null,
-          walk: coords ? walkMinutes(distanceMeters(self, coords)) : null,
-        },
-      ];
-    });
-  }, [travel.items, travel.bookings, travel.places, day, exclude, self]);
+  }, [travel.items, travel.bookings, travel.places, days, exclude, self]);
 }
 
 /**
- * Option C of kondo-time-pickers.html: the plan is an ink block on its day's
- * timeline among the trip's other plans. Drag it to move start and end
+ * Option C of kondo-time-pickers.html: the plan is an ink block on the trip's
+ * timeline among its other plans. With `days`, the timeline runs through all
+ * of them like a calendar's day columns laid end to end: dragging the block
+ * picks the day and the time together, and the end can run into the next day.
+ * Without, it is the one `day` (a hotel's check-in/out). Drag it to move start and end
  * together, or its top/bottom grip to change one end (5-minute steps, at least
  * 15 minutes). The walk to the neighbours turns red when it makes someone late.
  * The big 開始 → 終了 readout can also be typed into.
@@ -130,6 +163,7 @@ function useDayBlocks(
 export function TimelinePicker({
   title,
   day,
+  days,
   time,
   endTime,
   endDayOffset = 0,
@@ -144,6 +178,8 @@ export function TimelinePicker({
 }: {
   title: string;
   day: string;
+  /** The days the block may be dragged through (the trip's). */
+  days?: readonly string[];
   time: string;
   endTime: string;
   endDayOffset?: number;
@@ -162,21 +198,53 @@ export function TimelinePicker({
 }) {
   const excludeKey = exclude.join("|");
   const excluded = useMemo(() => excludeKey.split("|"), [excludeKey]);
-  const blocks = useDayBlocks(day, excluded, self ?? null);
+  const daysKey = (days ?? []).join("|");
+  const trackDays = useMemo(() => {
+    const list = daysKey ? daysKey.split("|") : [];
+    if (!list.includes(day)) (list.push(day), list.sort());
+    return list;
+  }, [daysKey, day]);
+  const bounds: Bounds = daysBounds(trackDays.length);
+  const first = trackDays[0];
+  const dayAt = (minutes: number) =>
+    addDays(first, Math.floor(Math.max(0, minutes) / DAY));
+  const blocks = useTrackBlocks(trackDays, excluded, self ?? null);
+  // The day at the top of the view, pinned in the stage's corner.
+  const [viewDay, setViewDay] = useState(day);
+  const multiDay = trackDays.length > 1;
   const [span, setSpan] = useState<Span>(() => {
-    const start = minutesOf(time) ?? freeStart(blocks);
+    const base = trackDays.indexOf(day) * DAY;
+    const own = blocks
+      .filter((block) => block.start >= base && block.start < base + DAY)
+      .map((block) => ({
+        ...block,
+        start: block.start - base,
+        end: block.end === null ? null : block.end - base,
+      }));
+    const start = base + (minutesOf(time) ?? freeStart(own));
     const end = minutesOf(endTime);
-    const at = end === null ? null : end + endDayOffset * 1440;
+    const at = end === null ? null : base + end + endDayOffset * DAY;
     return {
       start,
       end:
-        !point && at !== null && at > start && at <= DAY_END ? at : start + 60,
+        !point && at !== null && at > start && at <= bounds.end
+          ? at
+          : start + 60,
     };
   });
   const shown: Span = point
     ? { start: span.start, end: span.start + POINT }
     : span;
-  const flags = walkFlags(shown, blocks);
+  const startIndex = Math.floor(span.start / DAY);
+  const startDay = dayAt(span.start);
+  const endOffset = point ? 0 : Math.floor(span.end / DAY) - startIndex;
+  const endMark = endDayMark(startDay, endOffset);
+  // The walks are to the plans around it on its own day(s) only.
+  const near = blocks.filter((block) => {
+    const at = Math.floor(block.start / DAY);
+    return at >= startIndex && at <= startIndex + Math.max(0, endOffset);
+  });
+  const flags = walkFlags(shown, near);
 
   const stage = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
@@ -189,8 +257,10 @@ export function TimelinePicker({
   // Open on the plan, a third of the way down.
   useLayoutEffect(() => {
     const box = stage.current;
-    if (box)
+    if (box) {
       box.scrollTop = Math.max(0, y(span.start) - box.clientHeight * 0.3);
+      setViewDay(dayAt((box.scrollTop + 24 - PAD) / PXM));
+    }
   }, []);
 
   // The readout pops when a number changes.
@@ -248,8 +318,7 @@ export function TimelinePicker({
     frame: number;
   } | null>(null);
   const minuteAt = (clientY: number) =>
-    (clientY - track.current!.getBoundingClientRect().top - PAD) / PXM +
-    DAY_START;
+    (clientY - track.current!.getBoundingClientRect().top - PAD) / PXM;
   const follow = () => {
     const state = drag.current;
     if (!state) return;
@@ -257,10 +326,10 @@ export function TimelinePicker({
     const now = spanRef.current;
     const next =
       state.mode === "move"
-        ? moveSpan(now, at - state.grab)
+        ? moveSpan(now, at - state.grab, undefined, bounds)
         : state.mode === "start"
-          ? resizeStart(now, at)
-          : resizeEnd(now, at);
+          ? resizeStart(now, at, bounds)
+          : resizeEnd(now, at, bounds);
     if (next.start !== now.start || next.end !== now.end) {
       spanRef.current = next;
       setSpan(next);
@@ -331,10 +400,12 @@ export function TimelinePicker({
   useEffect(() => () => release(), []);
 
   const onKey = (event: KeyboardEvent<HTMLDivElement>) => {
-    const next = keySpan(span, event.key, {
-      shift: event.shiftKey,
-      alt: event.altKey && !point,
-    });
+    const next = keySpan(
+      span,
+      event.key,
+      { shift: event.shiftKey, alt: event.altKey && !point },
+      bounds,
+    );
     if (!next) return;
     event.preventDefault();
     jump(point ? { start: next.start, end: next.start + 60 } : next);
@@ -344,26 +415,33 @@ export function TimelinePicker({
     const dialog = event.currentTarget.closest("dialog");
     onSave(
       point
-        ? { time: clockOf(span.start), endTime: "", endDayOffset: 0 }
+        ? {
+            day: startDay,
+            time: clockOf(span.start),
+            endTime: "",
+            endDayOffset: 0,
+          }
         : {
+            day: startDay,
             time: clockOf(span.start),
             endTime: clockOf(span.end),
-            endDayOffset: span.end >= 1440 ? 1 : 0,
+            endDayOffset: endOffset,
           },
     );
     dismissModal(onClose, dialog);
   };
   const clear = (event: { currentTarget: Element }) => {
     const dialog = event.currentTarget.closest("dialog");
-    onSave({ time: "", endTime: "", endDayOffset: 0 });
+    onSave({ day: startDay, time: "", endTime: "", endDayOffset: 0 });
     dismissModal(onClose, dialog);
   };
 
   const length = span.end - span.start;
   const hours = [];
-  for (let hour = DAY_START / 60; hour <= DAY_END / 60; hour++)
-    hours.push(hour);
-  const range = `${clockOf(shown.start)}–${shown.end >= 1440 ? "翌" : ""}${clockOf(shown.end)}`;
+  for (let hour = 0; hour <= bounds.end / 60; hour++) hours.push(hour);
+  const range = `${clockOf(shown.start)}–${endMark}${clockOf(shown.end)}`;
+  // A typed time stays on the block's day; the length is kept.
+  const base = startIndex * DAY;
   return (
     <Modal
       title={`${title}の時刻`}
@@ -381,7 +459,7 @@ export function TimelinePicker({
       <div className="tlp">
         <div className="tlp-h">
           <b>{title}</b>
-          <span>{dayLabel(day)}</span>
+          <span aria-live="polite">{dayLabel(startDay)}</span>
         </div>
         <div className="tlp-readout">
           <label>
@@ -393,9 +471,14 @@ export function TimelinePicker({
               aria-label={point ? (pointLabel ?? "時刻") : "開始"}
               value={clockOf(span.start)}
               onChange={(value) => {
-                const at = minutesOf(value)!;
+                const at = base + minutesOf(value)!;
                 jump(
-                  point ? { start: at, end: at + 60 } : typedStart(span, at),
+                  point
+                    ? { start: at, end: at + 60 }
+                    : {
+                        start: at,
+                        end: Math.min(bounds.end, at + length),
+                      },
                 );
               }}
             />
@@ -406,7 +489,7 @@ export function TimelinePicker({
               <label>
                 <small>終了</small>
                 <span className="tlp-end">
-                  {span.end >= 1440 && <i>翌</i>}
+                  {endMark && <i>{endMark}</i>}
                   <TimeField
                     ref={endOut}
                     live={false}
@@ -414,9 +497,12 @@ export function TimelinePicker({
                     aria-label="終了"
                     value={clockOf(span.end)}
                     onChange={(value) => {
-                      const next = typedEnd(span, minutesOf(value)!);
+                      const next = typedEnd(
+                        { start: span.start - base, end: span.end - base },
+                        minutesOf(value)!,
+                      );
                       if (!next) return false;
-                      jump(next);
+                      jump({ start: next.start + base, end: next.end + base });
                     }}
                   />
                 </span>
@@ -427,20 +513,53 @@ export function TimelinePicker({
         <p className="tlp-dur" aria-live="polite">
           {point ? "数字を押すと入力できます" : lengthLabel(length)}
         </p>
-        <div className="tlp-stage" ref={stage}>
+        <div
+          className="tlp-stage"
+          ref={stage}
+          onScroll={
+            multiDay
+              ? (event) =>
+                  setViewDay(
+                    dayAt((event.currentTarget.scrollTop + 24 - PAD) / PXM),
+                  )
+              : undefined
+          }
+        >
+          {multiDay && (
+            <div className="tlp-viewday" aria-hidden="true">
+              <span>{dayLabel(viewDay)}</span>
+            </div>
+          )}
           <div
             className="tlp-track"
             ref={track}
-            style={{ height: y(DAY_END) + PAD }}
+            style={{ height: y(bounds.end) + PAD }}
           >
-            {hours.map((hour) => (
-              <div key={hour}>
-                <div className="tlp-hr" style={{ top: y(hour * 60) }} />
-                <span className="tlp-hl" style={{ top: y(hour * 60) }}>
-                  {hourLabel(hour)}
-                </span>
-              </div>
-            ))}
+            {hours.map((hour) => {
+              // Each midnight is the next day's title, as in a calendar.
+              const midnight = hour % 24 === 0;
+              return (
+                <div key={hour}>
+                  <div
+                    className={`tlp-hr${midnight ? " is-day" : ""}`}
+                    style={{ top: y(hour * 60) }}
+                  />
+                  <span
+                    className={`tlp-hl${midnight ? " is-day" : ""}`}
+                    style={{ top: y(hour * 60) }}
+                  >
+                    {midnight ? (
+                      <>
+                        {md(addDays(first, hour / 24))}
+                        <small>{weekdayOf(addDays(first, hour / 24))}</small>
+                      </>
+                    ) : (
+                      hourLabel(hour)
+                    )}
+                  </span>
+                </div>
+              );
+            })}
             {blocks.map((block) => (
               <div
                 key={block.key}
@@ -494,8 +613,8 @@ export function TimelinePicker({
               role="slider"
               tabIndex={0}
               aria-label={`${title}の時刻。上下の矢印で5分ずつ、Shiftで15分。${point ? "" : "Optionと矢印で終了を変えます。"}`}
-              aria-valuemin={DAY_START}
-              aria-valuemax={DAY_END}
+              aria-valuemin={0}
+              aria-valuemax={bounds.end}
               aria-valuenow={span.start}
               aria-valuetext={point ? clockOf(span.start) : range}
               onPointerDown={press}
@@ -565,28 +684,43 @@ export const TIME_TAP_HINT = "時刻をタップすると直せます";
 
 /** The form's 時刻 button: 「08:30 – 09:30」 or 「未定」, opening the picker. */
 export function TimeRangeButton({
+  day,
   time,
   endTime,
   nextDay = false,
+  endDayOffset,
   className = "",
   onOpen,
   label = "時刻",
 }: {
+  /** Shown before the times when the picker also picks the day. */
+  day?: string;
   time: string;
   endTime?: string;
   nextDay?: boolean;
+  endDayOffset?: number;
   className?: string;
   onOpen: () => void;
   label?: string;
 }) {
+  const mark =
+    endDayOffset !== undefined
+      ? endDayMark(day ?? "", endDayOffset)
+      : nextDay
+        ? "翌"
+        : "";
+  const when = time
+    ? `${time}${endTime ? `から${mark}${endTime}` : ""}`
+    : "未定";
   return (
     <button
       type="button"
       className={`tlp-trigger ${className}`}
-      aria-label={`${label}：${time ? `${time}${endTime ? `から${nextDay ? "翌" : ""}${endTime}` : ""}` : "未定"}`}
+      aria-label={`${label}：${day ? `${dayLabel(day)} ` : ""}${when}`}
       data-time-trigger=""
       onClick={onOpen}
     >
+      {day && <span className="tlp-trigger-day">{dayLabel(day)}</span>}
       {time ? (
         <>
           <b>{time}</b>
@@ -594,7 +728,7 @@ export function TimeRangeButton({
             <>
               <em>–</em>
               <b>
-                {nextDay && <small>翌</small>}
+                {mark && <small>{mark}</small>}
                 {endTime}
               </b>
             </>
@@ -640,8 +774,13 @@ export function PlanTimePicker({
         };
     return entryCoords(entry, travel.places);
   }, [item, booking, stay, travel.places]);
-  // Days-long plans keep their end; only the start moves here.
-  const point = Boolean(stay) || span > 1;
+  // A stay's check-in/out is one time on its booking's day; any other plan
+  // moves through the trip's days, its end with it.
+  const point = Boolean(stay);
+  const days = useMemo(
+    () => (point ? undefined : tripDays(travel.selectedTrip, item.day)),
+    [point, travel.selectedTrip, item.day],
+  );
   return (
     <TimelinePicker
       title={booking ? booking.title : item.title}
@@ -653,6 +792,7 @@ export function PlanTimePicker({
           : "開始"
       }
       day={item.day}
+      days={days}
       time={item.time}
       endTime={details.endTime}
       endDayOffset={span}
@@ -664,8 +804,9 @@ export function PlanTimePicker({
       ]}
       onSave={(picked) => {
         const endTime = point ? details.endTime : picked.endTime;
+        const day = point ? item.day : picked.day;
         travel.updateItem(item.id, {
-          day: item.day,
+          day,
           time: picked.time,
           kind: item.kind,
           title: item.title,
@@ -676,7 +817,7 @@ export function PlanTimePicker({
             endDay: point
               ? details.endDay
               : endTime
-                ? addDays(item.day, picked.endDayOffset)
+                ? addDays(day, picked.endDayOffset)
                 : "",
           },
         });
