@@ -2,22 +2,14 @@
 .notes-page,
 dialog:has(.memo-editor),
 .memo-poof-dot {
-  --m-paper: var(--canvas);
-  --m-ink: #000;
-  --m-mid: #9c978f;
-  --m-pale: #cbc5bb;
-  --m-soft: #f3f2ef;
-  --m-mute: #77726b;
-  --m-line: #e8e6e1;
-}
-:root[data-theme="dark"]
-  :is(.notes-page, dialog:has(.memo-editor), .memo-poof-dot) {
-  --m-ink: #f5f1e9;
-  --m-mid: #b6b0a6;
-  --m-pale: #57534d;
-  --m-soft: #23221f;
-  --m-mute: #aaa49b;
-  --m-line: #2d2b29;
+  --m-paper: var(--p-paper);
+  --m-ink: var(--p-ink);
+  --m-mid: var(--p-mid);
+  --m-pale: var(--p-pale);
+  --m-soft: var(--p-soft);
+  --m-mute: var(--p-mute);
+  --m-line: var(--p-line);
+  font-family: var(--f-body);
 }
 
 /* ===== list ===== */
@@ -329,6 +321,7 @@ dialog:has(.memo-editor),
 }
 .memo-chip-no span {
   transform: rotate(45deg);
+  font-family: var(--f-num);
   font-size: 10px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -453,7 +446,6 @@ dialog:has(.memo-editor),
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  min-height: 32px;
   padding: 0;
   border: 0;
   background: none;
