@@ -11,7 +11,7 @@ import {
   type ReactNode,
   type Ref,
 } from "react";
-import { MapPin, Plus } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { useTravel } from "@/data/travel-provider";
 import { placeNumbers } from "@/data/place-numbers";
 import { ordinaryPlans } from "@/data/itinerary";
@@ -139,7 +139,6 @@ function previousStop(model: Model, mark: Mark) {
 
 export function PlacesScreen() {
   const travel = useTravel();
-  const trip = travel.selectedTrip!;
   const model = usePlacesModel();
   const [day, setDay] = useState(() => {
     const today = localDate();
@@ -181,41 +180,30 @@ export function PlacesScreen() {
 
   return (
     <div className="page places-page" ref={pageRef}>
+      {travel.canEdit && (
+        <AddButton label="場所を追加" onClick={() => setAdding(true)} />
+      )}
       <div className="places-head">
-        <h1>
-          {trip.name}
-          <small>場所 · {model.count}</small>
-        </h1>
-        {(model.days.length > 0 || travel.canEdit) && (
+        {model.days.length > 0 && (
           <div className="places-chips" role="group" aria-label="表示する日">
-            {model.days.length > 0 &&
-              ["all", ...model.days].map((entry) => (
-                <button
-                  key={entry}
-                  aria-pressed={activeDay === entry}
-                  onClick={() => {
-                    setDay(entry);
-                    setSelected(null);
-                  }}
-                >
-                  {entry !== "all" && (
-                    <i
-                      style={{ color: model.tone(entry) } as CSSProperties}
-                      aria-hidden="true"
-                    />
-                  )}
-                  {entry === "all" ? "全日程" : shortDate(entry)}
-                </button>
-              ))}
-            {travel.canEdit && (
+            {["all", ...model.days].map((entry) => (
               <button
-                className="places-add"
-                aria-label="場所を追加"
-                onClick={() => setAdding(true)}
+                key={entry}
+                aria-pressed={activeDay === entry}
+                onClick={() => {
+                  setDay(entry);
+                  setSelected(null);
+                }}
               >
-                <Plus size={14} strokeWidth={2.6} aria-hidden="true" />
+                {entry !== "all" && (
+                  <i
+                    style={{ color: model.tone(entry) } as CSSProperties}
+                    aria-hidden="true"
+                  />
+                )}
+                {entry === "all" ? "全日程" : shortDate(entry)}
               </button>
-            )}
+            ))}
           </div>
         )}
       </div>

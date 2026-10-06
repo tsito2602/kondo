@@ -33,7 +33,7 @@
   color: var(--pl-ink);
 }
 
-/* ===== head: trip name, count and the day to show ===== */
+/* ===== head: the day to show (the trip header names the trip) ===== */
 /* Pinned like the mock's head: the map and list scroll beneath it. */
 .places-head {
   position: sticky;
@@ -44,34 +44,12 @@
   background: var(--pl-paper);
   text-align: center;
 }
-.places-head h1 {
-  margin: 0;
-  font-family: var(--f-body);
-  font-size: 17px;
-  font-weight: 900;
-  line-height: 1.3;
-  letter-spacing: 0;
-}
-.places-head small {
-  display: block;
-  font-family: var(--f-mono);
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 1.3;
-  color: var(--pl-mute);
-}
 .places-chips {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 6px;
-  margin: 10px 0 0;
-}
-.places-chips .places-add {
-  width: 31px;
-  padding: 0;
-  justify-content: center;
-  color: var(--pl-ink);
+  margin: 0;
 }
 .places-chips button {
   display: flex;

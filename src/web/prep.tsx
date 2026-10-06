@@ -26,14 +26,8 @@ import { anim, RM, spring } from "./cartoon";
 import { useJellyScroll } from "./jelly-scroll";
 import { dismissModal } from "./motion";
 import { PageTop } from "./page-top";
-import {
-  CheckIcon,
-  LockIcon,
-  Picture,
-  PlusIcon,
-  pictureFor,
-} from "./prep-pictures";
-import { ErrorText, Modal } from "./ui";
+import { CheckIcon, LockIcon, Picture, pictureFor } from "./prep-pictures";
+import { AddButton, ErrorText, Modal } from "./ui";
 
 /* ---------- motion, as kondo-prep3.html plays it ---------- */
 
@@ -144,27 +138,15 @@ function PrepHeader({
   const left = selectedTrip
     ? daysBetween(localDate(), selectedTrip.startsOn)
     : 0;
-  const sub = [selectedTrip?.name, left > 0 ? `あと${left}日` : ""]
-    .filter(Boolean)
-    .join(" · ");
   return (
-    <PageTop
-      size={30}
-      sub={sub || undefined}
-      title={title}
-      actions={
-        onAdd && (
-          <button
-            type="button"
-            className="page-plus"
-            aria-label={addLabel}
-            onClick={onAdd}
-          >
-            <PlusIcon />
-          </button>
-        )
-      }
-    />
+    <>
+      <PageTop
+        size={30}
+        sub={left > 0 ? `あと${left}日` : undefined}
+        title={title}
+      />
+      {onAdd && <AddButton label={addLabel} onClick={onAdd} />}
+    </>
   );
 }
 

@@ -92,6 +92,7 @@ stubAnimate();
 const BOX = {
   l: [16, 62],
   tabs: [90, 284],
+  "tabs-full": [16, 358],
   toast: [16, 358],
   "toast-r": [90, 284],
 };
@@ -106,6 +107,8 @@ Object.defineProperty(dom.window.HTMLElement.prototype, "offsetLeft", {
     if (slot === "r") return rightBox(this)[0];
     if (slot === "toast" && this.classList.contains("cdock-toast-r"))
       return BOX["toast-r"][0];
+    if (slot === "tabs" && this.hasAttribute("data-full"))
+      return BOX["tabs-full"][0];
     if (slot) return BOX[slot][0];
     const i = this.parentElement
       ? [...this.parentElement.querySelectorAll(":scope > a")].indexOf(this)
@@ -120,6 +123,8 @@ Object.defineProperty(dom.window.HTMLElement.prototype, "offsetWidth", {
     if (slot === "r") return rightBox(this)[1];
     if (slot === "toast" && this.classList.contains("cdock-toast-r"))
       return BOX["toast-r"][1];
+    if (slot === "tabs" && this.hasAttribute("data-full"))
+      return BOX["tabs-full"][1];
     if (slot) return BOX[slot][1];
     return this.tagName === "A" ? 46 : 0;
   },
@@ -173,7 +178,7 @@ function DockHarness({ mode }) {
     return h(
       M.ThumbDock,
       { mode: "browse" },
-      h(M.TripDock, { tripId: "demo", onBack() {} }),
+      h(M.TripDock, { tripId: "demo" }),
     );
   if (mode === "ctx")
     return h(
@@ -227,10 +232,11 @@ test("leaving controls fade out as inert copies that cannot be tapped, then go",
   stubAnimate();
   const dock = await mountDock();
   try {
+    await dock.go("edit");
     calls.length = 0;
     await act(async () => dock.go("ctx", 0));
     const copy = document.querySelector(".cdock-ui > [data-outgoing]");
-    assert.ok(copy, "the tab row fades out in place");
+    assert.ok(copy, "the save fades out in place");
     assert.equal(copy.inert, true);
     assert.equal(copy.getAttribute("aria-hidden"), "true");
     assert.equal(copy.querySelector("[href]"), null);
@@ -245,10 +251,9 @@ test("leaving controls fade out as inert copies that cannot be tapped, then go",
   }
 });
 
-test("the trip dock has a back button and six labelled tabs that navigate", async () => {
+test("the trip dock has six labelled tabs that navigate and no back circle (the trip header goes back)", async () => {
   stubAnimate();
   const root = createRoot(document.getElementById("root"));
-  let backs = 0;
   function Where() {
     return h("output", null, useLocation().pathname);
   }
@@ -265,7 +270,7 @@ test("the trip dock has a back button and six labelled tabs that navigate", asyn
             h(
               M.ThumbDock,
               { mode: "browse" },
-              h(M.TripDock, { tripId: "demo", onBack: () => backs++ }),
+              h(M.TripDock, { tripId: "demo" }),
             ),
           ),
         ),
@@ -287,10 +292,7 @@ test("the trip dock has a back button and six labelled tabs that navigate", asyn
       "/trips/demo/bookings",
     );
     assert.equal(tabs[4].getAttribute("aria-current"), "page");
-    await act(async () =>
-      document.querySelector('[aria-label="旅行一覧へ戻る"]').click(),
-    );
-    assert.equal(backs, 1);
+    assert.equal(document.querySelector('[data-slot="l"]'), null);
   } finally {
     await act(async () => root.unmount());
   }
@@ -388,8 +390,8 @@ test("a dock that is hidden while its controls change (a closing dialog) still m
     await act(async () => wait(900));
     assert.ok(
       near(islands(), [
-        [16, 78],
-        [90, 374],
+        [16, 16],
+        [16, 374],
       ]),
       "the islands follow",
     );

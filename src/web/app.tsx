@@ -32,7 +32,6 @@ import {
   useSearchParams,
 } from "react-router";
 import {
-  ArrowLeft,
   Settings,
   Trash2,
   ChevronRight,
@@ -44,10 +43,11 @@ import { Card } from "./obsidian/card";
 import { GoogleSignIn, useAuth } from "@/auth/auth-provider";
 import { TravelProvider, useTravel } from "@/data/travel-provider";
 import type { Trip, TripMember } from "@/data/types";
-import { formatDate, localDate } from "@/utils/dates";
+import { localDate } from "@/utils/dates";
 import { TripEditor } from "./editors";
 import { TripDock, tripTabs } from "./trip-dock";
-import { TripMenuButton } from "./trip-menu";
+import { TripMenuButton, tripSpan } from "./trip-menu";
+import { DockBackIcon } from "./cartoon-dock";
 import { installPressFeedback } from "./press-feedback";
 import { keyboardInset, revealModalField } from "./viewport";
 import { ThumbDock, ThumbDockProvider, ContextDock } from "./thumb-dock";
@@ -542,13 +542,11 @@ function TripLayout() {
               startTripTransition(() => navigate("/"), trip.id, true);
             }}
           >
-            <ArrowLeft />
+            <DockBackIcon />
           </Link>
           <div className="trip-title">
             <h1>{trip.name}</h1>
-            <p>
-              {formatDate(trip.startsOn)} — {formatDate(trip.endsOn)}
-            </p>
+            <p>{tripSpan(trip)}</p>
           </div>
           <TripMenuButton tripId={trip.id} />
         </div>
@@ -581,10 +579,7 @@ function TripLayout() {
         <Outlet />
       </main>
       <ThumbDock mode="browse">
-        <TripDock
-          tripId={trip.id}
-          onBack={() => startTripTransition(() => navigate("/"), trip.id, true)}
-        />
+        <TripDock tripId={trip.id} />
       </ThumbDock>
     </>
   );

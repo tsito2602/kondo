@@ -12,6 +12,7 @@ import {
 import { createPortal } from "react-dom";
 import { CartoonDock, DockGroup } from "./cartoon-dock";
 import { UpdateNotice } from "./app-update";
+import { spring } from "./cartoon";
 
 type DockEntry = {
   content: ReactNode;
@@ -81,6 +82,22 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
   const active = activeEntry?.value as DockEntry | undefined;
   const add = ordered.filter((entry) => entry.scope === "add").at(-1)?.value as
     AddAction | undefined;
+  // The ＋ pops in (kondo-cartoon's popIn: from .4, k380 d13) whenever it
+  // appears or a screen swaps in its own add action.
+  const addButton = useRef<HTMLButtonElement>(null);
+  const addLabel = add?.label;
+  useLayoutEffect(() => {
+    if (!addLabel || !addButton.current) return;
+    spring(
+      addButton.current,
+      [
+        { transform: "scale(.4)", opacity: 0 },
+        { transform: "none", opacity: 1 },
+      ],
+      { k: 380, d: 13 },
+      { delay: 110, fill: "backwards" },
+    );
+  }, [addLabel]);
   const browse = ordered
     .filter(
       (entry) =>
@@ -114,6 +131,8 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
         {children}
         {createPortal(
           <button
+            ref={addButton}
+            type="button"
             className="floating-add persistent-add"
             hidden={!add}
             aria-label={add?.label}

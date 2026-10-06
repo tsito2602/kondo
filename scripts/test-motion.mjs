@@ -760,11 +760,7 @@ test("details retain the same six tab nodes and close before one-tap navigation,
       ThumbDockProvider,
       null,
       h("output", null, useLocation().pathname),
-      h(
-        ThumbDock,
-        { mode: "browse" },
-        h(TripDock, { tripId: "demo", onBack: () => {} }),
-      ),
+      h(ThumbDock, { mode: "browse" }, h(TripDock, { tripId: "demo" })),
       open &&
         h(
           Modal,
@@ -825,7 +821,11 @@ test("details retain the same six tab nodes and close before one-tap navigation,
       assert.equal(document.querySelector(".cdock-islands"), islands);
       assert.equal(host.querySelector(".cdock-tabs"), nav);
       assert.deepEqual([...nav.querySelectorAll("svg")], icons);
-      assert.ok(host.querySelector('[aria-label="旅行一覧へ戻る"]'));
+      // Back on the tabs, the trip header (not the dock) leads home.
+      assert.equal(
+        host.querySelector('[data-slot="l"]:not([data-outgoing])'),
+        null,
+      );
     }
     assert.equal(edits, 3);
     await act(async () => openDetail());

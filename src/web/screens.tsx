@@ -16,7 +16,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { PlusIcon } from "./booking-icons";
 import { PageTop } from "./page-top";
 import { bookingSink } from "./booking-motion";
 import { useJellyScroll } from "./jelly-scroll";
@@ -29,7 +28,7 @@ import {
   formatConnectionDuration,
 } from "@/data/flight-connections";
 import type { Booking } from "@/data/types";
-import { Empty } from "./ui";
+import { AddButton, Empty } from "./ui";
 import { BookingDetail } from "./details";
 
 export { ItineraryScreen } from "./itinerary-screen";
@@ -127,22 +126,13 @@ export function BookingsScreen() {
           tripDay(now.slice(0, 10)) &&
           now.slice(0, 10) <= (selectedTrip?.endsOn ?? "")
             ? `旅の${tripDay(now.slice(0, 10))} · ${monthDay(now.slice(0, 10))} ${now.slice(11)}`
-            : `${selectedTrip?.name ? `${selectedTrip.name} · ` : ""}${bookings.length}件`
+            : `${bookings.length}件`
         }
         title="予約"
-        actions={
-          canEdit && (
-            <button
-              type="button"
-              className="page-plus"
-              aria-label="予約を追加"
-              onClick={() => setAdding(true)}
-            >
-              <PlusIcon size={20} />
-            </button>
-          )
-        }
       />
+      {canEdit && (
+        <AddButton label="予約を追加" onClick={() => setAdding(true)} />
+      )}
       {!bookings.length ? (
         <Empty>
           <BookOpen />
