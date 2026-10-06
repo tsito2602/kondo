@@ -64,10 +64,16 @@ export function bookingPlaceName(booking: Booking) {
 }
 
 /** A flight or a train as the 予約 tab's card draws it: departure over
-    arrival, each time level with its dot and place (Tsubasa 2026-10-06:
-    「予約のカード同様縦並べにしよう」). */
-export function JourneyLine({ booking }: { booking: Booking }) {
-  return <BookingBody booking={booking} now="" />;
+    arrival, each place level with its dot (Tsubasa 2026-10-06:
+    「予約のカード同様縦並べにしよう」); the departure time is the row's own. */
+export function JourneyLine({
+  booking,
+  arrivalOnly = false,
+}: {
+  booking: Booking;
+  arrivalOnly?: boolean;
+}) {
+  return <BookingBody booking={booking} now="" arrivalOnly={arrivalOnly} />;
 }
 
 function PlanCard({
@@ -203,7 +209,7 @@ function BookingCard({
           <Glyph name={booking.kind === "train" ? "move" : "up"} />
           {booking.title}
         </div>
-        <JourneyLine booking={booking} />
+        <JourneyLine booking={booking} arrivalOnly />
       </div>
     );
   }

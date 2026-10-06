@@ -170,9 +170,13 @@ const singleLabel: Record<BookingKind, string> = {
 export function BookingBody({
   booking,
   now,
+  arrivalOnly = false,
 }: {
   booking: Booking;
   now: string;
+  /** The しおり's left column already holds the departure time: only the
+      arrival's (Tsubasa 2026-10-06: 「時刻は到着の方だけ表示すればいい」). */
+  arrivalOnly?: boolean;
 }) {
   const { kind } = booking;
   if (kind === "flight" || kind === "train" || kind === "car") {
@@ -184,8 +188,8 @@ export function BookingBody({
       <div className="bk-vj">
         <Stop
           row={1}
-          big={booking.time || "--:--"}
-          small={kind === "car" ? "受取" : "発"}
+          big={arrivalOnly ? "" : booking.time || "--:--"}
+          small={arrivalOnly ? "" : kind === "car" ? "受取" : "発"}
           place={from.primary}
           note={from.secondary}
         />
