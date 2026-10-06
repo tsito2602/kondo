@@ -165,22 +165,19 @@ function PlanCard({
         {category.label}
       </div>
       <h3>{item.title}</h3>
-      {place && (place.number || !sameName(place.name, item.title)) && (
+      {place && (
         <div className="it-where">
           {place.number ? (
             <MapPin number={place.number} />
           ) : (
             <Glyph name="pin" />
           )}
-          {/* The name only when the title does not already say it. */}
-          {!sameName(place.name, item.title) && <span>{place.name}</span>}
+          {place.name && <span>{place.name}</span>}
         </div>
       )}
     </>
   );
 }
-const sameName = (place: string, title: string) =>
-  Boolean(place) && (title.includes(place) || place.includes(title));
 
 function BookingCard({ entry, used }: { entry: DayEntry; used: boolean }) {
   const booking = entry.booking!;

@@ -40,6 +40,7 @@ import {
 } from "./thumb-dock";
 import { Button } from "./obsidian/button";
 import { DockBackIcon } from "./cartoon-dock";
+import { spring } from "./cartoon";
 import {
   cardOrigin,
   closeToCard,
@@ -237,8 +238,13 @@ export function Modal({
   action,
   preserveNavigation = false,
   dockActions,
+  sheet,
 }: PropsWithChildren<{
   title: string;
+  /** "bottom": kondo-detail's sheet on phones: it rises from the bottom edge
+      on the split spring and drops on lead, instead of opening out of the
+      pressed card. */
+  sheet?: "bottom";
   onClose: () => void;
   full?: boolean;
   fullscreen?: boolean;
@@ -248,6 +254,9 @@ export function Modal({
     primary?: ReactNode;
     actions?: ReactNode;
     backLabel?: string;
+    /** Replaces the back circle on the left island (kondo-detail's 削除 and
+        編集 circles). */
+    back?: ReactNode;
     /** Many tools in a row where the tabs sit (a note's editor). */
     wide?: boolean;
   };
@@ -284,8 +293,16 @@ export function Modal({
     const panel = dialog.querySelector<HTMLElement>(".modal-inner");
     const phone =
       panel && !reduceMotion() && matchMedia("(max-width: 759px)").matches;
-    cartoon.current = phone ? { card: cardOrigin(origin.current) } : null;
-    if (phone && cartoon.current?.card)
+    cartoon.current = phone
+      ? { card: sheet === "bottom" ? null : cardOrigin(origin.current) }
+      : null;
+    if (phone && sheet === "bottom")
+      void spring(
+        panel,
+        [{ transform: "translateY(105%)" }, { transform: "none" }],
+        "split",
+      );
+    else if (phone && cartoon.current?.card)
       void openFromCard(cartoon.current.card, panel, {
         parent: dialog,
         parts: [
@@ -297,15 +314,19 @@ export function Modal({
     else if (phone) void sheetIn(panel);
     const enter = phone ? null : animateDialog(dialog, origin.current);
     animation.current = enter;
-    depth.current = menuDepth(
-      reduceMotion(),
-      {
-        duration: 320,
-        easing: "cubic-bezier(.32, 0, .2, 1)",
-        fill: "both",
-      },
-      dialog,
-    );
+    // kondo-detail's sheet slides over a plain #0006 scrim; the page stays.
+    depth.current =
+      phone && sheet === "bottom"
+        ? null
+        : menuDepth(
+            reduceMotion(),
+            {
+              duration: 320,
+              easing: "cubic-bezier(.32, 0, .2, 1)",
+              fill: "both",
+            },
+            dialog,
+          );
     backdropAnimation.current = dialog
       .getAnimations?.({ subtree: true })
       .find(
@@ -369,7 +390,16 @@ export function Modal({
         (pendingClose.current ?? closeCallback.current)();
       };
       void (
-        card ? closeToCard(card, panel, { parent: dialog }) : sheetOut(panel)
+        sheet === "bottom"
+          ? spring(
+              panel,
+              [{ transform: "none" }, { transform: "translateY(105%)" }],
+              "lead",
+              { fill: "forwards" },
+            )
+          : card
+            ? closeToCard(card, panel, { parent: dialog })
+            : sheetOut(panel)
       ).then(finish);
       const timer = setTimeout(finish, 900);
       return () => {
@@ -411,6 +441,7 @@ export function Modal({
     <dialog
       ref={ref}
       aria-labelledby={id}
+      data-sheet={sheet}
       className={`modal ${full || fullscreen ? "full" : ""} ${fullscreen ? "fullscreen" : ""} ${closing ? "closing" : ""}`}
       onCancel={(event) => {
         event.preventDefault();
@@ -482,7 +513,9 @@ export function Modal({
           {saveAction || dockActions ? (
             <ContextDock
               back={
-                fullscreen ? (
+                dockActions?.back && !saveAction ? (
+                  dockActions.back
+                ) : fullscreen ? (
                   <button aria-label="閉じる" onClick={close}>
                     <X size={22} />
                   </button>

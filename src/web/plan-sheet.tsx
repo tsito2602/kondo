@@ -99,6 +99,13 @@ function MiniMap({
   };
   return (
     <div className="ps-map" aria-hidden="true">
+      <svg
+        className="ps-map-streets"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+      >
+        <path d="M-5 40 Q40 30 105 48M30 -5 Q38 50 32 105M60 -5 Q70 60 100 105M-5 80 Q50 70 105 90" />
+      </svg>
       {others.map((other, index) => (
         <span
           className="ps-map-pin is-dim"
@@ -654,16 +661,15 @@ export function PlanSheet({
     <Modal
       title="予定の詳細"
       full
+      sheet="bottom"
       onClose={onClose}
       dockActions={{
-        actions: travel.canEdit && (
+        // kondo-detail: 削除 and 編集 circles at the left, 「閉じる」 at the right.
+        back: travel.canEdit ? (
           <>
-            <button aria-label="編集" onClick={() => setEditing(true)}>
-              <Glyph name="edit" className="ps-dock-glyph" />
-            </button>
             <button
               aria-label="予定を削除"
-              className="danger"
+              className="ps-dock-circle ps-dock-danger"
               onClick={() =>
                 dismissModal(() => {
                   onClose();
@@ -673,7 +679,19 @@ export function PlanSheet({
             >
               <Glyph name="trash" className="ps-dock-glyph" />
             </button>
+            <button
+              aria-label="編集"
+              className="ps-dock-circle"
+              onClick={() => setEditing(true)}
+            >
+              <Glyph name="edit" className="ps-dock-glyph" />
+            </button>
           </>
+        ) : undefined,
+        actions: (
+          <button type="button" onClick={() => dismissModal(onClose)}>
+            閉じる
+          </button>
         ),
       }}
     >

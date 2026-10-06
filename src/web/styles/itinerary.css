@@ -65,18 +65,65 @@ dialog:has(.plan-add),
   white-space: nowrap;
 }
 
+/* ===== head: the trip's name, its mono line and the date tabs stay put
+   (kondo-itinerary .trip-head + .days); only the timeline moves under them ===== */
+.it-top {
+  position: sticky;
+  top: var(--trip-header-height, 0px);
+  z-index: 19;
+  background: var(--it-paper);
+  padding-top: env(safe-area-inset-top);
+}
+.it-head {
+  position: relative;
+  padding: 6px 16px 10px;
+  text-align: center;
+}
+.it-head h1 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.3;
+  letter-spacing: normal;
+}
+.it-head h1 small {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--it-mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--it-mute);
+}
+.it-head .trip-menu-anchor {
+  position: absolute;
+  top: 2px;
+  right: 12px;
+}
+@media (min-width: 760px) {
+  .it-head {
+    display: none;
+  }
+}
 /* ===== date tabs: stay in the header, an ink pill on a soft track ===== */
 :root .itinerary-screen .date-strip {
+  position: relative;
+  top: auto;
+  z-index: 2;
   display: flex;
   gap: 0;
-  margin: 6px 16px 4px;
+  margin: 0 16px 4px;
   padding: 5px;
   border: 0;
   border-radius: 24px;
   background: var(--it-soft);
-  box-shadow: 0 -6px 0 16px var(--canvas);
+  box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+:root .itinerary-screen .date-strip::-webkit-scrollbar {
+  display: none;
 }
 :root .itinerary-screen .date-strip button {
   position: relative;
@@ -86,12 +133,16 @@ dialog:has(.plan-add),
   min-width: 58px;
   min-height: 0;
   padding: 6px 0;
-  border-radius: 19px;
+  border: 0;
+  border-radius: 0;
   background: none;
   color: var(--it-mute);
+  font: inherit;
   line-height: 1.1;
+  transition: color 0.2s;
 }
 :root .itinerary-screen .date-strip small {
+  display: inline;
   font-family: var(--it-mono);
   font-size: 10px;
   font-weight: 400;
@@ -106,14 +157,17 @@ dialog:has(.plan-add),
 :root .itinerary-screen .date-strip [aria-current="date"] {
   color: var(--it-paper);
 }
-.itinerary-screen .date-selection {
+:root .itinerary-screen .date-selection {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 5px;
+  width: 0;
+  height: auto;
   border-radius: 19px;
   background: var(--it-ink);
-}
-.itinerary-screen .date-strip[data-ready="true"] .date-selection {
-  transition:
-    transform 650ms var(--it-split),
-    width 650ms var(--it-split);
+  transform: none;
+  transition: none;
 }
 .date-today {
   position: absolute;
@@ -146,7 +200,9 @@ dialog:has(.plan-add),
 }
 .it-day {
   position: relative;
-  scroll-margin-top: calc(var(--trip-header-height) + 80px);
+  scroll-margin-top: calc(
+    var(--it-top-height, 0px) + var(--trip-header-height, 0px) + 4px
+  );
 }
 .it-day-h {
   position: relative;
@@ -887,6 +943,18 @@ dialog:has(.plan-add),
   border-radius: 18px;
   background: var(--it-soft);
 }
+.ps-map-streets {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.ps-map-streets path {
+  fill: none;
+  stroke: var(--it-line);
+  stroke-width: 7;
+  stroke-linecap: round;
+}
 .ps-map-pin {
   position: absolute;
   display: block;
@@ -1171,6 +1239,52 @@ dialog:has(.plan-add),
 }
 :root .plan-add .it-hint.is-booking {
   margin: 8px 2px 0;
+}
+
+/* ===== kondo-detail: the plan's detail is a bottom sheet on phones =====
+   88 % of the screen, top corners 32 px, a 40 × 5 grab, over a #0006 scrim. */
+@media (max-width: 759px) {
+  :root:root dialog.modal[data-sheet="bottom"] {
+    padding: 0;
+    align-items: flex-end;
+  }
+  :root:root dialog.modal[data-sheet="bottom"] .modal-inner {
+    height: 88%;
+    max-height: 88%;
+    border-radius: 32px 32px 0 0;
+    box-shadow: 0 -10px 40px -10px #0005;
+  }
+  :root:root dialog.modal[data-sheet="bottom"]::backdrop {
+    background: #0006;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    animation-duration: 250ms;
+  }
+  :root dialog[data-sheet="bottom"]:has(.plan-sheet) .modal-body {
+    padding: 10px 22px 130px;
+  }
+  :root dialog[data-sheet="bottom"]:has(.plan-sheet) .modal-header {
+    height: 14px;
+    padding: 0;
+  }
+}
+/* The detail's dock: separate 削除 and 編集 circles (left 16 and 86), so the
+   left island itself stays out of sight and each circle is its own pill. */
+.cdock:has(.cdock-group[data-slot="l"] > .ps-dock-circle)
+  .cdock-isl:first-child {
+  visibility: hidden;
+}
+:root .cdock-group[data-slot="l"]:has(> .ps-dock-circle) {
+  gap: 8px;
+}
+:root .cdock-group[data-slot="l"] > .ps-dock-circle {
+  width: 62px;
+  border-radius: 31px;
+  background: var(--p-dock);
+  box-shadow: var(--p-dock-shadow);
+}
+:root .cdock-group > .ps-dock-danger {
+  color: #c2410c;
 }
 
 /* ===== dock contents ===== */
