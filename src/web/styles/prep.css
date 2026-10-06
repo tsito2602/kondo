@@ -10,7 +10,7 @@
 }
 @media (max-width: 759px) {
   /* The mock's .scroll: 8 px 18 px, under the status bar. */
-  .page.prep-page {
+  :root:root .page.prep-page {
     padding: calc(8px + env(safe-area-inset-top)) 18px
       calc(150px + env(safe-area-inset-bottom));
   }
