@@ -105,7 +105,8 @@ export async function verifyHttp(origin, commit, fetcher = fetch) {
   }
 }
 
-/** One build invocation, one installation, one complete check, one deployment. */
+/** One build invocation, one installation, typecheck + build, one deployment.
+    The full test suite (npm run check) runs before pushing, not on every deploy. */
 export async function release(settings, adapters = {}) {
   const run = adapters.run ?? command;
   const preflight = adapters.preflight ?? verifyDatabase;
@@ -116,8 +117,8 @@ export async function release(settings, adapters = {}) {
   run('node', ['--test', 'scripts/test-workers-build.mjs'], settings.env, 60000);
   run('npm', ['ci', '--include=dev', '--prefer-offline', '--no-audit', '--no-fund'], settings.env, 180000);
   clean();
-  // Includes the existing Web build. Do not add a second npm run build:web.
-  run('npm', ['run', 'check'], settings.env, 480000);
+  // Typecheck plus the Web build. Do not add a second npm run build:web.
+  run('npm', ['run', 'deploy:check'], settings.env, 480000);
   if (settings.checkOnly) { console.log('[workers-build] Check-only complete; no remote writes or deployment'); return; }
   write(settings.config);
   const configArgs = ['--config', '.wrangler.generated.jsonc'];

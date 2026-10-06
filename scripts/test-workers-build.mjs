@@ -82,7 +82,7 @@ test('exactly one install, complete check and deploy, with checks before writes'
   const h = harness(); await release(settings(), h.adapters);
   assert.deepEqual(h.events, [
     'preflight', 'node --test scripts/test-workers-build.mjs', 'npm ci --include=dev --prefer-offline --no-audit --no-fund',
-    'clean', 'npm run check', 'config',
+    'clean', 'npm run deploy:check', 'config',
     'npx --no-install wrangler d1 execute DB --remote --config .wrangler.generated.jsonc --file worker/schema.sql',
     'npx --no-install wrangler deploy --config .wrangler.generated.jsonc --keep-vars', 'verify',
   ]);
@@ -91,7 +91,7 @@ test('exactly one install, complete check and deploy, with checks before writes'
 });
 
 test('preflight, test, installation and check failures cannot write remotely', async () => {
-  for (const failure of [{ preflightError: true }, { fail: 'node --test' }, { fail: 'npm ci' }, { fail: 'npm run check' }]) {
+  for (const failure of [{ preflightError: true }, { fail: 'node --test' }, { fail: 'npm ci' }, { fail: 'npm run deploy:check' }]) {
     const h = harness(failure); await assert.rejects(release(settings(), h.adapters));
     assert(!h.events.some(e => /wrangler|config|verify/.test(e)));
   }
@@ -111,7 +111,7 @@ test('failed schema/deploy/HTTP checks are surfaced without automated retries', 
 
 test('explicit bootstrap check-only may check a feature branch but cannot deploy', async () => {
   const h = harness(); await release(settings({ WORKERS_CI_BRANCH: 'ci/issue-152-workers-builds' }, true), h.adapters);
-  assert(h.events.includes('npm run check'));
+  assert(h.events.includes('npm run deploy:check'));
   assert(!h.events.some(e => /wrangler|config|verify/.test(e)));
   assert.throws(() => settings({ WORKERS_CI_BRANCH: 'ci/issue-152-workers-builds' }));
 });
