@@ -1,13 +1,23 @@
 import { Component, createRef, type ReactNode } from "react";
-import { anim, Live, RM, sleep, spring } from "./cartoon";
+import { anim, Live, RM, samples, sleep, spring } from "./cartoon";
+import {
+  dockContour,
+  morphDock,
+  MORPH_MS,
+  prepareDockMorph,
+  type DockIsland,
+  type DockMorphPlan,
+} from "./dock-morph";
 
-// The cartoon dock from kondo-cartoon.html (section 9) and kondo-itinerary.html:
-// two solid islands that crouch, tear apart and bump together. Every island has
-// a left and a right edge on their own springs; before it moves it crouches
-// (0.9), springs up as it stretches, the edge that travels further leads
-// ('lead') and the other trails ('split'), and it lands with a squish. Merging
-// into one island (the undo toast) ends in a bump; leaving it tears the seam.
-// Pressing anywhere on an island squishes the whole island (scale 2-v, v).
+// The cartoon dock from kondo-cartoon.html (section 9) and kondo-itinerary.html,
+// with the original fluid dock's morph (dock-morph.ts): the solid islands are
+// one SVG contour, and every change of layout (tabs to a detail, a sheet's
+// back circle, the undo toast, settings) morphs that contour in one eased
+// move. Islands part and join through a neck rather than one pill sliding
+// over another, and an island that is no longer needed melts into its
+// neighbour instead of shrinking into a separate blob. The cartoon touches
+// stay: the undo toast lands with a bump, the launch logo inflates the dock,
+// and pressing anywhere on an island squishes the whole island (2-v, v).
 //
 // What sits on the islands is plain markup in groups ([data-slot]): l (back),
 // tabs, r (context actions) and toast. The islands follow the groups' boxes.
@@ -65,58 +75,24 @@ export function DockBackIcon() {
 }
 
 type Span = [number, number];
-type Island = {
-  el: HTMLDivElement;
-  L: Live;
-  R: Live;
-  Q: Live;
-};
 type Groups = { key: string; el: HTMLElement }[];
+type Shape = { islands: DockIsland[]; tension: number };
 
-function mkIsl(el: HTMLDivElement): Island {
-  const st = { l: 0, r: 0, q: 1 };
-  const draw = () => {
-    const w = Math.abs(st.r - st.l);
-    el.style.left = Math.min(st.l, st.r) + "px";
-    el.style.width = w + "px";
-    el.style.borderRadius = Math.min(31, w / 2) + "px";
-    el.style.opacity = w < 4 ? "0" : "1";
-    el.style.scale =
-      Math.abs(st.q - 1) < 0.0005
-        ? ""
-        : `${(2 - st.q).toFixed(4)} ${st.q.toFixed(4)}`;
-  };
-  return {
-    el,
-    L: new Live(0, (v) => ((st.l = v), draw()), "lead", 0.3),
-    R: new Live(0, (v) => ((st.r = v), draw()), "lead", 0.3),
-    Q: new Live(1, (v) => ((st.q = v), draw()), { k: 600, d: 18 }, 0.0005),
-  };
-}
+/** Island height (62) and where its centre sits in the 120 px islands box. */
+const RADIUS = 31;
+const CENTER = 120 - 30 - RADIUS;
+const tones = new Set(["ink", "ink-dim"]);
 
-/** The mock's moveIsl(): crouch, spring up and stretch out, land. */
-async function moveIsl(I: Island, [l, r]: Span, delay = 0) {
-  const dl = l - I.L.t,
-    dr = r - I.R.t;
-  if (Math.abs(dl) < 0.5 && Math.abs(dr) < 0.5) return;
-  if (RM()) {
-    I.L.set(l);
-    I.R.set(r);
-    return;
-  }
-  void I.Q.to(0.9, { k: 700, d: 26 });
-  await sleep(70 + delay); // crouch
-  void I.Q.to(1, { k: 420, d: 11 }, 3); // spring up and stretch out
-  const leadL = Math.abs(dl) >= Math.abs(dr);
-  await Promise.race([
-    Promise.all([
-      I.L.to(l, leadL ? "lead" : "split"),
-      I.R.to(r, leadL ? "split" : "lead"),
-    ]),
-    sleep(380),
-  ]);
-  void I.Q.to(1, { k: 420, d: 12 }, -4); // land
-}
+/** The fluid dock's path, on a cartoon spring: the islands overshoot their
+    new shape a little and settle back, so a morph lands with a プルン. */
+const JELLY = samples({ k: 300, d: 21 });
+const MORPH = Math.max(MORPH_MS, JELLY.ms);
+const jelly = (t: number) => {
+  const at = t * (JELLY.vals.length - 1),
+    i = Math.floor(at);
+  if (i >= JELLY.vals.length - 1) return 1;
+  return JELLY.vals[i] + (JELLY.vals[i + 1] - JELLY.vals[i]) * (at - i);
+};
 
 /** Hides and shows groups as the mock's show(): fade out .12s; fade in .14s
     after .08s while each control pops from 0.4 (k380 d13, 110 ms + 45 ms each). */
@@ -171,18 +147,32 @@ export const DOCK_INFLATE = "kondo:dock-inflate";
 export class CartoonDock extends Component<Props> {
   root = createRef<HTMLDivElement>();
   goo = createRef<HTMLDivElement>();
-  a = createRef<HTMLDivElement>();
-  b = createRef<HTMLDivElement>();
-  seam = createRef<HTMLSpanElement>();
+  fill = createRef<SVGPathElement>();
+  ink = createRef<SVGPathElement>();
   ui = createRef<HTMLDivElement>();
-  IA?: Island;
-  IB?: Island;
+  /** What is drawn now, and the layout it is heading for. */
+  shape: Shape | null = null;
   geo = "";
+  tone = "";
   merged = false;
   width = 0;
   retry = 0;
   tries = 0;
-  pressed: Island | null = null;
+  frame = 0;
+  morph: {
+    from: DockIsland[];
+    to: DockIsland[];
+    tension: number;
+    start: number;
+    plan: DockMorphPlan;
+    done: () => void;
+  } | null = null;
+  /** The pressed island (its index in the drawn shape) and its squish. */
+  pressed = -1;
+  Q = new Live(1, () => this.paint(), { k: 600, d: 18 }, 0.0005);
+  /** The whole dock's crouch, stretch and landing squish around a morph. */
+  J = new Live(1, () => this.paint(), { k: 600, d: 18 }, 0.0005);
+  last = "";
   observer?: ResizeObserver;
 
   groups(): Groups {
@@ -213,8 +203,6 @@ export class CartoonDock extends Component<Props> {
 
   componentDidMount() {
     const root = this.root.current!;
-    this.IA = mkIsl(this.a.current!);
-    this.IB = mkIsl(this.b.current!);
     this.layout(true);
     this.observer =
       typeof ResizeObserver === "undefined"
@@ -266,20 +254,20 @@ export class CartoonDock extends Component<Props> {
   componentWillUnmount() {
     this.observer?.disconnect();
     cancelAnimationFrame(this.retry);
+    cancelAnimationFrame(this.frame);
+    this.morph?.done();
+    this.morph = null;
     const root = this.root.current;
     root?.removeEventListener("pointerdown", this.down, true);
     window.removeEventListener(DOCK_INFLATE, this.onInflate);
     window.removeEventListener("pointerup", this.up, true);
     window.removeEventListener("pointercancel", this.up, true);
-    for (const I of [this.IA, this.IB]) {
-      I?.L.stop();
-      I?.R.stop();
-      I?.Q.stop();
-    }
+    this.Q.stop();
+    this.J.stop();
   }
 
-  /** Where each island should be, from the visible groups' boxes. */
-  targets(): { a: Span; b: Span; merged: boolean; tone?: string } | null {
+  /** Where the islands should be, from the visible groups' boxes. */
+  targets(): { islands: Span[]; merged: boolean; tone: string } | null {
     const box = (el?: HTMLElement): Span | null =>
       el ? [el.offsetLeft, el.offsetLeft + el.offsetWidth] : null;
     const find = (...slots: DockSlot[]) =>
@@ -289,28 +277,27 @@ export class CartoonDock extends Component<Props> {
     const toast = find("toast"),
       left = find("l"),
       right = find("tabs", "r");
+    // Controls that carry their own pills (a plan's 削除 and 編集 circles)
+    // need no island under them.
+    const a = left?.querySelector(":scope > .ps-dock-circle")
+      ? null
+      : box(left);
     if (toast) {
       const t = box(toast)!;
-      if (left) return { a: box(left)!, b: t, merged: false };
-      return { a: t, b: t, merged: true };
+      return { islands: a ? [a, t] : [t], merged: !a, tone: "" };
     }
-    const a = box(left),
-      b = box(right);
-    if (!a && !b) return null;
+    const b = box(right);
+    const tone = right?.dataset.tone ?? "";
     return {
-      // A missing island shrinks into its neighbour's near edge and vanishes.
-      a: a ?? [b![0], b![0]],
-      b: b ?? [a![1], a![1]],
+      islands: [a, b].filter((span): span is Span => Boolean(span)),
       merged: false,
-      tone: right?.dataset.tone,
+      tone: tones.has(tone) ? tone : "",
     };
   }
 
   layout(instant: boolean) {
-    const root = this.root.current,
-      IA = this.IA,
-      IB = this.IB;
-    if (!root || !IA || !IB) return;
+    const root = this.root.current;
+    if (!root) return;
     cancelAnimationFrame(this.retry);
     if (!root.clientWidth) {
       // Hidden for a moment: a closing dialog that still holds the dock is
@@ -324,90 +311,153 @@ export class CartoonDock extends Component<Props> {
     this.width = root.clientWidth;
     const t = this.targets();
     if (!t) return;
-    const key = JSON.stringify([t.a, t.b]);
-    const tone = t.tone ?? "";
-    const paint = () => {
-      if (this.geo === key) IB.el.dataset.tone = tone;
-    };
-    if (key === this.geo && !instant) return paint();
-    const first = !this.geo;
+    const key = JSON.stringify([this.width, t.islands, t.tone]);
+    if (key === this.geo && !instant) return;
     this.geo = key;
-    // An island only turns ink once it has its new shape, so a wide plain
-    // island never flashes as a wide black bar on its way to 「閉じる」.
-    const late = tone === "ink" && !(instant || first || RM());
-    if (!late) paint();
     const wasMerged = this.merged;
     this.merged = t.merged;
-    let landB: Promise<unknown> = Promise.resolve();
-    if (instant || first || RM()) {
-      IA.L.set(t.a[0]);
-      IA.R.set(t.a[1]);
-      IB.L.set(t.b[0]);
-      IB.R.set(t.b[1]);
-    } else if (t.merged) {
-      // the two islands run into each other and become one, with a bump
-      void Promise.all([moveIsl(IA, t.a), moveIsl(IB, t.b)]).then(() =>
+    if (t.tone) this.tone = t.tone;
+    // The right-hand island carries the tone (a lone save turns it ink); the
+    // ink fades in only once the morph is well on its way, as in the fluid dock.
+    const to = t.islands.map(([l, r], i): DockIsland => ({
+      left: l,
+      width: r - l,
+      radius: RADIUS,
+      slot: i,
+      tint: t.tone && i === t.islands.length - 1 ? 1 : 0,
+    }));
+    const from = this.shape;
+    if (instant || !from || !from.islands.length || RM()) {
+      this.stopMorph();
+      this.shape = { islands: to, tension: 0 };
+      this.paint();
+      return;
+    }
+    const bump = t.merged && !wasMerged;
+    // crouch, spring up as the material stretches, land with a squish
+    void this.J.to(0.92, { k: 700, d: 26 });
+    const up = setTimeout(() => void this.J.to(1, { k: 420, d: 11 }, 3), 70);
+    void this.morphTo(to).then((landed) => {
+      clearTimeout(up);
+      if (!landed) return;
+      void this.J.to(1, { k: 420, d: 12 }, -4);
+      // the islands run into each other and become one, with a bump
+      if (bump)
         spring(
           this.goo.current!,
           [{ transform: "scale(1.05,.82)" }, { transform: "none" }],
           "boing",
-        ),
-      );
-    } else if (wasMerged && t.a[1] > t.a[0]) {
-      // tear the one island apart where the back circle will be
-      this.tearAt((t.a[1] + t.b[0]) / 2);
-      landB = sleep(120).then(() => {
-        void moveIsl(IA, t.a);
-        return moveIsl(IB, t.b);
-      });
-    } else {
-      void moveIsl(IA, t.a);
-      landB = moveIsl(IB, t.b, 30);
-    }
-    if (late) void landB.then(paint);
+        );
+    });
   }
 
-  tearAt(x: number) {
-    const seam = this.seam.current;
-    if (RM() || !seam) return;
-    seam.style.left = x + "px";
-    void anim(
-      seam,
-      [
-        { opacity: 0, transform: "scaleY(.3)" },
-        { opacity: 1, transform: "scaleY(1.1)", offset: 0.3 },
-        { opacity: 1, transform: "none", offset: 0.6 },
-        { opacity: 0, transform: "scaleY(.6)" },
-      ],
-      { duration: 360 },
+  stopMorph() {
+    cancelAnimationFrame(this.frame);
+    this.frame = 0;
+    this.morph?.done();
+    this.morph = null;
+  }
+
+  /** Morph from exactly what is drawn now (also mid-morph) to `to`. Resolves
+      true once it lands, false when another layout takes over. */
+  morphTo(to: DockIsland[]): Promise<boolean> {
+    const from = this.shape!;
+    const previous = this.morph;
+    this.morph = null;
+    previous?.done();
+    let landed = false;
+    return new Promise<boolean>((resolve) => {
+      this.morph = {
+        from: from.islands,
+        to,
+        tension: from.tension,
+        start: performance.now(),
+        plan: prepareDockMorph(from.islands, to),
+        done: () => resolve(landed),
+      };
+      const tick = (now: number) => {
+        this.frame = 0;
+        const m = this.morph;
+        if (!m) return;
+        const p = Math.min(1, Math.max(0, (now - m.start) / MORPH));
+        this.shape = morphDock(m.from, m.to, m.tension, p, m.plan, jelly);
+        this.paint();
+        if (p < 1) {
+          this.frame = requestAnimationFrame(tick);
+          return;
+        }
+        landed = true;
+        this.morph = null;
+        m.done();
+      };
+      if (!this.frame) this.frame = requestAnimationFrame(tick);
+    });
+  }
+
+  /** Draw the current shape (and the pressed island's squish). */
+  paint() {
+    const shape = this.shape,
+      fill = this.fill.current,
+      ink = this.ink.current,
+      goo = this.goo.current;
+    if (!shape || !fill || !ink || !goo) return;
+    const w = this.width || this.root.current?.clientWidth || 0;
+    const scales = shape.islands.map((_, i) => {
+      const v = this.J.v * (i === this.pressed ? this.Q.v : 1);
+      return Math.abs(v - 1) > 0.0005 ? { x: 2 - v, y: v } : { x: 1, y: 1 };
+    });
+    const d = dockContour(w, shape.islands, shape.tension, scales, CENTER);
+    const tinted = shape.islands
+      .map((island, i) => ({ island, scale: scales[i] }))
+      .filter(({ island }) => (island.tint ?? 0) > 0.001);
+    const a = dockContour(
+      w,
+      tinted.map(({ island }) => island),
+      shape.tension,
+      tinted.map(({ scale }) => scale),
+      CENTER,
+    );
+    const opacity = Math.max(0, ...tinted.map(({ island }) => island.tint!));
+    const key = d + "|" + a + "|" + opacity.toFixed(3) + this.tone;
+    if (key === this.last) return;
+    this.last = key;
+    fill.setAttribute("d", d);
+    ink.setAttribute("d", a);
+    ink.style.opacity = opacity.toFixed(3);
+    goo.dataset.tone = this.tone;
+    // The visible islands' spans: what the dock looks like, for its tests.
+    goo.dataset.shape = JSON.stringify(
+      shape.islands
+        .filter((island) => island.width > 0.5 && island.radius > 0)
+        .sort((x, y) => x.left - y.left)
+        .map((island) => [
+          Math.round(island.left * 10) / 10,
+          Math.round((island.left + island.width) * 10) / 10,
+        ]),
     );
   }
 
   /** Launch: the dock inflates out of the logo's impact (kondo-cartoon §1). */
   inflate(from?: Span) {
     const mid = (this.root.current?.clientWidth ?? 390) / 2;
-    from ??= [mid - 31, mid + 31];
-    const IA = this.IA,
-      IB = this.IB;
-    if (!IA || !IB || RM()) return;
-    for (const I of [IA, IB]) {
-      I.L.set(from[0]);
-      I.R.set(from[1]);
-      I.Q.set(1);
-    }
-    this.merged = false;
+    from ??= [mid - RADIUS, mid + RADIUS];
+    if (RM() || !this.root.current?.clientWidth) return;
+    this.stopMorph();
+    this.shape = {
+      islands: [
+        { left: from[0], width: from[1] - from[0], radius: RADIUS, slot: 0 },
+      ],
+      tension: 0,
+    };
+    this.paint();
     void spring(
       this.goo.current!,
       [{ transform: "scale(1.3,.62)" }, { transform: "none" }],
       "boing",
     );
     void sleep(140).then(() => {
-      const t = this.targets();
-      if (!t) return;
-      this.tearAt((t.a[1] + t.b[0]) / 2);
-      this.geo = JSON.stringify([t.a, t.b]);
-      void moveIsl(IA, t.a);
-      void moveIsl(IB, t.b, 30);
+      this.geo = "";
+      this.layout(false);
     });
   }
 
@@ -415,31 +465,28 @@ export class CartoonDock extends Component<Props> {
 
   // pressing anywhere on an island squishes the whole island too
   down = (e: PointerEvent) => {
-    if (RM() || e.button !== 0) return;
+    if (RM() || e.button !== 0 || !this.shape) return;
     const root = this.root.current;
     if (!root || !(e.target as Element).closest?.(".cdock-content")) return;
     const r = root.getBoundingClientRect();
     const x = ((e.clientX - r.left) / r.width) * root.clientWidth;
-    this.pressed =
-      [this.IA!, this.IB!].find(
-        (I) => x >= Math.min(I.L.v, I.R.v) && x <= Math.max(I.L.v, I.R.v),
-      ) ?? null;
-    void this.pressed?.Q.to(0.95, { k: 600, d: 22 });
+    this.pressed = this.shape.islands.findIndex(
+      (I) => I.width > 0 && x >= I.left && x <= I.left + I.width,
+    );
+    if (this.pressed >= 0) void this.Q.to(0.95, { k: 600, d: 22 });
   };
   up = () => {
-    void this.pressed?.Q.to(1, { k: 420, d: 12 });
-    this.pressed = null;
+    if (this.pressed >= 0) void this.Q.to(1, { k: 420, d: 12 });
   };
 
   render() {
     return (
       <div ref={this.root} className="cdock">
         <div ref={this.goo} className="cdock-islands" aria-hidden="true">
-          <div ref={this.a} className="cdock-isl" />
-          <div ref={this.b} className="cdock-isl" />
-          <span ref={this.seam} className="cdock-seam">
-            <i />
-          </span>
+          <svg className="cdock-shape" width="100%" height="120">
+            <path ref={this.fill} className="cdock-fill" />
+            <path ref={this.ink} className="cdock-ink" style={{ opacity: 0 }} />
+          </svg>
         </div>
         <div ref={this.ui} className="cdock-ui">
           <div className="cdock-content">{this.props.children}</div>

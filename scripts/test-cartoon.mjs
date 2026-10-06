@@ -42,7 +42,7 @@ dom.window.HTMLDialogElement.prototype.close = function () {
 const { outputFiles } = await build({
   stdin: {
     contents:
-      "export * from './src/web/cartoon'; export { CartoonDock, DockGroup } from './src/web/cartoon-dock'; export { TripDock, tripTabs, moveEdges } from './src/web/trip-dock'; export { ThumbDockProvider, ThumbDock, ContextDock, DockToast } from './src/web/thumb-dock'; export { jellyScroll } from './src/web/jelly-scroll'; export { openFromCard, closeToCard, sheetIn, sheetOut, cardOrigin } from './src/web/transitions'; export { installPressFeedback } from './src/web/press-feedback';",
+      "export * from './src/web/cartoon'; export { CartoonDock, DockGroup } from './src/web/cartoon-dock'; export { morphDock, dockContour } from './src/web/dock-morph'; export { TripDock, tripTabs, moveEdges } from './src/web/trip-dock'; export { ThumbDockProvider, ThumbDock, ContextDock, DockToast } from './src/web/thumb-dock'; export { jellyScroll } from './src/web/jelly-scroll'; export { openFromCard, closeToCard, sheetIn, sheetOut, cardOrigin } from './src/web/transitions'; export { installPressFeedback } from './src/web/press-feedback';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -136,12 +136,11 @@ Object.defineProperty(dom.window.HTMLElement.prototype, "clientWidth", {
     return this.classList?.contains("cdock") && !dockHidden ? 390 : 0;
   },
 });
+/** The visible islands' [left, right] spans as the dock draws them now. */
 const islands = () =>
-  [...document.querySelectorAll(".cdock-isl")].map((el) => [
-    parseFloat(el.style.left),
-    parseFloat(el.style.left) + parseFloat(el.style.width),
-  ]);
+  JSON.parse(document.querySelector(".cdock-islands")?.dataset.shape ?? "[]");
 const near = (a, b, eps = 0.6) =>
+  a.length === b.length &&
   a.every((pair, i) => pair.every((v, j) => Math.abs(v - b[i][j]) < eps));
 
 test("Live retargets mid-flight, settles on its target and jumps under reduced motion", async () => {
@@ -194,6 +193,9 @@ function DockHarness({ mode }) {
         ),
       }),
     );
+  if (mode === "back")
+    // 設定 over a trip: nothing but the back circle on the left.
+    return h(M.ThumbDock, { mode: "context" }, h(M.ContextDock, { back }));
   if (mode === "edit")
     return h(
       M.ThumbDock,
@@ -304,12 +306,7 @@ test("reduced motion places the islands at once and animates nothing", async () 
   const dock = await mountDock();
   try {
     await act(async () => dock.go("toast", 0));
-    assert.ok(
-      near(islands(), [
-        [16, 374],
-        [16, 374],
-      ]),
-    );
+    assert.ok(near(islands(), [[16, 374]]), "the toast is one island");
     await act(async () => dock.go("ctx", 0));
     assert.ok(
       near(islands(), [
@@ -323,6 +320,79 @@ test("reduced motion places the islands at once and animates nothing", async () 
     await act(async () => dock.root.unmount());
     reduced = false;
   }
+});
+
+test("the trip tabs fold into a lone back circle (設定) and back as one island, never a separate pill", async () => {
+  stubAnimate();
+  const dock = await mountDock();
+  const watch = async (mode, ms = 1100) => {
+    const seen = [];
+    await act(async () => dock.go(mode, 0));
+    for (let t = 0; t < ms; t += 16) {
+      await act(async () => wait(16));
+      seen.push(islands());
+    }
+    return seen;
+  };
+  try {
+    assert.ok(near(islands(), [[16, 374]]), "full-width tabs");
+    const folding = await watch("back");
+    assert.ok(
+      folding.every((shape) => shape.length === 1),
+      "one island all the way: " + JSON.stringify(folding),
+    );
+    assert.ok(
+      folding.every(([[l]]) => Math.abs(l - 16) < 1),
+      "its left edge stays where the circle is",
+    );
+    assert.ok(near(islands(), [[16, 78]]), "it lands as the back circle");
+    const opening = await watch("tabs");
+    assert.ok(
+      opening.every((shape) => shape.length === 1),
+      "the circle stretches back into the tabs in one piece",
+    );
+    assert.ok(
+      opening.some(([[, r]]) => r > 80 && r < 370),
+      "and it moves there rather than jumping",
+    );
+    assert.ok(near(islands(), [[16, 374]]));
+    // Home's two islands (設定, 旅行を作成) join into the tabs through a neck.
+    await dock.go("home", 1100);
+    assert.ok(
+      near(islands(), [
+        [16, 78],
+        [225, 374],
+      ]),
+    );
+    const joining = await watch("tabs");
+    assert.ok(joining.every((shape) => shape.length <= 2));
+    assert.ok(near(islands(), [[16, 374]]), "one island at the end");
+  } finally {
+    await act(async () => dock.root.unmount());
+  }
+});
+
+test("a springy morph may overshoot its edges but never thins an island below both of its shapes", () => {
+  const circle = [{ left: 16, width: 62, radius: 31 }];
+  const tabs = [{ left: 16, width: 358, radius: 31 }];
+  for (const t of [0.5, 0.8, 0.95]) {
+    const { islands: shape } = M.morphDock(
+      tabs,
+      circle,
+      0,
+      t,
+      undefined,
+      () => 1.08,
+    );
+    assert.ok(shape[0].width >= 62, "the circle never shrinks in height");
+    const d = M.dockContour(390, shape, 0, [], 59);
+    assert.equal(/NaN|Infinity/.test(d), false);
+  }
+  const grown = M.morphDock(circle, tabs, 0, 0.9, undefined, () => 1.05);
+  assert.ok(
+    grown.islands[0].width > 358,
+    "growing, it stretches past and settles",
+  );
 });
 
 test("a sheet opens out of its card and closes back onto it without leaving an overlay", async () => {
@@ -388,13 +458,7 @@ test("a dock that is hidden while its controls change (a closing dialog) still m
     await act(async () => dock.go("tabs", 0));
     dockHidden = false;
     await act(async () => wait(900));
-    assert.ok(
-      near(islands(), [
-        [16, 16],
-        [16, 374],
-      ]),
-      "the islands follow",
-    );
+    assert.ok(near(islands(), [[16, 374]]), "the islands follow");
   } finally {
     dockHidden = false;
     await act(async () => dock.root.unmount());

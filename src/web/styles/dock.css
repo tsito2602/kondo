@@ -51,41 +51,25 @@
   transform-origin: 50% 100%;
   pointer-events: none;
 }
-.cdock-isl {
+/* The islands are one contour (dock-morph.ts), so parting and joining
+   islands share one outline and one shadow. */
+.cdock-shape {
   position: absolute;
-  bottom: 30px;
-  height: 62px;
-  border-radius: 31px;
-  background: var(--p-dock);
-  box-shadow: var(--p-dock-shadow);
-  transform-origin: 50% 100%;
-  transition: background-color 0.2s;
+  inset: 0;
+  overflow: visible;
+  filter: drop-shadow(0 9px 9px #0000001f);
 }
-.cdock-isl[data-tone="ink"] {
-  background: var(--p-ink);
+.cdock-fill {
+  fill: var(--p-dock);
+  stroke: var(--p-line);
+  stroke-width: 2;
+  paint-order: stroke;
 }
-/* A disabled lone primary: the mock's ink pill at opacity .4. */
-.cdock-isl[data-tone="ink-dim"] {
-  background: color-mix(in srgb, var(--p-ink) 40%, var(--p-paper));
+.cdock-ink {
+  fill: var(--p-ink);
 }
-.cdock-seam {
-  position: absolute;
-  bottom: 30px;
-  z-index: 2;
-  width: 30px;
-  height: 62px;
-  margin-left: -15px;
-  display: grid;
-  place-items: center;
-  opacity: 0;
-  pointer-events: none;
-}
-.cdock-seam i {
-  width: 5px;
-  height: 50px;
-  border-radius: 3px;
-  background: var(--p-paper);
-  box-shadow: 0 0 0 1.5px var(--p-ink);
+.cdock-islands[data-tone="ink-dim"] .cdock-ink {
+  fill: color-mix(in srgb, var(--p-ink) 40%, var(--p-paper));
 }
 .cdock-ui,
 .cdock-content {

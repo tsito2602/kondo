@@ -1944,12 +1944,9 @@ dialog:has(.plan-add),
     padding: 0;
   }
 }
-/* The detail's dock: separate 削除 and 編集 circles (left 16 and 86), so the
-   left island itself stays out of sight and each circle is its own pill. */
-.cdock:has(.cdock-group[data-slot="l"] > .ps-dock-circle)
-  .cdock-isl:first-child {
-  visibility: hidden;
-}
+/* The detail's dock: separate 削除 and 編集 circles (left 16 and 86); the
+   dock draws no island under them (CartoonDock.targets) and each circle is
+   its own pill. */
 :root .cdock-group[data-slot="l"]:has(> .ps-dock-circle) {
   gap: 8px;
 }
