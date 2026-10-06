@@ -151,6 +151,9 @@ const keyOf = (el: HTMLElement, identity: string) => {
 
 type Props = { identity: string; children: ReactNode };
 
+/** Dispatched on window when the launch logo lands in the dock (boot.ts). */
+export const DOCK_INFLATE = "kondo:dock-inflate";
+
 export class CartoonDock extends Component<Props> {
   root = createRef<HTMLDivElement>();
   goo = createRef<HTMLDivElement>();
@@ -205,6 +208,7 @@ export class CartoonDock extends Component<Props> {
           );
     this.observer?.observe(root);
     root.addEventListener("pointerdown", this.down, true);
+    window.addEventListener(DOCK_INFLATE, this.onInflate);
     window.addEventListener("pointerup", this.up, true);
     window.addEventListener("pointercancel", this.up, true);
   }
@@ -242,6 +246,7 @@ export class CartoonDock extends Component<Props> {
     this.observer?.disconnect();
     const root = this.root.current;
     root?.removeEventListener("pointerdown", this.down, true);
+    window.removeEventListener(DOCK_INFLATE, this.onInflate);
     window.removeEventListener("pointerup", this.up, true);
     window.removeEventListener("pointercancel", this.up, true);
     for (const I of [this.IA, this.IB]) {
@@ -339,7 +344,9 @@ export class CartoonDock extends Component<Props> {
   }
 
   /** Launch: the dock inflates out of the logo's impact (kondo-cartoon §1). */
-  inflate(from: Span = [164, 226]) {
+  inflate(from?: Span) {
+    const mid = (this.root.current?.clientWidth ?? 390) / 2;
+    from ??= [mid - 31, mid + 31];
     const IA = this.IA,
       IB = this.IB;
     if (!IA || !IB || RM()) return;
@@ -363,6 +370,8 @@ export class CartoonDock extends Component<Props> {
       void moveIsl(IB, t.b, 30);
     });
   }
+
+  onInflate = () => this.inflate();
 
   // pressing anywhere on an island squishes the whole island too
   down = (e: PointerEvent) => {
