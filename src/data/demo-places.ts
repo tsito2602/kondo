@@ -24,7 +24,7 @@ export function withDemoPlaces(cache: TravelCache, tripId: string, start: string
     { id: 'sample-museum', day: day3, time: '14:00', kind: '予定', title: '美術史美術館', note: '', details: sight('') },
     { id: 'sample-concert', day: day3, time: '19:30', kind: '予定', title: '楽友協会でコンサート', note: '', details: sight('') },
     { id: 'sample-belvedere', day: day4, time: '09:15', kind: '予定', title: 'ベルヴェデーレ宮殿', note: '', details: sight('') },
-  ].filter((item) => !items.some((existing) => existing.id === item.id));
+  ];
   const known: Record<string, Partial<Place>> = {
     'sample-place-cafe': { title: 'カフェ・ツェントラル', note: 'メランジェとアプフェルシュトゥルーデル', location: pin('Café Central', 48.21043, 16.36547), status: 'planned', itineraryItemId: 'sample-cafe' },
     'sample-place-museum': { note: 'ブリューゲルの部屋から回る', location: pin('Kunsthistorisches Museum', 48.20379, 16.36166), status: 'planned', itineraryItemId: 'sample-museum' },
@@ -40,19 +40,33 @@ export function withDemoPlaces(cache: TravelCache, tripId: string, start: string
     place('sample-place-naschmarkt', 'ナッシュマルクト', '土曜は蚤の市も', 48.1984, 16.363),
     place('sample-place-prater', 'プラーター大観覧車', '夕方がきれいらしい', 48.21665, 16.39585),
     place('sample-place-schoenbrunn', 'シェーンブルン宮殿', '行けたら。U4で約20分', 48.18486, 16.31224),
-  ].filter((entry) => !places.some((existing) => existing.id === entry.id));
+  ];
+  // The しおり's sample (demo-itinerary) may already plan some of these places:
+  // a place, plan or booking that exists by id is kept, and nothing is added twice.
+  const bookings = cache.bookingsByTrip[tripId] ?? [];
+  const linked = new Set(places.map((entry) => entry.itineraryItemId).filter(Boolean));
+  const taken = (itemId?: string | null) =>
+    !!itemId && (linked.has(itemId) || bookings.some((booking) => booking.id === itemId) || items.some((item) => item.id === itemId));
+  const addedPlaces = extraPlaces.filter((entry) => !places.some((existing) => existing.id === entry.id) && !taken(entry.itineraryItemId));
+  const addedItems = extraItems.filter((item) => addedPlaces.some((entry) => entry.itineraryItemId === item.id));
+  const update = (entry: Place): Place => {
+    const change = known[entry.id];
+    // Leave a place alone when it is already planned, or its plan already has a place.
+    if (!change || entry.itineraryItemId || (change.itineraryItemId && linked.has(change.itineraryItemId))) return entry;
+    return { ...entry, ...change };
+  };
   return {
     ...cache,
     bookingsByTrip: {
       ...cache.bookingsByTrip,
       [tripId]: (cache.bookingsByTrip[tripId] ?? []).map((booking) =>
-        booking.id === 'sample-hotel' ? { ...booking, location: pin('旧市街のホテル', 48.2087, 16.3697) } : booking,
+        booking.id === 'sample-hotel' && !booking.location ? { ...booking, location: pin('旧市街のホテル', 48.2087, 16.3697) } : booking,
       ),
     },
-    itemsByTrip: { ...cache.itemsByTrip, [tripId]: [...items, ...extraItems] },
+    itemsByTrip: { ...cache.itemsByTrip, [tripId]: [...items, ...addedItems] },
     placesByTrip: {
       ...cache.placesByTrip,
-      [tripId]: [...places.map((entry) => ({ ...entry, ...known[entry.id] })), ...extraPlaces],
+      [tripId]: [...places.map(update), ...addedPlaces],
     },
   };
 }
