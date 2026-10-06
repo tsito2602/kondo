@@ -10,6 +10,7 @@ import { createPortal } from "react-dom";
 import { MoreHorizontal } from "lucide-react";
 import { ease, linearSupported } from "./cartoon";
 import { reduceMotion } from "./motion";
+import { menuDepth } from "./menu-depth";
 
 // The header's … menu, as uchino's space menu (Tsubasa 2026-10-06): the page
 // blurs behind a veil and the items, label then icon, stand right-aligned
@@ -55,6 +56,7 @@ export function AnchoredMenu({
   const items = useRef<{ node: HTMLElement; from: string }[]>([]);
   const [closing, setClosing] = useState(false);
   const pending = useRef<(() => void) | undefined>(undefined);
+  const depth = useRef<ReturnType<typeof menuDepth> | null>(null);
   const finish = useRef(onClose);
   finish.current = onClose;
   const id = useId();
@@ -85,6 +87,13 @@ export function AnchoredMenu({
     );
     node.showModal();
     const animated = typeof control.animate === "function" && !reduceMotion();
+    // The page behind blurs AND recedes, as it does behind a floating panel
+    // (Tsubasa 2026-10-06: 「ブラーさせるだけでなく、縮小させて」).
+    depth.current = menuDepth(!animated, {
+      duration: 320,
+      easing: "cubic-bezier(.32, 0, .2, 1)",
+      fill: "both",
+    });
     if (animated) {
       // The … gives way: it squashes and fades as the first item takes its place.
       control.animate(
@@ -148,6 +157,8 @@ export function AnchoredMenu({
       document.removeEventListener("wheel", preventBackgroundScroll);
       document.removeEventListener("touchmove", preventBackgroundScroll);
       items.current = [];
+      depth.current?.cancel();
+      depth.current = null;
       anchor.current?.appendChild(host);
       node.close();
       if (previousFocus?.isConnected)
@@ -169,6 +180,7 @@ export function AnchoredMenu({
       const timer = setTimeout(complete, 0);
       return () => clearTimeout(timer);
     }
+    depth.current?.reverse(320, -1.7);
     // The … comes back where the first item was, with its プルン.
     bounce(button.current);
     const last = items.current.length - 1;
