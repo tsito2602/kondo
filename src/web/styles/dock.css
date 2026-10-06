@@ -181,7 +181,7 @@
   background: var(--p-ink);
   color: var(--p-paper);
 }
-/* m: a separate function (しおりで見る, 券を開く) on its own island, 12 px
+/* m: a separate function (しおりで見る, 詳細を開く) on its own island, 12 px
    left of the r island (--cdock-r-w is r's width, set by the dock). */
 .cdock-group[data-slot="m"] {
   right: calc(

@@ -21,7 +21,7 @@ import {
 //
 // What sits on the islands is plain markup in groups ([data-slot]): l (back),
 // tabs, m (a separate function beside the context actions, such as しおりで見る
-// or 券を開く: its own island), r (context actions) and toast. The islands
+// or 詳細を開く: its own island), r (context actions) and toast. The islands
 // follow the groups' boxes.
 
 export type DockSlot = "l" | "tabs" | "m" | "r" | "toast";

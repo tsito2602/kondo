@@ -1,4 +1,3 @@
-import { bookingDuration } from "@/data/booking-duration";
 import { formatConnectionDuration } from "@/data/flight-connections";
 import {
   distanceLabel,
@@ -14,7 +13,6 @@ import {
 } from "@/data/itinerary";
 import {
   isJourney,
-  laterDayMark,
   nightsOf,
   planPlace,
   type DayEntry,
@@ -22,6 +20,7 @@ import {
 } from "@/data/plan-timeline";
 import { referenceUrl } from "@/data/places";
 import type { Booking, ItineraryItem, Place } from "@/data/types";
+import { BookingBody } from "./booking-card";
 import { categoryGlyph, Glyph, MapPin } from "./itinerary-icons";
 
 export type OpenTarget =
@@ -64,64 +63,11 @@ export function bookingPlaceName(booking: Booking) {
   return referenceUrl(text) ? (placeNameFromLink(text) ?? "") : text;
 }
 
-function Arc({ train }: { train: boolean }) {
-  return (
-    <svg viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true">
-      <path
-        d={train ? "M3 15 H97" : "M3 24 Q 50 -6 97 24"}
-        fill="none"
-        stroke="currentColor"
-        strokeOpacity=".45"
-        strokeWidth="2.6"
-        strokeDasharray="0 6.5"
-        strokeLinecap="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
-  );
-}
-/** From → to, arrival with 着 (翌 when later) and the real, zone-corrected time on board. */
-export function JourneyLine({
-  booking,
-  large = false,
-}: {
-  booking: Booking;
-  large?: boolean;
-}) {
-  const train = booking.kind === "train";
-  const from =
-    (train ? booking.origin : booking.originCode) ||
-    booking.origin ||
-    booking.originCode ||
-    "出発地";
-  const to =
-    (train ? booking.destination : booking.destinationCode) ||
-    booking.destination ||
-    booking.destinationCode ||
-    "到着地";
-  const minutes = bookingDuration(booking)?.minutes;
-  const later = laterDayMark(booking.day, booking.endDay || booking.day);
-  return (
-    <div
-      className={`it-jp${train ? " is-train" : ""}${large ? " is-large" : ""}`}
-    >
-      <span className="it-jp-code">{from}</span>
-      <span className="it-jp-mid">
-        <Arc train={train} />
-        {minutes !== undefined && <em>{durationLabel(minutes)}</em>}
-      </span>
-      <span className="it-jp-end">
-        <span className="it-jp-code">{to}</span>
-        {booking.endTime && (
-          <b className="it-jp-arr">
-            {later && <small>{later}</small>}
-            {booking.endTime}
-            <i>着</i>
-          </b>
-        )}
-      </span>
-    </div>
-  );
+/** A flight or a train as the 予約 tab's card draws it: departure over
+    arrival, each time level with its dot and place (Tsubasa 2026-10-06:
+    「予約のカード同様縦並べにしよう」). */
+export function JourneyLine({ booking }: { booking: Booking }) {
+  return <BookingBody booking={booking} now="" />;
 }
 
 function PlanCard({

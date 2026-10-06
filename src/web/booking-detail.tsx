@@ -174,6 +174,7 @@ export function BookingDetail({
       <Modal
         title="予約の詳細"
         addPanel
+        tall
         onClose={onClose}
         dockActions={{
           // Every detail panel's dock: ‹ closes, 編集 then 削除 at the right
