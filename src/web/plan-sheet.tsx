@@ -61,6 +61,13 @@ import {
   placeLabel,
 } from "./itinerary-rows";
 import { previewPlace, savePlanPlace } from "./plan-place";
+import {
+  PlanTimePicker,
+  TIME_TAP_HINT,
+  TimelinePicker,
+  TimeRangeButton,
+  TimeTap,
+} from "./timeline-picker";
 
 const weekday = (day: string) =>
   new Intl.DateTimeFormat("ja-JP", { weekday: "short" }).format(
@@ -252,6 +259,16 @@ function PlanView({
     : mapUrl(details.location);
   const transport =
     details.category === "transport" ? details.transport : undefined;
+  // The times themselves open the time picker (Tsubasa's 「B」).
+  const [picking, setPicking] = useState(false);
+  const tap = (text: string, label: string) =>
+    travel.canEdit ? (
+      <TimeTap label={label} onOpen={() => setPicking(true)}>
+        {text}
+      </TimeTap>
+    ) : (
+      text
+    );
   return (
     <div className="plan-sheet">
       <div className="ps-dt">
@@ -264,14 +281,14 @@ function PlanView({
       <div className="ps-row is-when">
         <div className="ps-when">
           <b>
-            {item.time || "未定"}
+            {tap(item.time || "未定", "開始の時刻を直す")}
             {details.endTime && (
               <>
                 <em>–</em>
                 {details.endDay && details.endDay !== item.day
                   ? `${md(details.endDay)} `
                   : ""}
-                {details.endTime}
+                {tap(details.endTime, "終了の時刻を直す")}
               </>
             )}
           </b>
@@ -280,7 +297,11 @@ function PlanView({
           )}
         </div>
         <div className="ps-from">{tripDayLabel(item.day, days)}</div>
+        {travel.canEdit && <p className="time-tap-hint">{TIME_TAP_HINT}</p>}
       </div>
+      {picking && (
+        <PlanTimePicker item={item} onClose={() => setPicking(false)} />
+      )}
       {transport ? (
         <section className="ps-row">
           <h4>
@@ -411,14 +432,16 @@ function PlanEditForm({
   const [error, setError] = useState("");
   const { busy, run } = useAction();
   // An overnight plan keeps how many days it spans when its start day moves.
-  const span =
+  const [span, setSpan] = useState(
     initial.endDay && initial.endTime
       ? Math.round(
           (Date.parse(`${initial.endDay}T12:00:00Z`) -
             Date.parse(`${item.day}T12:00:00Z`)) /
             86400000,
         )
-      : 0;
+      : 0,
+  );
+  const [picking, setPicking] = useState(false);
   const endDay = endTime
     ? new Date(Date.parse(`${day}T12:00:00Z`) + span * 86400000)
         .toISOString()
@@ -540,28 +563,44 @@ function PlanEditForm({
           ))}
         </div>
         <div className="ps-times">
-          <input
+          <TimeRangeButton
             className="ps-inp"
-            inputMode="numeric"
-            maxLength={5}
-            placeholder="--:--"
-            aria-label="開始"
-            value={time}
-            onChange={(event) => setTime(event.target.value)}
-            onBlur={(event) => setTime(clockTime(event.target.value))}
-          />
-          <span aria-hidden="true">–</span>
-          <input
-            className="ps-inp"
-            inputMode="numeric"
-            maxLength={5}
-            placeholder="--:--"
-            aria-label="終了"
-            value={endTime}
-            onChange={(event) => setEndTime(event.target.value)}
-            onBlur={(event) => setEndTime(clockTime(event.target.value))}
+            time={clockTime(time)}
+            endTime={clockTime(endTime)}
+            nextDay={span === 1}
+            onOpen={() => setPicking(true)}
           />
         </div>
+        {picking && (
+          <TimelinePicker
+            title={title.trim() || "予定"}
+            day={day}
+            time={clockTime(time)}
+            endTime={clockTime(endTime)}
+            endDayOffset={span}
+            point={span > 1}
+            pointLabel="開始"
+            exclude={[`item-${item.id}`]}
+            self={entryCoords(
+              {
+                key: `item-${item.id}`,
+                day: item.day,
+                time: item.time,
+                title: item.title,
+                item,
+              },
+              travel.places,
+            )}
+            allowClear
+            onSave={(picked) => {
+              setTime(picked.time);
+              if (span > 1 && picked.time) return;
+              setEndTime(picked.endTime);
+              setSpan(picked.endTime ? picked.endDayOffset : 0);
+            }}
+            onClose={() => setPicking(false)}
+          />
+        )}
         <p className="ps-hint">
           時刻を空けると「未定」でその日の最後に入ります。
         </p>
@@ -752,6 +791,7 @@ function StayEditForm({
   const anchor = useRef<HTMLFormElement>(null);
   const terms = endpoint === "start" ? booking.time : booking.endTime;
   const [time, setTime] = useState(plan?.time ?? terms);
+  const [picking, setPicking] = useState(false);
   const label = endpoint === "start" ? "チェックイン" : "チェックアウト";
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -786,15 +826,43 @@ function StayEditForm({
     >
       <p className="ps-old-h">{label}の時刻</p>
       <h3 className="ps-title">{booking.title}</h3>
-      <label className="field">
+      <div className="field">
         <span>{endpoint === "start" ? "入る時刻" : "出る時刻"}</span>
-        <input
+        <TimeRangeButton
           className="ps-inp"
-          type="time"
-          value={time}
-          onChange={(event) => setTime(event.target.value)}
+          label={endpoint === "start" ? "入る時刻" : "出る時刻"}
+          time={time}
+          onOpen={() => setPicking(true)}
         />
-      </label>
+      </div>
+      {picking && (
+        <TimelinePicker
+          title={booking.title}
+          day={
+            endpoint === "start" ? booking.day : booking.endDay || booking.day
+          }
+          time={time}
+          endTime=""
+          point
+          pointLabel={label}
+          exclude={[`booking-${booking.id}-${endpoint}`]}
+          self={entryCoords(
+            {
+              key: `booking-${booking.id}-${endpoint}`,
+              day: booking.day,
+              time,
+              title: booking.title,
+              booking,
+              endpoint,
+            },
+            travel.places,
+          )}
+          allowClear={Boolean(terms)}
+          clearLabel="宿の条件の時刻に戻す"
+          onSave={(picked) => setTime(picked.time || terms)}
+          onClose={() => setPicking(false)}
+        />
+      )}
       {terms && (
         <p className="ps-hint">
           宿の条件は{endpoint === "start" ? `${terms}〜` : `〜${terms}`}

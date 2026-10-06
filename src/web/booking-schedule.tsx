@@ -3,6 +3,7 @@ import { localDateTimeToEpoch } from "@/data/flight-connections";
 import { itemDetails } from "@/data/itinerary";
 import type { Booking, BookingKind, ItineraryItem } from "@/data/types";
 import { formatDate } from "@/utils/dates";
+import { TIME_TAP_HINT, TimeTap } from "./timeline-picker";
 
 const labels: Record<BookingKind, [string, string]> = {
   flight: ["出発", "到着"],
@@ -44,20 +45,32 @@ function ScheduleTime({
   day,
   time,
   zoneLabel,
+  onEdit,
+  editLabel,
 }: {
   day: string;
   time: string;
   zoneLabel?: string;
+  /** The time is tappable: it opens the time picker. */
+  onEdit?: () => void;
+  editLabel?: string;
 }) {
+  const clock = time ? (
+    <time className="booking-time-clock" dateTime={`${day}T${time}`}>
+      {time}
+    </time>
+  ) : (
+    <span className="booking-time-missing">時刻未設定</span>
+  );
   return (
     <div className="booking-time">
       <span className="booking-time-date">{formatDate(day)}</span>
-      {time ? (
-        <time className="booking-time-clock" dateTime={`${day}T${time}`}>
-          {time}
-        </time>
+      {onEdit ? (
+        <TimeTap label={editLabel ?? "時刻を直す"} onOpen={onEdit}>
+          {clock}
+        </TimeTap>
       ) : (
-        <span className="booking-time-missing">時刻未設定</span>
+        clock
       )}
       {zoneLabel && <span className="booking-time-zone">{zoneLabel}</span>}
     </div>
@@ -144,26 +157,45 @@ export function BookingSchedule({
     </div>
   );
 }
-export function ItemSchedule({ item }: { item: ItineraryItem }) {
+export function ItemSchedule({
+  item,
+  onEditTime,
+}: {
+  item: ItineraryItem;
+  /** The times are tappable (場所の詳細's しおりの予定) and open the picker. */
+  onEditTime?: () => void;
+}) {
   const details = itemDetails(item);
   const range = Boolean(details.endTime || details.endDay);
   const transport = details.category === "transport";
+  const startLabel = transport ? "出発" : range ? "開始" : "日時";
+  const endLabel = transport ? "到着" : "終了";
   return (
-    <div className={`detail-grid booking-schedule${range ? "" : " single"}`}>
-      <section>
-        <h3>{transport ? "出発" : range ? "開始" : "日時"}</h3>
-        <ScheduleTime day={item.day} time={item.time} />
-      </section>
-      {range && (
+    <>
+      <div className={`detail-grid booking-schedule${range ? "" : " single"}`}>
         <section>
-          <h3>{transport ? "到着" : "終了"}</h3>
+          <h3>{startLabel}</h3>
           <ScheduleTime
-            day={details.endDay || item.day}
-            time={details.endTime || ""}
+            day={item.day}
+            time={item.time}
+            onEdit={onEditTime}
+            editLabel={`${startLabel}の時刻を直す`}
           />
         </section>
-      )}
-    </div>
+        {range && (
+          <section>
+            <h3>{endLabel}</h3>
+            <ScheduleTime
+              day={details.endDay || item.day}
+              time={details.endTime || ""}
+              onEdit={onEditTime}
+              editLabel={`${endLabel}の時刻を直す`}
+            />
+          </section>
+        )}
+      </div>
+      {onEditTime && <p className="time-tap-hint">{TIME_TAP_HINT}</p>}
+    </>
   );
 }
 

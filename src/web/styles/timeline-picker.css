@@ -1,0 +1,389 @@
+/* The time picker (kondo-time-pickers.html, option C): the plan as an ink
+   block on its day's timeline, in the full-height floating panel. */
+:root dialog.modal[data-panel="add"]:has(.tlp) .modal-header {
+  padding-top: 0;
+}
+:root dialog.modal[data-panel="add"]:has(.tlp) .modal-header h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+:root dialog.modal[data-tall]:has(.tlp) .modal-inner,
+:root dialog.modal:not([data-panel="add"]):has(.tlp) .modal-inner {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+:root dialog.modal:has(.tlp) .modal-body {
+  padding: 20px 18px 18px;
+}
+:root dialog.modal[data-tall]:has(.tlp) .modal-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.tlp {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: min(760px, 80dvh);
+  min-height: 0;
+  color: var(--p-ink);
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* Always the full-height panel on a phone (panel-fit.ts measures this). */
+@media (max-width: 759px) {
+  .tlp {
+    height: 100dvh;
+  }
+}
+:root dialog.modal[data-tall]:has(.tlp) .tlp {
+  flex: 1;
+  height: auto;
+}
+.tlp-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.tlp-h b {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tlp-h span {
+  flex: none;
+  color: var(--p-mid);
+  font-family: var(--f-mono);
+  font-size: 12px;
+}
+.tlp-readout {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 6px;
+}
+.tlp-readout label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.tlp-readout small {
+  color: var(--p-mid);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+.tlp-readout em {
+  padding-bottom: 10px;
+  color: var(--p-pale);
+  font-family: var(--f-num);
+  font-size: 22px;
+  font-style: normal;
+  font-weight: 800;
+}
+.tlp-end {
+  display: flex;
+  align-items: baseline;
+}
+.tlp-end i {
+  margin-right: -4px;
+  color: var(--p-mid);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 700;
+}
+:root .tlp-readout .time-field {
+  width: 4.1ch;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--p-ink);
+  caret-color: var(--p-ink);
+  font-family: var(--f-num);
+  font-size: 40px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+  box-sizing: content-box;
+  outline: none;
+  cursor: text;
+  transition: background-color 0.15s;
+}
+:root .tlp-readout .time-field:focus {
+  background: var(--p-soft);
+}
+:root .tlp-readout .time-field::selection {
+  background: var(--p-select);
+}
+:root .tlp-readout .time-field[aria-invalid="true"] {
+  color: var(--p-danger);
+}
+.tlp-dur {
+  min-height: 18px;
+  margin: -4px 0 0;
+  color: var(--p-mid);
+  font-family: var(--f-mono);
+  font-size: 12px;
+  text-align: center;
+}
+.tlp-stage {
+  position: relative;
+  flex: 1;
+  min-height: 160px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 18px;
+  background: var(--p-soft);
+  scrollbar-width: none;
+}
+.tlp-stage::-webkit-scrollbar {
+  display: none;
+}
+.tlp-track {
+  position: relative;
+}
+.tlp-hr {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--p-line);
+}
+.tlp-hl {
+  position: absolute;
+  left: 8px;
+  padding-right: 4px;
+  background: var(--p-soft);
+  color: var(--p-mid);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  transform: translateY(-50%);
+}
+.tlp-ev {
+  position: absolute;
+  left: 54px;
+  right: 10px;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 4px 10px;
+  border: 1px solid var(--p-line);
+  border-radius: 12px;
+  background: var(--p-paper);
+  color: var(--p-mid);
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tlp-ev.is-point {
+  border-style: dashed;
+}
+.tlp-me {
+  z-index: 2;
+  padding: 8px 10px;
+  border: 0;
+  background: var(--p-ink);
+  color: var(--p-paper);
+  box-shadow: 0 8px 20px -8px #0008;
+  cursor: grab;
+  touch-action: none;
+  transform-origin: 50% 50%;
+  overflow: visible;
+  transition: box-shadow 0.18s;
+}
+.tlp-me.is-point {
+  border-style: none;
+  padding-top: 5px;
+}
+.tlp-me.is-held {
+  cursor: grabbing;
+  box-shadow: 0 14px 28px -10px #000a;
+}
+.tlp-me:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--p-ink) 40%, transparent);
+  outline-offset: 2px;
+}
+.tlp-me b {
+  display: block;
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+}
+.tlp-me > span:not(.tlp-grip):not(.tlp-hit) {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  opacity: 0.8;
+}
+.tlp-grip {
+  position: absolute;
+  left: 50%;
+  width: 34px;
+  height: 5px;
+  margin-left: -17px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--p-paper) 55%, transparent);
+  pointer-events: none;
+}
+.tlp-grip.is-t {
+  top: 4px;
+}
+.tlp-grip.is-b {
+  bottom: 4px;
+}
+.tlp-hit {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  height: 22px;
+  cursor: ns-resize;
+}
+.tlp-hit.is-t {
+  top: -8px;
+}
+.tlp-hit.is-b {
+  bottom: -8px;
+}
+.tlp-walk {
+  position: absolute;
+  left: 70px;
+  z-index: 1;
+  color: var(--p-mid);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  pointer-events: none;
+}
+.tlp-walk.is-bad {
+  color: var(--p-danger);
+}
+.tlp-clear {
+  align-self: center;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 99px;
+  background: var(--p-soft);
+  color: var(--p-mute);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* The plan's own times, tappable where they are shown. */
+.time-tap {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline dotted
+    color-mix(in srgb, currentColor 45%, transparent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+.time-tap:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.time-tap-hint {
+  margin: 4px 0 0;
+  color: var(--p-mid);
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+}
+
+/* A form's 時刻: the times as a button that opens the picker. */
+.tlp-trigger {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--p-soft);
+  color: var(--p-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  align-content: center;
+  align-items: center;
+}
+.tlp-trigger b {
+  font-family: var(--f-num);
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.tlp-trigger b small {
+  margin-right: 1px;
+  font-size: 11px;
+}
+.tlp-trigger em {
+  color: var(--p-pale);
+  font-style: normal;
+}
+.tlp-trigger-empty {
+  color: var(--p-mid);
+}
+
+/* 予約を手で入力: a date and its numeric time side by side. */
+.bk-moment > span {
+  display: flex;
+  gap: 6px;
+}
+:root .bk-moment input {
+  min-width: 0;
+}
+:root .bk-moment .time-field {
+  flex: 0 0 4.9em;
+  padding-inline: 8px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+:root .bk-moment .time-field[aria-invalid="true"],
+:root .calendar-time .time-field[aria-invalid="true"] {
+  color: var(--p-danger);
+}
+
+/* In the plan forms the times take the whole row. */
+.ps-times:has(.tlp-trigger) {
+  display: block;
+}
+.it-row2:has(.tlp-trigger) {
+  grid-template-columns: minmax(0, 1fr);
+}
+:root:root .modal .field .tlp-trigger {
+  display: flex;
+  align-items: baseline;
+  text-align: left;
+}
+/* One time only: the name and the time on one line. */
+.tlp-me.is-point {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+}
+.tlp-me.is-point b {
+  min-width: 0;
+  white-space: nowrap;
+}
+.tlp-me.is-point > span {
+  flex: none;
+}

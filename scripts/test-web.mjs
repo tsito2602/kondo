@@ -151,10 +151,42 @@ const click = async (node) => {
 const field = (label) =>
   [...document.querySelectorAll("dialog .field, dialog .bk-fld")]
     .find((node) => node.querySelector("span, small")?.textContent === label)
-    ?.querySelector("input,select,textarea,.date-trigger");
+    ?.querySelector("input,select,textarea,.date-trigger,[data-time-trigger]");
+// A plan's times: the button opens the timeline picker, whose big 開始/終了
+// readout is typed into (digits, then Enter) and saved with 「これにする」.
+const pickTime = async (trigger, values) => {
+  await click(trigger);
+  const picker = [...document.querySelectorAll("dialog[open]")].at(-1);
+  assert.ok(picker.querySelector(".tlp"), "the time picker opens");
+  for (const [label, value] of Object.entries(values)) {
+    const input = picker.querySelector(`.tlp-readout [aria-label="${label}"]`);
+    assert.ok(input, `picker ${label} exists`);
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        dom.window.HTMLInputElement.prototype,
+        "value",
+      ).set.call(input, value.replace(":", ""));
+      input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      input.dispatchEvent(
+        new dom.window.KeyboardEvent("keydown", {
+          key: "Enter",
+          bubbles: true,
+        }),
+      );
+    });
+    assert.equal(input.value, value);
+  }
+  await click(byText(".context-actions button", "これにする"));
+  await waitFor(() => !picker.isConnected || !picker.open, "the picker closes");
+  await tick(30);
+};
 const fill = async (label, value) => {
   const input = field(label);
   assert.ok(input, `field ${label} exists`);
+  if (input.matches("[data-time-trigger]"))
+    return pickTime(input, { 開始: value });
   if (input.matches(".date-trigger")) {
     await click(input);
     const selection = typeof value === "string" ? { start: value } : value;
@@ -190,7 +222,7 @@ const fill = async (label, value) => {
     if (selection.end) await chooseDate(selection.end);
     if (selection.time !== undefined) {
       const time = document.querySelector(
-        'dialog:last-of-type input[type="time"]',
+        "dialog:last-of-type input[data-time-field]",
       );
       await act(async () => {
         Object.getOwnPropertyDescriptor(
@@ -356,15 +388,9 @@ const keyboardWhileEditing = async (backLabel = "戻る") => {
 };
 
 const setTime = async (label, value) => {
-  const input = document.querySelector(`dialog [aria-label="${label}"]`);
-  assert.ok(input, `time ${label} exists`);
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(
-      dom.window.HTMLInputElement.prototype,
-      "value",
-    ).set.call(input, value);
-    input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
-  });
+  const trigger = document.querySelector("dialog[open] [data-time-trigger]");
+  assert.ok(trigger, `time ${label} exists`);
+  await pickTime(trigger, { [label]: value });
 };
 
 // 予定の詳細 edits in place: the same sheet becomes the form and comes back.
@@ -934,6 +960,26 @@ test("legacy account cache and pending changes survive React migration; real for
       document.querySelector(".detail-visit .booking-time-clock").textContent,
       "16:00",
     );
+    // The times themselves open the timeline picker; no separate button.
+    assert.equal(
+      byText("dialog .detail-visit button", "予定の日時を編集"),
+      undefined,
+    );
+    assert.match(
+      document.querySelector(".detail-visit").textContent,
+      /時刻をタップすると直せます/,
+    );
+    await pickTime(document.querySelector(".detail-visit .time-tap"), {
+      開始: "17:05",
+    });
+    assert.equal(document.querySelector("dialog[open]"), placeDetail);
+    assert.equal(
+      document.querySelector(".detail-visit .booking-time-clock").textContent,
+      "17:05",
+    );
+    await pickTime(document.querySelector(".detail-visit .time-tap"), {
+      開始: "16:00",
+    });
     assert.equal(
       document.querySelector("dialog .detail-itinerary-action").textContent,
       "しおりを見る",
