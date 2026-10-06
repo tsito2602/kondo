@@ -294,13 +294,21 @@ export class CartoonDock extends Component<Props> {
     if (!this.width) return; // Hidden on wide screens, or not yet placed.
     const t = this.targets();
     if (!t) return;
-    IB.el.dataset.tone = t.tone ?? "";
     const key = JSON.stringify([t.a, t.b]);
-    if (key === this.geo && !instant) return;
+    const tone = t.tone ?? "";
+    const paint = () => {
+      if (this.geo === key) IB.el.dataset.tone = tone;
+    };
+    if (key === this.geo && !instant) return paint();
     const first = !this.geo;
     this.geo = key;
+    // An island only turns ink once it has its new shape, so a wide plain
+    // island never flashes as a wide black bar on its way to 「閉じる」.
+    const late = tone === "ink" && !(instant || first || RM());
+    if (!late) paint();
     const wasMerged = this.merged;
     this.merged = t.merged;
+    let landB: Promise<unknown> = Promise.resolve();
     if (instant || first || RM()) {
       IA.L.set(t.a[0]);
       IA.R.set(t.a[1]);
@@ -318,14 +326,15 @@ export class CartoonDock extends Component<Props> {
     } else if (wasMerged) {
       // tear the one island apart where the back circle will be
       this.tearAt((t.a[1] + t.b[0]) / 2);
-      void sleep(120).then(() => {
+      landB = sleep(120).then(() => {
         void moveIsl(IA, t.a);
-        void moveIsl(IB, t.b);
+        return moveIsl(IB, t.b);
       });
     } else {
       void moveIsl(IA, t.a);
-      void moveIsl(IB, t.b, 30);
+      landB = moveIsl(IB, t.b, 30);
     }
+    if (late) void landB.then(paint);
   }
 
   tearAt(x: number) {
