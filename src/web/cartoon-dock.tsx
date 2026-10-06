@@ -84,8 +84,10 @@ const CENTER = 120 - 30 - RADIUS;
 const tones = new Set(["ink", "ink-dim"]);
 
 /** The fluid dock's path, on a cartoon spring: the islands overshoot their
-    new shape a little and settle back, so a morph lands with a プルン. */
-const JELLY = samples({ k: 300, d: 21 });
+    new shape a little and settle back, so a morph lands with a プルン.
+    Damped to about 2 % overshoot: at d21 the stretch back to full tabs ran
+    into the screen edge (Tsubasa 2026-10-06: 「強すぎる」). */
+const JELLY = samples({ k: 300, d: 27 });
 const MORPH = Math.max(MORPH_MS, JELLY.ms);
 const jelly = (t: number) => {
   const at = t * (JELLY.vals.length - 1),
