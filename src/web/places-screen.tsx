@@ -14,6 +14,7 @@ import {
 import { MapPin } from "lucide-react";
 import { useTravel } from "@/data/travel-provider";
 import { placeNumbers } from "@/data/place-numbers";
+import { ordinaryPlans } from "@/data/itinerary";
 import {
   mapCoordinates,
   placeCoordinates,
@@ -64,8 +65,10 @@ function usePlacesModel() {
   const travel = useTravel();
   const trip = travel.selectedTrip!;
   return useMemo(() => {
-    const numbers = placeNumbers(travel.places, travel.items);
-    const itemById = new Map(travel.items.map((item) => [item.id, item]));
+    // Hotel in/out records are the しおり's own; the map shows plans only.
+    const schedule = ordinaryPlans(travel.items);
+    const numbers = placeNumbers(travel.places, schedule);
+    const itemById = new Map(schedule.map((item) => [item.id, item]));
     const marks: Mark[] = travel.places
       .map((place) => {
         const item = place.itineraryItemId

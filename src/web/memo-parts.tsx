@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useAuth } from "@/auth/auth-provider";
 import { memberAssignee } from "@/data/assignee";
 import { placeNumbers } from "@/data/place-numbers";
+import { ordinaryPlans } from "@/data/itinerary";
 import { useTravel } from "@/data/travel-provider";
 import type { ItineraryItem, Place, TravelNote } from "@/data/types";
 import { AssigneeAvatar } from "./assignee-avatar";
@@ -131,7 +132,10 @@ export type NotePlace = {
 };
 /** Every place with its map number, scheduled ones first. */
 export function useNotePlaces(): NotePlace[] {
-  const { places, items } = useTravel();
+  const travel = useTravel();
+  const { places } = travel;
+  // Hotel in/out records are not plans a note can point to.
+  const items = ordinaryPlans(travel.items);
   const numbers = placeNumbers(places, items);
   return places
     .map((place) => ({

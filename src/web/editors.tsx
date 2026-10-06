@@ -16,6 +16,7 @@ import {
   emptyItineraryDetails,
   itemDetails,
   itineraryDetailsError,
+  ordinaryPlans,
 } from "@/data/itinerary";
 import {
   placeStatuses,
@@ -507,7 +508,7 @@ export function BookingForm({
   const [mergeId, setMergeId] = useState<string | null>(null);
   const candidate =
     !existing && !onDraft && draft.kind
-      ? findMatchingItineraryItem(travel.items, {
+      ? findMatchingItineraryItem(ordinaryPlans(travel.items), {
           ...draft,
           kind,
           title: displayTitle,
