@@ -1,0 +1,180 @@
+/* 種類の色と注意の赤 (Tsubasa 2026-10-06). The screens stay black and white:
+   only a kind's glyph wears its colour (as uchiwake's 費目 icons do), and red
+   appears only when something will go wrong. */
+@import "./palette.css";
+
+[data-kind="sightseeing"] {
+  --kind: var(--kind-sightseeing);
+}
+[data-kind="meal"] {
+  --kind: var(--kind-meal);
+}
+[data-kind="transport"] {
+  --kind: var(--kind-transport);
+}
+[data-kind="stay"] {
+  --kind: var(--kind-stay);
+}
+[data-kind="ticket"] {
+  --kind: var(--kind-ticket);
+}
+[data-kind="shopping"] {
+  --kind: var(--kind-shopping);
+}
+[data-kind="other"] {
+  --kind: var(--kind-other);
+}
+
+:is(.it-lab, .it-lnr, .bk-hd, .ps-kick)[data-kind] > svg,
+:is(.ps-chips, .it-chips, .bk-kinds) > button[data-kind] svg {
+  color: var(--kind);
+}
+
+/* 注意の赤: a walk that makes the next plan late, its warning in the plan,
+   and a やること past its deadline. */
+.it-gap.is-late {
+  color: var(--p-danger);
+}
+.it-gap.is-late i {
+  background: var(--p-danger);
+  color: #fff;
+}
+.ps-warn {
+  background: var(--p-danger);
+  color: #fff;
+}
+.prep-page {
+  --prep-late: var(--p-danger);
+}
+
+/* uchiwake's colour picker (kondo-style.css .color-picker), on kondo's tokens. */
+.color-picker {
+  min-width: 0;
+  margin: 4px 0;
+  padding: 0;
+  border: 0;
+}
+.color-picker legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 650;
+}
+.color-picker-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--p-mute);
+  font-size: 11px;
+  font-weight: 400;
+}
+.color-picker-value i {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border-radius: 50%;
+}
+.palette-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--p-mute);
+}
+.color-swatches {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+  max-width: 330px;
+  padding: 12px 0;
+}
+.color-swatch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 48px;
+  cursor: pointer;
+}
+.color-swatch > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.color-swatch > span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--swatch-color);
+  box-shadow:
+    0 0 0 0 var(--p-paper),
+    0 0 0 0 var(--swatch-color);
+  transition:
+    transform 350ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 250ms ease;
+}
+.color-swatch > input:checked + span {
+  transform: scale(1.2);
+  box-shadow:
+    0 0 0 3px var(--p-paper),
+    0 0 0 5px var(--swatch-color);
+}
+:root[data-theme="dark"] .color-swatch > span {
+  outline: 1px solid #ffffff30;
+}
+.swatch-check {
+  color: var(--p-paper);
+  font-size: 17px;
+  font-weight: 750;
+  line-height: 1;
+  opacity: 0;
+  transform: scale(0.45);
+  transition:
+    opacity 160ms ease,
+    transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.color-swatch > input:checked + span .swatch-check {
+  opacity: 1;
+  transform: scale(1);
+}
+.color-swatch > input:focus-visible + span {
+  outline: 2px solid var(--swatch-color);
+  outline-offset: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .color-swatch > span,
+  .swatch-check {
+    transition: none;
+  }
+}
+
+/* The 種類の色 rows in 設定 and the panel's heading glyph. */
+.settings-row-icon.is-kind {
+  color: var(--kind);
+}
+.kind-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.kind-panel-head svg {
+  width: 26px;
+  height: 26px;
+  color: var(--kind);
+}

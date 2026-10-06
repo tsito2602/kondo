@@ -55,6 +55,7 @@ import {
   useAction,
 } from "./ui";
 import { categoryGlyph, Glyph, MapPin } from "./itinerary-icons";
+import { kindOfBooking } from "./kind-colors";
 import {
   bookingLabel,
   bookingPlaceName,
@@ -273,7 +274,7 @@ function PlanView({
   return (
     <div className="plan-sheet">
       <div className="ps-dt">
-        <div className="ps-kick">
+        <div className="ps-kick" data-kind={category.value}>
           <Glyph name={categoryGlyph[category.value]} />
           {category.label}
         </div>
@@ -528,6 +529,7 @@ function PlanEditForm({
               type="button"
               key={entry.value}
               aria-pressed={category === entry.value}
+              data-kind={entry.value}
               onClick={() => setCategory(entry.value)}
             >
               <Glyph name={categoryGlyph[entry.value]} />
@@ -964,7 +966,7 @@ function BookingView({
     </section>
   );
   const kick = (
-    <div className="ps-kick">
+    <div className="ps-kick" data-kind={kindOfBooking(booking.kind)}>
       <Glyph
         name={
           booking.kind === "flight"

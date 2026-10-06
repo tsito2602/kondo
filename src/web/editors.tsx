@@ -13,6 +13,7 @@ import { Textarea } from "./obsidian/textarea";
 import { type FormEvent, useRef, useState } from "react";
 import { Trash2, Plus, Paperclip } from "lucide-react";
 import { bookingIcons, spring } from "./booking-card";
+import { kindOfBooking } from "./kind-colors";
 import { AirportField } from "./airport-field";
 import { findAirportByCode } from "@/data/airports";
 import { findMatchingItineraryItem } from "@/data/booking-match";
@@ -676,6 +677,7 @@ export function BookingForm({
               key={entry.value}
               type="button"
               aria-pressed={draft.kind === entry.value}
+              data-kind={kindOfBooking(entry.value)}
               onClick={(event) => {
                 setDraft({ ...draft, kind: entry.value });
                 spring(

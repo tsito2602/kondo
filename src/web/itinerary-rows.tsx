@@ -22,6 +22,7 @@ import { referenceUrl } from "@/data/places";
 import type { Booking, ItineraryItem, Place } from "@/data/types";
 import { BookingBody, bookingHeading } from "./booking-card";
 import { categoryGlyph, Glyph, MapPin } from "./itinerary-icons";
+import { kindOfBooking, kindOfCategory } from "./kind-colors";
 
 export type OpenTarget =
   | { kind: "item"; id: string }
@@ -92,7 +93,7 @@ function PlanCard({
     const { origin = "", destination = "" } = details.transport ?? {};
     return (
       <>
-        <div className="it-lab">
+        <div className="it-lab" data-kind="transport">
           <Glyph name="move" />
           {[transportLabel(details), durationLabel(minutes)]
             .filter(Boolean)
@@ -112,7 +113,7 @@ function PlanCard({
   const place = placeLabel(item, places, numbers);
   return (
     <>
-      <div className="it-lab">
+      <div className="it-lab" data-kind={kindOfCategory(category.value)}>
         <Glyph name={categoryGlyph[category.value]} />
         {category.label}
       </div>
@@ -148,7 +149,7 @@ function BookingCard({
     if (entry.endpoint === "end")
       return (
         <div className="it-card is-line">
-          <div className="it-lnr">
+          <div className="it-lnr" data-kind="stay">
             <Glyph name="out" />
             <b>チェックアウト</b>
             {booking.endTime && (
@@ -163,7 +164,7 @@ function BookingCard({
     const nights = nightsOf(booking);
     return (
       <div className="it-card" data-press-card>
-        <div className="it-lab">
+        <div className="it-lab" data-kind="stay">
           <Glyph name="in" />
           チェックイン
         </div>
@@ -189,7 +190,7 @@ function BookingCard({
     if (entry.endpoint === "end")
       return (
         <div className="it-card is-line">
-          <div className="it-lnr">
+          <div className="it-lnr" data-kind="transport">
             <Glyph name="down" />
             <b>
               {(booking.kind === "train"
@@ -205,7 +206,7 @@ function BookingCard({
       );
     return (
       <div className="it-card" data-press-card>
-        <div className="it-lab is-single">
+        <div className="it-lab is-single" data-kind="transport">
           <Glyph name={booking.kind === "train" ? "move" : "up"} />
           {bookingHeading(booking)}
         </div>
@@ -216,7 +217,7 @@ function BookingCard({
   if (entry.endpoint === "end")
     return (
       <div className="it-card is-line">
-        <div className="it-lnr">
+        <div className="it-lnr" data-kind={kindOfBooking(booking.kind)}>
           <Glyph name="out" />
           <b>{entry.stage}</b>
           <span>{booking.title}</span>
@@ -231,7 +232,7 @@ function BookingCard({
   const number = linked ? numbers.get(linked.id) : undefined;
   return (
     <div className="it-card" data-press-card>
-      <div className="it-lab">
+      <div className="it-lab" data-kind={kindOfBooking(booking.kind)}>
         <Glyph name="ticket" />
         {bookingLabel[booking.kind]}
       </div>
@@ -309,7 +310,7 @@ export function TimelineRow({
         <time />
         <i className="it-node" aria-hidden="true" />
         <div className="it-card is-mid" data-press-card>
-          <div className="it-lab">
+          <div className="it-lab" data-kind="stay">
             <Glyph name="bed" />
             連泊 · {row.night}泊目
           </div>

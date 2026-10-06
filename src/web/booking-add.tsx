@@ -26,6 +26,7 @@ import { mapUrl, referenceUrl } from "@/data/places";
 import { linkBookingPlace } from "@/data/booking-place";
 import type { BookingKind } from "@/data/types";
 import { monthDay, spring } from "./booking-card";
+import { kindOfBooking } from "./kind-colors";
 import { useLayer } from "./booking-detail";
 import { bookingIcons, CheckIcon, ClipIcon } from "./booking-icons";
 import { BookingEditor, bookingKinds, type BookingInput } from "./editors";
@@ -807,6 +808,7 @@ export function AddBookingSheet({
                     key={entry.value}
                     type="button"
                     aria-pressed={form.kind === entry.value}
+                    data-kind={kindOfBooking(entry.value)}
                     onClick={(event) => {
                       const button = event.currentTarget;
                       setForm({ ...EMPTY_FORM, kind: entry.value });

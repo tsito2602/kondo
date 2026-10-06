@@ -8,6 +8,7 @@ import { installHaptics } from "./haptics";
 import { installSpringTokens } from "./cartoon";
 import { installHomeIndicatorInset } from "./home-indicator";
 import { installScrollState } from "./scroll-state";
+import { installKindColors } from "./kind-colors";
 
 // The faces' @font-face list is large (Japanese comes in ~120 slices per
 // weight), so it loads beside the app instead of blocking its first paint.
@@ -16,6 +17,7 @@ installHaptics();
 installSpringTokens();
 installHomeIndicatorInset();
 installScrollState();
+installKindColors();
 createRoot(document.getElementById("root")!).render(
   <AppRouter>
     <ThemeProvider>

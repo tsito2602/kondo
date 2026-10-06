@@ -5,6 +5,7 @@ import { placeNameFromLink } from "@/data/geo";
 import { durationLabel } from "@/data/itinerary";
 import type { Booking, BookingKind } from "@/data/types";
 import { bookingIcons } from "./booking-icons";
+import { kindOfBooking } from "./kind-colors";
 import { localDate } from "@/utils/dates";
 import { reduceMotion } from "./motion";
 
@@ -362,7 +363,7 @@ export function BookingCard({
     <>
       {used && <UsedStamp id={booking.id} spin={spinStamp} delay={spinDelay} />}
       <div className="bk-mn">
-        <div className="bk-hd">
+        <div className="bk-hd" data-kind={kindOfBooking(booking.kind)}>
           <Icon size={20} strokeWidth={1.9} aria-hidden="true" />
           <b>{bookingHeading(booking)}</b>
           {!used && isStaying(booking, now) && (

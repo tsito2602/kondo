@@ -7,6 +7,7 @@ import { localDate } from "@/utils/dates";
 import { appVersion, updateLabel, useAppUpdate } from "./app-update";
 import { RM, spring } from "./cartoon";
 import { jellyScroll } from "./jelly-scroll";
+import { KindColorRows } from "./kind-settings";
 import { Modal, useAction, useTheme, useToast } from "./ui";
 
 /** A trip's entry stamp: a latin place becomes a 3-letter code, others keep their first word. */
@@ -466,6 +467,8 @@ export function SettingsScreen() {
         <Passport />
         <h3 className="settings-label">外観</h3>
         <Appearance />
+        <h3 className="settings-label">種類の色</h3>
+        <KindColorRows />
         <h3 className="settings-label">アプリ</h3>
         <AppRows />
         <div className="settings-group settings-signout">

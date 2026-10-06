@@ -110,6 +110,7 @@ export function PlanAddSheet({
                 type="button"
                 key={entry.value}
                 aria-pressed={category === entry.value}
+                data-kind={entry.value}
                 onClick={() => setCategory(entry.value)}
               >
                 <Glyph name={categoryGlyph[entry.value]} />
