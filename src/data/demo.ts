@@ -10,7 +10,13 @@ export function createDemoCache(): TravelCache {
   return {
     ...emptyTravelCache(),
     selectedTripId: tripId,
-    trips: [{ id: tripId, name: 'ウィーンの街を歩く', destination: 'Vienna, Austria', startsOn: start, endsOn: last, memberCount: 2, role: 'owner' }],
+    trips: [
+      { id: tripId, name: 'ウィーンの街を歩く', destination: 'Vienna, Austria', startsOn: start, endsOn: last, memberCount: 2, role: 'owner' },
+      // Past trips fill the passport's entry stamps in 設定.
+      { id: 'sample-taipei', name: '台北で食べ歩き', destination: '台北', startsOn: addDays(localDate(), -60), endsOn: addDays(localDate(), -57), memberCount: 2, role: 'owner' },
+      { id: 'sample-osaka', name: '大阪の週末', destination: 'Osaka, Japan', startsOn: addDays(localDate(), -150), endsOn: addDays(localDate(), -148), memberCount: 1, role: 'owner' },
+      { id: 'sample-seoul', name: 'ソウルの冬', destination: 'Seoul, Korea', startsOn: addDays(localDate(), -300), endsOn: addDays(localDate(), -296), memberCount: 3, role: 'owner' },
+    ],
     bookingsByTrip: { [tripId]: [flight, { ...flight, id: 'sample-flight-2', title: 'サンプル航空 202', origin: 'ドバイ国際空港', originCode: 'DXB', destination: 'ウィーン国際空港', destinationCode: 'VIE', day: next, time: '08:55', endDay: next, endTime: '12:25' }, { ...flight, id: 'sample-hotel', kind: 'hotel', title: '旧市街のホテル', origin: '', originCode: '', destination: '', destinationCode: '', detail: 'ウィーン旧市街', day: next, time: '15:00', endDay: last, endTime: '11:00' }] },
     itemsByTrip: { [tripId]: [{ id: 'sample-walk', day: next, time: '16:00', kind: '予定', title: '旧市街を散歩', note: '気になった通りへ、ゆっくり歩く。' }, { id: 'sample-cafe', day: addDays(start, 2), time: '10:00', kind: '予定', title: 'カフェで朝ごはん', note: '' }] },
     tasksByTrip: { [tripId]: [{ id: 'sample-task-1', title: 'eSIMを用意する', dueOn: addDays(start, -2), assignee: '', done: false }, { id: 'sample-task-2', title: '休暇を申請する', dueOn: '', assignee: '', done: true }] },

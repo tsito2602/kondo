@@ -569,6 +569,20 @@ test("legacy account cache and pending changes survive React migration; real for
       });
     return response;
   };
+  // The app looks for a waiting service worker from launch.
+  const swRegistration = {
+    waiting: null,
+    update: async () => {},
+    addEventListener() {},
+  };
+  Object.defineProperty(navigator, "serviceWorker", {
+    configurable: true,
+    value: {
+      getRegistration: async () => swRegistration,
+      addEventListener() {},
+      removeEventListener() {},
+    },
+  });
   const root = createRoot(document.getElementById("root"));
   try {
     await act(async () =>
@@ -1039,43 +1053,71 @@ test("legacy account cache and pending changes survive React migration; real for
     const settingsBackground = document.querySelector("#main-content");
     assert.equal(document.querySelector("dialog h2").textContent, "設定");
     assert.ok(document.querySelector("dialog.full .settings-page"));
-    const appInfo = document.querySelector("dialog .settings-app-info");
-    assert.match(appInfo.textContent, /kondo\s*バージョン 2\.0\.0/);
-    assert.equal(appInfo.querySelectorAll("img").length, 2);
-    let updateFails = false;
-    Object.defineProperty(navigator, "serviceWorker", {
-      configurable: true,
-      value: {
-        getRegistration: async () => ({
-          waiting: null,
-          update: async () => {
-            if (updateFails) throw new Error("offline");
-          },
-        }),
-      },
+    const foot = document.querySelector("dialog .settings-foot");
+    assert.match(
+      foot.textContent,
+      /^kondo$/,
+      "the version moved to the app row",
+    );
+    assert.ok(foot.querySelector("button[aria-label='kondo'] svg"));
+    assert.match(
+      document.querySelector("dialog .passport-stamps").textContent,
+      /これまでの旅 \d+回/,
+    );
+    assert.equal(byText("dialog button", "表示名を保存"), undefined);
+    assert.equal(byText("dialog button", "更新を確認"), undefined);
+    const versionRow = [
+      ...document.querySelectorAll("dialog .settings-row"),
+    ].find((row) => row.textContent.includes("バージョン 2.0.0"));
+    assert.match(versionRow.textContent, /最新です/);
+    const nameInput = document.querySelector("dialog .passport-name");
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        dom.window.HTMLInputElement.prototype,
+        "value",
+      ).set.call(nameInput, "つばさ");
+      nameInput.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
     });
-    await click(byText("dialog button", "更新を確認"));
-    const updateStatus = document.querySelector(".pwa-update-status");
-    assert.match(updateStatus.textContent, /更新を確認しました/);
-    assert.equal(
-      updateStatus.previousElementSibling,
-      byText("dialog button", "更新を確認"),
-      "confirmation stays in document flow below its button",
+    await waitFor(
+      () =>
+        document.querySelector(".toast.visible")?.textContent ===
+        "表示名を保存しました",
+      "the display name autosaves while typing",
     );
-    assert.ok(
-      !document
-        .querySelector(".toast")
-        .textContent.includes("更新を確認しました"),
+    const posted = [];
+    const waitingWorker = {
+      postMessage(message, ports) {
+        posted.push(message.type);
+        if (message.type === "GET_VERSION")
+          ports[0].postMessage({ version: "2026.10.7" });
+      },
+    };
+    swRegistration.waiting = waitingWorker;
+    await act(async () => {
+      document.dispatchEvent(new dom.window.Event("visibilitychange"));
+    });
+    const notice = await waitFor(
+      () => document.querySelector("dialog .update-notice"),
+      "a waiting version shows the notice inside the open sheet",
     );
-    updateFails = true;
-    await click(byText("dialog button", "更新を確認"));
-    assert.match(updateStatus.textContent, /更新を確認できませんでした/);
-    assert.equal(
-      byText("dialog button", "更新を確認").disabled,
-      false,
-      "failed checks can be retried",
+    assert.match(
+      notice.textContent,
+      /アップデートされました\s*kondo 2026\.10\.7\s*新しくする/,
     );
-    delete navigator.serviceWorker;
+    assert.equal(document.documentElement.dataset.appUpdate, "waiting");
+    assert.match(versionRow.textContent, /2026\.10\.7 が届いています/);
+    await click(notice);
+    assert.deepEqual(posted, ["GET_VERSION", "ACTIVATE_UPDATE"]);
+    assert.equal(sessionStorage.getItem("kondo.updated"), "1");
+    sessionStorage.removeItem("kondo.updated");
+    swRegistration.waiting = null;
+    await act(async () => {
+      document.dispatchEvent(new dom.window.Event("visibilitychange"));
+    });
+    await waitFor(
+      () => !document.querySelector(".update-notice"),
+      "the notice leaves once nothing is waiting",
+    );
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
     assert.equal(document.querySelector("#main-content"), settingsBackground);
@@ -1209,6 +1251,7 @@ test("legacy account cache and pending changes survive React migration; real for
     await tick(30);
   } finally {
     await act(async () => root.unmount());
+    delete navigator.serviceWorker;
     db.close();
     dom.window.close();
   }

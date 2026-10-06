@@ -3,10 +3,36 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
 
+/** The build's user-facing version: its day in Japan, e.g. 2026.10.7. */
+function buildVersion() {
+  const [year, month, day] = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+  })
+    .format(new Date())
+    .split("-")
+    .map(Number);
+  return `${year}.${month}.${day}`;
+}
+
 export default defineConfig(({ mode }) => {
   const env = { ...loadEnv(mode, process.cwd(), ""), ...process.env };
+  const version = env.VITE_APP_VERSION || buildVersion();
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        // build-pwa.mjs reads this so the service worker can name its build.
+        name: "kondo-version",
+        transformIndexHtml: () => [
+          {
+            tag: "meta",
+            attrs: { name: "kondo-version", content: version },
+            injectTo: "head",
+          },
+        ],
+      },
+    ],
     resolve: {
       alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
     },
@@ -21,9 +47,7 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.VITE_ENABLE_DEMO": JSON.stringify(
         env.VITE_ENABLE_DEMO ?? env.EXPO_PUBLIC_ENABLE_DEMO ?? "false",
       ),
-      "import.meta.env.VITE_APP_VERSION": JSON.stringify(
-        process.env.npm_package_version ?? "2.0.0",
-      ),
+      "import.meta.env.VITE_APP_VERSION": JSON.stringify(version),
     },
     server: { proxy: { "/v1": "http://localhost:8787" } },
     build: { outDir: "dist" },
