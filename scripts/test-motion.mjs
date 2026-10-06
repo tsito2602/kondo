@@ -1342,95 +1342,87 @@ test("calendar floats above its editor, commits ranges only on confirmation and 
   }
 });
 
-test("trip expansion shares the cover across snapshots, restores list scroll and cleans up on interruption", async () => {
+test("a trip opens by stretching its card into the screen and returns into the card, restoring list scroll", async () => {
   const root = createRoot(document.getElementById("root"));
   const h = React.createElement;
   const originalScroll = window.scrollTo;
   const originalY = window.scrollY;
-  const nativeStart = document.startViewTransition;
+  const nativeRect = dom.window.HTMLElement.prototype.getBoundingClientRect;
+  const nativeAnimate = HTMLElement.prototype.animate;
+  HTMLElement.prototype.animate = () => ({
+    finished: Promise.resolve(),
+    cancel() {},
+  });
+  const wait = (ms) =>
+    act(async () => new Promise((resolve) => setTimeout(resolve, ms)));
   let navigate;
   let scroll;
-  const captures = [];
+  const pages = [];
   window.scrollTo = (options) => {
     scroll = options.top;
   };
   window.scrollY = 560;
-  document.startViewTransition = (update) => {
-    const motion = timeline();
-    captures.push({ update, motion });
-    return {
-      ready: Promise.resolve(),
-      finished: motion.finished,
-      skipTransition: () => motion.finish(),
-    };
+  dom.window.HTMLElement.prototype.getBoundingClientRect = function () {
+    return this.classList.contains("home-trip")
+      ? { left: 18, top: 120, width: 354, height: 196 }
+      : nativeRect.call(this);
   };
   function Harness() {
     const [page, setPage] = React.useState("list");
-    navigate = setPage;
-    return h(
-      page === "list" ? "article" : "main",
-      { "data-trip-surface": "trip1" },
-      h("img", { "data-trip-cover": "trip1", src: "/cover.jpg" }),
-      page,
-    );
+    navigate = (next) => {
+      pages.push(next);
+      setPage(next);
+    };
+    return page === "list"
+      ? h("a", { className: "home-trip", "data-trip-surface": "trip1" }, page)
+      : h("main", null, page);
   }
-  const cover = () => document.querySelector("[data-trip-cover]");
+  const card = () => document.querySelector(".home-trip");
+  const ink = () => document.querySelector(".cartoon-morph");
   try {
     await act(async () => root.render(h(Harness)));
-    const oldCover = cover();
     startTripTransition(() => navigate("itinerary"), "trip1");
-    assert.equal(oldCover.style.viewTransitionName, "trip-cover");
-    await act(async () => captures[0].update());
-    assert.notEqual(cover(), oldCover);
-    assert.equal(cover().style.viewTransitionName, "trip-cover");
-    assert.equal(
-      document.querySelector("main").style.viewTransitionName,
-      "trip-surface",
-    );
+    assert.ok(ink(), "the card's ink stretches out");
+    assert.equal(ink().style.left, "18px");
+    assert.equal(card().style.visibility, "hidden");
+    assert.equal(document.documentElement.dataset.tripTransition, "open");
+    assert.ok(card(), "the trip waits under the stretch");
+    await wait(470);
+    assert.equal(document.querySelector("main").textContent, "itinerary");
     assert.equal(scroll, 0);
-    captures[0].motion.finish();
-    await act(async () => {});
-    assert.equal(cover().style.viewTransitionName, "");
-    assert.equal(oldCover.style.viewTransitionName, "");
-    startTripTransition(() => navigate("list"), "trip1", true);
-    await act(async () => captures[1].update());
-    assert.equal(scroll, 560);
-    assert.equal(
-      cover().style.viewTransitionName,
-      "",
-      "return keeps the card and photo together",
-    );
-    assert.equal(
-      document.querySelector("article").style.viewTransitionName,
-      "",
-    );
-    document.dispatchEvent(new dom.window.Event("pointerdown"));
-    await act(async () => {});
+    await wait(20);
+    assert.equal(ink(), null, "the ink fades off the trip");
     assert.equal(document.documentElement.dataset.tripTransition, undefined);
-    assert.equal(cover().style.viewTransitionName, "");
+
+    startTripTransition(() => navigate("list"), "trip1", true);
+    await wait(20);
+    assert.ok(card(), "home returns under the ink");
+    assert.equal(scroll, 560);
+    assert.equal(card().style.visibility, "hidden");
+    assert.ok(ink(), "the ink shrinks into the card");
+    await wait(520);
+    assert.equal(card().style.visibility, "");
+    assert.equal(ink(), null);
+    assert.equal(document.documentElement.dataset.tripTransition, undefined);
+
     startTripTransition(() => navigate("stale"), "trip1");
     startTripTransition(() => navigate("itinerary"), "trip1");
-    await act(async () => captures[2].update());
+    await wait(490);
     assert.ok(
-      document.querySelector("article"),
-      "superseded callback cannot replace the newer navigation",
+      !pages.includes("stale"),
+      "a superseded open cannot replace the newer navigation",
     );
-    await act(async () => captures[3].update());
-    captures[3].motion.finish();
-    await act(async () => {});
+    assert.equal(document.querySelector("main").textContent, "itinerary");
     reduced = true;
     await act(async () =>
       startTripTransition(() => navigate("list"), "trip1", true),
     );
-    assert.equal(
-      captures.length,
-      4,
-      "reduced motion commits without snapshots",
-    );
-    assert.ok(document.querySelector("article"));
+    assert.ok(card(), "reduced motion commits at once");
+    assert.equal(ink(), null);
   } finally {
     await act(async () => root.unmount());
-    document.startViewTransition = nativeStart;
+    dom.window.HTMLElement.prototype.getBoundingClientRect = nativeRect;
+    HTMLElement.prototype.animate = nativeAnimate;
     window.scrollTo = originalScroll;
     window.scrollY = originalY;
     reduced = false;
@@ -1498,67 +1490,34 @@ test("task list strikes before reordering, preserves row identity, and keeps edi
   }
 });
 
-test("returning from bookings captures the full list without creating a disconnected cover layer", async () => {
-  const nativeStart = document.startViewTransition;
+test("returning home when the trip's card is off screen fades the ink instead of shrinking it", async () => {
   const originalScroll = window.scrollTo;
   const host = document.getElementById("root");
-  let update;
-  const motion = timeline();
-  document.startViewTransition = (callback) => {
-    update = callback;
-    return {
-      ready: Promise.resolve(),
-      finished: motion.finished,
-      skipTransition: () => motion.finish(),
-    };
-  };
+  const nativeAnimate = HTMLElement.prototype.animate;
+  HTMLElement.prototype.animate = () => ({
+    finished: Promise.resolve(),
+    cancel() {},
+  });
   window.scrollTo = () => {};
   try {
-    host.innerHTML =
-      '<main id="main-content" data-trip-surface="trip1"><p>Bookings</p></main>';
-    const oldMain = host.firstElementChild;
-    oldMain.getBoundingClientRect = () => ({
-      top: -240,
-      left: 0,
-      width: 390,
-      height: 1800,
-    });
+    host.innerHTML = '<main id="main-content"><p>Bookings</p></main>';
     startTripTransition(
       () => {
         host.innerHTML =
-          '<main id="main-content"><article data-trip-surface="trip1"><img data-trip-cover="trip1"><h2>Trip title</h2></article></main>';
-        host.firstElementChild.getBoundingClientRect = () => ({
-          top: 64,
-          left: 0,
-          width: 390,
-          height: 700,
-        });
+          '<main id="main-content"><a class="home-trip" data-trip-surface="trip1">Trip</a></main>';
       },
       "trip1",
       true,
     );
-    assert.equal(oldMain.style.viewTransitionName, "");
-    await update();
-    assert.equal(
-      document.documentElement.style.getPropertyValue("--route-old-top"),
-      "-240px",
-    );
-    assert.equal(
-      document.documentElement.style.getPropertyValue("--route-new-top"),
-      "64px",
-    );
-    assert.equal(host.querySelector("img").style.viewTransitionName, "");
-    assert.equal(host.querySelector("article").style.viewTransitionName, "");
-    assert.equal(
-      document.documentElement.style.getPropertyValue("--route-direction"),
-      "-1",
-    );
-    motion.finish();
-    await act(async () => {});
+    assert.equal(document.documentElement.dataset.tripTransition, "close");
+    assert.ok(document.querySelector(".cartoon-morph"), "ink covers the trip");
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 30)));
+    assert.ok(host.querySelector(".home-trip"));
+    assert.equal(host.querySelector(".home-trip").style.visibility, "");
+    assert.equal(document.querySelector(".cartoon-morph"), null);
     assert.equal(document.documentElement.dataset.tripTransition, undefined);
   } finally {
-    motion.finish();
-    document.startViewTransition = nativeStart;
+    HTMLElement.prototype.animate = nativeAnimate;
     window.scrollTo = originalScroll;
     host.innerHTML = "";
   }

@@ -5,6 +5,7 @@ import { finishBootScreen } from "./boot";
 import {
   PastTripCard,
   UpcomingTripCard,
+  useHomeMotion,
   useTripListEntrance,
 } from "./home-trips";
 import {
@@ -328,6 +329,7 @@ function Home() {
     .sort((a, b) => b.startsOn.localeCompare(a.startsOn));
   const list = useRef<HTMLElement>(null);
   useTripListEntrance(list);
+  useHomeMotion(list);
   const open = (trip: Trip) =>
     startTripTransition(() => {
       travel.selectTrip(trip.id);

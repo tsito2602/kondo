@@ -1,88 +1,126 @@
 import { flushSync } from "react-dom";
-import { reduceMotion, startRouteTransition } from "./motion";
+import { anim, morph, rect, sleep, spring, type Box } from "./cartoon";
+import { reduceMotion } from "./motion";
 
-let active: ViewTransition | undefined;
-let cleanupActive: (() => void) | undefined;
+// kondo-cartoon.html §2 (ticket): opening a trip, the card stretches into the
+// screen, top edge first (lead), the bottom 70 ms behind (split), the sides
+// 120 ms behind (boing). 200 ms in the dock turns to the trip's tabs, 230 ms
+// later the trip is underneath and the ink fades off it in 240 ms (ease-out).
+// Back: ink covers the trip in 160 ms, home returns underneath, and the ink
+// shrinks into the card (bottom leads, top 60 ms behind on split); after the
+// shrink settles or 480 ms the card shows and gives a boing (1.03, .95).
+// The mock's card is a ticket with a stub; home's cards are photo cards, so
+// there is no stub to tear.
+
 let listScroll = 0;
 let generation = 0;
+const CARD_RADIUS = 26;
 
-/** Expand the cover on entry; return the complete page without splitting cards. */
+const screenBox = (): Box => ({
+  x: 0,
+  y: 0,
+  w: window.innerWidth,
+  h: window.innerHeight,
+  // The mock's phone corners; a wide window has square ones.
+  r: window.innerWidth < 760 ? 54 : 0,
+});
+const cardOf = (tripId: string) =>
+  Array.from(
+    document.querySelectorAll<HTMLElement>(".home-trip[data-trip-surface]"),
+  ).find((node) => node.dataset.tripSurface === tripId);
+const onScreen = (box: Box) =>
+  box.w > 0 && box.y < window.innerHeight && box.y + box.h > 0;
+const MORPH = { zIndex: 30 } as const; // under the dock (40), as in the mock
+
+/** Open a trip from its home card, or go back home into that card. */
 export function startTripTransition(
   update: () => void,
   tripId: string,
   closing = false,
 ) {
   const current = ++generation;
-  active?.skipTransition();
-  cleanupActive?.();
   if (!closing) listScroll = window.scrollY;
   const commit = () => {
     flushSync(update);
     window.scrollTo({ top: closing ? listScroll : 0, behavior: "instant" });
   };
-  if (!document.startViewTransition || reduceMotion()) {
+  if (reduceMotion()) {
     commit();
     return;
   }
-  const cleanups: (() => void)[] = [];
-  const mark = () => {
-    if (closing) return;
-    for (const [attribute, name] of [
-      ["data-trip-surface", "trip-surface"],
-      ["data-trip-cover", "trip-cover"],
-    ]) {
-      const node = Array.from(
-        document.querySelectorAll<HTMLElement>(`[${attribute}]`),
-      ).find((node) => node.getAttribute(attribute) === tripId);
-      if (!node) continue;
-      const previous = node.style.viewTransitionName;
-      node.style.viewTransitionName = name;
-      cleanups.push(() => {
-        node.style.viewTransitionName = previous;
-      });
-    }
-  };
-  mark();
   const root = document.documentElement;
   root.dataset.tripTransition = closing ? "close" : "open";
-  const previousDirection = root.style.getPropertyValue("--route-direction");
-  if (closing) root.style.setProperty("--route-direction", "-1");
-  const transition = closing
-    ? startRouteTransition(() => {
-        if (current === generation) commit();
-      })
-    : document.startViewTransition(async () => {
-        if (current !== generation) return;
-        commit();
-        mark();
-        const photo = document.querySelector<HTMLImageElement>(
-          '[data-trip-cover][style*="trip-cover"]',
-        );
-        await photo?.decode?.().catch(() => undefined);
-      });
-  active = transition;
-  const interrupt = () => transition.skipTransition();
-  document.addEventListener("pointerdown", interrupt, true);
-  document.addEventListener("keydown", interrupt, true);
-  void transition.ready.catch(() => undefined);
-  let cleaned = false;
-  const cleanup = () => {
-    if (cleaned) return;
-    cleaned = true;
-    cleanups.reverse().forEach((reset) => reset());
-    document.removeEventListener("pointerdown", interrupt, true);
-    document.removeEventListener("keydown", interrupt, true);
-    if (active === transition) {
-      active = undefined;
-      cleanupActive = undefined;
-      delete root.dataset.tripTransition;
-      if (closing) {
-        if (previousDirection)
-          root.style.setProperty("--route-direction", previousDirection);
-        else root.style.removeProperty("--route-direction");
-      }
-    }
+  const finish = () => {
+    if (current === generation) delete root.dataset.tripTransition;
   };
-  cleanupActive = cleanup;
-  void transition.finished.catch(() => undefined).finally(cleanup);
+  void (
+    closing ? close(commit, tripId, current) : open(commit, tripId, current)
+  )
+    .catch(() => undefined)
+    .finally(finish);
+}
+
+async function open(commit: () => void, tripId: string, current: number) {
+  const card = cardOf(tripId);
+  const from = card && rect(card);
+  if (!card || !from || !onScreen(from)) {
+    commit();
+    return;
+  }
+  const m = morph({ ...from, r: CARD_RADIUS }, screenBox(), {
+    ...MORPH,
+    springs: { t: "lead", b: "split", l: "boing", r: "boing" },
+    lag: { b: 70, l: 120, r: 120 },
+  });
+  card.style.visibility = "hidden";
+  await sleep(200 + 230);
+  if (current === generation) commit();
+  card.style.visibility = "";
+  await anim(m.el, [{ opacity: 1 }, { opacity: 0 }], {
+    duration: 240,
+    easing: "ease-out",
+    fill: "forwards",
+  });
+  m.el.remove();
+}
+
+async function close(commit: () => void, tripId: string, current: number) {
+  const cover = morph(screenBox(), screenBox(), MORPH);
+  cover.el.style.opacity = "0";
+  await anim(cover.el, [{ opacity: 0 }, { opacity: 1 }], {
+    duration: 160,
+    fill: "forwards",
+  });
+  cover.el.style.opacity = "";
+  if (current !== generation) {
+    cover.el.remove();
+    return;
+  }
+  commit();
+  const card = cardOf(tripId);
+  const to = card && rect(card);
+  if (!card || !to || !onScreen(to)) {
+    await anim(cover.el, [{ opacity: 1 }, { opacity: 0 }], {
+      duration: 240,
+      easing: "ease-out",
+      fill: "forwards",
+    });
+    cover.el.remove();
+    return;
+  }
+  card.style.visibility = "hidden";
+  const back = morph(
+    screenBox(),
+    { ...to, r: CARD_RADIUS },
+    {
+      ...MORPH,
+      springs: { t: "split", b: "lead", l: "boing", r: "boing" },
+      lag: { t: 60 },
+    },
+  );
+  cover.el.remove();
+  await Promise.race([back.done, sleep(480)]);
+  card.style.visibility = "";
+  back.el.remove();
+  void spring(card, [{ transform: "scale(1.03,.95)" }, { transform: "none" }]);
 }
