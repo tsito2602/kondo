@@ -115,3 +115,15 @@ test('updates wait for consent and keep one previous shell for active tabs', asy
   assert.deepEqual(f.deleted, ['tabi-shell-old1']); assert.ok(f.stores.has('other-app-cache'));
   f.offline(); assert.equal(await (await f.fetch('/_expo/static/js/web/previous.js')).text(), 'previous bundle');
 });
+test('a waiting worker names its build label so the page can show the update', async () => {
+  const answer = (source) => {
+    const listeners = {};
+    vm.runInNewContext(source, { self: { addEventListener: (type, fn) => { listeners[type] = fn; }, location: { origin: 'https://tabi.test' } }, caches: {}, URL, Response, fetch });
+    let reply;
+    listeners.message({ data: { type: 'GET_VERSION' }, ports: [{ postMessage: (value) => { reply = value; } }] });
+    return reply;
+  };
+  const filled = template.replace('__VERSION__', 'test').replace('__PRECACHE__', '[]');
+  assert.equal(answer(filled.replace('__BUILD_LABEL__', '2026.10.7.1432')).version, '2026.10.7.1432');
+  assert.equal(answer(filled).version, '', 'an unlabelled build reports no version');
+});

@@ -2,6 +2,8 @@
 const CACHE = 'tabi-shell-__VERSION__';
 const PRECACHE = __PRECACHE__;
 const SHELL = '/';
+// The build's user-facing version (e.g. 2026.10.7); left as a placeholder when unknown.
+const BUILD_LABEL = '__BUILD_LABEL__';
 
 function navigationResponse(response) {
   // A navigation's redirect mode is manual. Returning a followed redirect from
@@ -36,6 +38,8 @@ self.addEventListener('install', (event) => {
 // An update waits until the user explicitly accepts it, preserving active forms.
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'ACTIVATE_UPDATE') self.skipWaiting();
+  // A waiting worker answers so the page can name the update before applying it.
+  if (event.data?.type === 'GET_VERSION') event.ports?.[0]?.postMessage({ version: BUILD_LABEL.startsWith('__') ? '' : BUILD_LABEL });
 });
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {

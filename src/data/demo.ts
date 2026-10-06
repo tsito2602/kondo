@@ -65,6 +65,8 @@ export function createDemoCache(): TravelCache {
     'sample-taipei': people('self', 'companion'),
     'sample-hokkaido': people('self', 'companion', 'ken'),
     'sample-okinawa': people('self', 'companion', 'ken', 'sakura', 'yui', 'akira'),
+    'sample-osaka': people('self'),
+    'sample-seoul': people('self', 'companion', 'ken'),
   };
   const trip = (id: string, name: string, destination: string, startsOn: string, days: number, coverImage?: string): Trip => ({
     id, name, destination, startsOn, endsOn: addDays(startsOn, days - 1), role: 'owner', memberCount: extraMembers[id].length, ...(coverImage ? { coverImage } : {}),
@@ -74,6 +76,9 @@ export function createDemoCache(): TravelCache {
     trip('sample-taipei', '台湾の夜市めぐり', '台北', addDays(today, -283), 4, sceneCover(['#1d2442', '#5a3d6b', '#c4566a', '#f0a35e'], '#16121c')),
     trip('sample-hokkaido', '北海道ドライブ', '北海道', addDays(today, -422), 5),
     trip('sample-okinawa', '沖縄でのんびり', '沖縄', addDays(today, -825), 4),
+    // Past trips also fill the passport's entry stamps in 設定.
+    trip('sample-osaka', '大阪の週末', 'Osaka, Japan', addDays(today, -150), 3),
+    trip('sample-seoul', 'ソウルの冬', 'Seoul, Korea', addDays(today, -300), 5),
   ];
   const flight: Booking = { id: 'sample-flight-1', kind: 'flight', title: 'サンプル航空 101', detail: '', origin: '成田国際空港', originCode: 'NRT', destination: 'ドバイ国際空港', destinationCode: 'DXB', day: start, time: '22:20', endDay: next, endTime: '05:30', confirmationCode: 'SAMPLE', note: 'サンプルの予約です。実際の搭乗には使えません。' };
   return {
