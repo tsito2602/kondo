@@ -359,6 +359,7 @@ export function NoteEditor({
             }
           : {
               actions: tools,
+              wide: true,
             }
       }
     >

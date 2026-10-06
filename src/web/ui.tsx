@@ -25,7 +25,6 @@ import {
   Check,
   Plus,
   LoaderCircle,
-  ArrowLeft,
   Keyboard,
   ChevronDown,
   SlidersHorizontal,
@@ -40,6 +39,7 @@ import {
   useThumbForm,
 } from "./thumb-dock";
 import { Button } from "./obsidian/button";
+import { DockBackIcon } from "./cartoon-dock";
 import {
   normalizeThemePreference,
   resolveTheme,
@@ -215,7 +215,7 @@ export function FormBackButton({
           <ChevronDown size={12} />
         </span>
       ) : (
-        (icon ?? label ?? <ArrowLeft size={22} />)
+        (icon ?? label ?? <DockBackIcon />)
       )}
     </button>
   );
@@ -241,6 +241,8 @@ export function Modal({
     primary?: ReactNode;
     actions?: ReactNode;
     backLabel?: string;
+    /** Many tools in a row where the tabs sit (a note's editor). */
+    wide?: boolean;
   };
 }>) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -455,15 +457,17 @@ export function Modal({
                 )
               }
               actions={dockActions?.actions}
+              wide={dockActions?.wide}
             />
           ) : (
-            <>
-              <button className="thumb-control" onClick={close}>
-                <ArrowLeft size={20} />
-                戻る
-              </button>
-              {action}
-            </>
+            <ContextDock
+              back={
+                <button aria-label="戻る" onClick={close}>
+                  <DockBackIcon />
+                </button>
+              }
+              actions={action}
+            />
           )}
         </ThumbDock>
       </ThumbFormContext.Provider>
@@ -492,7 +496,7 @@ export function ThumbTools({
     <>
       <ThumbAction>
         <button
-          className="thumb-control"
+          className="cdock-btn"
           aria-label={title}
           onClick={() => setOpen(true)}
         >

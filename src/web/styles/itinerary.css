@@ -2,7 +2,6 @@
 .itinerary-screen,
 dialog:has(.plan-sheet),
 dialog:has(.plan-add),
-.thumb-dock:has(.it-undo),
 .itinerary-poof-dot {
   --it-paper: #fff;
   --it-ink: #000;
@@ -47,7 +46,6 @@ dialog:has(.plan-add),
     .itinerary-screen,
     dialog:has(.plan-sheet),
     dialog:has(.plan-add),
-    .thumb-dock:has(.it-undo),
     .itinerary-poof-dot
   ) {
   --it-paper: #141312;
@@ -1175,47 +1173,12 @@ dialog:has(.plan-add),
   width: 22px;
   height: 22px;
 }
-:root .context-island > button.ps-dock-ticket {
+:root .cdock-group > button.ps-dock-ticket {
   width: auto;
   gap: 8px;
   padding: 0 18px 0 16px;
   font-size: 15px;
   font-weight: 700;
-}
-.thumb-dock:has(.it-undo) .context-primary:empty {
-  display: none;
-}
-.thumb-dock:has(.it-undo) .context-actions {
-  flex: 1;
-  min-width: 0;
-}
-:root .context-actions > .it-undo {
-  display: flex;
-  flex: 1;
-  justify-content: space-between;
-  gap: 8px;
-  width: auto;
-  min-width: 0;
-  padding: 0 5px 0 22px;
-  font-size: 14px;
-  font-weight: 700;
-}
-.it-undo span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.it-undo b {
-  display: flex;
-  flex: none;
-  align-items: center;
-  height: calc(var(--dock-height) - 14px);
-  padding: 0 16px;
-  border-radius: 99px;
-  background: var(--it-ink);
-  color: var(--it-paper);
-  font-size: 13px;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -10,14 +10,12 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { Plus } from "lucide-react";
-import { DockContent } from "./dock-content";
-import { FluidDockSurface, type FluidDockHandle } from "./fluid-dock";
+import { CartoonDock, DockGroup } from "./cartoon-dock";
 import { UpdateNotice } from "./app-update";
 
 type DockEntry = {
   content: ReactNode;
-  mode: "browse" | "detail" | "edit" | "context";
+  mode: "browse" | "detail" | "edit" | "context" | "toast";
   target?: () => HTMLElement | null;
   disabled?: boolean;
   navigation?: DockNavigation;
@@ -56,8 +54,6 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
       className: "update-notice-host",
     }),
   );
-  const surface = useRef<HTMLDivElement>(null);
-  const morph = useRef<FluidDockHandle>(null);
   const registry = useMemo(() => {
     return {
       put: (id: string, scope: Entry["scope"], value: Entry["value"]) => {
@@ -104,7 +100,6 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
     if (host.parentElement !== parent) parent.appendChild(host);
     if (noticeHost.parentElement !== parent) parent.appendChild(noticeHost);
     host.hidden = !active;
-    if (active) morph.current?.measure();
   });
   useLayoutEffect(
     () => () => {
@@ -124,7 +119,15 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
             aria-label={add?.label}
             onClick={add?.onClick}
           >
-            <Plus />
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 5v14M5 12h14"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+              />
+            </svg>
           </button>,
           document.body,
         )}
@@ -132,18 +135,15 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
           <SharedDockSurfaceContext.Provider value={true}>
             <DockNavigationContext.Provider value={active?.navigation ?? null}>
               <div
-                ref={surface}
                 className="thumb-dock"
                 data-mode={visible?.mode ?? "browse"}
                 inert={active?.disabled}
               >
-                <FluidDockSurface root={surface} ref={morph} />
-                <DockContent
+                <CartoonDock
                   identity={`${activeEntry?.order}:${visible?.mode}`}
-                  mode={visible?.mode ?? "browse"}
                 >
                   {visible?.content}
-                </DockContent>
+                </CartoonDock>
               </div>
             </DockNavigationContext.Provider>
           </SharedDockSurfaceContext.Provider>,
@@ -190,26 +190,73 @@ export function ThumbActions() {
   return <>{useContext(Actions)}</>;
 }
 
-/** Separate surfaces for the current screen's back, primary and icon actions. */
+/** The current screen's controls on the cartoon dock's two islands: the back
+    circle on the left island, the context actions on the right one. A lone
+    primary (保存, 追加する) turns its island ink; next to other actions it is
+    an ink pill on a plain island. */
 export function ContextDock({
   back,
   primary,
   actions,
+  wide,
 }: {
   back?: ReactNode;
   primary?: ReactNode;
   actions?: ReactNode;
+  /** Lay the actions out like the tab row (left 90 px to the right edge). */
+  wide?: boolean;
 }) {
   return (
-    <div className="context-dock">
-      {back && <div className="context-island context-back">{back}</div>}
-      <div className={`context-primary${primary ? " context-island" : ""}`}>
-        {primary}
-      </div>
-      {actions && (
-        <div className="context-island context-actions">{actions}</div>
+    <>
+      {back && (
+        <DockGroup slot="l" className="context-back">
+          {back}
+        </DockGroup>
       )}
-    </div>
+      {(primary || actions) && (
+        <DockGroup
+          slot="r"
+          className="context-actions"
+          tone={primary && !actions ? "ink" : undefined}
+          mixed={Boolean(primary && actions)}
+          wide={wide}
+        >
+          {actions}
+          {primary}
+        </DockGroup>
+      )}
+    </>
+  );
+}
+
+/** The undo toast (kondo-cartoon §5): the islands run together into one with
+    a bump, holding what happened and 「元に戻す」; leaving it tears them apart.
+    With `back`, the back circle stays and the toast takes the right island. */
+export function DockToast({
+  message,
+  onUndo,
+  undoLabel = "元に戻す",
+  back,
+}: {
+  message: ReactNode;
+  onUndo: () => void;
+  undoLabel?: string;
+  back?: ReactNode;
+}) {
+  return (
+    <>
+      {back && (
+        <DockGroup slot="l" className="context-back">
+          {back}
+        </DockGroup>
+      )}
+      <DockGroup slot="toast" className={back ? "cdock-toast-r" : undefined}>
+        <span role="status">{message}</span>
+        <button type="button" onClick={onUndo}>
+          {undoLabel}
+        </button>
+      </DockGroup>
+    </>
   );
 }
 

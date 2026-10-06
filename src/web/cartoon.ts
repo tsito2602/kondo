@@ -283,9 +283,15 @@ export async function squishTap(el: HTMLElement, amt = 0.95) {
 }
 
 /** What squishes and by how much; the first matching selector wins.
-    Screens add their own rows with registerSquish (the mocks' SQ tables). */
+    Screens add their own rows with registerSquish (the mocks' SQ tables);
+    press-feedback.ts plays them for pointer and keyboard presses. */
 const SQ: [string, number][] = [
-  [".cdock-btn, .cdock-tabs a, .cdock-tabs button, .cdock-toast button", 0.9],
+  [".floating-add", 0.88],
+  [
+    ".cdock-group > button, .cdock-group > a, .cdock-tabs > a, .icon-button, .add-action",
+    0.9,
+  ],
+  ["[data-press-card]", 0.97],
 ];
 export function registerSquish(selector: string, amount: number) {
   const row: [string, number] = [selector, amount];
@@ -295,35 +301,15 @@ export function registerSquish(selector: string, amount: number) {
     if (i >= 0) SQ.splice(i, 1);
   };
 }
-/** One capture listener for the whole document, as in the mocks. */
-export function installSquish(root: Document = document) {
-  let pressed: HTMLElement | null = null;
-  const down = (e: PointerEvent) => {
-    if (RM() || e.button !== 0) return;
-    const target = e.target instanceof Element ? e.target : null;
-    if (!target) return;
-    for (const [sel, amt] of SQ) {
-      const el = target.closest<HTMLElement>(sel);
-      if (el && !(el as HTMLButtonElement).disabled) {
-        pressed = el;
-        void squishDown(el, amt);
-        return;
-      }
-    }
-  };
-  const release = () => {
-    if (!pressed) return;
-    void squishUp(pressed);
-    pressed = null;
-  };
-  root.addEventListener("pointerdown", down, true);
-  window.addEventListener("pointerup", release, true);
-  window.addEventListener("pointercancel", release, true);
-  return () => {
-    root.removeEventListener("pointerdown", down, true);
-    window.removeEventListener("pointerup", release, true);
-    window.removeEventListener("pointercancel", release, true);
-  };
+/** The element a press on `target` squishes, and how far. */
+export function squishTarget(
+  target: Element,
+): [element: HTMLElement, amount: number] | null {
+  for (const [sel, amt] of SQ) {
+    const el = target.closest<HTMLElement>(sel);
+    if (el) return [el, amt];
+  }
+  return null;
 }
 
 // ===== morph: a rectangle whose four edges travel on their own springs =====
