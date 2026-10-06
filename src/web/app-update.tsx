@@ -1,4 +1,10 @@
-import { useEffect, useLayoutEffect, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useSyncExternalStore,
+} from "react";
+import { anim, RM, spring } from "./cartoon";
 import { useToast } from "./ui";
 
 // The app checks for a new service worker on its own (on open, when it comes
@@ -23,6 +29,15 @@ export const appVersion = () => import.meta.env.VITE_APP_VERSION;
 /** The waiting build's name; an older worker that cannot say is just "new". */
 export const updateLabel = (version: string) =>
   version && version !== appVersion() ? version : "新しいバージョン";
+
+/** Shows the notice without a real worker: for screenshots in development. */
+export function previewUpdate(version: string) {
+  if (!import.meta.env.DEV) return;
+  publish({
+    waiting: { postMessage() {} } as unknown as ServiceWorker,
+    version,
+  });
+}
 
 const CHECK_INTERVAL = 30 * 60 * 1000;
 const UPDATED_KEY = "kondo.updated";
@@ -143,6 +158,22 @@ export function useUpdateGuard(ready: boolean, pendingCount: number) {
 export function UpdateNotice() {
   const { waiting, version } = useAppUpdate();
   const notify = useToast();
+  const pill = useRef<HTMLButtonElement>(null);
+  // Arrives like the mock's blocks: lands and flattens a little.
+  useLayoutEffect(() => {
+    if (!waiting || !pill.current || RM()) return;
+    void anim(
+      pill.current,
+      [
+        { transform: "translateY(18px) scale(.9,1.12)", opacity: 0 },
+        { transform: "translateY(0) scale(.92,1.1)", opacity: 1, offset: 0.42 },
+        { transform: "translateY(0) scale(1.06,.9)", offset: 0.6 },
+        { transform: "translateY(-2px) scale(.99,1.02)", offset: 0.8 },
+        { transform: "none", opacity: 1 },
+      ],
+      { duration: 460, easing: "cubic-bezier(.4,0,.6,1)" },
+    );
+  }, [waiting]);
   useLayoutEffect(() => {
     if (!waiting) return;
     // Pages and sheets add room underneath so the pill never hides content.
@@ -157,14 +188,38 @@ export function UpdateNotice() {
   return (
     <button
       type="button"
+      ref={pill}
       className="update-notice"
-      data-press-card
       aria-label={`アップデートされました。kondo ${label}。新しくする`}
-      onClick={() => {
+      onClick={async (event) => {
         if (pendingChanges) {
           notify("未同期の変更を送信してから新しくできます");
           return;
         }
+        // kondo-settings.html: the pill squishes, the screen blurs away, then
+        // the new version takes over (and toasts after the reload).
+        await spring(
+          event.currentTarget,
+          [{ transform: "scale(.94)" }, { transform: "none" }],
+          "squish",
+        );
+        const screens = [
+          ...document.querySelectorAll<HTMLElement>(
+            "#main-content, dialog[open] .modal-inner",
+          ),
+        ];
+        await Promise.all(
+          screens.map((screen) =>
+            anim(
+              screen,
+              [
+                { opacity: 1, filter: "blur(0)" },
+                { opacity: 0, filter: "blur(6px)" },
+              ],
+              { duration: 260, fill: "forwards" },
+            ),
+          ),
+        );
         applyUpdate();
       }}
     >

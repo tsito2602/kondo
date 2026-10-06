@@ -1,13 +1,12 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { type Location, useLocation, useNavigate } from "react-router";
-import { ChevronRight, Contrast, Moon, Sun } from "lucide-react";
 import { useAuth } from "@/auth/auth-provider";
 import { useTravel } from "@/data/travel-provider";
 import type { Trip } from "@/data/types";
 import { localDate } from "@/utils/dates";
 import { appVersion, updateLabel, useAppUpdate } from "./app-update";
-import { reduceMotion } from "./motion";
-import { SegmentSelection } from "./segment-selection";
+import { RM, spring } from "./cartoon";
+import { jellyScroll } from "./jelly-scroll";
 import { Modal, useAction, useTheme, useToast } from "./ui";
 
 /** A trip's entry stamp: a latin place becomes a 3-letter code, others keep their first word. */
@@ -26,33 +25,6 @@ export function stampLabel(trip: Pick<Trip, "destination" | "name">) {
   return [...word].slice(0, 4).join("");
 }
 
-// uchiwake's boing spring (k420/d14), sampled for WAAPI.
-function boing() {
-  const values = [0];
-  let x = 0,
-    v = 0;
-  for (let t = 0; t < 2; t += 1 / 120) {
-    v += (-420 * (x - 1) - 14 * v) / 120;
-    x += v / 120;
-    values.push(x);
-    if (Math.abs(x - 1) < 0.0008 && Math.abs(v) < 0.01) break;
-  }
-  values[values.length - 1] = 1;
-  const step = Math.max(1, Math.floor(values.length / 64));
-  const points = values
-    .filter((_, index) => index % step === 0 || index === values.length - 1)
-    .map((value) => +value.toFixed(4));
-  const linear =
-    typeof CSS !== "undefined" &&
-    CSS.supports?.("transition-timing-function", "linear(0, 1)");
-  return {
-    duration: Math.round((values.length / 120) * 1000),
-    easing: linear
-      ? `linear(${points.join(",")})`
-      : "cubic-bezier(.34,1.56,.64,1)",
-  };
-}
-
 /** The logo hops and its dotted route runs, like the launch. */
 function FooterLogo() {
   const mark = useRef<SVGSVGElement>(null);
@@ -63,8 +35,9 @@ function FooterLogo() {
         type="button"
         aria-label="kondo"
         onClick={() => {
-          if (reduceMotion() || !mark.current?.animate) return;
-          mark.current.animate(
+          if (RM() || !mark.current) return;
+          void spring(
+            mark.current,
             [
               { transform: "translateY(0)" },
               {
@@ -74,7 +47,7 @@ function FooterLogo() {
               { transform: "translateY(0) scale(1.12,.86)", offset: 0.75 },
               { transform: "none" },
             ],
-            boing(),
+            "boing",
           );
           route.current?.animate(
             [{ strokeDashoffset: 0 }, { strokeDashoffset: -137 }],
@@ -165,7 +138,6 @@ function Passport() {
     .map((trip) => ({ trip, label: stampLabel(trip) }))
     .filter((stamp) => stamp.label);
   const photo = auth.user?.avatarUrl;
-  const initial = [...(name.trim() || auth.user?.email || "k")][0];
   return (
     <div className="passport">
       <span className="passport-photo">
@@ -176,7 +148,7 @@ function Passport() {
             alt="Googleアカウントのアイコン"
           />
         ) : (
-          <span aria-hidden="true">{initial.toUpperCase()}</span>
+          <Face />
         )}
       </span>
       <div className="passport-fields">
@@ -227,6 +199,103 @@ function Passport() {
   );
 }
 
+/** The mock's passport photo, for accounts without one. */
+function Face() {
+  return (
+    <svg viewBox="0 0 30 30" aria-hidden="true">
+      <rect width="30" height="30" fill="#E9B872" />
+      <circle cx="15" cy="34" r="12" fill="#3a322c" />
+      <circle cx="15" cy="14" r="7.5" fill="#F6D7B0" />
+      <circle cx="12.4" cy="13.6" r="1" fill="#2a2420" />
+      <circle cx="17.6" cy="13.6" r="1" fill="#2a2420" />
+      <path
+        d="M12.6 16.6q2.4 2 4.8 0"
+        fill="none"
+        stroke="#2a2420"
+        strokeWidth="1.1"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+const THEME_ICONS = {
+  system: (
+    <>
+      <circle
+        cx="12"
+        cy="12"
+        r="8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+      />
+      <path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" />
+    </>
+  ),
+  light: (
+    <>
+      <circle
+        cx="12"
+        cy="12"
+        r="4.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+      />
+      <path
+        d="M12 2.5v2.5M12 19v2.5M2.5 12h2.5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+    </>
+  ),
+  dark: (
+    <path
+      d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinejoin="round"
+    />
+  ),
+};
+const THEMES = [
+  { value: "system", label: "自動" },
+  { value: "light", label: "ライト" },
+  { value: "dark", label: "ダーク" },
+] as const;
+
+/** 外観: three buttons; the chosen one turns paper, the pressed one boings. */
+function Appearance() {
+  const theme = useTheme();
+  return (
+    <div className="settings-theme" role="group" aria-label="表示モード">
+      {THEMES.map((entry) => (
+        <button
+          key={entry.value}
+          type="button"
+          aria-pressed={theme.preference === entry.value}
+          onClick={(event) => {
+            theme.setPreference(entry.value);
+            void spring(
+              event.currentTarget,
+              [{ transform: "scale(.9)" }, { transform: "none" }],
+              "boing",
+            );
+          }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            {THEME_ICONS[entry.value]}
+          </svg>
+          {entry.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 type InstallEvent = Event & { prompt: () => Promise<void> };
 function AppRows() {
   const { waiting, version } = useAppUpdate();
@@ -251,13 +320,18 @@ function AppRows() {
         <button
           type="button"
           className="settings-row"
-          onClick={() => {
+          onClick={(event) => {
+            void spring(
+              event.currentTarget,
+              [{ transform: "scale(.97)" }, { transform: "none" }],
+              "squish",
+            );
             if (installEvent) void installEvent.prompt();
             else
               notify(
                 /iPhone|iPad/.test(navigator.userAgent)
-                  ? "Safariの共有メニューから「ホーム画面に追加」を選んでください"
-                  : "ブラウザーのメニューから「アプリをインストール」または「ホーム画面に追加」を選んでください",
+                  ? "Safari の共有メニューから「ホーム画面に追加」"
+                  : "ブラウザーのメニューから「アプリをインストール」または「ホーム画面に追加」",
               );
           }}
         >
@@ -288,15 +362,20 @@ function AppRows() {
             <small>アプリのように全画面で開ける</small>
           </span>
           <span className="settings-row-end">
-            <ChevronRight size={16} aria-hidden="true" />
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M9 5l7 7-7 7"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </span>
         </button>
       )}
-      <div
-        className="settings-row settings-version"
-        role="status"
-        aria-live="polite"
-      >
+      <div className="settings-row" role="status" aria-live="polite">
         <span>
           <b>バージョン {appVersion()}</b>
         </span>
@@ -326,15 +405,51 @@ function AppRows() {
   );
 }
 
+// kondo-settings.html's sink: lands, flattens a little (1.06 × .9), settles.
+const SETTLE: Keyframe[] = [
+  { transform: "translateY(-20px) scale(.9,1.12)", opacity: 0 },
+  { transform: "translateY(0) scale(.92,1.1)", opacity: 1, offset: 0.42 },
+  { transform: "translateY(0) scale(1.06,.9)", offset: 0.6 },
+  { transform: "translateY(-2px) scale(.99,1.02)", offset: 0.8 },
+  { transform: "none", opacity: 1 },
+];
+const SETTLE_ITEMS =
+  ":scope > .settings-label, :scope > .passport, :scope > .settings-theme, :scope > .settings-group";
+
 export function SettingsScreen() {
   const location = useLocation();
   const returnTo = (location.state as { returnTo?: string } | null)?.returnTo;
   const backTo = returnTo?.startsWith("/trips/") ? returnTo : "/";
   const auth = useAuth();
   const travel = useTravel();
-  const theme = useTheme();
   const { busy, run } = useAction();
   const navigate = useNavigate();
+  const page = useRef<HTMLDivElement>(null);
+  // The groups land one after another (40 ms apart), as the mock opens.
+  useLayoutEffect(() => {
+    if (RM()) return;
+    page.current?.querySelectorAll(SETTLE_ITEMS).forEach((el, i) =>
+      el.animate?.(SETTLE, {
+        duration: 460,
+        delay: i * 40,
+        easing: "cubic-bezier(.4,0,.6,1)",
+        fill: "backwards",
+      }),
+    );
+  }, []);
+  // Jelly scroll (kondo-cartoon §3) on the page's blocks.
+  useEffect(() => {
+    const root = page.current;
+    const scroller = root?.closest<HTMLElement>(".modal-inner");
+    if (!root || !scroller) return;
+    return jellyScroll(
+      () =>
+        root.querySelectorAll<HTMLElement>(
+          SETTLE_ITEMS + ", :scope > .settings-foot",
+        ),
+      { scroller },
+    );
+  }, []);
   return (
     <Modal
       title="設定"
@@ -346,35 +461,11 @@ export function SettingsScreen() {
         else navigate(backTo, { replace: true });
       }}
     >
-      <div className="settings-page settings-v2">
+      <div ref={page} className="settings-page settings-v2">
         <h3 className="settings-label">アカウント</h3>
         <Passport />
         <h3 className="settings-label">外観</h3>
-        <div
-          className="segmented appearance-control has-selection settings-theme"
-          aria-label="表示モード"
-        >
-          {(
-            [
-              { value: "system", label: "自動", icon: Contrast },
-              { value: "light", label: "ライト", icon: Sun },
-              { value: "dark", label: "ダーク", icon: Moon },
-            ] as const
-          ).map((entry) => (
-            <button
-              key={entry.value}
-              aria-pressed={theme.preference === entry.value}
-              className={theme.preference === entry.value ? "selected" : ""}
-              onClick={() => theme.setPreference(entry.value)}
-            >
-              <entry.icon size={17} strokeWidth={2.2} aria-hidden="true" />
-              {entry.label}
-            </button>
-          ))}
-          <SegmentSelection
-            index={["system", "light", "dark"].indexOf(theme.preference)}
-          />
-        </div>
+        <Appearance />
         <h3 className="settings-label">アプリ</h3>
         <AppRows />
         <div className="settings-group settings-signout">
