@@ -1,6 +1,7 @@
 /* 場所: a drawn places map with stable numbers, a list and a place card (kondo-map mock). */
 .places-page,
-.places-card {
+.places-card,
+.places-map.is-full {
   --pl-paper: #fff;
   --pl-ink: #000;
   --pl-mid: #9c978f;
@@ -14,7 +15,8 @@
   --pl-t4: #67635d;
 }
 :root[data-theme="dark"] .places-page,
-:root[data-theme="dark"] .places-card {
+:root[data-theme="dark"] .places-card,
+:root[data-theme="dark"] .places-map.is-full {
   --pl-paper: #141312;
   --pl-ink: #f5f1e9;
   --pl-mid: #b6b0a6;
@@ -545,4 +547,96 @@
   stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* ---- the ground: OpenStreetMap roads, buildings, water, parks (basemap.ts) ---- */
+.places-ground-slot {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.places-ground {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.4s;
+  pointer-events: none;
+}
+.places-map.has-ground .places-ground {
+  opacity: 1;
+}
+.places-map.has-ground .places-map-grid {
+  display: none;
+}
+.places-ground canvas {
+  outline: none;
+}
+.places-attribution {
+  position: absolute;
+  z-index: 4;
+  left: 12px;
+  bottom: calc(var(--places-bottom, 0px) + 3px);
+  color: var(--pl-mute);
+  font-size: 8px;
+  line-height: 1;
+  text-decoration: none;
+  opacity: 0.8;
+}
+.places-map.has-ground .places-scale {
+  bottom: calc(var(--places-bottom, 0px) + 16px);
+}
+
+/* ---- 全画面: the map covers the screen; the dock stays over it ---- */
+.places-full-toggle {
+  position: absolute;
+  z-index: 4;
+  top: 12px;
+  left: 12px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--pl-paper);
+  color: var(--pl-ink);
+  box-shadow:
+    0 0 0 1px var(--pl-line),
+    0 4px 10px -6px #0005;
+  cursor: pointer;
+}
+.places-map.is-full {
+  translate: none !important;
+  position: fixed;
+  z-index: 35;
+  inset: 0;
+  height: auto;
+  border-radius: 0;
+  box-shadow: none;
+  animation: places-full-in 0.42s
+    var(--spring-boing, cubic-bezier(0.3, 1.4, 0.5, 1)) both;
+}
+@keyframes places-full-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+.places-map.is-full .places-full-toggle,
+.places-map.is-full .places-compass {
+  top: calc(env(safe-area-inset-top) + 12px);
+}
+.places-map.is-full .places-scale,
+.places-map.is-full .places-refit {
+  bottom: calc(var(--places-bottom, 0px) + 16px);
+}
+:root.places-full,
+:root.places-full body {
+  overflow: hidden;
+}
+/* the trip header and ＋ sit under the full map; its own fades go too */
+:root.places-full body::after {
+  display: none;
 }

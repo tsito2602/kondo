@@ -11,7 +11,9 @@ import {
   type ReactNode,
   type Ref,
 } from "react";
-import { MapPin } from "lucide-react";
+import { Maximize2, MapPin, Minimize2 } from "lucide-react";
+import { createPortal } from "react-dom";
+import { createBasemap, lngLatFor, zoomFor } from "./basemap";
 import { PageTop } from "./page-top";
 import { useTravel } from "@/data/travel-provider";
 import {
@@ -302,8 +304,26 @@ function PlacesMap({
 }) {
   const mapEl = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(358);
+  const [height, setHeight] = useState(MAP_HEIGHT);
+  // 全画面: the map covers the screen up to the dock (the dock stays).
+  const [full, setFull] = useState(false);
   const W = width;
-  const H = MAP_HEIGHT;
+  const H = height;
+  // In 全画面 the dock floats over the map's bottom; arrows and the scale
+  // keep clear of it.
+  const [bottomInset, setBottomInset] = useState(0);
+  const groundSlot = useRef<HTMLDivElement>(null);
+  // The ground lives in one element that moves with the map between the
+  // page and 全画面, so MapLibre is made once.
+  const [groundEl] = useState(() => {
+    const element = document.createElement("div");
+    element.className = "places-ground";
+    element.setAttribute("aria-hidden", "true");
+    return element;
+  });
+  useLayoutEffect(() => {
+    groundSlot.current?.appendChild(groundEl);
+  }, [full, groundEl]);
 
   // Places on the map for this view: the day's plans and stay, plus every candidate.
   const shown = useMemo(() => {
@@ -383,13 +403,71 @@ function PlacesMap({
 
   useLayoutEffect(() => {
     const element = mapEl.current!;
-    const observer = new ResizeObserver(() =>
-      setWidth(Math.round(element.clientWidth) || 358),
-    );
+    const measure = () => {
+      setWidth(Math.round(element.clientWidth) || 358);
+      setHeight(Math.round(element.clientHeight) || MAP_HEIGHT);
+      const dock = document.querySelector(".thumb-dock-host:not([hidden])");
+      setBottomInset(
+        element.classList.contains("is-full") && dock
+          ? Math.max(
+              0,
+              window.innerHeight - dock.getBoundingClientRect().top + 8,
+            )
+          : 0,
+      );
+    };
+    const observer = new ResizeObserver(measure);
     observer.observe(element);
-    setWidth(Math.round(element.clientWidth) || 358);
+    measure();
     return () => observer.disconnect();
-  }, []);
+  }, [full]);
+
+  /* 全画面: the page under it stays still; Esc closes it */
+  useEffect(() => {
+    if (!full) return;
+    const root = document.documentElement;
+    root.classList.add("places-full");
+    const key = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFull(false);
+    };
+    window.addEventListener("keydown", key);
+    return () => {
+      root.classList.remove("places-full");
+      window.removeEventListener("keydown", key);
+    };
+  }, [full]);
+
+  /* the ground: roads, buildings, water and parks, following the camera */
+  const ground = useRef<Awaited<ReturnType<typeof createBasemap>> | null>(null);
+  const [grounded, setGrounded] = useState(false);
+  useEffect(() => {
+    // No WebGL (tests, very old browsers): the dotted grid stays.
+    if (typeof WebGLRenderingContext === "undefined") return;
+    let gone = false;
+    void createBasemap(groundEl)
+      .then((made) => {
+        if (gone) return made.remove();
+        ground.current = made;
+        if (import.meta.env.DEV)
+          (window as unknown as { __basemap?: unknown }).__basemap = made.map;
+        const v = viewRef.current;
+        made.map.jumpTo({ center: lngLatFor(v.cx, v.cy), zoom: zoomFor(v.k) });
+        made.map.once("load", () => !gone && setGrounded(true));
+      })
+      .catch(() => {});
+    return () => {
+      gone = true;
+      ground.current?.remove();
+      ground.current = null;
+    };
+  }, [groundEl]);
+
+  useLayoutEffect(() => {
+    const map = ground.current?.map;
+    if (!map) return;
+    map.resize();
+    map.jumpTo({ center: lngLatFor(view.cx, view.cy), zoom: zoomFor(view.k) });
+  }, [view.cx, view.cy, view.k, W, H]);
 
   const toPx = (key: string, v = view) => {
     const p = merc.get(key)!;
@@ -466,7 +544,8 @@ function PlacesMap({
   /* pins and the edge arrows for places outside the frame */
   const pins = shown.all.map((mark) => {
     const q = toPx(mark.key);
-    const inside = q.x > 8 && q.x < W - 8 && q.y > 30 && q.y < H - 4;
+    const inside =
+      q.x > 8 && q.x < W - 8 && q.y > 30 && q.y < H - bottomInset - 4;
     return { mark, q, inside };
   });
   const edges: Edge[] = [];
@@ -482,11 +561,13 @@ function PlacesMap({
       (H / 2 - inset) / Math.abs(dy || 1e-9),
     );
     let x = cx + dx * t;
-    let y = Math.max(inset, Math.min(H - 44, cy + dy * t));
-    // keep clear of the compass, the scale bar and 全体を表示
+    const floor = H - bottomInset;
+    let y = Math.max(inset, Math.min(floor - 44, cy + dy * t));
+    // keep clear of the compass, 全画面, the scale bar and 全体を表示
     if (y < 56 && x > W - 66) x = W - 66;
-    if (y > H - 50 && x < 92) x = 92;
-    if (y > H - 50 && x > W - 132) x = W - 132;
+    if (y < 56 && x < 66) x = 66;
+    if (y > floor - 50 && x < 92) x = 92;
+    if (y > floor - 50 && x > W - 132) x = W - 132;
     const near = edges.find((edge) => Math.hypot(edge.x - x, edge.y - y) < 34);
     if (near) near.marks.push(mark);
     else
@@ -599,7 +680,7 @@ function PlacesMap({
   const onPointerDown = (event: ReactPointerEvent) => {
     if (
       (event.target as Element).closest(
-        ".places-pin, .places-edge, .places-refit",
+        ".places-pin, .places-edge, .places-refit, .places-full-toggle, .places-attribution",
       )
     )
       return;
@@ -669,7 +750,7 @@ function PlacesMap({
     };
     element.addEventListener("wheel", wheel, { passive: false });
     return () => element.removeEventListener("wheel", wheel);
-  }, [fitted.k, kMax, W, H]);
+  }, [fitted.k, kMax, W, H, full]);
 
   /* dotted grid moves with the map; the scale bar follows the zoom */
   const grid = 24;
@@ -684,10 +765,11 @@ function PlacesMap({
     Math.abs(view.k / fitted.k - 1) > 0.04 ||
     Math.hypot(view.cx - fitted.cx, view.cy - fitted.cy) * view.k > 14;
 
-  return (
+  const mapView = (
     <div
       ref={mapEl}
-      className="places-map"
+      className={`places-map${full ? " is-full" : ""}${grounded ? " has-ground" : ""}`}
+      style={{ "--places-bottom": `${bottomInset}px` } as CSSProperties}
       role="group"
       aria-label="場所の地図"
       onPointerDown={onPointerDown}
@@ -698,6 +780,7 @@ function PlacesMap({
         if (!dragged.current && selected) onSelect(null);
       }}
     >
+      <div ref={groundSlot} className="places-ground-slot" />
       <div
         className="places-map-grid"
         style={{
@@ -781,6 +864,32 @@ function PlacesMap({
             .join("·")}
         </button>
       ))}
+      <button
+        className="places-full-toggle"
+        aria-label={full ? "全画面をとじる" : "地図を全画面で見る"}
+        aria-pressed={full}
+        onClick={(event) => {
+          event.stopPropagation();
+          setFull((value) => !value);
+        }}
+      >
+        {full ? (
+          <Minimize2 size={17} aria-hidden="true" />
+        ) : (
+          <Maximize2 size={17} aria-hidden="true" />
+        )}
+      </button>
+      {grounded && (
+        <a
+          className="places-attribution"
+          href="https://www.openstreetmap.org/copyright"
+          target="_blank"
+          rel="noreferrer"
+          onClick={(event) => event.stopPropagation()}
+        >
+          © OpenStreetMap · OpenMapTiles · OpenFreeMap
+        </a>
+      )}
       <div className="places-compass" aria-hidden="true">
         <svg viewBox="0 0 10 8">
           <path d="M5 0 L10 8 H0Z" />
@@ -806,6 +915,15 @@ function PlacesMap({
         全体を表示
       </button>
     </div>
+  );
+  // 全画面 goes to <body>, over the header and ＋; the dock stays over it.
+  return full ? (
+    <>
+      <div className="places-map-spot" style={{ height: MAP_HEIGHT }} />
+      {createPortal(mapView, document.body)}
+    </>
+  ) : (
+    mapView
   );
 }
 
