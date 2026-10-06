@@ -864,7 +864,8 @@ export function PlaceEditor({
     <Modal
       title={place ? "場所を編集" : "行きたい場所を追加"}
       onClose={onClose}
-      full
+      full={Boolean(place)}
+      addPanel={!place}
     >
       <form className="form place-form" onSubmit={submit}>
         <Field label="場所の名前">

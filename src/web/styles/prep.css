@@ -413,24 +413,29 @@
 
 /* ---------- sheets (.sheet): from the bottom edge, on a dark scrim ---------- */
 @media (max-width: 759px) {
-  :root:has(.thumb-dock-host) dialog.modal:has(.prep-sheet) {
+  :root:has(.thumb-dock-host) dialog.modal:has(.prep-sheet):not([data-panel]) {
     padding: calc(50px + env(safe-area-inset-top)) 0 0;
   }
-  :root:has(.thumb-dock-host) dialog.modal:has(.prep-sheet)::backdrop {
+  :root:has(.thumb-dock-host)
+    dialog.modal:has(.prep-sheet):not([data-panel])::backdrop {
     background: #0005;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
-  :root:has(.thumb-dock-host) dialog.modal:has(.prep-sheet) .modal-inner {
+  :root:has(.thumb-dock-host)
+    dialog.modal:has(.prep-sheet):not([data-panel])
+    .modal-inner {
     border-radius: 30px 30px 0 0;
     background: var(--p-paper);
     box-shadow: 0 -10px 30px -12px #0006;
   }
-  :root:has(.thumb-dock-host) dialog.modal:has(.prep-sheet) .modal-body {
+  :root:has(.thumb-dock-host)
+    dialog.modal:has(.prep-sheet):not([data-panel])
+    .modal-body {
     padding: 0 18px calc(112px + env(safe-area-inset-bottom));
   }
 }
-dialog.modal:has(.prep-sheet) .modal-header {
+dialog.modal:has(.prep-sheet):not([data-panel]) .modal-header {
   justify-content: flex-start;
   min-height: 0;
   padding: 22px 18px 12px;
@@ -439,7 +444,7 @@ dialog.modal:has(.prep-sheet) .modal-header {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
-dialog.modal:has(.prep-sheet) .modal-header h2 {
+dialog.modal:has(.prep-sheet):not([data-panel]) .modal-header h2 {
   margin: 0;
   color: var(--p-ink);
   font-family: var(--f-body);

@@ -2,6 +2,7 @@
 .itinerary-screen,
 dialog:has(.plan-sheet),
 dialog:has(.plan-add),
+dialog[data-panel="add"],
 .itinerary-poof-dot {
   --it-paper: #fff;
   --it-ink: #000;
@@ -46,6 +47,7 @@ dialog:has(.plan-add),
     .itinerary-screen,
     dialog:has(.plan-sheet),
     dialog:has(.plan-add),
+    dialog[data-panel="add"],
     .itinerary-poof-dot
   ) {
   --it-paper: #141312;
@@ -712,6 +714,7 @@ dialog:has(.plan-add),
     .itinerary-screen,
     dialog:has(.plan-sheet),
     dialog:has(.plan-add),
+    dialog[data-panel="add"],
     .itinerary-poof-dot
   ) {
   --it-paper: #141312;
@@ -1404,7 +1407,7 @@ dialog:has(.plan-add),
 
 /* ===== detail and edit sheets ===== */
 :root dialog:has(.plan-sheet) .modal-inner,
-:root dialog:has(.plan-add) .modal-inner {
+:root dialog.modal[data-panel="add"] .modal-inner {
   border-radius: 30px;
   background: var(--it-paper);
   color: var(--it-ink);
@@ -1415,7 +1418,7 @@ dialog:has(.plan-add),
     0 24px 60px -20px #0005;
 }
 :root dialog:has(.plan-sheet)::backdrop,
-:root dialog:has(.plan-add)::backdrop {
+:root dialog.modal[data-panel="add"]::backdrop {
   background: color-mix(in srgb, var(--paper) 50%, transparent);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
@@ -1790,32 +1793,47 @@ dialog:has(.plan-add),
   color: var(--it-mute);
 }
 
-/* ===== add sheet: right above the dock, every field within thumb reach ===== */
+/* ===== the ＋ button's floating panel (Modal addPanel): every add screen
+   (予定・場所・やること・持ち物・メモ, and 予約's own sheet in bookings.css)
+   sits right above the dock, every field within thumb reach. Taller content
+   scrolls inside the panel, which grows up to just below the trip header. ===== */
 @media (max-width: 759px) {
   /* .add{bottom:104px}: 12 px above the dock's islands. */
-  :root:root:has(.thumb-dock-host) dialog.modal:has(.plan-add) {
+  :root:root:has(.thumb-dock-host) dialog.modal[data-panel="add"] {
+    padding-top: calc(var(--add-panel-top) + env(safe-area-inset-top));
     padding-bottom: calc(
       var(--dock-height) + var(--dock-bottom-gap) + 12px +
         env(safe-area-inset-bottom)
     );
   }
 }
-:root dialog:has(.plan-add) .modal-header {
+:root {
+  /* 12 px below the trip header (58 px), plus the demo banner when shown. */
+  --add-panel-top: 70px;
+}
+:root:has(#root > .demo-banner) {
+  --add-panel-top: 106px;
+}
+:root dialog.modal[data-panel="add"] .modal-header {
   justify-content: flex-start;
   min-height: 0;
   padding: 20px 18px 0;
   border: 0;
-  background: none;
+  background: var(--it-paper);
   box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
-:root dialog:has(.plan-add) .modal-header h2 {
+:root dialog.modal[data-panel="add"] .modal-header h2 {
   margin: 0;
+  color: var(--it-ink);
+  font-family: var(--f-body);
   font-size: 19px;
   font-weight: 900;
   line-height: 1.3;
   text-align: left;
 }
-:root dialog:has(.plan-add) .modal-body {
+:root dialog.modal[data-panel="add"] .modal-body {
   padding: 0 18px 18px;
 }
 .plan-add {
