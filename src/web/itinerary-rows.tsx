@@ -20,7 +20,7 @@ import {
 } from "@/data/plan-timeline";
 import { referenceUrl } from "@/data/places";
 import type { Booking, ItineraryItem, Place } from "@/data/types";
-import { BookingBody } from "./booking-card";
+import { BookingBody, bookingHeading } from "./booking-card";
 import { categoryGlyph, Glyph, MapPin } from "./itinerary-icons";
 
 export type OpenTarget =
@@ -207,7 +207,7 @@ function BookingCard({
       <div className="it-card" data-press-card>
         <div className="it-lab is-single">
           <Glyph name={booking.kind === "train" ? "move" : "up"} />
-          {booking.title}
+          {bookingHeading(booking)}
         </div>
         <JourneyLine booking={booking} arrivalOnly />
       </div>

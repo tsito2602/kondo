@@ -28,7 +28,7 @@ const people = (...keys: string[]) => keys.map((key) => DEMO_PEOPLE[key]);
 export const demoMembers = people('self', 'misaki');
 
 /** Bump when the sample content changes, so devices drop an older saved sample. */
-export const DEMO_REVISION = '2026-10-06-vienna-2';
+export const DEMO_REVISION = '2026-10-06-vienna-3';
 
 /**
  * Demo mode's data: one five-day trip to Vienna starting 13 days from today
@@ -105,7 +105,7 @@ export function createDemoCache(): TravelCache {
   const bookings: Booking[] = [
     flight('sample-flight-1', '319', NRT, DXB, [0, '22:20'], [1, '05:30'], '34A・34B'),
     flight('sample-flight-2', '127', DXB, VIE, [1, '08:55'], [1, '12:25'], '41D・41E'),
-    booking({ id: 'sample-train', kind: 'train', title: 'シティ・エアポート・トレイン', detail: 'CAT · 往復券 2名', origin: 'ウィーン空港', destination: 'ウィーン・ミッテ駅', day: day(1), time: '13:06', endTime: '13:22', confirmationCode: '48102756', note: '帰りも同じ券で乗れる。' }),
+    booking({ id: 'sample-train', kind: 'train', title: 'シティ・エアポート・トレイン', detail: 'CAT', origin: 'ウィーン空港', destination: 'ウィーン・ミッテ駅', day: day(1), time: '13:06', endTime: '13:22', confirmationCode: '48102756', note: '往復券 2名 · 帰りも同じ券で乗れる。' }),
     booking({ id: 'sample-hotel', kind: 'hotel', title: 'ホテル・ザッハー・ウィーン', detail: '', location: VIENNA.sacher, day: day(1), time: '15:00', endDay: day(3), endTime: '12:00', confirmationCode: '40921776', note: 'ダブルルーム · 朝食付き · 2泊' }),
     booking({ id: 'sample-dinner', kind: 'restaurant', title: 'フィグルミュラー', detail: '', location: VIENNA.figl, day: day(1), time: '17:30', endTime: '19:00', note: '2名 · 予約名はみさき', placeId: 'sample-place-figl' }),
     booking({ id: 'sample-concert', kind: 'ticket', title: '楽友協会 モーツァルト・コンサート', detail: '', location: VIENNA.musikverein, day: day(1), time: '20:15', endTime: '21:45', confirmationCode: '30418827', note: '黄金のホール · バルコン 2列 12・13番', placeId: 'sample-place-musikverein' }),

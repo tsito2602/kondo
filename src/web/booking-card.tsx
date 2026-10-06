@@ -167,6 +167,18 @@ const singleLabel: Record<BookingKind, string> = {
   other: "予約",
 };
 
+/** A flight or a train is headed by its carrier, then its number or name
+    (Tsubasa 2026-10-06: 「航空会社鉄道会社　便名と表示しよう」). */
+export function bookingHeading(booking: Booking) {
+  const detail = (booking.detail ?? "").trim();
+  const carrier =
+    (booking.kind === "flight" || booking.kind === "train") &&
+    !/^https?:/i.test(detail)
+      ? detail
+      : "";
+  return [carrier, (booking.title ?? "").trim()].filter(Boolean).join(" ");
+}
+
 /** The card's body: the moment that matters most on the left, what and where on the right. */
 export function BookingBody({
   booking,
@@ -352,7 +364,7 @@ export function BookingCard({
       <div className="bk-mn">
         <div className="bk-hd">
           <Icon size={20} strokeWidth={1.9} aria-hidden="true" />
-          <b>{booking.title}</b>
+          <b>{bookingHeading(booking)}</b>
           {!used && isStaying(booking, now) && (
             <span className="bk-chip">滞在中</span>
           )}
