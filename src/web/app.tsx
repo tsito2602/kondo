@@ -40,6 +40,7 @@ import {
   Copy,
   BookOpen,
   Plus,
+  Link2,
 } from "lucide-react";
 import { Card } from "./obsidian/card";
 import { GoogleSignIn, useAuth } from "@/auth/auth-provider";
@@ -65,6 +66,7 @@ import {
   Field,
   Loading,
   Modal,
+  DockFunction,
   copyText,
   useAction,
   useToast,
@@ -340,7 +342,8 @@ function Home() {
     }, trip.id);
   return (
     <>
-      {/* Settings on the left, create on the right: both only here on phones. */}
+      {/* Settings on the left, joining by invite and create on the right:
+          only here on phones. */}
       <ThumbDock mode="context">
         <ContextDock
           back={
@@ -351,6 +354,15 @@ function Home() {
             >
               <Settings size={22} />
             </Link>
+          }
+          secondary={
+            <DockFunction
+              label="招待リンクから参加"
+              short="招待で参加"
+              className="home-join-dock"
+              icon={<Link2 aria-hidden="true" />}
+              onClick={() => setInvite(" ")}
+            />
           }
           actions={
             <button className="home-create" onClick={() => setEditing(true)}>
