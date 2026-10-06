@@ -430,6 +430,13 @@
     0 18px 40px -16px #0006;
   transform-origin: 50% 100%;
 }
+/* With ＋ on screen the card sits 12 px above it rather than over it
+   (Tsubasa 2026-10-06: 「プラスの上に表示すればいいだけじゃない？」). */
+@media (max-width: 759px) {
+  :root:has(.persistent-add:not([hidden])) .places-card {
+    bottom: calc(var(--add-bottom) + 58px + 12px);
+  }
+}
 .places-card-top {
   display: flex;
   align-items: start;

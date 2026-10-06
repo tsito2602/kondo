@@ -76,6 +76,18 @@ dialog[data-panel="add"],
   background: var(--it-paper);
   padding-top: 4px;
 }
+/* The timeline fades out under the date tabs instead of being cut off by a
+   hard edge (Tsubasa 2026-10-06: 「ここダサいのでいい感じにして」). */
+.it-top::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 24px;
+  background: linear-gradient(var(--it-paper), transparent);
+  pointer-events: none;
+}
 /* ===== date tabs: stay in the header, an ink pill on a soft track ===== */
 :root .itinerary-screen .date-strip {
   position: relative;

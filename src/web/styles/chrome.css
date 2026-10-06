@@ -16,6 +16,21 @@
   color: var(--p-ink);
   --control-size: 44px;
 }
+/* Every trip screen's content fades out under the header rather than
+   being cut off; the しおり's date tabs carry their own fade. */
+:root .trip-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 24px;
+  background: linear-gradient(var(--p-paper), transparent);
+  pointer-events: none;
+}
+:root:has(.it-top) .trip-header::after {
+  display: none;
+}
 :root .trip-header .trip-heading {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) 44px;
@@ -146,7 +161,7 @@
 :root .persistent-add:not([hidden]) {
   position: fixed;
   right: max(20px, env(safe-area-inset-right));
-  bottom: calc(112px + env(safe-area-inset-bottom));
+  bottom: var(--add-bottom);
   z-index: 24;
   width: 58px;
   height: 58px;
@@ -161,6 +176,10 @@
   box-shadow: 0 12px 24px -10px #0006;
   cursor: pointer;
   view-transition-name: floating-add;
+}
+:root {
+  /* ＋ floats 22 px above the dock's islands. */
+  --add-bottom: calc(var(--dock-safe-bottom) + var(--dock-height) + 22px);
 }
 :root .persistent-add:hover {
   background: var(--p-ink);
