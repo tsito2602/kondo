@@ -212,6 +212,9 @@ export function NotesScreen() {
     <div className="page notes-page">
       <div className="memo-top">
         <div>
+          <small>
+            {travel.selectedTrip?.name} · {all.length}件
+          </small>
           <h2>メモ</h2>
         </div>
         <div className="memo-acts">
@@ -279,12 +282,10 @@ export function NotesScreen() {
       )}
       {rest.length > 0 && (
         <>
-          {pins.length > 0 && (
-            <div className="memo-lab">
-              <b>メモ</b>
-              <span>{rest.length}件</span>
-            </div>
-          )}
+          <div className="memo-lab">
+            <b>メモ</b>
+            <span>{rest.length}件</span>
+          </div>
           {tiles(rest)}
         </>
       )}

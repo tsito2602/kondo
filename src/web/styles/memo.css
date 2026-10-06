@@ -24,7 +24,7 @@ dialog:has(.memo-editor),
 :root .notes-page {
   max-width: 880px;
   padding-inline: 18px;
-  padding-top: 8px;
+  padding-top: calc(8px + env(safe-area-inset-top));
   color: var(--m-ink);
 }
 .memo-top {
@@ -33,6 +33,12 @@ dialog:has(.memo-editor),
   justify-content: space-between;
   gap: 10px;
   padding: 6px 4px 8px;
+}
+.memo-top small {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--m-mute);
 }
 .memo-top h2 {
   margin: 0;

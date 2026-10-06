@@ -116,11 +116,11 @@ export function createDemoCache(): TravelCache {
       { id: 'sample-place-museum', title: '美術史美術館', note: '気になる展示をゆっくり見る。', openingHours: '', reservationStatus: 'needed', location: 'https://www.google.com/maps/search/?api=1&query=Kunsthistorisches+Museum', status: 'planned', itineraryItemId: 'sample-museum' },
     ] },
     notesByTrip: { [tripId]: [
-      { id: 'sample-note-address', title: 'タクシーに見せる住所', body: 'Hotel Sacher Wien\nPhilharmoniker Str. 4\n1010 Wien', pinned: true, updatedBy: 'demo-companion', updatedAt: ago(5) },
-      { id: 'sample-note-gifts', title: 'お土産リスト', body: '- [x] ザッハトルテ（空港で買う）\n- [ ] マンナーのウエハース\n- [ ] ユリウス・マインルのコーヒー豆\n- [x] モーツァルトクーゲル\n- [ ] 会社に配るお菓子\n- [ ] ポストカード', updatedBy: 'demo-self', updatedAt: ago(1) },
-      { id: 'sample-note-museum', title: '美術史美術館で見たいもの', body: '- [ ] ブリューゲル「バベルの塔」\n- [ ] フェルメール「絵画芸術」\n- [ ] 丸天井のカフェで休憩', placeId: 'sample-place-museum', updatedBy: 'demo-companion', updatedAt: ago(7) },
-      { id: 'sample-note-german', title: 'ドイツ語のひとこと', body: 'Danke schön ― ありがとう\nDie Rechnung, bitte. ― お会計お願いします\nEine Melange, bitte. ― メランジェをください', updatedBy: 'demo-companion', updatedAt: ago(8) },
-      { id: 'sample-note-money', title: '両替と支払い', body: '## お金\nカードはほぼどこでも使える\nチップは端数を切り上げて5〜10%\n## 小銭\nトイレ用に50セント硬貨を何枚か', updatedBy: 'demo-self', updatedAt: ago(13) },
+      { id: 'sample-note-address', title: 'タクシーに見せる住所', body: 'Hotel Sacher Wien\nPhilharmoniker Str. 4\n1010 Wien', pinned: true, updatedBy: 'demo-companion', updatedAt: ago(2) },
+      { id: 'sample-note-gifts', title: 'お土産リスト', body: '- [x] ザッハトルテ（空港で買う）\n- [ ] マンナーのウエハース\n- [ ] ユリウス・マインルのコーヒー豆\n- [x] モーツァルトクーゲル\n- [ ] 会社に配るお菓子', updatedBy: 'demo-self', updatedAt: ago(1) },
+      { id: 'sample-note-belvedere', title: 'ベルヴェデーレで見たいもの', body: '- [ ] クリムト「接吻」（上宮2階）\n- [ ] ダヴィッド「ナポレオンの肖像」\n- [ ] 庭園の端から街を見る', placeId: 'sample-place-belvedere', updatedBy: 'demo-companion', updatedAt: ago(3) },
+      { id: 'sample-note-german', title: 'ドイツ語のひとこと', body: 'Danke schön ― ありがとう\nDie Rechnung, bitte. ― お会計お願いします\nEine Melange, bitte. ― メランジェをください', updatedBy: 'demo-friend', updatedAt: ago(4) },
+      { id: 'sample-note-money', title: '両替と支払い', body: '## お金\nカードはほぼどこでも使える\nチップは端数を切り上げて5〜10%\n## 小銭\nトイレ用に50セント硬貨を何枚か', updatedBy: 'demo-self', updatedAt: ago(8) },
     ] },
     packingByTrip: { [tripId]: packing },
   }), tripId, start);
