@@ -117,3 +117,92 @@ export async function poof(element: HTMLElement | null | undefined) {
   });
   void Promise.all(dots);
 }
+
+/** The メモ editor opens out of the pressed tile (or ＋): it grows from
+    scale(.86) at the tile's centre on the split spring, rounding off 40 px
+    corners; closing shrinks it to .9 and fades (220 ms), then the tile boings.
+    A delete only fades (160 ms): the tile poofs instead. */
+export function memoEditorTransition(
+  from: () => Element | null | undefined,
+  deleting: () => boolean,
+) {
+  const centre = (panel: HTMLElement, element: Element | null | undefined) => {
+    if (!element?.isConnected) return "";
+    const box = element.getBoundingClientRect();
+    const frame = panel.getBoundingClientRect();
+    return `${box.left - frame.left + box.width / 2}px ${box.top - frame.top + box.height / 2}px`;
+  };
+  return {
+    enter: async (panel: HTMLElement, card: HTMLElement | null) => {
+      panel.style.transformOrigin = centre(panel, card ?? from());
+      await spring(
+        panel,
+        [
+          { transform: "scale(.86)", opacity: 0, borderRadius: "40px" },
+          { transform: "none", opacity: 1, borderRadius: "0px" },
+        ],
+        "split",
+      );
+      panel.style.transformOrigin = "";
+    },
+    exit: async (panel: HTMLElement, card: HTMLElement | null) => {
+      if (reduceMotion() || !panel.animate) return;
+      if (deleting()) {
+        await panel
+          .animate([{ opacity: 1 }, { opacity: 0 }], {
+            duration: 160,
+            fill: "forwards",
+          })
+          .finished.catch(() => undefined);
+        return;
+      }
+      await panel
+        .animate(
+          [
+            { transform: "none", opacity: 1 },
+            { transform: "scale(.9)", opacity: 0 },
+          ],
+          {
+            duration: 220,
+            easing: "cubic-bezier(.5,0,.8,.4)",
+            fill: "forwards",
+          },
+        )
+        .finished.catch(() => undefined);
+      void spring(card, [{ transform: "scale(.94)" }, { transform: "none" }]);
+    },
+  };
+}
+
+/** The mock's bubble: an ink note that pops above the pressed dock button
+    (2.6 s), e.g. 「上にピン留めしました」. */
+export function bubble(anchor: Element, text: string) {
+  const host = anchor.closest("dialog") ?? document.body;
+  let bub = host.querySelector<HTMLElement>(":scope > .memo-bub");
+  if (!bub) {
+    bub = document.createElement("div");
+    bub.className = "memo-bub";
+    bub.setAttribute("role", "status");
+    host.appendChild(bub);
+  }
+  bub.textContent = text;
+  bub.style.left = "0px";
+  const width = bub.offsetWidth;
+  const box = anchor.getBoundingClientRect();
+  bub.style.left = `${Math.max(12, Math.min(window.innerWidth - 12 - width, box.left + box.width / 2 - width / 2))}px`;
+  bub.getAnimations().forEach((animation) => animation.cancel());
+  if (reduceMotion() || !bub.animate) {
+    bub.style.opacity = "1";
+    setTimeout(() => bub && (bub.style.opacity = ""), 2600);
+    return;
+  }
+  bub.animate(
+    [
+      { opacity: 0, transform: "translateY(10px) scale(.6)" },
+      { opacity: 1, transform: "none", offset: 0.12 },
+      { opacity: 1, transform: "none", offset: 0.85 },
+      { opacity: 0 },
+    ],
+    { duration: 2600, easing: "ease-out" },
+  );
+}

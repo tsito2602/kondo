@@ -228,6 +228,10 @@ export function FormBackButton({
   );
 }
 
+export type ModalTransition = {
+  enter: (panel: HTMLElement, card: HTMLElement | null) => unknown;
+  exit: (panel: HTMLElement, card: HTMLElement | null) => Promise<unknown>;
+};
 export function Modal({
   title,
   children,
@@ -237,6 +241,7 @@ export function Modal({
   action,
   preserveNavigation = false,
   dockActions,
+  transition,
 }: PropsWithChildren<{
   title: string;
   onClose: () => void;
@@ -251,6 +256,8 @@ export function Modal({
     /** Many tools in a row where the tabs sit (a note's editor). */
     wide?: boolean;
   };
+  /** A screen's own phone move in place of the shared card/sheet one. */
+  transition?: ModalTransition;
 }>) {
   const ref = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -285,7 +292,9 @@ export function Modal({
     const phone =
       panel && !reduceMotion() && matchMedia("(max-width: 759px)").matches;
     cartoon.current = phone ? { card: cardOrigin(origin.current) } : null;
-    if (phone && cartoon.current?.card)
+    if (phone && transition)
+      void transition.enter(panel, cartoon.current!.card);
+    else if (phone && cartoon.current?.card)
       void openFromCard(cartoon.current.card, panel, {
         parent: dialog,
         parts: [
@@ -297,15 +306,19 @@ export function Modal({
     else if (phone) void sheetIn(panel);
     const enter = phone ? null : animateDialog(dialog, origin.current);
     animation.current = enter;
-    depth.current = menuDepth(
-      reduceMotion(),
-      {
-        duration: 320,
-        easing: "cubic-bezier(.32, 0, .2, 1)",
-        fill: "both",
-      },
-      dialog,
-    );
+    // A screen's own move draws over the page as it is: no receding page.
+    depth.current =
+      phone && transition
+        ? null
+        : menuDepth(
+            reduceMotion(),
+            {
+              duration: 320,
+              easing: "cubic-bezier(.32, 0, .2, 1)",
+              fill: "both",
+            },
+            dialog,
+          );
     backdropAnimation.current = dialog
       .getAnimations?.({ subtree: true })
       .find(
@@ -369,7 +382,11 @@ export function Modal({
         (pendingClose.current ?? closeCallback.current)();
       };
       void (
-        card ? closeToCard(card, panel, { parent: dialog }) : sheetOut(panel)
+        transition
+          ? transition.exit(panel, card)
+          : card
+            ? closeToCard(card, panel, { parent: dialog })
+            : sheetOut(panel)
       ).then(finish);
       const timer = setTimeout(finish, 900);
       return () => {

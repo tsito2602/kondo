@@ -307,9 +307,15 @@ dialog:has(.memo-editor),
   padding: 0;
   border: 0;
   border-radius: 0;
-  background: var(--m-paper);
+  /* The paper is the panel's, so the list shows while it grows in. */
+  background: transparent;
   box-shadow: none;
   overflow: hidden;
+}
+:root .modal.full:has(.memo-editor)::backdrop {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 :root .modal.full:has(.memo-editor) .modal-inner,
 :root:has(.thumb-dock-host) .modal.full:has(.memo-editor) .modal-inner {
@@ -593,4 +599,23 @@ dialog:has(.memo-show) .context-back {
 .memo-linked .memo-cb svg {
   width: 11px;
   height: 11px;
+}
+
+/* The mock's bubble over the dock (memo-motion bubble()). */
+.memo-bub {
+  position: fixed;
+  left: 0;
+  bottom: calc(var(--dock-bottom-gap) + 74px + env(safe-area-inset-bottom));
+  z-index: 90;
+  padding: 7px 12px;
+  border-radius: 12px;
+  background: var(--p-ink);
+  color: var(--p-paper);
+  font-family: var(--f-body);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.7;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
 }
