@@ -230,6 +230,12 @@ CREATE TABLE IF NOT EXISTS note_details (
   content TEXT
 );
 
+-- Optional link from a note to a numbered place; omission by old clients preserves it.
+CREATE TABLE IF NOT EXISTS note_places (
+  note_id TEXT PRIMARY KEY REFERENCES travel_notes(id) ON DELETE CASCADE,
+  place_id TEXT REFERENCES places(id) ON DELETE SET NULL
+);
+
 -- Optional packing ownership preserves existing rows and repeatable deployment.
 CREATE TABLE IF NOT EXISTS packing_details (
   item_id TEXT PRIMARY KEY REFERENCES packing_items(id) ON DELETE CASCADE,

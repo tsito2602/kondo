@@ -271,9 +271,9 @@ async function notesRoute(request: Request, env: Env, user: User, tripId: string
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
   if (request.method === 'GET' && !noteId) {
-    const rows = await env.DB.prepare(`SELECT n.id, n.body, n.updated_at AS updatedAt, COALESCE(d.title, '') AS title, d.content
-      FROM travel_notes n LEFT JOIN note_details d ON d.note_id=n.id WHERE n.trip_id=? ORDER BY n.updated_at DESC, n.id`).bind(tripId).all();
-    return json({ notes: rows.results.map(({ content, ...row }) => ({ ...row, pinned: false, content: content ? JSON.parse(String(content)) : null })) });
+    const rows = await env.DB.prepare(`SELECT n.id, n.body, n.pinned, n.updated_by AS updatedBy, n.updated_at AS updatedAt, COALESCE(d.title, '') AS title, d.content, l.place_id AS placeId
+      FROM travel_notes n LEFT JOIN note_details d ON d.note_id=n.id LEFT JOIN note_places l ON l.note_id=n.id WHERE n.trip_id=? ORDER BY n.updated_at DESC, n.id`).bind(tripId).all();
+    return json({ notes: rows.results.map(({ content, pinned, ...row }) => ({ ...row, pinned: pinned === 1, content: content ? JSON.parse(String(content)) : null })) });
   }
   if (request.method === 'DELETE' && noteId) {
     await env.DB.prepare('DELETE FROM travel_notes WHERE id=? AND trip_id=?').bind(noteId, tripId).run();
@@ -284,17 +284,25 @@ async function notesRoute(request: Request, env: Env, user: User, tripId: string
     if (!isObject(body) || !idField(body.id) || typeof body.body !== 'string' || body.body.length > NOTE_BODY_LIMIT) return json({ error: 'メモは50,000文字以内で入力してください' }, 400);
     if (body.title !== undefined && (typeof body.title !== 'string' || body.title.length > NOTE_TITLE_LIMIT)) return json({ error: 'タイトルは120文字以内で入力してください' }, 400);
     if (body.content != null && !validNoteContent(body.content)) return json({ error: 'メモの書式を確認してください' }, 400);
+    // Older clients omit pinned/placeId; omission keeps what is stored.
+    if (body.pinned !== undefined && typeof body.pinned !== 'boolean') return json({ error: 'ピン留めの値を確認してください' }, 400);
+    if (body.placeId != null && !idField(body.placeId)) return json({ error: '場所を確認してください' }, 400);
+    const pinned = body.pinned === undefined ? null : body.pinned ? 1 : 0;
+    const placeId = body.placeId === undefined ? undefined : body.placeId === null ? null : (await env.DB.prepare('SELECT id FROM places WHERE id=? AND trip_id=?').bind(body.placeId, tripId).first<{ id: string }>())?.id ?? null;
     const plain = body.content == null ? body.body : notePlainText(body.content);
     if (plain.length > NOTE_BODY_LIMIT) return json({ error: 'メモは50,000文字以内で入力してください' }, 400);
     const content = body.content == null ? null : JSON.stringify(body.content);
     const [result] = await env.DB.batch([
-      env.DB.prepare(`INSERT INTO travel_notes (id,trip_id,body,pinned,updated_by) VALUES (?,?,?,0,?)
-        ON CONFLICT(id) DO UPDATE SET body=excluded.body,pinned=0,updated_by=excluded.updated_by,updated_at=unixepoch()
-        WHERE travel_notes.trip_id=excluded.trip_id`).bind(body.id, tripId, plain, user.id),
+      env.DB.prepare(`INSERT INTO travel_notes (id,trip_id,body,pinned,updated_by) VALUES (?,?,?,COALESCE(?,0),?)
+        ON CONFLICT(id) DO UPDATE SET body=excluded.body,pinned=COALESCE(?,travel_notes.pinned),updated_by=excluded.updated_by,updated_at=unixepoch()
+        WHERE travel_notes.trip_id=excluded.trip_id`).bind(body.id, tripId, plain, pinned, user.id, pinned),
       env.DB.prepare(`INSERT INTO note_details (note_id,title,content)
         SELECT ?,COALESCE(?,''),? WHERE EXISTS (SELECT 1 FROM travel_notes WHERE id=? AND trip_id=?)
         ON CONFLICT(note_id) DO UPDATE SET title=COALESCE(?,note_details.title),content=excluded.content
       `).bind(body.id, body.title ?? null, content, body.id, tripId, body.title ?? null),
+      ...(placeId === undefined ? [] : [env.DB.prepare(`INSERT INTO note_places (note_id,place_id)
+        SELECT ?,? WHERE EXISTS (SELECT 1 FROM travel_notes WHERE id=? AND trip_id=?)
+        ON CONFLICT(note_id) DO UPDATE SET place_id=excluded.place_id`).bind(body.id, placeId, body.id, tripId)]),
     ]);
     if (!result.meta.changes) return json({ error: 'メモのIDが競合しました' }, 409);
     return json({ id: body.id }, 201);

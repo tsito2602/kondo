@@ -111,8 +111,9 @@ export type Place = {
 };
 export type PlaceInput = Omit<Place, 'id' | 'updatedAt'>;
 
-export type TravelNote = { id: string; title?: string; body: string; content?: import('./notes').NoteContent | null; pinned?: boolean; updatedAt: number };
-export type NoteInput = Pick<TravelNote, 'title' | 'body' | 'content'>;
+/** placeId links the note to a numbered place (and through it, a day's plan). Both optional for older rows. */
+export type TravelNote = { id: string; title?: string; body: string; content?: import('./notes').NoteContent | null; pinned?: boolean; placeId?: string | null; updatedBy?: string | null; updatedAt: number };
+export type NoteInput = Pick<TravelNote, 'title' | 'body' | 'content' | 'pinned' | 'placeId'>;
 
 export type PendingMutation = {
   id: string;

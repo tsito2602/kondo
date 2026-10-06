@@ -36,7 +36,9 @@ test('titled rich notes round-trip, preserve legacy text and enforce schema, rol
     const legacy = { id, body: '旅のメモ\n- [ ] お土産', pinned: true };
     assert.equal((await call(base, 'POST', legacy)).status, 201);
     assert.equal((await read()).body, legacy.body);
-    assert.equal((await read()).pinned, false);
+    assert.equal((await read()).pinned, true);
+    assert.equal((await read()).updatedBy, 'owner');
+    assert.equal((await read()).placeId, null);
     const content = { type: 'doc', content: [
       { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: '買い物' }] },
       { type: 'taskList', content: [{ type: 'taskItem', attrs: { checked: true }, content: [
@@ -47,6 +49,9 @@ test('titled rich notes round-trip, preserve legacy text and enforce schema, rol
     assert.equal((await call(base, 'POST', rich, 'editor')).status, 201);
     assert.deepEqual((await read()).content, content);
     assert.equal((await read()).body, rich.body);
+    // A save that omits the pin keeps it; the last writer is reported.
+    assert.equal((await read()).pinned, true);
+    assert.equal((await read()).updatedBy, 'editor');
     db.exec(await readFile('worker/schema.sql', 'utf8'));
     assert.equal((await read()).title, rich.title);
     assert.deepEqual((await read()).content, content);
@@ -388,7 +393,10 @@ test('travel notes preserve text, replay safely and enforce trip permissions', a
     const read = async () => (await (await call(base)).json()).notes;
     assert.equal((await read()).length, 1);
     assert.equal((await read())[0].body, note.body);
+    assert.equal((await read())[0].pinned, true);
+    assert.equal((await call(base, 'POST', { ...note, pinned: false })).status, 201);
     assert.equal((await read())[0].pinned, false);
+    assert.equal((await call(base, 'POST', { ...note, pinned: 'yes' })).status, 400);
     assert.equal((await call(base, 'POST', { ...note, body: 'a'.repeat(50001) })).status, 400);
     assert.equal((await call(base, 'GET', undefined, 'outsider')).status, 403);
     assert.equal((await call(base, 'POST', note, 'outsider')).status, 403);
@@ -406,6 +414,37 @@ test('travel notes preserve text, replay safely and enforce trip permissions', a
     await call(base, 'POST', note);
     await call(`/trips/${trip.id}`, 'DELETE');
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM travel_notes').get().n, 0);
+  } finally { db.close(); }
+});
+
+test('notes link to a place of the same trip, survive old clients and schema reruns, and unlink when the place goes', async () => {
+  const { db, call, trip } = await fixture();
+  try {
+    const placeId = randomUUID(), otherPlace = randomUUID(), id = randomUUID();
+    assert.equal((await call(`/trips/${trip.id}/places`, 'POST', { id: placeId, ...place })).status, 201);
+    const other = { ...trip, id: randomUUID() };
+    await call('/trips', 'POST', other);
+    assert.equal((await call(`/trips/${other.id}/places`, 'POST', { id: otherPlace, ...place })).status, 201);
+    const base = `/trips/${trip.id}/notes`;
+    const read = async () => (await (await call(base)).json()).notes.find((note) => note.id === id);
+    const note = { id, title: '美術館で見たいもの', body: '- [ ] 展示', pinned: false, placeId };
+    assert.equal((await call(base, 'POST', note)).status, 201);
+    assert.equal((await read()).placeId, placeId);
+    // Old clients send only text: the link stays.
+    assert.equal((await call(base, 'POST', { id, title: note.title, body: '- [x] 展示' }, 'editor')).status, 201);
+    assert.equal((await read()).placeId, placeId);
+    db.exec(await readFile('worker/schema.sql', 'utf8'));
+    assert.equal((await read()).placeId, placeId);
+    // Another trip's place is never linked.
+    assert.equal((await call(base, 'POST', { ...note, placeId: otherPlace })).status, 201);
+    assert.equal((await read()).placeId, null);
+    assert.equal((await call(base, 'POST', { ...note, placeId: 'not-an-id' })).status, 400);
+    assert.equal((await call(base, 'POST', note)).status, 201);
+    assert.equal((await call(`/trips/${trip.id}/places/${placeId}`, 'DELETE')).status, 204);
+    assert.equal((await read()).placeId, null);
+    assert.equal((await read()).body, note.body);
+    assert.equal((await call(`${base}/${id}`, 'DELETE')).status, 204);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM note_places').get().n, 0);
   } finally { db.close(); }
 });
 

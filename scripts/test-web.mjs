@@ -940,40 +940,59 @@ test("legacy account cache and pending changes survive React migration; real for
       1,
     );
     await click(byText("nav a", "メモ"));
+    const noteCount = () =>
+      db.prepare("SELECT COUNT(*) AS n FROM travel_notes").get().n;
+    const typeInto = async (node, value) => {
+      assert.ok(node, "text field exists");
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(
+          dom.window.HTMLTextAreaElement.prototype,
+          "value",
+        ).set.call(node, value);
+        node.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+      });
+    };
+    const closeNote = async () => {
+      // The dock's back button first dismisses the keyboard, then goes back.
+      document.activeElement?.blur();
+      await tick(40);
+      await click(document.querySelector('dialog [aria-label="戻る"]'));
+      await tick();
+    };
     await click(document.querySelector('[aria-label="メモを書く"]'));
     await tick(550);
+    assert.equal(noteCount(), 0, "opening an empty note does not save it");
     assert.equal(
-      db.prepare("SELECT COUNT(*) AS n FROM travel_notes").get().n,
-      0,
-      "opening an empty note does not save it",
+      byText("dialog button", "完了"),
+      undefined,
+      "notes autosave; there is no 完了",
     );
-    await click(byText(".context-primary button", "完了"));
+    await closeNote();
     await click(document.querySelector('[aria-label="メモを書く"]'));
-    assert.equal(document.activeElement, document.querySelector("dialog h2"));
-    assert.equal(document.querySelector('[aria-label="ピン留め"]'), null);
-    const title = document.querySelector('[aria-label="メモのタイトル"]');
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(
-        dom.window.HTMLInputElement.prototype,
-        "value",
-      ).set.call(title, "旅先の買い物");
-      title.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
-    });
-    const textarea = document.querySelector('textarea[aria-label="メモ本文"]');
-    assert.equal(textarea.placeholder, "メモを入力...");
-    assert.equal(document.querySelector('[aria-label="本文の書式"]'), null);
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(
-        dom.window.HTMLTextAreaElement.prototype,
-        "value",
-      ).set.call(textarea, "お土産\n待ち合わせ場所");
-      textarea.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
-    });
-    await tick(550);
     assert.equal(
-      db.prepare("SELECT COUNT(*) AS n FROM travel_notes").get().n,
-      1,
+      document.activeElement,
+      document.querySelector('[aria-label="メモのタイトル"]'),
+      "＋ starts on the title",
     );
+    await typeInto(
+      document.querySelector('[aria-label="メモのタイトル"]'),
+      "旅先の買い物",
+    );
+    await typeInto(
+      document.querySelector('textarea[aria-label="1行目"]'),
+      "お土産",
+    );
+    await click(document.querySelector('[aria-label="チェックを足す"]'));
+    await typeInto(
+      document.querySelector('textarea[aria-label="2行目"]'),
+      "待ち合わせ場所",
+    );
+    assert.ok(
+      document.querySelector('dialog .memo-ln.c [role="checkbox"]'),
+      "a check line renders as a box",
+    );
+    await tick(550);
+    assert.equal(noteCount(), 1);
     assert.equal(
       db.prepare("SELECT title FROM note_details").get().title,
       "旅先の買い物",
@@ -984,41 +1003,71 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.equal(
       db.prepare("SELECT body FROM travel_notes").get().body,
-      "お土産\n待ち合わせ場所",
+      "お土産\n- [ ] 待ち合わせ場所",
     );
-    await click(byText(".context-primary button", "完了"));
-    await tick();
+    await click(document.querySelector('[aria-label="ピン留め"]'));
+    await tick(550);
+    assert.equal(db.prepare("SELECT pinned FROM travel_notes").get().pinned, 1);
+    await closeNote();
     assert.match(
-      document.querySelector(".note-card").textContent,
+      document.querySelector(".memo-tile").textContent,
       /旅先の買い物/,
     );
-    await click(document.querySelector(".note-card"));
-    assert.equal(
-      document.querySelector('textarea[aria-label="メモ本文"]').value,
-      "お土産\n待ち合わせ場所",
-    );
-    await click(byText(".context-primary button", "完了"));
-    await tick();
-    await click(document.querySelector('[aria-label="メモを書く"]'));
-    const temporaryTitle = document.querySelector(
-      '[aria-label="メモのタイトル"]',
-    );
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(
-        dom.window.HTMLInputElement.prototype,
-        "value",
-      ).set.call(temporaryTitle, "削除するメモ");
-      temporaryTitle.dispatchEvent(
-        new dom.window.Event("input", { bubbles: true }),
-      );
-    });
-    await click(document.querySelector('[aria-label="メモを削除"]'));
+    assert.ok(byText(".memo-lab b", "ピン留め"), "pinned notes group on top");
+    assert.match(document.querySelector(".memo-meta").textContent, /あなた/);
+    // Ticking on the tile saves without opening the note.
+    await click(document.querySelector('.memo-tile [role="checkbox"]'));
     await tick(550);
+    assert.equal(document.querySelector("dialog"), null);
     assert.equal(
-      db.prepare("SELECT COUNT(*) AS n FROM travel_notes").get().n,
-      1,
-      "deleting a pending draft cancels its autosave",
+      db.prepare("SELECT body FROM travel_notes").get().body,
+      "お土産\n- [x] 待ち合わせ場所",
     );
+    await click(document.querySelector(".memo-tile-open"));
+    assert.equal(
+      document.querySelector('textarea[aria-label="2行目"]').value,
+      "待ち合わせ場所",
+    );
+    assert.equal(
+      document
+        .querySelector('dialog [role="checkbox"]')
+        .getAttribute("aria-checked"),
+      "true",
+    );
+    await closeNote();
+    await click(document.querySelector('[aria-label="メモを書く"]'));
+    await typeInto(
+      document.querySelector('[aria-label="メモのタイトル"]'),
+      "削除するメモ",
+    );
+    await click(document.querySelector('[aria-label="メモを消す"]'));
+    await tick(50);
+    assert.ok(
+      ![...document.querySelectorAll(".memo-tile")].some((tile) =>
+        tile.textContent.includes("削除するメモ"),
+      ),
+      "a deleted note leaves the list at once, with no confirm",
+    );
+    await click(document.querySelector(".memo-undo"));
+    assert.ok(
+      [...document.querySelectorAll(".memo-tile")].some((tile) =>
+        tile.textContent.includes("削除するメモ"),
+      ),
+      "元に戻す brings it back",
+    );
+    await click(
+      [...document.querySelectorAll(".memo-tile-open")].find((button) =>
+        button.textContent.includes("削除するメモ"),
+      ),
+    );
+    await click(document.querySelector('[aria-label="メモを消す"]'));
+    await tick(50);
+    assert.ok(document.querySelector(".memo-undo"));
+    // Leaving the page settles the deletion instead of waiting for the timer.
+    await click(byText("nav a", "しおり"));
+    await tick(550);
+    assert.equal(noteCount(), 1, "the undo window ends in a real delete");
+    await click(byText("nav a", "メモ"));
     assert.deepEqual(
       failures,
       [],

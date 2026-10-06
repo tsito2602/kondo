@@ -1,5 +1,6 @@
 import { PlaceStatusLabel } from "./place-status";
 import { DocumentPreview } from "./document-preview";
+import { LinkedNotes } from "./linked-notes";
 import { BookingSchedule, ItemSchedule } from "./booking-schedule";
 import { dismissModal } from "./motion";
 import { Button } from "./obsidian/button";
@@ -646,6 +647,17 @@ export function PlaceDetail({
               <p className="pre-wrap">{place.note}</p>
             </section>
           )}
+          <LinkedNotes
+            placeId={place.id}
+            onOpen={(noteId) =>
+              dismissModal(() => {
+                onClose();
+                navigate(
+                  `/trips/${travel.selectedTrip!.id}/notes?note=${noteId}`,
+                );
+              })
+            }
+          />
           {place.referenceLinks?.length ? (
             <section className="detail-section">
               <h3>
