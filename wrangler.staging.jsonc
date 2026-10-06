@@ -6,10 +6,12 @@
   "compatibility_flags": ["nodejs_compat"],
   "assets": { "directory": "./dist", "binding": "ASSETS", "not_found_handling": "single-page-application", "run_worker_first": ["/v1/*"] },
   "d1_databases": [{ "binding": "DB", "database_name": "tabi-staging", "database_id": "__D1_DATABASE_ID__" }],
+  "ai": { "binding": "AI" },
   "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "tabi-documents-staging" }],
   "vars": {
     "GOOGLE_CLIENT_IDS": "__GOOGLE_CLIENT_IDS__",
-    "ALLOWED_ORIGINS": "__ALLOWED_ORIGINS__"
+    "ALLOWED_ORIGINS": "__ALLOWED_ORIGINS__",
+    "AI_GATEWAY_ID": "kondo"
   },
   "observability": { "enabled": true }
 }
