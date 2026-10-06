@@ -1089,7 +1089,7 @@ test("legacy account cache and pending changes survive React migration; real for
       postMessage(message, ports) {
         posted.push(message.type);
         if (message.type === "GET_VERSION")
-          ports[0].postMessage({ version: "2026.10.7" });
+          ports[0].postMessage({ version: "2026.10.7.1432" });
       },
     };
     swRegistration.waiting = waitingWorker;
@@ -1102,10 +1102,10 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.match(
       notice.textContent,
-      /アップデートされました\s*kondo 2026\.10\.7\s*新しくする/,
+      /アップデートされました\s*kondo 2026\.10\.7\.1432\s*新しくする/,
     );
     assert.equal(document.documentElement.dataset.appUpdate, "waiting");
-    assert.match(versionRow.textContent, /2026\.10\.7 が届いています/);
+    assert.match(versionRow.textContent, /2026\.10\.7\.1432 が届いています/);
     await click(notice);
     assert.deepEqual(posted, ["GET_VERSION", "ACTIVATE_UPDATE"]);
     assert.equal(sessionStorage.getItem("kondo.updated"), "1");

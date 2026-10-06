@@ -3,15 +3,23 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
 
-/** The build's user-facing version: its day in Japan, e.g. 2026.10.7. */
+/** The build's user-facing version: its time in Japan, e.g. 2026.10.7.1432. */
 function buildVersion() {
-  const [year, month, day] = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tokyo",
-  })
-    .format(new Date())
-    .split("-")
-    .map(Number);
-  return `${year}.${month}.${day}`;
+  const part = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(new Date())
+      .map((entry) => [entry.type, entry.value]),
+  );
+  // Several deploys a day each get their own name.
+  return `${part.year}.${part.month}.${part.day}.${part.hour}${part.minute}`;
 }
 
 export default defineConfig(({ mode }) => {

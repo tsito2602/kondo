@@ -124,6 +124,6 @@ test('a waiting worker names its build label so the page can show the update', a
     return reply;
   };
   const filled = template.replace('__VERSION__', 'test').replace('__PRECACHE__', '[]');
-  assert.equal(answer(filled.replace('__BUILD_LABEL__', '2026.10.7')).version, '2026.10.7');
+  assert.equal(answer(filled.replace('__BUILD_LABEL__', '2026.10.7.1432')).version, '2026.10.7.1432');
   assert.equal(answer(filled).version, '', 'an unlabelled build reports no version');
 });

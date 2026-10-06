@@ -20,7 +20,7 @@ export const useAppUpdate = () => useSyncExternalStore(subscribe, () => state);
 
 // Read lazily: some test bundles load this module without Vite's env.
 export const appVersion = () => import.meta.env.VITE_APP_VERSION;
-/** The waiting build's name; a build that cannot say (or says the same day) is just "new". */
+/** The waiting build's name; an older worker that cannot say is just "new". */
 export const updateLabel = (version: string) =>
   version && version !== appVersion() ? version : "新しいバージョン";
 
