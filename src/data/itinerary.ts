@@ -21,6 +21,13 @@ export const emptyItineraryDetails = (category: ItineraryCategory = 'other'): It
 export function itemDetails(item: ItineraryItem): ItineraryDetails {
   return item.details ?? emptyItineraryDetails(itineraryCategories.find((category) => category.label === item.kind)?.value ?? 'other');
 }
+/**
+ * Our own check-in/out time for a hotel booking (details.stay) is stored as an
+ * itinerary item, but it is not a plan: only the しおり timeline and the hotel
+ * sheet read it. Everything else that lists plans goes through ordinaryPlans.
+ */
+export const isStayRecord = (item: ItineraryItem) => Boolean(item.details?.stay);
+export const ordinaryPlans = (items: readonly ItineraryItem[]) => items.filter((item) => !isStayRecord(item));
 export function itemCategory(item: ItineraryItem) {
   return itineraryCategories.find((category) => category.value === itemDetails(item).category) ?? itineraryCategories[4];
 }

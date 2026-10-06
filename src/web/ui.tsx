@@ -132,14 +132,20 @@ export function useAction() {
   };
   return { busy, run };
 }
-/** Keep the pointer-down action stable even when the browser blurs on tap.
-    A sheet may name its way out (「やめる」) instead of showing an arrow. */
-function FormBackButton({
+/**
+ * Keep the pointer-down action stable even when the browser blurs on tap.
+ * While an editor is focused it closes the keyboard; otherwise it leaves.
+ * A sheet may name its way out (「やめる」) as text instead of an arrow, or
+ * pass an icon, in which case the label is only the accessible name.
+ */
+export function FormBackButton({
   onBack,
   label,
+  icon,
 }: {
   onBack: () => void;
   label?: string;
+  icon?: ReactNode;
 }) {
   const [editor, setEditor] = useState<HTMLElement | null>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -179,8 +185,14 @@ function FormBackButton({
     <button
       ref={button}
       type="button"
-      aria-label={editor ? "キーボードを閉じる" : label ? undefined : "戻る"}
-      className={label && !editor ? "context-back-label" : undefined}
+      aria-label={
+        editor
+          ? "キーボードを閉じる"
+          : label && !icon
+            ? undefined
+            : (label ?? "戻る")
+      }
+      className={label && !icon && !editor ? "context-back-label" : undefined}
       onPointerDown={(event) => {
         pressedEditor.current = editor;
         if (editor) event.preventDefault();
@@ -203,7 +215,7 @@ function FormBackButton({
           <ChevronDown size={12} />
         </span>
       ) : (
-        (label ?? <ArrowLeft size={22} />)
+        (icon ?? label ?? <ArrowLeft size={22} />)
       )}
     </button>
   );

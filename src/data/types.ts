@@ -21,6 +21,10 @@ export type ItineraryDetails = {
   endDay: string;
   endTime: string;
   transport?: { mode: TransportMode; origin: string; destination: string; durationMinutes?: number; afterKey?: string };
+  /** The travellers' own check-in/out time for a hotel booking; the booking keeps the hotel's terms. */
+  stay?: { bookingId: string; endpoint: 'start' | 'end' };
+  /** The linked place was attached in the しおり (a map link), not scheduled from the places list. */
+  ownPlace?: boolean;
 };
 
 export type ItineraryItem = {

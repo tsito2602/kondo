@@ -24,6 +24,7 @@ const people = (...keys: string[]) => keys.map((key) => DEMO_PEOPLE[key]);
 /** The demo trip's three travellers; the provider lists them as members. */
 export const demoMembers = people('self', 'companion', 'friend');
 import { withDemoPlaces } from './demo-places';
+import { withItineraryDemo } from './demo-itinerary';
 
 export function createDemoCache(): TravelCache {
   const start = addDays(localDate(), 14);
@@ -88,13 +89,15 @@ export function createDemoCache(): TravelCache {
     flight,
     { ...flight, id: 'sample-flight-2', title: 'サンプル航空 202', origin: 'ドバイ国際空港', originCode: 'DXB', destination: 'ウィーン国際空港', destinationCode: 'VIE', day: next, time: '08:55', endDay: next, endTime: '12:25' },
     { ...flight, ...plain, id: 'sample-hotel', kind: 'hotel', title: '旧市街のホテル', detail: 'ウィーン旧市街', day: next, time: '15:00', endDay: last, endTime: '11:00' },
-    { ...flight, ...plain, id: 'sample-opera', kind: 'ticket', title: '魔笛', detail: 'ウィーン国立歌劇場', day: next, time: '19:00', endDay: next, endTime: '', confirmationCode: 'WSO-7781' },
-    { ...flight, ...plain, id: 'sample-belvedere', kind: 'ticket', title: 'ベルヴェデーレ宮殿 上宮', detail: '時間指定券', day: addDays(start, 2), time: '10:00', endDay: addDays(start, 2), endTime: '', confirmationCode: 'BLV-55120' },
-    { ...flight, ...plain, id: 'sample-dinner', kind: 'restaurant', title: 'フィグルミュラー', detail: 'ヴォルツァイレ通り', day: addDays(start, 2), time: '19:30', endDay: addDays(start, 2), endTime: '', confirmationCode: '' },
-    { ...flight, ...plain, id: 'sample-train', kind: 'train', title: 'CAT 空港特急', detail: 'シティ・エアポート・トレイン', origin: 'ウィーン・ミッテ駅', destination: 'ウィーン国際空港', day: last, time: '12:06', endDay: last, endTime: '12:22', confirmationCode: 'CAT-88412' },
+    { ...flight, ...plain, id: 'sample-opera', kind: 'ticket', title: '魔笛', detail: 'ウィーン国立歌劇場', day: next, time: '20:30', endDay: next, endTime: '', confirmationCode: 'WSO-7781' },
+    { ...flight, ...plain, id: 'sample-belvedere', kind: 'ticket', title: 'ベルヴェデーレ宮殿 上宮', detail: '時間指定券', day: last, time: '09:15', endDay: last, endTime: '', confirmationCode: 'BLV-55120' },
+    { ...flight, ...plain, id: 'sample-dinner', kind: 'restaurant', title: 'フィグルミュラー', detail: 'ヴォルツァイレ通り', day: next, time: '18:30', endDay: next, endTime: '', confirmationCode: '' },
+    { ...flight, ...plain, id: 'sample-train', kind: 'train', title: 'CAT 空港特急', detail: 'シティ・エアポート・トレイン', origin: 'ウィーン国際空港', destination: 'ウィーン・ミッテ駅', day: next, time: '13:10', endDay: next, endTime: '13:26', confirmationCode: 'CAT-88412' },
     { ...flight, id: 'sample-flight-3', title: 'サンプル航空 102', origin: 'ウィーン国際空港', originCode: 'VIE', destination: 'ドバイ国際空港', destinationCode: 'DXB', day: last, time: '14:40', endDay: last, endTime: '22:05' },
   ];
-  return withDemoPlaces({
+  // Sample bookings line up with the しおり's plans (dinner, Belvedere, the airport train);
+  // しおり's plans come first, then the places map adds its candidates around them.
+  return withDemoPlaces(withItineraryDemo({
     ...emptyTravelCache(),
     selectedTripId: tripId,
     trips: [
@@ -120,5 +123,5 @@ export function createDemoCache(): TravelCache {
       { id: 'sample-note-money', title: '両替と支払い', body: '## お金\nカードはほぼどこでも使える\nチップは端数を切り上げて5〜10%\n## 小銭\nトイレ用に50セント硬貨を何枚か', updatedBy: 'demo-self', updatedAt: ago(13) },
     ] },
     packingByTrip: { [tripId]: packing },
-  }, tripId, start);
+  }), tripId, start);
 }

@@ -1,4 +1,3 @@
-import { DayStrip } from "./day-strip";
 import {
   BookingCard,
   dayLabel,
@@ -8,88 +7,31 @@ import {
   useClockNow,
 } from "./booking-card";
 import { AddBookingSheet } from "./booking-add";
-import {
-  dayTimeline,
-  isJourney,
-  JourneyPair,
-  StayCards,
-  StayCard,
-} from "./itinerary-bookings";
-import { CalendarPanel } from "./date-picker";
-import { TripCover } from "./trip-cover";
-import { useItineraryScroll } from "./itinerary-scroll";
 import { reduceMotion } from "./motion";
-import { ThumbAction } from "./thumb-dock";
-import { Button } from "./obsidian/button";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import {
-  Camera,
-  ShoppingBag,
-  type LucideIcon,
   BookOpen,
   Plus,
-  MapPin,
   Plane,
-  PlaneLanding,
-  PlaneTakeoff,
-  CircleCheck,
-  Route as RouteIcon,
-  Clock,
   Hotel,
   TrainFront,
   Car,
   Utensils,
   Ticket,
-  CalendarDays,
 } from "lucide-react";
-import { Badge } from "./obsidian/badge";
 import { useTravel } from "@/data/travel-provider";
-import { addDays, formatDate } from "@/utils/dates";
-import {
-  durationLabel,
-  durationMinutes,
-  itemDetails,
-  itemCategory,
-  orderItineraryEntries,
-  transportLabel,
-} from "@/data/itinerary";
+import { durationMinutes } from "@/data/itinerary";
 import {
   findFlightConnections,
   formatConnectionDuration,
 } from "@/data/flight-connections";
-import type {
-  Booking,
-  ItineraryItem,
-  ItineraryCategory,
-} from "@/data/types";
-import { AddButton, Empty, ThumbTools, Field } from "./ui";
-import {
-  BookingEditor,
-  ItemEditor,
-  bookingKinds,
-} from "./editors";
-import { BookingDetail, ItemDetail } from "./details";
+import type { Booking } from "@/data/types";
+import { Empty } from "./ui";
+import { BookingDetail } from "./details";
 
-export type Entry = {
-  key: string;
-  day: string;
-  time: string;
-  title: string;
-  item?: ItineraryItem;
-  booking?: Booking;
-  stage?: string;
-  endpoint?: "start" | "end";
-};
-const stages = {
-  flight: ["出発", "到着"],
-  hotel: ["チェックイン", "チェックアウト"],
-  train: ["乗車", "到着"],
-  car: ["受取", "返却"],
-  restaurant: ["予約", "終了"],
-  ticket: ["利用", "終了"],
-  other: ["予約", "終了"],
-};
+export { ItineraryScreen } from "./itinerary-screen";
+export { timelineEntries, type Entry } from "@/data/plan-timeline";
 const bookingIcons = {
   flight: Plane,
   hotel: Hotel,
@@ -99,315 +41,6 @@ const bookingIcons = {
   ticket: Ticket,
   other: BookOpen,
 };
-const itineraryIcons = {
-  sightseeing: Camera,
-  meal: Utensils,
-  transport: RouteIcon,
-  shopping: ShoppingBag,
-  other: CalendarDays,
-} satisfies Record<ItineraryCategory, LucideIcon>;
-export function timelineEntries(
-  items: ItineraryItem[],
-  bookings: Booking[],
-): Entry[] {
-  return orderItineraryEntries([
-    ...items.map((item) => ({
-      key: `item-${item.id}`,
-      day: item.day,
-      time: item.time,
-      title: item.title,
-      item,
-    })),
-    ...bookings.flatMap((booking) => {
-      const entries: Entry[] = [
-        {
-          key: `booking-${booking.id}-start`,
-          day: booking.day,
-          time: booking.time,
-          title: booking.title,
-          booking,
-          stage: stages[booking.kind][0],
-          endpoint: "start",
-        },
-      ];
-      if (
-        (booking.endDay || booking.endTime) &&
-        ((booking.endDay && booking.endDay !== booking.day) ||
-          (booking.endTime && booking.endTime !== booking.time))
-      )
-        entries.push({
-          key: `booking-${booking.id}-end`,
-          day: booking.endDay || booking.day,
-          time: booking.endTime,
-          title: booking.title,
-          booking,
-          stage: stages[booking.kind][1],
-          endpoint: "end",
-        });
-      return entries;
-    }),
-  ]);
-}
-export function ItineraryScreen() {
-  const travel = useTravel();
-  const [params] = useSearchParams();
-  const [adding, setAdding] = useState<string | null>(null);
-  const [datePicker, setDatePicker] = useState(false);
-  const [detail, setDetail] = useState<{
-    type: "item" | "booking";
-    id: string;
-  } | null>(null);
-  const entries = useMemo(
-    () => timelineEntries(travel.items, travel.bookings),
-    [travel.items, travel.bookings],
-  );
-  const days = useMemo(() => {
-    const values = new Set(entries.map((entry) => entry.day));
-    for (const booking of travel.bookings) {
-      if (booking.kind !== "hotel") continue;
-      for (
-        let day = booking.day, count = 0;
-        day <= booking.endDay && count < 1096;
-        day = addDays(day, 1), count++
-      )
-        values.add(day);
-    }
-    const trip = travel.selectedTrip!;
-    for (
-      let day = trip.startsOn, count = 0;
-      day <= trip.endsOn && count < 1096;
-      day = addDays(day, 1), count++
-    )
-      values.add(day);
-    return [...values].sort();
-  }, [entries, travel.selectedTrip, travel.bookings]);
-  const { selectedDay, selectDay } = useItineraryScroll(
-    days,
-    params.get("day") ?? travel.selectedTrip!.startsOn,
-  );
-  useEffect(() => {
-    const day = params.get("day");
-    if (!day) return;
-    const timer = setTimeout(() => selectDay(day, "instant"), 50);
-    return () => clearTimeout(timer);
-  }, [params, selectDay]);
-  const connections = findFlightConnections(travel.bookings);
-  return (
-    <>
-      <ThumbAction>
-        <button
-          className="thumb-control"
-          onClick={() => setDatePicker(true)}
-          aria-label="日付を選ぶ"
-        >
-          <CalendarDays size={18} />
-          {selectedDay.slice(5).replace("-", "/")}
-        </button>
-      </ThumbAction>
-      {datePicker && (
-        <CalendarPanel
-          label="日付を選ぶ"
-          required
-          value={selectedDay}
-          allowedDates={days}
-          min={days[0]}
-          max={days.at(-1)}
-          onChange={(day) =>
-            requestAnimationFrame(() =>
-              selectDay(day, reduceMotion() ? "instant" : "smooth"),
-            )
-          }
-          onClose={() => setDatePicker(false)}
-        />
-      )}
-      {travel.selectedTrip!.coverImage && (
-        <section className="itinerary-cover" aria-label="旅行のカバー">
-          <TripCover
-            id={travel.selectedTrip!.id}
-            src={travel.selectedTrip!.coverImage}
-          />
-          <div className="itinerary-cover-caption">
-            <span>{travel.selectedTrip!.destination}</span>
-            <h2>{travel.selectedTrip!.name}</h2>
-          </div>
-        </section>
-      )}
-      <DayStrip days={days} selectedDay={selectedDay} onSelect={selectDay} />
-      <div className="page timeline">
-        {days.map((day, index) => {
-          const dayEntries = dayTimeline(entries, day);
-          return (
-            <section className="day-section" id={`day-${day}`} key={day}>
-              <div className="day-heading">
-                <span className="eyebrow">
-                  DAY {String(index + 1).padStart(2, "0")}
-                </span>
-                <h2>{formatDate(day)}</h2>
-              </div>
-              <StayCards
-                bookings={travel.bookings}
-                day={day}
-                onOpen={(id) => setDetail({ type: "booking", id })}
-              />
-              {!dayEntries.length && (
-                <button
-                  className="timeline-entry timeline-empty"
-                  disabled={!travel.canEdit}
-                  aria-label={
-                    travel.canEdit
-                      ? `${formatDate(day)}に予定を追加`
-                      : undefined
-                  }
-                  onClick={() => setAdding(day)}
-                >
-                  <div data-press-card>
-                    <p>まだ予定はありません</p>
-                    {travel.canEdit && (
-                      <span className="empty-add">
-                        <Plus size={16} />
-                        予定を追加
-                      </span>
-                    )}
-                  </div>
-                </button>
-              )}
-              {dayEntries.map((entry) => {
-                if (entry.booking?.kind === "hotel")
-                  return (
-                    <StayCard
-                      key={entry.key}
-                      booking={entry.booking}
-                      endpoint={entry.endpoint}
-                      onOpen={(id) => setDetail({ type: "booking", id })}
-                    />
-                  );
-                const ItemIcon = entry.item
-                  ? itineraryIcons[itemCategory(entry.item).value]
-                  : CalendarDays;
-                const BookingIcon = entry.booking
-                  ? entry.booking.kind === "flight"
-                    ? entry.endpoint === "end"
-                      ? PlaneLanding
-                      : PlaneTakeoff
-                    : entry.booking.kind === "train" && entry.endpoint === "end"
-                      ? MapPin
-                      : bookingIcons[entry.booking.kind]
-                  : BookOpen;
-                const transport =
-                  entry.item &&
-                  itemDetails(entry.item).category === "transport";
-                const connection =
-                  entry.booking &&
-                  (entry.stage === "到着" || entry.joinedArrival) &&
-                  connections.find(
-                    (connection) =>
-                      connection.arrivalBookingId === entry.booking!.id,
-                  );
-                return (
-                  <div key={entry.key}>
-                    <button
-                      id={entry.item ? `item-${entry.item.id}` : undefined}
-                      className={`timeline-entry ${transport ? "transport-entry" : ""} ${isJourney(entry.booking) ? "journey-entry" : ""} ${params.get("item") === entry.item?.id ? "highlight" : ""}`}
-                      onClick={() =>
-                        setDetail({
-                          type: entry.item ? "item" : "booking",
-                          id: (entry.item ?? entry.booking)!.id,
-                        })
-                      }
-                    >
-                      <time>{entry.time || "未定"}</time>
-                      <span
-                        className="timeline-marker"
-                        data-endpoint={
-                          entry.joinedArrival
-                            ? "both"
-                            : isJourney(entry.booking)
-                              ? entry.endpoint
-                              : undefined
-                        }
-                        aria-hidden="true"
-                      >
-                        {entry.item ? (
-                          <ItemIcon size={17} />
-                        ) : entry.booking ? (
-                          <BookingIcon size={17} />
-                        ) : (
-                          <span />
-                        )}
-                        {entry.joinedArrival &&
-                          (entry.booking?.kind === "flight" ? (
-                            <PlaneLanding size={17} />
-                          ) : (
-                            <MapPin size={17} />
-                          ))}
-                      </span>
-                      <div data-press-card>
-                        <small>
-                          {entry.item
-                            ? transport
-                              ? `${transportLabel(itemDetails(entry.item))} ${durationLabel(durationMinutes(entry.item.day, entry.item.time, itemDetails(entry.item)))}`
-                              : itemCategory(entry.item).label
-                            : isJourney(entry.booking)
-                              ? `${entry.booking!.kind === "flight" ? "フライト" : "鉄道"}${entry.endpoint === "end" ? " · 到着" : ""}`
-                              : entry.stage}
-                        </small>
-                        <h3>{entry.title}</h3>
-                        {entry.booking && isJourney(entry.booking) ? (
-                          <JourneyPair
-                            booking={entry.booking}
-                            arrival={entry.endpoint === "end"}
-                          />
-                        ) : (
-                          entry.booking && (
-                            <p className="muted">
-                              {entry.booking.originCode || entry.booking.origin}
-                              {entry.booking.destinationCode ||
-                              entry.booking.destination
-                                ? " → "
-                                : ""}
-                              {entry.booking.destinationCode ||
-                                entry.booking.destination}
-                            </p>
-                          )
-                        )}
-                      </div>
-                    </button>
-                    {connection && (
-                      <button
-                        className="connection-strip"
-                        onClick={() =>
-                          setDetail({ type: "booking", id: entry.booking!.id })
-                        }
-                      >
-                        <Clock size={14} />
-                        {connection.airportCode} 乗り継ぎ{" "}
-                        {formatConnectionDuration(connection.durationMinutes)}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </section>
-          );
-        })}
-      </div>
-      {travel.canEdit && (
-        <AddButton
-          floating
-          label="予定を追加"
-          onClick={() => setAdding(selectedDay)}
-        />
-      )}
-      {adding && <ItemEditor day={adding} onClose={() => setAdding(null)} />}
-      {detail?.type === "item" && (
-        <ItemDetail id={detail.id} onClose={() => setDetail(null)} />
-      )}
-      {detail?.type === "booking" && (
-        <BookingDetail id={detail.id} onClose={() => setDetail(null)} />
-      )}
-    </>
-  );
-}
 export function BookingsScreen() {
   const { bookings, canEdit, selectedTrip } = useTravel();
   const [id, setId] = useState<string | null>(null);
