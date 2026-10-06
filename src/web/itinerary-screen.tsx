@@ -18,6 +18,9 @@ import {
 import type { ItineraryItem } from "@/data/types";
 import { addDays, formatDate } from "@/utils/dates";
 import { DayStrip } from "./day-strip";
+import { registerSquish, spring } from "./cartoon";
+import { useJellyScroll } from "./jelly-scroll";
+import { TripMenuButton, tripSpan } from "./trip-menu";
 import { useItineraryScroll } from "./itinerary-scroll";
 import { reduceMotion } from "./motion";
 import { AddButton } from "./ui";
@@ -30,6 +33,30 @@ import { PlanAddSheet } from "./plan-add";
 import { PlanUndoDock } from "./plan-undo";
 
 const UNDO_MS = 4200;
+/** The timeline's moving parts (the mock's jelly and cascade selectors). */
+const ROWS = ".it-day-h, .it-ev, .it-gap, .it-conn, .it-now, .it-empty";
+
+/** Entrance: the day's rows rise in one by one (kondo-itinerary cascade()). */
+function cascadeRows(root: HTMLElement | null) {
+  if (!root) return;
+  const vh = window.innerHeight;
+  [...root.querySelectorAll<HTMLElement>(ROWS)]
+    .filter((el) => {
+      const y = el.getBoundingClientRect().top;
+      return y < vh + 20 && y > -200;
+    })
+    .forEach((el, i) =>
+      spring(
+        el,
+        [
+          { transform: "translateY(34px) scale(.95)", opacity: 0 },
+          { transform: "none", opacity: 1 },
+        ],
+        "boing",
+        { delay: 60 + i * 40, fill: "backwards" },
+      ),
+    );
+}
 
 /** The wall clock, ticking each minute, for the travelling view. */
 function useNow() {
@@ -55,6 +82,35 @@ export function ItineraryScreen() {
   );
   const [landed, setLanded] = useState<string | null>(null);
   const trip = travel.selectedTrip!;
+  const root = useRef<HTMLDivElement>(null);
+  const top = useRef<HTMLDivElement>(null);
+  // Jelly scroll: the rows lag behind a fast scroll and settle on a spring.
+  useJellyScroll(root, ROWS);
+  // kondo-itinerary's squish table (scale 2-v, v under the finger).
+  useEffect(() => {
+    const off = [
+      registerSquish(".it-ev", 0.97),
+      registerSquish(".it-conn, .it-empty button", 0.93),
+      registerSquish(".itinerary-screen .floating-add", 0.88),
+      registerSquish(".date-strip button", 0.9),
+    ];
+    return () => off.forEach((undo) => undo());
+  }, []);
+  // The head and date tabs stay put; days scroll in just under them.
+  useLayoutEffect(() => {
+    const node = top.current;
+    if (!node) return;
+    const update = () =>
+      root.current?.style.setProperty(
+        "--it-top-height",
+        `${node.getBoundingClientRect().height}px`,
+      );
+    update();
+    const observer =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    observer?.observe(node);
+    return () => observer?.disconnect();
+  }, []);
   const items = useMemo(
     () => travel.items.filter((item) => item.id !== removed?.id),
     [travel.items, removed?.id],
@@ -107,6 +163,11 @@ export function ItineraryScreen() {
     const timer = setTimeout(() => selectDay(day, "instant"), 50);
     return () => clearTimeout(timer);
   }, [params, selectDay]);
+  useEffect(() => {
+    if (!today && !params.get("day")) cascadeRows(root.current);
+    // Only the first paint cascades.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Travelling: open scrolled to いま.
   const opened = useRef(false);
   useEffect(() => {
@@ -190,13 +251,22 @@ export function ItineraryScreen() {
       ? planPlace(openItem, travel.places)
       : undefined;
   return (
-    <div className="itinerary-screen">
-      <DayStrip
-        days={days}
-        selectedDay={selectedDay}
-        today={today}
-        onSelect={selectDay}
-      />
+    <div className="itinerary-screen" ref={root}>
+      <div className="it-top" ref={top}>
+        <header className="it-head">
+          <h1>
+            {trip.name}
+            <small>{tripSpan(trip, now)}</small>
+          </h1>
+          <TripMenuButton tripId={trip.id} />
+        </header>
+        <DayStrip
+          days={days}
+          selectedDay={selectedDay}
+          today={today}
+          onSelect={selectDay}
+        />
+      </div>
       <div className="it-timeline">
         {timeline.map(({ day, rows }, index) => (
           <section className="it-day" id={`day-${day}`} key={day}>

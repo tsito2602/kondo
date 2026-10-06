@@ -39,9 +39,11 @@ export function useItineraryScroll(days: string[], initialDay: string) {
       });
       if (!sections.length || !sections.some(({ bounds }) => bounds.height))
         return;
+      // kondo-itinerary: a day is current once its heading is within 90 px
+      // of the top of the scrolling area (under the head and date tabs).
       const boundary =
-        (document.querySelector(".date-strip")?.getBoundingClientRect()
-          .bottom ?? 0) + 24;
+        (document.querySelector(".it-top")?.getBoundingClientRect().bottom ??
+          0) + 90;
       const atBottom =
         window.scrollY > 0 &&
         Math.ceil(window.scrollY + window.innerHeight) >=

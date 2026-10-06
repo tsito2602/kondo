@@ -93,7 +93,7 @@ export function createDemoCache(): TravelCache {
     { ...flight, ...plain, id: 'sample-opera', kind: 'ticket', title: '魔笛', detail: 'ウィーン国立歌劇場', day: next, time: '20:30', endDay: next, endTime: '', confirmationCode: 'WSO-7781' },
     { ...flight, ...plain, id: 'sample-belvedere', kind: 'ticket', title: 'ベルヴェデーレ宮殿 上宮', detail: '時間指定券', day: last, time: '09:15', endDay: last, endTime: '', confirmationCode: 'BLV-55120' },
     { ...flight, ...plain, id: 'sample-dinner', kind: 'restaurant', title: 'フィグルミュラー', detail: 'ヴォルツァイレ通り', day: next, time: '18:30', endDay: next, endTime: '', confirmationCode: '' },
-    { ...flight, ...plain, id: 'sample-train', kind: 'train', title: 'CAT 空港特急', detail: 'シティ・エアポート・トレイン', origin: 'ウィーン国際空港', destination: 'ウィーン・ミッテ駅', day: next, time: '13:10', endDay: next, endTime: '13:26', confirmationCode: 'CAT-88412' },
+    { ...flight, ...plain, id: 'sample-train', kind: 'train', title: 'シティ・エアポート・トレイン', detail: 'CAT 空港特急', origin: 'ウィーン空港', destination: 'ミッテ駅', day: next, time: '13:10', endDay: next, endTime: '13:26', confirmationCode: 'CAT-88412' },
     { ...flight, id: 'sample-flight-3', title: 'サンプル航空 102', origin: 'ウィーン国際空港', originCode: 'VIE', destination: 'ドバイ国際空港', destinationCode: 'DXB', day: last, time: '14:40', endDay: last, endTime: '22:05' },
   ];
   // Sample bookings line up with the しおり's plans (dinner, Belvedere, the airport train);

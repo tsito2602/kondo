@@ -88,7 +88,8 @@ export function PlanAddSheet({
       title="予定を追加"
       onClose={onClose}
       dockActions={{
-        primary: (
+        // kondo-itinerary: 「追加する」 sits on a plain island (uiAdd).
+        actions: (
           <button type="submit" form={formId} disabled={busy}>
             <Glyph name="plus" className="ps-dock-glyph" />
             追加する
