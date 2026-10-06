@@ -439,6 +439,21 @@ export function ItineraryScreen() {
 export function BookingsScreen() {
   const { bookings, canEdit, selectedTrip } = useTravel();
   const [id, setId] = useState<string | null>(null);
+  // しおり links here with ?booking=<id> to open that booking directly.
+  const [params, setParams] = useSearchParams();
+  const linked = params.get("booking");
+  useEffect(() => {
+    if (!linked || !bookings.some((booking) => booking.id === linked)) return;
+    setId(linked);
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("booking");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [linked, bookings, setParams]);
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState<string[]>([]);
   const now = useClockNow();
