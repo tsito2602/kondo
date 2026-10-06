@@ -2,24 +2,24 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 
-/** The build's user-facing version: its time in Japan, e.g. 2026.10.7.1432. */
+/** The build's user-facing version, e.g. 2.0.538: major.minor from
+ * package.json, then the commit count, so every deploy gets a higher number. */
 function buildVersion() {
-  const part = Object.fromEntries(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Tokyo",
-      year: "numeric",
-      month: "numeric",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-    })
-      .formatToParts(new Date())
-      .map((entry) => [entry.type, entry.value]),
+  const [major, minor] = (process.env.npm_package_version ?? "2.0.0").split(
+    ".",
   );
-  // Several deploys a day each get their own name.
-  return `${part.year}.${part.month}.${part.day}.${part.hour}${part.minute}`;
+  const git = (...args: string[]) =>
+    execFileSync("git", args, { encoding: "utf8", stdio: "pipe" }).trim();
+  try {
+    // A shallow deploy checkout would count too few commits.
+    if (git("rev-parse", "--is-shallow-repository") === "true")
+      git("fetch", "--unshallow", "--quiet");
+    return `${major}.${minor}.${git("rev-list", "--count", "HEAD")}`;
+  } catch {
+    return `${major}.${minor}.0`;
+  }
 }
 
 export default defineConfig(({ mode }) => {
