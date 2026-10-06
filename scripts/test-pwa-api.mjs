@@ -11,6 +11,15 @@ const dir = await mkdtemp(join(tmpdir(), 'tabi-pwa-'));
 await build({ entryPoints: ['worker/index.ts'], bundle: true, platform: 'node', format: 'cjs', outfile: join(dir, 'worker.cjs'), logLevel: 'silent' });
 const worker = createRequire(import.meta.url)(join(dir, 'worker.cjs')).default;
 after(() => rm(dir, { recursive: true, force: true }));
+// Short Google Maps links are followed once by the Worker; never reach the network in tests.
+const shortLinkRequests = [];
+globalThis.fetch = async (input, init) => {
+  const url = new URL(input instanceof Request ? input.url : input);
+  if (url.hostname !== 'maps.app.goo.gl') throw new Error(`unexpected fetch ${url}`);
+  shortLinkRequests.push({ url: url.href, redirect: init?.redirect });
+  const location = url.pathname === '/stephansdom' ? 'https://www.google.com/maps/place/Stephansdom/@48.2,16.37,17z/data=!3m1!4b1!4m6!3m5!8m2!3d48.20849!4d16.37314' : 'https://www.google.com/maps?q=Vienna';
+  return new Response(null, { status: 302, headers: { location } });
+};
 async function fixture() {
   const db = new DatabaseSync(':memory:'); db.exec('PRAGMA foreign_keys=ON');
   const schema = await readFile('worker/schema.sql', 'utf8'); db.exec(schema); db.exec(schema);
@@ -145,6 +154,35 @@ test('multiple place links and unavailable reservations round-trip without losin
     assert.deepEqual((await read()).referenceLinks, []);
     assert.equal((await call(`${base}/${id}`, 'DELETE')).status, 204);
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM place_details WHERE place_id = ?').get(id).n, 0);
+  } finally { db.close(); }
+});
+test('place coordinates come from Google Maps links, follow one short-link redirect and survive unchanged edits', async () => {
+  const { db, call, trip } = await fixture();
+  try {
+    const base = `/trips/${trip.id}/places`, id = randomUUID();
+    const read = async () => (await (await call(base)).json()).places.find((item) => item.id === id);
+    const long = 'https://www.google.com/maps/place/Belvedere/@48.19,16.38,17z/data=!4m6!3m5!8m2!3d48.19149!4d16.38085';
+    const created = await call(base, 'POST', { id, ...place, location: long });
+    assert.equal(created.status, 201);
+    assert.deepEqual([(await created.json()).place.lat, (await read()).lng], [48.19149, 16.38085]);
+    // A short link is resolved through its redirect without following it further.
+    shortLinkRequests.length = 0;
+    assert.equal((await call(`${base}/${id}`, 'PATCH', { ...place, location: 'https://maps.app.goo.gl/stephansdom' })).status, 200);
+    assert.deepEqual(shortLinkRequests, [{ url: 'https://maps.app.goo.gl/stephansdom', redirect: 'manual' }]);
+    assert.deepEqual([(await read()).lat, (await read()).lng], [48.20849, 16.37314]);
+    // An unchanged link keeps its pin without asking Google again; lat/lng sent by clients are ignored.
+    assert.equal((await call(`${base}/${id}`, 'PATCH', { ...place, location: 'https://maps.app.goo.gl/stephansdom', title: '大聖堂', lat: 1, lng: 2 })).status, 200);
+    assert.equal(shortLinkRequests.length, 1);
+    assert.deepEqual([(await read()).lat, (await read()).lng], [48.20849, 16.37314]);
+    // A link without a position, or an address, clears the old pin.
+    assert.equal((await call(`${base}/${id}`, 'PATCH', { ...place, location: 'https://maps.app.goo.gl/somewhere' })).status, 200);
+    assert.deepEqual([(await read()).lat, (await read()).lng], [null, null]);
+    assert.equal((await call(`${base}/${id}`, 'PATCH', { ...place, location: long })).status, 200);
+    assert.equal((await call(`${base}/${id}`, 'PATCH', { ...place, location: 'Prinz-Eugen-Straße 27, Wien' })).status, 200);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM place_coordinates').get().n, 0);
+    assert.equal((await call(`${base}/${id}`, 'PATCH', { ...place, location: long })).status, 200);
+    assert.equal((await call(`${base}/${id}`, 'DELETE')).status, 204);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM place_coordinates').get().n, 0, 'coordinates go with the place');
   } finally { db.close(); }
 });
 test('place itinerary links survive status/title edits and old clients, but clear after plan deletion', async () => {

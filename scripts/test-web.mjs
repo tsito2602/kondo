@@ -700,7 +700,15 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await submit();
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM places").get().n, 1);
-    await click([...document.querySelectorAll(".place-card-main")][0]);
+    const placeRow = document.querySelector(".places-row");
+    assert.equal(placeRow.querySelector(".places-badge").textContent, "1");
+    assert.equal(
+      placeRow.querySelector(".places-row-distance").textContent,
+      "位置なし",
+      "a place without a map link says why it has no pin",
+    );
+    // Without coordinates the row opens 場所の詳細 directly.
+    await click(placeRow);
     const placeMapLink = [
       ...document.querySelectorAll("dialog .reference-link"),
     ].find((link) => link.textContent.includes("Google Mapsで開く"));
@@ -771,8 +779,43 @@ test("legacy account cache and pending changes survive React migration; real for
       document.querySelector(".context-primary").textContent,
       "しおりを見る",
     );
+    await click(document.querySelector('.context-actions [aria-label="編集"]'));
+    await fill(
+      "住所・Google MapsのURL",
+      "https://www.google.com/maps/place/Kunsthistorisches+Museum/@48.2037,16.3616,17z/data=!4m6!3m5!8m2!3d48.20379!4d16.36166",
+    );
+    await submit();
+    assert.deepEqual(
+      { ...db.prepare("SELECT lat, lng FROM place_coordinates").get() },
+      { lat: 48.20379, lng: 16.36166 },
+      "the Worker stores the pin from the pasted Google Maps link",
+    );
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(200);
+    const pin = await waitFor(
+      () =>
+        document.querySelector('.places-pin[aria-label="1 更新した美術館"]'),
+      "the scheduled place appears as pin 1 on its day",
+    );
+    assert.ok(pin.classList.contains("plan"));
+    assert.equal(
+      [...document.querySelectorAll(".places-chips button")]
+        .map((chip) => chip.textContent)
+        .join(","),
+      "全日程,11/22",
+    );
+    await click(pin);
+    assert.equal(
+      document.querySelector(".places-card .places-tag").textContent,
+      "DAY 1 · 11/22 16:00",
+    );
+    assert.ok(
+      document
+        .querySelector(".places-card a.is-primary")
+        .href.startsWith("https://www.google.com/maps/place/"),
+    );
+    await click(document.querySelector('.places-card [aria-label="閉じる"]'));
+    assert.equal(document.querySelector(".places-card"), null);
     await click(byText("nav a", "準備"));
     await click(document.querySelector('[aria-label="やることを追加"]'));
     assert.equal(
@@ -1213,6 +1256,90 @@ test("legacy account cache and pending changes survive React migration; real for
     dom.window.close();
   }
 });
+test("places map reads Google Maps links and numbers places with walking estimates", async () => {
+  const { mapCoordinates, isShortMapsLink, placeCoordinates } = await bundle(
+    "export * from './src/data/places';",
+  );
+  const { distanceMeters, walkMinutes, formatMeters } = await bundle(
+    "export * from './src/data/place-geo';",
+  );
+  const { placeNumbers } = await bundle(
+    "export * from './src/data/place-numbers';",
+  );
+  // The place's own pin wins over the camera position.
+  assert.deepEqual(
+    mapCoordinates(
+      "https://www.google.com/maps/place/Stephansdom/@48.2,16.37,17z/data=!3m1!4b1!4m6!3m5!8m2!3d48.20849!4d16.37314",
+    ),
+    { lat: 48.20849, lng: 16.37314 },
+  );
+  assert.deepEqual(
+    mapCoordinates("https://www.google.com/maps/@48.21,16.36,15z"),
+    { lat: 48.21, lng: 16.36 },
+  );
+  assert.deepEqual(
+    mapCoordinates("https://maps.google.com/?q=48.1984,16.363"),
+    { lat: 48.1984, lng: 16.363 },
+  );
+  assert.deepEqual(
+    mapCoordinates(
+      "https://www.google.com/maps/search/?api=1&query=48.21665%2C16.39585",
+    ),
+    { lat: 48.21665, lng: 16.39585 },
+  );
+  assert.equal(
+    mapCoordinates(
+      "https://www.google.com/maps/search/?api=1&query=Kunsthistorisches+Museum",
+    ),
+    null,
+  );
+  assert.equal(mapCoordinates("https://example.com/@48.2,16.3"), null);
+  assert.equal(mapCoordinates("Stephansplatz 3, Wien"), null);
+  assert.equal(
+    mapCoordinates("https://www.google.com/maps/@95.0,16.3,15z"),
+    null,
+  );
+  assert.equal(isShortMapsLink("https://maps.app.goo.gl/AbCdEf"), true);
+  assert.equal(isShortMapsLink("https://www.google.com/maps/@1,2,3z"), false);
+  assert.deepEqual(
+    placeCoordinates({
+      lat: 1,
+      lng: 2,
+      location: "https://maps.google.com/?q=3,4",
+    }),
+    { lat: 1, lng: 2 },
+    "stored coordinates win; the link is only a fallback",
+  );
+  // Cafe Central to Stephansdom: about 610 m straight, x1.3 at 80 m/min.
+  const metres = distanceMeters(
+    { lat: 48.21043, lng: 16.36547 },
+    { lat: 48.20849, lng: 16.37314 },
+  );
+  assert.ok(metres > 590 && metres < 630, `${metres}`);
+  assert.equal(walkMinutes(metres), 10);
+  assert.equal(formatMeters(metres), `${Math.round(metres / 10) * 10}m`);
+  assert.equal(formatMeters(1234), "1.2km");
+  const items = [
+    { id: "late", day: "2026-11-23", time: "09:00" },
+    { id: "early", day: "2026-11-22", time: "18:30" },
+  ];
+  const numbers = placeNumbers(
+    [
+      { id: "c-b" },
+      { id: "p-late", itineraryItemId: "late" },
+      { id: "c-a" },
+      { id: "p-early", itineraryItemId: "early" },
+    ],
+    items,
+  );
+  assert.deepEqual(Object.fromEntries(numbers), {
+    "p-early": 1,
+    "p-late": 2,
+    "c-a": 3,
+    "c-b": 4,
+  });
+});
+
 test("all-day hotel checkout remains visible in itinerary without an end time", () => {
   const entries = timelineEntries(
     [],

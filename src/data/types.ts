@@ -107,9 +107,12 @@ export type Place = {
   referenceLinks?: PlaceReferenceLink[];
   itineraryItemId?: string | null;
   status: PlaceStatus;
+  /** Read from the Google Maps link by the Worker; absent on older rows and offline edits. */
+  lat?: number | null;
+  lng?: number | null;
   updatedAt?: number;
 };
-export type PlaceInput = Omit<Place, 'id' | 'updatedAt'>;
+export type PlaceInput = Omit<Place, 'id' | 'updatedAt' | 'lat' | 'lng'>;
 
 export type TravelNote = { id: string; title?: string; body: string; content?: import('./notes').NoteContent | null; pinned?: boolean; updatedAt: number };
 export type NoteInput = Pick<TravelNote, 'title' | 'body' | 'content'>;

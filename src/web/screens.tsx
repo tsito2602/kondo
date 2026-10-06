@@ -1,5 +1,4 @@
 import { SegmentSelection } from "./segment-selection";
-import { PlaceStatusLabel } from "./place-status";
 import { DayStrip } from "./day-strip";
 import { BookingTicketContent } from "./booking-ticket";
 import {
@@ -9,7 +8,6 @@ import {
   StayCards,
   StayCard,
 } from "./itinerary-bookings";
-import { PlaceCard } from "./place-card";
 import { TaskList } from "./task-list";
 import { CalendarPanel } from "./date-picker";
 import { TripCover } from "./trip-cover";
@@ -58,7 +56,6 @@ import {
   findFlightConnections,
   formatConnectionDuration,
 } from "@/data/flight-connections";
-import { placeStatuses } from "@/data/places";
 import {
   matchesPreparationFilter,
   preparationFilterOptions,
@@ -66,7 +63,6 @@ import {
 import { AssigneeAvatar } from "./assignee-avatar";
 import type {
   Booking,
-  Place,
   ItineraryItem,
   ItineraryCategory,
   PackingItem,
@@ -77,11 +73,10 @@ import { AddButton, Empty, ThumbTools, Field, useAction } from "./ui";
 import {
   BookingEditor,
   ItemEditor,
-  PlaceEditor,
   PreparationEditor,
   bookingKinds,
 } from "./editors";
-import { BookingDetail, ItemDetail, PlaceDetail } from "./details";
+import { BookingDetail, ItemDetail } from "./details";
 
 export type Entry = {
   key: string;
@@ -482,96 +477,7 @@ export function BookingsScreen() {
     </div>
   );
 }
-export function PlacesScreen() {
-  const travel = useTravel();
-  const [id, setId] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [scheduling, setScheduling] = useState<Place | null>(null);
-  const [filter, setFilter] = useState("all");
-  const places = travel.places.filter(
-    (place) => filter === "all" || place.status === filter,
-  );
-  return (
-    <div className="page places-page">
-      <ThumbTools title="場所の絞り込み" label="絞り込み">
-        <div className="menu-list">
-          {[{ value: "all", label: "すべて" }, ...placeStatuses].map(
-            (entry) => (
-              <button
-                key={entry.value}
-                aria-pressed={filter === entry.value}
-                onClick={() => setFilter(entry.value)}
-              >
-                <PlaceStatusLabel
-                  status={entry.value as Place["status"] | "all"}
-                />
-                {filter === entry.value && <CircleCheck size={18} />}
-              </button>
-            ),
-          )}
-        </div>
-      </ThumbTools>
-      <div className="page-toolbar">
-        <div>
-          <h2>行きたい場所</h2>
-          <span className="muted">{travel.places.length}件</span>
-        </div>
-        {travel.canEdit && (
-          <AddButton label="場所を追加" onClick={() => setAdding(true)} />
-        )}
-      </div>
-      <div className="filter-strip" aria-label="訪問ステータス">
-        {[{ value: "all", label: "すべて" }, ...placeStatuses].map((entry) => (
-          <button
-            key={entry.value}
-            className={filter === entry.value ? "selected" : ""}
-            aria-pressed={filter === entry.value}
-            onClick={() => setFilter(entry.value)}
-          >
-            <PlaceStatusLabel status={entry.value as Place["status"] | "all"} />
-          </button>
-        ))}
-      </div>
-      {!places.length ? (
-        <Empty>
-          <MapPin />
-          <h2>
-            {travel.places.length
-              ? "該当する場所はありません"
-              : "場所はまだありません"}
-          </h2>
-          <p>
-            {travel.places.length
-              ? "絞り込みを変更してください。"
-              : "訪れたい場所を追加できます。"}
-          </p>
-        </Empty>
-      ) : (
-        <div className="place-grid">
-          {places.map((place) => (
-            <PlaceCard
-              key={place.id}
-              place={place}
-              linked={travel.items.find(
-                (item) => item.id === place.itineraryItemId,
-              )}
-              tripId={travel.selectedTrip!.id}
-              onOpen={() => setId(place.id)}
-              onSchedule={
-                travel.canEdit ? () => setScheduling(place) : undefined
-              }
-            />
-          ))}
-        </div>
-      )}
-      {scheduling && (
-        <ItemEditor place={scheduling} onClose={() => setScheduling(null)} />
-      )}
-      {adding && <PlaceEditor onClose={() => setAdding(false)} />}
-      {id && <PlaceDetail id={id} onClose={() => setId(null)} />}
-    </div>
-  );
-}
+export { PlacesScreen } from "./places-screen";
 export function PackingScreen() {
   const travel = useTravel();
   const [tab, setTab] = useState<"task" | "packing">("task");

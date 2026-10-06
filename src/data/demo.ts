@@ -1,5 +1,6 @@
 import { addDays, localDate } from '@/utils/dates';
 import { Booking, emptyTravelCache, TravelCache } from './types';
+import { withDemoPlaces } from './demo-places';
 
 export function createDemoCache(): TravelCache {
   const start = addDays(localDate(), 14);
@@ -7,7 +8,7 @@ export function createDemoCache(): TravelCache {
   const last = addDays(start, 3);
   const tripId = 'sample-vienna';
   const flight: Booking = { id: 'sample-flight-1', kind: 'flight', title: 'サンプル航空 101', detail: '', origin: '成田国際空港', originCode: 'NRT', destination: 'ドバイ国際空港', destinationCode: 'DXB', day: start, time: '22:20', endDay: next, endTime: '05:30', confirmationCode: 'SAMPLE', note: 'サンプルの予約です。実際の搭乗には使えません。' };
-  return {
+  return withDemoPlaces({
     ...emptyTravelCache(),
     selectedTripId: tripId,
     trips: [{ id: tripId, name: 'ウィーンの街を歩く', destination: 'Vienna, Austria', startsOn: start, endsOn: last, memberCount: 2, role: 'owner' }],
@@ -19,5 +20,5 @@ export function createDemoCache(): TravelCache {
       { id: 'sample-place-museum', title: '美術史美術館', note: '気になる展示をゆっくり見る。', openingHours: '', reservationStatus: 'needed', location: 'https://www.google.com/maps/search/?api=1&query=Kunsthistorisches+Museum', status: 'want' },
     ] },
     packingByTrip: { [tripId]: [{ id: 'sample-pack-1', name: 'パスポート', category: '書類', quantity: 1, packed: false }, { id: 'sample-pack-2', name: '充電器', category: '電子機器', quantity: 1, packed: false }, { id: 'sample-pack-3', name: '着替え', category: '衣類', quantity: 3, packed: true }] },
-  };
+  }, tripId, start);
 }

@@ -191,6 +191,13 @@ CREATE TABLE IF NOT EXISTS place_details (
   reservation_status TEXT CHECK(reservation_status IS NULL OR reservation_status = 'unavailable')
 );
 
+-- Map position read from the place's Google Maps link (WGS84 degrees); absent when the link has none.
+CREATE TABLE IF NOT EXISTS place_coordinates (
+  place_id TEXT PRIMARY KEY REFERENCES places(id) ON DELETE CASCADE,
+  lat REAL NOT NULL CHECK(lat BETWEEN -90 AND 90),
+  lng REAL NOT NULL CHECK(lng BETWEEN -180 AND 180)
+);
+
 -- Add read-only membership without rebuilding the existing member table.
 CREATE TABLE IF NOT EXISTS trip_member_permissions (
   trip_id TEXT NOT NULL,
