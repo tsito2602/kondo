@@ -1,0 +1,135 @@
+/* The plan form's date and time rows, Google Calendar style (datetime-rows.tsx). */
+.dtr {
+  overflow: hidden;
+  border-radius: var(--radius-field);
+  background: var(--field-tint);
+}
+.dtr-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 54px;
+  padding: 0 8px 0 6px;
+}
+.dtr-row + .dtr-row {
+  border-top: 1px solid var(--p-line);
+}
+.dtr-label {
+  padding-left: 10px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.dtr-date,
+.dtr-time {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--p-ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.dtr-time {
+  font-family: var(--f-num);
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+.dtr-date[aria-expanded="true"],
+.dtr-time[aria-expanded="true"] {
+  background: var(--p-ink);
+  color: var(--p-paper);
+}
+/* An iOS-sized switch: on = 時刻は未定. */
+.dtr-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 51px;
+  min-height: 0;
+  height: 31px;
+  padding: 0;
+  border: 0;
+  border-radius: 99px;
+  background: var(--p-pale);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.dtr-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px #0003;
+  transition: transform 0.28s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.dtr-switch[aria-checked="true"] {
+  background: var(--p-ink);
+}
+.dtr-switch[aria-checked="true"]::after {
+  transform: translateX(20px);
+  background: var(--p-paper);
+}
+.dtr-panel {
+  margin: 0 8px 8px;
+  animation: dtr-open 0.32s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+  transform-origin: top center;
+}
+.dtr-panel.prep-cal {
+  margin-top: 0;
+  background: var(--p-paper);
+}
+@keyframes dtr-open {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+}
+.dtr-times {
+  max-height: 232px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  border-radius: 16px;
+  background: var(--p-paper);
+}
+.dtr-times button {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--p-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.dtr-times button b {
+  font-family: var(--f-num);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.dtr-times button small,
+.dtr-times button span {
+  color: var(--p-mute);
+  font-size: 12px;
+  font-weight: 700;
+}
+.dtr-times button[aria-selected="true"] {
+  background: var(--p-ink);
+  color: var(--p-paper);
+}
+.dtr-times button[aria-selected="true"] small,
+.dtr-times button[aria-selected="true"] span {
+  color: var(--p-pale);
+}

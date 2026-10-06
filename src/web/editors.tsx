@@ -1,4 +1,6 @@
 import { DatePicker } from "./date-picker";
+import { DateTimeRows } from "./datetime-rows";
+import { withTime } from "@/data/datetime-rows";
 import { dismissModal } from "./motion";
 import { Button } from "./obsidian/button";
 import { Input } from "./obsidian/input";
@@ -222,14 +224,21 @@ export function ItemEditor({
     title: item?.title ?? place?.title ?? "",
     note: item?.note ?? place?.note ?? "",
   });
-  const [details, setDetails] = useState(
-    item
+  const [details, setDetails] = useState(() => {
+    const initial = item
       ? itemDetails(item)
       : {
           ...emptyItineraryDetails("sightseeing"),
           location: place?.location ?? "",
-        },
-  );
+        };
+    // A timed plan always has an end here, an hour by default (Google Calendar).
+    if (!item?.time || initial.endTime) return initial;
+    const when = withTime(
+      { day: item.day, time: item.time, endDay: "", endTime: "" },
+      item.time,
+    );
+    return { ...initial, endDay: when.endDay, endTime: when.endTime };
+  });
   const { error, busy, submit } = useSubmit(
     () => {
       const input = {
@@ -305,26 +314,29 @@ export function ItemEditor({
             }
           />
         </Field>
-        <DatePicker
-          label={details.category === "transport" ? "出発" : "開始"}
-          startLabel={details.category === "transport" ? "出発" : "開始"}
-          required
-          showTime
-          value={draft.day}
-          startTime={draft.time}
-          onChange={(day, _end, time) => setDraft({ ...draft, day, time })}
-        />
-        <DatePicker
-          label={details.category === "transport" ? "到着" : "終了"}
-          startLabel={details.category === "transport" ? "到着" : "終了"}
-          showTime
-          min={draft.day}
-          value={details.endDay ?? ""}
-          startTime={details.endTime}
-          onChange={(endDay, _end, endTime) =>
-            setDetails({ ...details, endDay, endTime })
-          }
-        />
+        <div className="field">
+          <span>日時</span>
+          <DateTimeRows
+            startLabel={details.category === "transport" ? "出発" : "開始"}
+            endLabel={details.category === "transport" ? "到着" : "終了"}
+            min={travel.selectedTrip?.startsOn}
+            max={travel.selectedTrip?.endsOn}
+            value={{
+              day: draft.day,
+              time: draft.time,
+              endDay: details.endDay ?? "",
+              endTime: details.endTime ?? "",
+            }}
+            onChange={(when) => {
+              setDraft({ ...draft, day: when.day, time: when.time });
+              setDetails({
+                ...details,
+                endDay: when.endDay,
+                endTime: when.endTime,
+              });
+            }}
+          />
+        </div>
         {details.category === "transport" ? (
           <>
             <div className="form-grid">
