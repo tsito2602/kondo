@@ -221,8 +221,7 @@
 .is-readonly .prep-row-main {
   cursor: default;
 }
-.prep-row-main b,
-.prep-item-name b {
+.prep-row-main b {
   position: relative;
   display: inline;
   font-size: 15px;
@@ -236,7 +235,7 @@
   right: -2px;
   left: -2px;
   height: 2.5px;
-  border-radius: 2px;
+  border-radius: 99px;
   background: var(--p-mid);
   transform: scaleX(0);
   transform-origin: 0 50%;
@@ -283,64 +282,37 @@
   box-shadow: inset 0 0 0 2.5px var(--p-pale);
 }
 
-/* ---------- .kr (持ち物 rows) ---------- */
+/* ---------- .kr (持ち物 rows): like やること, the whole row ticks ---------- */
 .prep-item {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 10px;
+  display: flex;
   align-items: center;
-  padding: 10px 12px 10px 18px;
 }
-.prep-item-name,
-.prep-check {
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-.prep-item-name {
+.prep-item > .prep-row-main {
+  flex: 1;
   min-width: 0;
-  text-align: left;
+  grid-template-columns: 1fr;
+  grid-auto-columns: auto;
+  grid-auto-flow: column;
+  padding-left: 18px;
 }
-.prep-item :disabled {
-  opacity: 1;
-  cursor: default;
+.prep-item > .prep-take {
+  margin-right: 12px;
 }
-.prep-item-name small {
+.prep-row-main small.prep-item-sub {
   display: flex;
   align-items: center;
   gap: 5px;
   margin-top: 1px;
-  color: var(--p-mute);
-  font-size: 12px;
 }
-.prep-item-name small .assignee-avatar {
+.prep-item-sub .assignee-avatar {
   width: 16px;
   height: 16px;
   font-size: 8px;
 }
-.prep-item-name small svg {
+.prep-item-sub svg {
   width: 16px;
   height: 16px;
   color: var(--p-mid);
-}
-.prep-item.is-done .prep-item-name b {
-  color: var(--p-mute);
-  text-decoration: line-through;
-  text-decoration-thickness: 2.5px;
-  text-decoration-color: var(--p-mid);
-}
-/* The box is 26 px as drawn; its hit area reaches 44 px. */
-.prep-check {
-  position: relative;
-}
-.prep-check::before {
-  content: "";
-  position: absolute;
-  inset: -9px;
 }
 .prep-others {
   display: flex;

@@ -805,6 +805,75 @@ const packingInput = (item: PackingItem) => ({
   kind: kindOf(item),
 });
 
+/** A 持ち物 row, as a やること row: tap anywhere to tick, hold to edit. */
+function PackRow({
+  item,
+  sub,
+  side,
+  take,
+  showCheck,
+  tickable,
+  onToggle,
+  onEdit,
+}: {
+  item: PackingItem;
+  sub: ReactNode;
+  side: ReactNode;
+  take: ReactNode;
+  showCheck: boolean;
+  tickable: boolean;
+  onToggle: () => void;
+  onEdit?: () => void;
+}) {
+  const hold = useHold(() => onEdit?.());
+  const done = showCheck && item.packed;
+  return (
+    <div
+      role="listitem"
+      data-item={item.id}
+      className={`prep-row prep-item${done ? " is-done" : ""}${tickable ? "" : " is-readonly"}`}
+    >
+      <button
+        type="button"
+        role={showCheck ? "checkbox" : undefined}
+        className="prep-row-main"
+        aria-checked={showCheck ? item.packed : undefined}
+        aria-disabled={!tickable}
+        aria-label={
+          tickable
+            ? `${item.name}を${item.packed ? "まだにする" : "入れた"}`
+            : item.name
+        }
+        data-haptic={tickable ? "" : undefined}
+        {...hold.handlers}
+        onClick={() => {
+          if (hold.held.current) {
+            hold.held.current = false;
+            return;
+          }
+          if (tickable) onToggle();
+        }}
+      >
+        <span>
+          <b>{item.name}</b>
+          {sub && <small className="prep-item-sub">{sub}</small>}
+        </span>
+        {side}
+        {showCheck && <Box />}
+      </button>
+      {take}
+      {onEdit && (
+        <button
+          type="button"
+          className="prep-sr"
+          aria-label={`${item.name}を編集`}
+          onClick={onEdit}
+        />
+      )}
+    </div>
+  );
+}
+
 export function PackingScreen() {
   return (
     <Bubble>
@@ -876,7 +945,7 @@ function Packing() {
     const canTick = tickable(item);
     const edit = travel.canEdit ? () => setSheet({ item }) : undefined;
     let sub: ReactNode = null;
-    let side: ReactNode = <span />;
+    let side: ReactNode = null;
     if (kind === "each")
       side = (
         <span className="prep-others">
@@ -928,40 +997,17 @@ function Packing() {
       );
     const showCheck = kind !== "one" || canTick;
     return (
-      <div
+      <PackRow
         key={item.id}
-        role="listitem"
-        data-item={item.id}
-        className={`prep-item${showCheck && item.packed ? " is-done" : ""}`}
-      >
-        <button
-          type="button"
-          className="prep-item-name"
-          disabled={!edit}
-          aria-label={edit ? `${item.name}を編集` : undefined}
-          onClick={edit}
-        >
-          <b>{item.name}</b>
-          {sub && <small>{sub}</small>}
-        </button>
-        {side}
-        {showCheck ? (
-          <button
-            type="button"
-            role="checkbox"
-            className="prep-check"
-            aria-checked={item.packed}
-            aria-label={`${item.name}を${item.packed ? "まだにする" : "入れた"}`}
-            disabled={!canTick}
-            data-haptic
-            onClick={() => toggle(item)}
-          >
-            <Box />
-          </button>
-        ) : (
-          <span />
-        )}
-      </div>
+        item={item}
+        sub={sub}
+        side={kind === "each" ? side : null}
+        take={kind === "one" ? side : null}
+        showCheck={showCheck}
+        tickable={canTick}
+        onToggle={() => toggle(item)}
+        onEdit={edit}
+      />
     );
   };
   return (
