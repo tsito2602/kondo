@@ -1082,6 +1082,69 @@ function Packing() {
   );
 }
 
+/**
+ * 誰が持つ opens under 1人が持つ: the space grows on a soft spring and the
+ * label and faces pop in one after another; it folds away when unpicked.
+ */
+function Reveal({ open, children }: { open: boolean; children: ReactNode }) {
+  const [shown, setShown] = useState(open);
+  const box = useRef<HTMLDivElement>(null);
+  const entering = useRef(false);
+  useLayoutEffect(() => {
+    if (open && !shown) {
+      entering.current = true;
+      setShown(true);
+      return;
+    }
+    if (open || !shown) return;
+    const el = box.current;
+    if (!el) return setShown(false);
+    let live = true;
+    el.style.overflow = "hidden";
+    void anim(
+      el,
+      [
+        { height: `${el.offsetHeight}px`, opacity: 1 },
+        { height: "0px", opacity: 0 },
+      ],
+      { duration: 200, easing: "cubic-bezier(.5,0,.9,.4)", fill: "forwards" },
+    ).then(() => live && setShown(false));
+    return () => {
+      live = false;
+    };
+  }, [open, shown]);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!shown || !el || !entering.current) return;
+    entering.current = false;
+    el.style.overflow = "hidden";
+    void spring(
+      el,
+      [{ height: "0px" }, { height: `${el.offsetHeight}px` }],
+      "soft",
+    ).then(() => {
+      el.style.overflow = "";
+    });
+    el.querySelectorAll<HTMLElement>(".prep-label, [role=radio]").forEach(
+      (part, index) =>
+        void spring(
+          part,
+          [
+            { opacity: 0, transform: "translateY(12px) scale(.6)" },
+            { opacity: 1, transform: "none" },
+          ],
+          "boing",
+          { delay: 60 + index * 55, fill: "backwards" },
+        ),
+    );
+  }, [shown]);
+  return shown ? (
+    <div ref={box} className="prep-reveal">
+      {children}
+    </div>
+  ) : null;
+}
+
 function PackingSheet({
   item,
   self,
@@ -1291,7 +1354,7 @@ function PackingSheet({
             </button>
           ))}
         </div>
-        {kind === "one" && (
+        <Reveal open={kind === "one"}>
           <>
             <span className="prep-label" id={`${formId}-who`}>
               誰が持つ
@@ -1347,7 +1410,7 @@ function PackingSheet({
               </button>
             </div>
           </>
-        )}
+        </Reveal>
         {before?.kind === "mine" && (
           <p className="prep-who-note">
             保存すると、ほかの人の一覧にも出るようになります
