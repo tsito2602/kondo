@@ -107,7 +107,28 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
         entry.scope === "dock" && (entry.value as DockEntry).mode === "browse",
     )
     .at(-1)?.value as DockEntry | undefined;
-  const visible = active?.navigation && browse ? browse : active;
+  // A panel that is closing hands the dock back at once: the islands morph
+  // to what lies underneath while the panel leaves, not after it has gone
+  // (Tsubasa 2026-10-07: 閉じるときも開くときと同じく同時に). The dock stays in
+  // the closing dialog's layer until it is gone. Docks of forms inside that
+  // dialog leave with it.
+  const docks = ordered.filter((entry) => entry.scope === "dock");
+  const leavingLayers = docks
+    .map((entry) => entry.value as DockEntry)
+    .filter((entry) => entry.disabled)
+    .map((entry) => entry.target?.())
+    .filter((layer): layer is HTMLElement => Boolean(layer));
+  const shownEntry =
+    docks
+      .filter((entry) => {
+        const dock = entry.value as DockEntry;
+        if (dock.disabled) return false;
+        const layer = dock.target?.();
+        return !layer || !leavingLayers.some((leaving) => leaving.contains(layer));
+      })
+      .at(-1) ?? activeEntry;
+  const shown = shownEntry?.value as DockEntry | undefined;
+  const visible = shown?.navigation && browse ? browse : shown;
   const actions = useMemo(
     () =>
       [...entries.values()]
@@ -160,14 +181,14 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
         )}
         {createPortal(
           <SharedDockSurfaceContext.Provider value={true}>
-            <DockNavigationContext.Provider value={active?.navigation ?? null}>
+            <DockNavigationContext.Provider value={shown?.navigation ?? null}>
               <div
                 className="thumb-dock"
                 data-mode={visible?.mode ?? "browse"}
                 inert={active?.disabled}
               >
                 <CartoonDock
-                  identity={`${activeEntry?.order}:${visible?.mode}`}
+                  identity={`${shownEntry?.order}:${visible?.mode}`}
                 >
                   {visible?.content}
                 </CartoonDock>
