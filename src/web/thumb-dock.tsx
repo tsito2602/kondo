@@ -225,11 +225,13 @@ export function ContextDock({
   actions,
   secondary,
   wide,
-  primaryFirst,
+  split,
 }: {
   back?: ReactNode;
-  /** The primary leads the actions (保存 left of 削除, Tsubasa 2026-10-07). */
-  primaryFirst?: boolean;
+  /** 保存 on its own ink island filling the room up to the actions (削除),
+      the secondary right after the back (Tsubasa 2026-10-07:
+      「保存と削除は別の島にして、保存ボタンを残りの領域いっぱい伸ばして」). */
+  split?: boolean;
   primary?: ReactNode;
   actions?: ReactNode;
   /** Its own island left of the actions; only beside actions. */
@@ -237,6 +239,27 @@ export function ContextDock({
   /** Lay the actions out like the tab row (left 90 px to the right edge). */
   wide?: boolean;
 }) {
+  if (split && primary && actions)
+    return (
+      <>
+        {back && (
+          <DockGroup slot="l" className="context-back">
+            {back}
+          </DockGroup>
+        )}
+        {secondary && (
+          <DockGroup slot="k" className="context-secondary">
+            {secondary}
+          </DockGroup>
+        )}
+        <DockGroup slot="m" className="context-primary" tone="ink" stretch>
+          {primary}
+        </DockGroup>
+        <DockGroup slot="r" className="context-actions">
+          {actions}
+        </DockGroup>
+      </>
+    );
   return (
     <>
       {back && (
@@ -254,12 +277,11 @@ export function ContextDock({
           slot="r"
           className="context-actions"
           tone={primary && !actions ? "ink" : undefined}
-          mixed={primary && actions ? (primaryFirst ? "first" : true) : false}
+          mixed={Boolean(primary && actions)}
           wide={wide}
         >
-          {primaryFirst && primary}
           {actions}
-          {!primaryFirst && primary}
+          {primary}
         </DockGroup>
       )}
     </>

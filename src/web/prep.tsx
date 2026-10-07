@@ -191,7 +191,7 @@ function PrepSheet({
       onClose={onClose}
       addPanel
       dockActions={{
-        primaryFirst: true,
+        split: true,
         primary: (
           <button type="submit" className="prep-primary" form={formId}>
             <CheckIcon />

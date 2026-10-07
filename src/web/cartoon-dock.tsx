@@ -24,7 +24,7 @@ import {
 // or 詳細を開く: its own island), r (context actions) and toast. The islands
 // follow the groups' boxes.
 
-export type DockSlot = "l" | "tabs" | "m" | "r" | "toast";
+export type DockSlot = "l" | "tabs" | "k" | "m" | "r" | "toast";
 
 /** One group of dock controls; its CSS box decides where its island goes. */
 export function DockGroup({
@@ -32,6 +32,7 @@ export function DockGroup({
   tone,
   mixed,
   wide,
+  stretch,
   className,
   children,
 }: {
@@ -39,9 +40,10 @@ export function DockGroup({
   /** "ink": the island under this group turns ink (a lone save button);
       "ink-dim": that ink at the mocks' disabled .4 (読み取る before a file). */
   tone?: "ink" | "ink-dim";
-  /** Several actions with a primary one: the primary is an ink pill
-      (last, or "first" when it leads, as 保存 before 削除). */
-  mixed?: boolean | "first";
+  /** Several actions with a primary one: the primary is an ink pill. */
+  mixed?: boolean;
+  /** Spans the room left between the islands beside it (保存). */
+  stretch?: boolean;
   /** Spread over the tab row's span (context tools such as a note's). */
   wide?: boolean;
   className?: string;
@@ -52,7 +54,8 @@ export function DockGroup({
       className={`cdock-group${className ? ` ${className}` : ""}`}
       data-slot={slot}
       data-tone={tone}
-      data-mixed={mixed === "first" ? "first" : mixed || undefined}
+      data-mixed={mixed || undefined}
+      data-stretch={stretch || undefined}
       data-wide={wide || undefined}
     >
       {children}
@@ -277,7 +280,12 @@ export class CartoonDock extends Component<Props> {
   }
 
   /** Where the islands should be, from the visible groups' boxes. */
-  targets(): { islands: Span[]; merged: boolean; tone: string } | null {
+  targets(): {
+    islands: Span[];
+    merged: boolean;
+    tone: string;
+    inkAt: number;
+  } | null {
     const box = (el?: HTMLElement): Span | null =>
       el ? [el.offsetLeft, el.offsetLeft + el.offsetWidth] : null;
     const find = (...slots: DockSlot[]) =>
@@ -286,6 +294,7 @@ export class CartoonDock extends Component<Props> {
       )?.el;
     const toast = find("toast"),
       left = find("l"),
+      keep = find("k"),
       middle = find("m"),
       right = find("tabs", "r");
     // Controls that carry their own pills (a plan's 削除 and 編集 circles)
@@ -295,15 +304,23 @@ export class CartoonDock extends Component<Props> {
       : box(left);
     if (toast) {
       const t = box(toast)!;
-      return { islands: a ? [a, t] : [t], merged: !a, tone: "" };
+      return { islands: a ? [a, t] : [t], merged: !a, tone: "", inkAt: -1 };
     }
     const b = box(right);
     const m = right ? box(middle) : null;
-    const tone = right?.dataset.tone ?? "";
+    const k = right ? box(keep) : null;
+    // The ink island: the right one, or a stretched 保存 in the middle.
+    const inked = [right, middle].find((el) =>
+      tones.has(el?.dataset.tone ?? ""),
+    );
+    const spans = [a, k, m, b];
+    const groups = [left, keep, middle, right];
+    const islands = spans.filter((span): span is Span => Boolean(span));
     return {
-      islands: [a, m, b].filter((span): span is Span => Boolean(span)),
+      islands,
       merged: false,
-      tone: tones.has(tone) ? tone : "",
+      tone: inked?.dataset.tone ?? "",
+      inkAt: inked ? islands.indexOf(spans[groups.indexOf(inked)]!) : -1,
     };
   }
 
@@ -327,6 +344,12 @@ export class CartoonDock extends Component<Props> {
       "--cdock-r-w",
       `${right?.offsetWidth ?? 0}px`,
     );
+    // A stretched middle starts after the 持たない-style island, if any.
+    const keep = this.groups().find(({ el }) => el.dataset.slot === "k")?.el;
+    this.ui.current?.style.setProperty(
+      "--cdock-k-w",
+      keep ? `${keep.offsetWidth + 10}px` : "0px",
+    );
     const t = this.targets();
     if (!t) return;
     const key = JSON.stringify([this.width, t.islands, t.tone]);
@@ -341,7 +364,7 @@ export class CartoonDock extends Component<Props> {
       width: r - l,
       radius: RADIUS,
       slot: i,
-      tint: t.tone && i === t.islands.length - 1 ? 1 : 0,
+      tint: t.tone && i === t.inkAt ? 1 : 0,
     }));
     const from = this.shape;
     if (instant || !from || !from.islands.length || RM()) {
