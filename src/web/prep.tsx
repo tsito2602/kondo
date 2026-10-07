@@ -263,6 +263,57 @@ const byDue = (a: TravelTask, b: TravelTask) =>
   a.title.localeCompare(b.title) ||
   a.id.localeCompare(b.id);
 
+/**
+ * 全員が持つ / 全員がやる: the other members and whether each has done it, a
+ * tick on the face (Tsubasa 2026-10-07). Past three people the faces would
+ * crowd the name, so it shows who has done it, stacked, and how many of all.
+ */
+function OthersDone({
+  others,
+  doneBy,
+  word,
+}: {
+  others: TripMember[];
+  doneBy: string[];
+  word: string;
+}) {
+  const { travel, label } = useTravellers();
+  const face = (member: TripMember, done: boolean) => (
+    <span
+      key={member.id}
+      className={done ? "is-on" : "is-off"}
+      role="img"
+      aria-label={`${label(member)}：${done ? word : "まだ"}`}
+    >
+      <AssigneeAvatar
+        value={memberAssignee(member.id)}
+        members={travel.members}
+      />
+    </span>
+  );
+  if (others.length <= 3)
+    return (
+      <span className="prep-others">
+        {others.map((member) => face(member, doneBy.includes(member.id)))}
+      </span>
+    );
+  const done = others.filter((member) => doneBy.includes(member.id));
+  return (
+    <span
+      className="prep-others is-many"
+      role="img"
+      aria-label={`ほかの${others.length}人のうち${done.length}人が${word}`}
+    >
+      <span className="prep-others-stack" aria-hidden="true">
+        {done.slice(0, 3).map((member) => face(member, true))}
+      </span>
+      <span className="prep-others-count" aria-hidden="true">
+        {done.length}/{others.length}
+      </span>
+    </span>
+  );
+}
+
 /** A row's box: the only part that ticks (the name opens the editor). */
 function Check({
   label,
@@ -425,24 +476,7 @@ function Tasks() {
     let take: ReactNode = null;
     if (kind === "each")
       side = (
-        <span className="prep-others">
-          {others.map((member) => {
-            const done = task.doneBy?.includes(member.id) ?? false;
-            return (
-              <span
-                key={member.id}
-                className={done ? "is-on" : "is-off"}
-                role="img"
-                aria-label={`${label(member)}：${done ? "済み" : "まだ"}`}
-              >
-                <AssigneeAvatar
-                  value={memberAssignee(member.id)}
-                  members={travel.members}
-                />
-              </span>
-            );
-          })}
-        </span>
+        <OthersDone others={others} doneBy={task.doneBy ?? []} word="済み" />
       );
     else if (open(task)) {
       sub = (
@@ -877,24 +911,11 @@ function Packing() {
     let side: ReactNode = null;
     if (kind === "each")
       side = (
-        <span className="prep-others">
-          {others.map((member) => {
-            const packed = item.packedBy?.includes(member.id) ?? false;
-            return (
-              <span
-                key={member.id}
-                className={packed ? "is-on" : "is-off"}
-                role="img"
-                aria-label={`${label(member)}：${packed ? "入れた" : "まだ"}`}
-              >
-                <AssigneeAvatar
-                  value={memberAssignee(member.id)}
-                  members={travel.members}
-                />
-              </span>
-            );
-          })}
-        </span>
+        <OthersDone
+          others={others}
+          doneBy={item.packedBy ?? []}
+          word="入れた"
+        />
       );
     else if (kind === "one") {
       sub = !unclaimed(item) ? (
