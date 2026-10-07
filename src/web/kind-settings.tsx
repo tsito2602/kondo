@@ -23,13 +23,13 @@ function KindIcon({ kind, className }: { kind: KindKey; className?: string }) {
 
 const dark = () => document.documentElement.dataset.theme === "dark";
 
-/** 設定 › カテゴリの色: one row per kind, its glyph in its colour (uchiwake's 費目).
- * 持ち物のカテゴリ follow as a second section. */
+/** 設定 › 予定のカテゴリ and 持ち物のカテゴリ: two columns of kinds, each glyph
+ * in its colour (uchiwake's 費目, Tsubasa 2026-10-07). */
 export function KindColorRows() {
   const colors = useKindColors();
   const [editing, setEditing] = useState<KindKey | null>(null);
   const group = (packing: boolean) => (
-    <div className="settings-group">
+    <div className="settings-group kind-grid">
       {KINDS.filter((kind) => (kind.group === "packing") === packing).map(
         (kind) => (
           <button
@@ -50,8 +50,10 @@ export function KindColorRows() {
             <span>
               <b>{kind.label}</b>
             </span>
-            <span className="settings-row-end">
-              {colorLabel(colors[kind.key], dark())}
+            <span
+              className="settings-row-end"
+              aria-label={colorLabel(colors[kind.key], dark())}
+            >
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   d="M9 5l7 7-7 7"
@@ -70,8 +72,9 @@ export function KindColorRows() {
   );
   return (
     <>
+      <h3 className="settings-label">予定のカテゴリ</h3>
       {group(false)}
-      <h3 className="settings-label">持ち物のカテゴリの色</h3>
+      <h3 className="settings-label">持ち物のカテゴリ</h3>
       {group(true)}
       {editing && (
         <KindColorPanel

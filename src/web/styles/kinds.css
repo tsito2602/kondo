@@ -198,3 +198,36 @@
   height: 26px;
   color: var(--kind);
 }
+
+/* 設定: each category group is two columns, like uchiwake's 費目 list. */
+.kind-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.kind-grid > .settings-row {
+  gap: 8px;
+  min-height: 54px;
+  padding: 10px 12px 10px 14px;
+}
+.kind-grid > .settings-row + .settings-row {
+  box-shadow: none;
+}
+.kind-grid > .settings-row:nth-child(n + 3) {
+  box-shadow: 0 -1px 0 var(--p-line);
+}
+.kind-grid > .settings-row:nth-child(even) {
+  box-shadow: -1px 0 0 var(--p-line);
+}
+.kind-grid > .settings-row:nth-child(even):nth-child(n + 3) {
+  box-shadow:
+    -1px 0 0 var(--p-line),
+    0 -1px 0 var(--p-line);
+}
+.kind-grid .settings-row b {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.kind-grid .settings-row-icon {
+  width: 21px;
+  height: 21px;
+}

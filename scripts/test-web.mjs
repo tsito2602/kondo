@@ -1727,7 +1727,7 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.ok(foot.querySelector("button[aria-label='kondo'] svg"));
     assert.ok(
-      byText("dialog .settings-label", "持ち物のカテゴリの色"),
+      byText("dialog .settings-label", "持ち物のカテゴリ"),
       "持ち物 categories have their own colour section",
     );
     assert.deepEqual(

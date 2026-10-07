@@ -477,7 +477,6 @@ export function SettingsScreen() {
         <Passport />
         <h3 className="settings-label">外観</h3>
         <Appearance />
-        <h3 className="settings-label">カテゴリの色</h3>
         <KindColorRows />
         <h3 className="settings-label">アプリ</h3>
         <AppRows />
