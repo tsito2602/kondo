@@ -234,10 +234,9 @@ function placeFields(body: Record<string, unknown>) {
  */
 const PAGE_PIN: RegExp[] = [
   /[?&;]markers=(-?\d{1,3}\.\d+)(?:%2C|,)(-?\d{1,3}\.\d+)/,
-  /[?&;]center=(-?\d{1,3}\.\d+)(?:%2C|,)(-?\d{1,3}\.\d+)/,
-  /!3d(-?\d{1,3}\.\d+)!4d(-?\d{1,3}\.\d+)/,
-  // Not the page's opening camera or its 「[null,null,lat,lng]」 bounds: those
-  // are where the reader is (the Worker's own city), not the place.
+  // Only a static map's marker. The page's camera, bounds, map centre and
+  // 「!3d…!4d…」 all sit where the reader is (the Worker's own city, Tokyo),
+  // not the place (staging trace 2026-10-07: Stuttgart pinned near Chiba).
 ];
 function pinInPage(html: string): Coordinates | null {
   for (const pattern of PAGE_PIN) {

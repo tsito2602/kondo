@@ -31,7 +31,7 @@ globalThis.fetch = async (input, init) => {
     const desktop = !/iPhone/.test(new Headers(init?.headers).get('user-agent') ?? '');
     const name = decodeURIComponent(url.pathname);
     // The full page opens on the reader's own city (here Tokyo), never the place.
-    if (desktop) return new Response('<script>window.APP_INITIALIZATION_STATE=[[[414656.3,140.1389056,35.7138432],[0,0,0]]];x=[[null,null,[null,null,35.507,139.511]]]</script>', { status: 200 });
+    if (desktop) return new Response('<script>window.APP_INITIALIZATION_STATE=[[[414656.3,140.1389056,35.7138432],[0,0,0]]];x=[[null,null,[null,null,35.507,139.511]]];y="!2d140.13!3d35.7114283!4d140.132352"</script><meta content="https://maps.google.com/maps/api/staticmap?center=35.71%2C140.13&amp;zoom=13" itemprop="image">', { status: 200 });
     return new Response('<html><script>mapslite = {}</script></html>', { status: 200 });
   }
   if (url.hostname === 'nominatim.openstreetmap.org') {
