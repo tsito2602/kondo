@@ -59,6 +59,13 @@
 .prep-kind-heading b {
   font-size: 14px;
 }
+/* 自分だけ: a quiet word that the others don't see this list. */
+.prep-kind-heading b small {
+  margin-left: 8px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--p-mute);
+}
 /* .lst */
 .prep-list {
   padding: 2px 0;

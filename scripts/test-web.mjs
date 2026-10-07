@@ -1556,21 +1556,32 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.match(kindRow(medicine).textContent, /あなたが持つ/);
     assert.ok(kindRow(medicine).querySelector('[role="checkbox"]'));
-    // 自分だけ is gone; the adder carries a 1人が持つ item unless they pick.
-    assert.equal(byText('[role="radio"] b', "自分だけ"), undefined);
-    const diary = await addPacking("日記", "1人が持つ");
-    assert.deepEqual(
-      [
-        db
-          .prepare("SELECT kind FROM packing_kinds WHERE item_id = ?")
-          .get(diary).kind,
-        db
-          .prepare("SELECT assignee FROM packing_details WHERE item_id = ?")
-          .get(diary).assignee,
-      ],
-      ["one", "member:owner"],
+    // The adder carries a 1人が持つ item unless they pick someone.
+    const adapter = await addPacking("変換プラグ", "1人が持つ");
+    assert.equal(
+      db
+        .prepare("SELECT assignee FROM packing_details WHERE item_id = ?")
+        .get(adapter).assignee,
+      "member:owner",
     );
-    assert.match(kindRow(diary).textContent, /あなたが持つ/);
+    assert.match(kindRow(adapter).textContent, /あなたが持つ/);
+    // 自分だけ: its heading says the others don't see it; rows say nothing.
+    const diary = await addPacking("日記", "自分だけ");
+    assert.deepEqual(
+      {
+        ...db
+          .prepare("SELECT kind, owner_id FROM packing_kinds WHERE item_id = ?")
+          .get(diary),
+      },
+      { kind: "mine", owner_id: "owner" },
+    );
+    assert.match(
+      document.querySelector(
+        'section[aria-label="自分だけ"] .prep-kind-heading',
+      ).textContent,
+      /ほかの人には見えない/,
+    );
+    assert.doesNotMatch(kindRow(diary).textContent, /見えない|持つ/);
     assert.doesNotMatch(kindRow(diary).textContent, /×/);
     await click(document.querySelector('[aria-label="日記を編集"]'));
     assert.equal(
@@ -1605,7 +1616,7 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.equal(
       db.prepare("SELECT COUNT(*) AS n FROM packing_items").get().n,
-      3,
+      4,
     );
     await click(byText("nav a", "メモ"));
     const noteCount = () =>

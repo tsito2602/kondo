@@ -760,18 +760,16 @@ function TaskSheet({
 /* ---------- 持ち物 ---------- */
 
 /**
- * Two kinds (Tsubasa 2026-10-07): everyone brings their own, or one person
- * carries it, picked when adding. An old 自分だけ item still reads as yours
- * and stays hidden from the others until it is saved again.
+ * Three kinds (Tsubasa 2026-10-07): everyone brings their own, one person
+ * carries it (picked when adding), or a private item only you see. The list
+ * is split by kind, so rows carry no note; 自分だけ's heading says it is hidden.
  */
-type ShownKind = "each" | "one";
-const kinds: Record<ShownKind, [string, string]> = {
+const kinds: Record<PackingKind, [string, string]> = {
   each: ["みんな各自", "全員の一覧に出る。チェックは自分の分だけ"],
   one: ["1人が持つ", "誰が持つかを選ぶ。全員の一覧に「○○が持つ」と出る"],
+  mine: ["自分だけ", "あなたの一覧にだけ出る。ほかの人には見えない"],
 };
 const kindOf = (item: PackingItem): PackingKind => item.kind ?? "one";
-const shownKind = (item: PackingItem): ShownKind =>
-  kindOf(item) === "each" ? "each" : "one";
 const categoryOf = (item: PackingItem) =>
   item.category || defaultPackingCategory;
 const ALL = "すべて";
@@ -992,14 +990,7 @@ function Packing() {
             自分が持つ
           </button>
         );
-    } else
-      // An old 自分だけ item reads like any other you carry.
-      sub = (
-        <>
-          <AssigneeAvatar value={me} members={travel.members} />
-          あなたが持つ
-        </>
-      );
+    }
     const showCheck = showsCheck(item);
     return (
       <PackRow
@@ -1047,18 +1038,21 @@ function Packing() {
           ))}
         </div>
       )}
-      {(["each", "one"] as const).map((kind) => {
+      {(["each", "one", "mine"] as const).map((kind) => {
         // The list's own order (oldest first), so ticking never moves a row.
         const items = travel.packingItems.filter(
           (item) =>
-            shownKind(item) === kind &&
+            kindOf(item) === kind &&
             (shown === ALL || categoryOf(item) === shown),
         );
         if (shown !== ALL && !items.length) return null;
         return (
           <section key={kind} aria-label={kinds[kind][0]}>
             <div className="prep-heading prep-kind-heading">
-              <b>{kinds[kind][0]}</b>
+              <b>
+                {kinds[kind][0]}
+                {kind === "mine" && <small>ほかの人には見えない</small>}
+              </b>
               <span>
                 {`${items.filter((item) => item.packed).length} / ${items.length}`}
               </span>
@@ -1159,7 +1153,7 @@ function PackingSheet({
   const { travel, members, label } = useTravellers();
   const formId = useId();
   const [name, setName] = useState(item?.name ?? "");
-  const [kind, setKind] = useState<ShownKind>(item ? shownKind(item) : "each");
+  const [kind, setKind] = useState<PackingKind>(item ? kindOf(item) : "each");
   const me = memberAssignee(self ?? "");
   // Who carries a 1人が持つ item: a member, nobody yet (""), or KEEP for an
   // old carrier who is not a member (free text or someone who left).
@@ -1216,9 +1210,13 @@ function PackingSheet({
               ? before.kind === "each"
                 ? before.packed
                 : Boolean(self && item.packedBy?.includes(self))
-              : sameCarrier
-                ? before.packed
-                : false,
+              : kind === "mine"
+                ? before.kind === "each"
+                  ? Boolean(self && item.packedBy?.includes(self))
+                  : holder === me && before.packed
+                : sameCarrier
+                  ? before.packed
+                  : false,
         });
         dismissModal(() => {
           onClose();
@@ -1333,7 +1331,7 @@ function PackingSheet({
           </button>
         </div>
         <div className="prep-kinds" role="radiogroup" aria-label="持ち物の種類">
-          {(Object.keys(kinds) as ShownKind[]).map((value) => (
+          {(Object.keys(kinds) as PackingKind[]).map((value) => (
             <button
               type="button"
               role="radio"
@@ -1411,11 +1409,6 @@ function PackingSheet({
             </div>
           </>
         </Reveal>
-        {before?.kind === "mine" && (
-          <p className="prep-who-note">
-            保存すると、ほかの人の一覧にも出るようになります
-          </p>
-        )}
       </form>
     </PrepSheet>
   );
