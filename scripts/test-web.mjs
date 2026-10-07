@@ -180,7 +180,7 @@ const pickTime = async (trigger, values) => {
     });
     assert.equal(input.value, value);
   }
-  await click(byText(".context-actions button", "保存する"));
+  await click(byText(":is(.context-actions, .context-primary) button", "保存する"));
   await waitFor(() => !picker.isConnected || !picker.open, "the picker closes");
   await tick(30);
 };
@@ -212,8 +212,8 @@ const fill = async (label, value) => {
       await chooseDate(selection.start);
     }
     if (selection.end) await chooseDate(selection.end);
-    assert.equal(byText(".context-actions button", "決定").disabled, false);
-    await click(byText(".context-actions button", "決定"));
+    assert.equal(byText(":is(.context-actions, .context-primary) button", "決定").disabled, false);
+    await click(byText(":is(.context-actions, .context-primary) button", "決定"));
     await tick(30);
     return;
   }
@@ -380,7 +380,7 @@ const editInPlace = async (change) => {
   const detail = document.querySelector("dialog[open]");
   const dock = document.querySelector(".thumb-dock-host");
   // Every detail panel keeps 編集 just left of 削除 on the right island.
-  const edit = '.context-actions [aria-label="編集"]';
+  const edit = ':is(.context-actions, .context-primary) [aria-label="編集"]';
   for (const save of [false, true]) {
     await click(document.querySelector(edit));
     assert.equal(document.querySelectorAll("dialog[open]").length, 1);
@@ -391,7 +391,7 @@ const editInPlace = async (change) => {
     if (save) {
       await change();
       const submitButton = dock.querySelector(
-        '.context-actions button[type="submit"]',
+        ':is(.context-actions, .context-primary) button[type="submit"]',
       );
       assert.equal(submitButton?.form, detail.querySelector("form"));
       await act(async () =>
@@ -422,7 +422,7 @@ const editAndReturn = async (label, value) => {
   const dock = document.querySelector(".thumb-dock-host");
   panel.scrollTop = 137;
   for (const save of [false, true, false]) {
-    await click(document.querySelector('.context-actions [aria-label="編集"]'));
+    await click(document.querySelector(':is(.context-actions, .context-primary) [aria-label="編集"]'));
     const dialogs = [...document.querySelectorAll("dialog[open]")];
     assert.equal(dialogs.length, 2, "detail stays behind its editor");
     assert.equal(dialogs[0], detail);
@@ -731,7 +731,7 @@ test("legacy account cache and pending changes survive React migration; real for
     // The plan's detail is the ＋ button's floating panel.
     assert.equal(document.querySelector("dialog[open]").dataset.panel, "add");
     assert.ok(
-      document.querySelector('.context-actions [aria-label="予定を削除"]'),
+      document.querySelector(':is(.context-actions, .context-primary) [aria-label="予定を削除"]'),
     );
     await editInPlace(async () => {
       await fill("タイトル", "市内を散策");
@@ -751,7 +751,7 @@ test("legacy account cache and pending changes survive React migration; real for
     // Every detail panel's dock: ‹ on the left, 編集 then 削除 at the right edge.
     assert.ok(document.querySelector('.context-back [aria-label="戻る"]'));
     assert.deepEqual(
-      [...document.querySelectorAll(".context-actions button")].map((node) =>
+      [...document.querySelectorAll(":is(.context-actions, .context-primary) button")].map((node) =>
         node.getAttribute("aria-label"),
       ),
       ["編集", "予定を削除"],
@@ -759,7 +759,7 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.equal(document.querySelector(".thumb-dock-host .cdock-tabs"), null);
     // Deleting is quiet: the plan goes at once and 「元に戻す」 brings it back.
     await click(
-      document.querySelector('.context-actions [aria-label="予定を削除"]'),
+      document.querySelector(':is(.context-actions, .context-primary) [aria-label="予定を削除"]'),
     );
     await waitFor(
       () => !document.querySelector("dialog[open]"),
@@ -862,7 +862,7 @@ test("legacy account cache and pending changes survive React migration; real for
     // The detail panel's dock: ‹, then 編集 and 削除 at the right; no 「見せる」.
     assert.ok(document.querySelector('.context-back [aria-label="戻る"]'));
     assert.deepEqual(
-      [...document.querySelectorAll(".context-actions button")].map((node) =>
+      [...document.querySelectorAll(":is(.context-actions, .context-primary) button")].map((node) =>
         node.getAttribute("aria-label"),
       ),
       ["編集", "予約を削除"],
@@ -871,7 +871,7 @@ test("legacy account cache and pending changes survive React migration; real for
       byText(".thumb-dock-host .cdock-group button", "見せる"),
       undefined,
     );
-    await click(document.querySelector('.context-actions [aria-label="編集"]'));
+    await click(document.querySelector(':is(.context-actions, .context-primary) [aria-label="編集"]'));
     assert.equal(document.querySelectorAll("dialog[open]").length, 2);
     await fill("宿泊施設名", "更新したホテル");
     // Every kind keeps its 予約内容 (production data has it on hotels too).
@@ -1034,10 +1034,10 @@ test("legacy account cache and pending changes survive React migration; real for
       true,
     );
     assert.ok(
-      document.querySelector('.context-actions [aria-label="場所を削除"]'),
+      document.querySelector(':is(.context-actions, .context-primary) [aria-label="場所を削除"]'),
     );
     // 場所を編集 shows what the add panel saved; reference links are added here.
-    await click(document.querySelector('.context-actions [aria-label="編集"]'));
+    await click(document.querySelector(':is(.context-actions, .context-primary) [aria-label="編集"]'));
     // No 訪問ステータス (Tsubasa 2026-10-07); 予約 is four chips.
     assert.equal(
       document.querySelector('dialog [aria-label="訪問ステータス"]'),
@@ -1085,7 +1085,7 @@ test("legacy account cache and pending changes survive React migration; real for
     // its own on the island left of them (the panel repeats it for wide
     // screens without the dock).
     assert.deepEqual(
-      [...document.querySelectorAll(".context-actions button")].map((node) =>
+      [...document.querySelectorAll(":is(.context-actions, .context-primary) button")].map((node) =>
         node.getAttribute("aria-label"),
       ),
       ["編集", "場所を削除"],
@@ -1140,8 +1140,8 @@ test("legacy account cache and pending changes survive React migration; real for
         .getAttribute("aria-label"),
       "しおりを見る",
     );
-    await click(document.querySelector('.context-actions [aria-label="編集"]'));
-    assert.ok(document.querySelector('.context-actions button[type="submit"]'));
+    await click(document.querySelector(':is(.context-actions, .context-primary) [aria-label="編集"]'));
+    assert.ok(document.querySelector(':is(.context-actions, .context-primary) button[type="submit"]'));
     assert.equal(
       document.querySelector('dialog [role="radio"][aria-checked="true"]')
         .textContent,
@@ -1155,7 +1155,7 @@ test("legacy account cache and pending changes survive React migration; real for
       document.querySelector("dialog .detail-itinerary-action").textContent,
       "しおりを見る",
     );
-    await click(document.querySelector('.context-actions [aria-label="編集"]'));
+    await click(document.querySelector(':is(.context-actions, .context-primary) [aria-label="編集"]'));
     await fill(
       "住所・Googleマップのリンク",
       "https://www.google.com/maps/place/Kunsthistorisches+Museum/@48.2037,16.3616,17z/data=!4m6!3m5!8m2!3d48.20379!4d16.36166",
@@ -1340,7 +1340,7 @@ test("legacy account cache and pending changes survive React migration; real for
         .getAttribute("aria-pressed"),
       "true",
     );
-    await click(byText(".context-actions button", "決定"));
+    await click(byText(":is(.context-actions, .context-primary) button", "決定"));
     await tick(30);
     assert.equal(
       document.querySelector("dialog .date-trigger").dataset.dateValue,
@@ -1391,7 +1391,7 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(
       [...document.querySelectorAll("dialog")].at(-1).querySelector(".dp-none"),
     );
-    await click(byText(".context-actions button", "決定"));
+    await click(byText(":is(.context-actions, .context-primary) button", "決定"));
     await tick(30);
     assert.match(
       document.querySelector("dialog .date-trigger").textContent,
@@ -1434,7 +1434,7 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await click(document.querySelector('[aria-label="チケットを予約を編集"]'));
     const taskDelete = document.querySelector(
-      '.context-actions [aria-label="やることを削除"]',
+      ':is(.context-actions, .context-primary) [aria-label="やることを削除"]',
     );
     assert.ok(
       taskDelete,
@@ -1459,7 +1459,7 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await click(document.querySelector('[aria-label="チケットを予約を編集"]'));
     await click(
-      document.querySelector('.context-actions [aria-label="やることを削除"]'),
+      document.querySelector(':is(.context-actions, .context-primary) [aria-label="やることを削除"]'),
     );
     await tick(30);
     // Leaving the page settles the deletion instead of waiting for the timer.
@@ -1698,7 +1698,7 @@ test("legacy account cache and pending changes survive React migration; real for
     const addNote = async () => {
       document.activeElement?.blur();
       await tick(40);
-      await click(byText("dialog .context-actions button", "追加する"));
+      await click(byText("dialog :is(.context-actions, .context-primary) button", "追加する"));
       await tick(50);
     };
     await click(document.querySelector('[aria-label="メモを書く"]'));
@@ -2032,7 +2032,7 @@ test("legacy account cache and pending changes survive React migration; real for
         entry.textContent.includes("NRT → KIX"),
       ),
     );
-    await click(document.querySelector('.context-actions [aria-label="編集"]'));
+    await click(document.querySelector(':is(.context-actions, .context-primary) [aria-label="編集"]'));
     assert.equal(
       field("便名（任意）").value,
       "",
@@ -2056,7 +2056,7 @@ test("legacy account cache and pending changes survive React migration; real for
     await tick(150); // the back button's bounce plays before the trip folds
     // Home keeps settings (left) and create (right) in the dock only.
     assert.equal(
-      document.querySelector(".context-actions .home-create").textContent,
+      document.querySelector(":is(.context-actions, .context-primary) .home-create").textContent,
       "旅行を作成",
     );
     assert.equal(
@@ -2070,9 +2070,9 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
-    await click(byText(".context-actions button", "旅行を作成"));
+    await click(byText(":is(.context-actions, .context-primary) button", "旅行を作成"));
     assert.equal(
-      document.querySelector('.context-actions button[type="submit"]').form,
+      document.querySelector(':is(.context-actions, .context-primary) button[type="submit"]').form,
       document.querySelector("dialog form"),
     );
     await click(document.querySelector('.context-back [aria-label="戻る"]'));

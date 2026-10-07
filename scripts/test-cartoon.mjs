@@ -97,6 +97,8 @@ const BOX = {
   "toast-r": [90, 284],
   // しおりで見る's own island, 12 px left of 編集 削除 (238).
   m: [123, 103],
+  // …or right after the back circle (16 + 62 + 10).
+  k: [88, 103],
 };
 function rightBox(el) {
   const n = el.querySelectorAll(":scope > button, :scope > a").length;
@@ -515,17 +517,17 @@ test("a separate function gets its own island: the tabs part into three and join
     assert.ok(
       near(islands(), [
         [16, 78],
-        [123, 226],
+        [88, 191],
         [238, 374],
       ]),
-      "‹, the function, then 編集 削除 at the right edge",
+      "‹, the function right after it, then 編集 削除 at the right edge",
     );
     const groups = [
       ...document.querySelectorAll(".cdock-content > [data-slot]"),
     ];
     assert.deepEqual(
       groups.map((g) => g.dataset.slot),
-      ["l", "m", "r"],
+      ["l", "k", "r"],
     );
     // Equal counts only move: from three islands to the two of a plain
     // detail, and back to three, with no neck while they stay apart.
@@ -541,7 +543,7 @@ test("a separate function gets its own island: the tabs part into three and join
     assert.ok(joining.every((shape) => shape.length <= 3));
     assert.ok(near(islands(), [[16, 374]]), "one island at the end");
     await dock.go("lone", 1100);
-    assert.equal(document.querySelector('[data-slot="m"]'), null);
+    assert.equal(document.querySelector('[data-slot="k"]'), null);
     assert.ok(near(islands(), [[16, 78]]), "only the back circle");
   } finally {
     await act(async () => dock.root.unmount());
