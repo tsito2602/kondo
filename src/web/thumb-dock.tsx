@@ -1,5 +1,6 @@
 import {
   createContext,
+  isValidElement,
   useContext,
   useId,
   useLayoutEffect,
@@ -240,6 +241,12 @@ export function ContextDock({
   /** Lay the actions out like the tab row (left 90 px to the right edge). */
   wide?: boolean;
 }) {
+  // A primary that cannot be pressed yet greys its whole island, like
+  // 読み取る before a file (Tsubasa 2026-10-07: 押せないときはグレーアウト).
+  const ink =
+    isValidElement<{ disabled?: boolean }>(primary) && primary.props.disabled
+      ? "ink-dim"
+      : "ink";
   if (split && primary && actions)
     return (
       <>
@@ -253,7 +260,7 @@ export function ContextDock({
             {secondary}
           </DockGroup>
         )}
-        <DockGroup slot="m" className="context-primary" tone="ink" stretch>
+        <DockGroup slot="m" className="context-primary" tone={ink} stretch>
           {primary}
         </DockGroup>
         <DockGroup slot="r" className="context-actions">
@@ -277,7 +284,7 @@ export function ContextDock({
         <DockGroup
           slot="r"
           className="context-actions"
-          tone={primary && !actions ? "ink" : undefined}
+          tone={primary && !actions ? ink : undefined}
           mixed={Boolean(primary && actions)}
           wide={wide}
         >
@@ -336,13 +343,15 @@ export function DockToast({
   );
 }
 
-type SaveAction = { formId: string; busy: boolean };
+/** blocked: the form cannot be saved yet, so its button is greyed out. */
+type SaveAction = { formId: string; busy: boolean; blocked?: boolean };
 export const ThumbFormContext = createContext<
   ((action: SaveAction | null) => void) | null
 >(null);
 export function useThumbForm(
   button: React.RefObject<HTMLButtonElement | null>,
   busy: boolean,
+  blocked = false,
 ) {
   const register = useContext(ThumbFormContext);
   const id = useId();
@@ -351,10 +360,10 @@ export function useThumbForm(
     if (!form || !register) return;
     const previousId = form.id;
     form.id ||= `thumb-form-${id}`;
-    register({ formId: form.id, busy });
+    register({ formId: form.id, busy, blocked });
     return () => {
       register(null);
       form.id = previousId;
     };
-  }, [register, id, busy, button]);
+  }, [register, id, busy, blocked, button]);
 }

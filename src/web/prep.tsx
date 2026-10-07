@@ -179,9 +179,12 @@ function PrepSheet({
   onDelete,
   deleteLabel,
   add = false,
+  blocked = false,
   extra,
   children,
 }: {
+  /** The name is still empty: the primary button is greyed out. */
+  blocked?: boolean;
   /** Opened by the ＋ (rises from the bottom); otherwise grows from the row. */
   add?: boolean;
   title: string;
@@ -204,7 +207,12 @@ function PrepSheet({
       dockActions={{
         split: true,
         primary: (
-          <button type="submit" className="prep-primary" form={formId}>
+          <button
+            type="submit"
+            className="prep-primary"
+            form={formId}
+            disabled={blocked}
+          >
             <CheckIcon />
             {primary}
           </button>
@@ -665,6 +673,7 @@ function TaskSheet({
       title={task ? "やることを編集" : "やることを追加"}
       add={!task}
       primary={task ? "保存" : "追加する"}
+      blocked={!title.trim()}
       formId={formId}
       onClose={onClose}
       onDelete={task ? remove : undefined}
@@ -1275,6 +1284,7 @@ function PackingSheet({
       title={item ? "持ち物を編集" : "持ち物を追加"}
       add={!item}
       primary={item ? "保存" : "追加する"}
+      blocked={!name.trim()}
       formId={formId}
       onClose={onClose}
       onDelete={item ? remove : undefined}

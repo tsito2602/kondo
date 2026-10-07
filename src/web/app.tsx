@@ -505,7 +505,7 @@ function Home() {
                 variant="ghost"
                 type="submit"
                 className="primary"
-                disabled={busy}
+                disabled={busy || !invite.trim()}
               >
                 この旅行に参加
               </Button>

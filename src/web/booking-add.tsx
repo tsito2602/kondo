@@ -620,11 +620,14 @@ export function AddBookingSheet({
       />
     );
   };
+  const year = Number(
+    (travel.selectedTrip?.startsOn || new Date().toISOString()).slice(0, 4),
+  );
+  // 追加する stays greyed out until the kind, a date and a name are in.
+  const manualReady =
+    Boolean(form.kind) && typeof manualInput(form, year) !== "string";
   const saveManual = () => {
     if (!form.kind) return notify("先にカテゴリを選んでください");
-    const year = Number(
-      (travel.selectedTrip?.startsOn || new Date().toISOString()).slice(0, 4),
-    );
     const input = manualInput(form, year);
     if (typeof input === "string") return notify(input);
     // 場所: one of the trip's places by name, or a map link (linked, or added as a place).
@@ -783,11 +786,7 @@ export function AddBookingSheet({
   /** The lone ink action on the right island; dimmed like the mock's .4. */
   const ink = (label: ReactNode, onClick: () => void, disabled = false) => (
     <DockGroup slot="r" tone={disabled ? "ink-dim" : "ink"}>
-      <button
-        type="button"
-        aria-disabled={disabled || undefined}
-        onClick={onClick}
-      >
+      <button type="button" disabled={disabled} onClick={onClick}>
         {label}
       </button>
     </DockGroup>
@@ -1066,6 +1065,7 @@ export function AddBookingSheet({
                     追加する
                   </>,
                   saveManual,
+                  !manualReady,
                 )
               : step === "review"
                 ? ink(
@@ -1074,7 +1074,7 @@ export function AddBookingSheet({
                       {adding}件を入れる
                     </>,
                     save,
-                    !adding,
+                    !adding || needs.length > 0,
                   )
                 : ink("読み取る", () => void read(), !files.length)}
           </>

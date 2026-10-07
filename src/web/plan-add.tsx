@@ -55,30 +55,32 @@ export function PlanAddSheet({
     day: selectedDay,
     time,
   });
+  const details: ItineraryDetails = {
+    ...emptyItineraryDetails(category),
+    ...(endTime
+      ? { endTime, endDay: shiftDay(selectedDay, endDayOffset) }
+      : {}),
+    ...(category === "transport"
+      ? {
+          transport: {
+            mode,
+            origin: origin.trim(),
+            destination: place.trim(),
+            ...(duration ? { durationMinutes: Number(duration) } : {}),
+          },
+        }
+      : {}),
+  };
+  // Greyed out until it can be added; only a real mistake (not an empty
+  // name) explains itself.
+  const reason = !title.trim()
+    ? "なにをするか入れてください"
+    : itineraryDetailsError(selectedDay, time, details);
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const dialog = event.currentTarget.closest("dialog");
-    const details: ItineraryDetails = {
-      ...emptyItineraryDetails(category),
-      ...(endTime
-        ? { endTime, endDay: shiftDay(selectedDay, endDayOffset) }
-        : {}),
-      ...(category === "transport"
-        ? {
-            transport: {
-              mode,
-              origin: origin.trim(),
-              destination: place.trim(),
-              ...(duration ? { durationMinutes: Number(duration) } : {}),
-            },
-          }
-        : {}),
-    };
-    const message = !title.trim()
-      ? "なにをするか入れてください"
-      : itineraryDetailsError(selectedDay, time, details);
-    setError(message);
-    if (message) return;
+    setError(reason);
+    if (reason) return;
     void run(() => {
       const link =
         category === "transport" ? null : registeredGoogleMapsUrl(place.trim());
@@ -109,7 +111,7 @@ export function PlanAddSheet({
       dockActions={{
         // The ＋ panel's dock: ‹ cancels, 「追加する」 is the ink pill.
         primary: (
-          <button type="submit" form={formId} disabled={busy}>
+          <button type="submit" form={formId} disabled={busy || !!reason}>
             <Glyph name="plus" className="ps-dock-glyph" />
             追加する
           </button>
@@ -246,7 +248,7 @@ export function PlanAddSheet({
             onChange={(event) => setNote(event.target.value)}
           />
         </label>
-        <ErrorText message={error} />
+        <ErrorText message={error || (title.trim() ? reason : "")} />
       </form>
       {picking && (
         <TimelinePicker

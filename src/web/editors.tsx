@@ -96,7 +96,17 @@ function useSubmit(
         dismissModal(close, dialog);
       });
   };
-  return { error, busy, submit };
+  // Greyed out until it can be saved (Tsubasa 2026-10-07). A plain missing
+  // field explains itself; anything else (a wrong link, an end before the
+  // start) says why right away.
+  const reason = validate();
+  return {
+    error:
+      error || (reason && !/を入力してください$/.test(reason) ? reason : ""),
+    busy,
+    submit,
+    blocked: Boolean(reason),
+  };
 }
 async function coverData(file: File) {
   if (!file.type.startsWith("image/"))
@@ -133,7 +143,7 @@ export function TripEditor({
     coverImage: trip?.coverImage ?? "",
   });
   const { busy: imageBusy, run } = useAction();
-  const { error, busy, submit } = useSubmit(
+  const { error, busy, submit, blocked } = useSubmit(
     () => {
       if (trip) travel.updateTrip(trip.id, draft);
       else createdId.current = travel.createTrip(draft);
@@ -225,7 +235,7 @@ export function TripEditor({
           }
         />
         <ErrorText message={error} />
-        <SaveButton busy={busy || imageBusy} />
+        <SaveButton busy={busy || imageBusy} blocked={blocked} />
       </form>
     </Modal>
   );
@@ -264,7 +274,7 @@ export function ItemEditor({
         (Date.parse(details.endDay) - Date.parse(draft.day)) / 86_400_000,
       )
     : 0;
-  const { error, busy, submit } = useSubmit(
+  const { error, busy, submit, blocked } = useSubmit(
     () => {
       const input = {
         ...draft,
@@ -438,7 +448,7 @@ export function ItemEditor({
           />
         </Field>
         <ErrorText message={error} />
-        <SaveButton busy={busy} />
+        <SaveButton busy={busy} blocked={blocked} />
       </form>
       {picking && (
         <TimelinePicker
@@ -575,7 +585,7 @@ export function BookingForm({
         })
       : null;
   const merged = candidate?.item.id === mergeId ? candidate.item : null;
-  const { error, busy, submit } = useSubmit(
+  const { error, busy, submit, blocked } = useSubmit(
     () => {
       const input = {
         ...draft,
@@ -874,7 +884,7 @@ export function BookingForm({
         </>
       )}
       <ErrorText message={error} />
-      <SaveButton busy={busy} />
+      <SaveButton busy={busy} blocked={blocked} />
     </form>
   );
 }
@@ -985,7 +995,7 @@ export function PlaceEditor({
       travel.items,
       travel.bookings,
     ).get("~new-place");
-  const { error, busy, submit } = useSubmit(
+  const { error, busy, submit, blocked } = useSubmit(
     () => {
       const input = { ...draft, title: draft.title.trim() };
       const pin = found?.link === link ? found.pin : null;
@@ -1030,7 +1040,7 @@ export function PlaceEditor({
           ? undefined
           : {
               primary: (
-                <button type="submit" form={formId} disabled={busy}>
+                <button type="submit" form={formId} disabled={busy || blocked}>
                   <Glyph name="plus" className="ps-dock-glyph" />
                   追加する
                 </button>
@@ -1205,7 +1215,7 @@ export function PlaceEditor({
           />
         </Field>
         <ErrorText message={pasteError || error} />
-        {place && <SaveButton busy={busy} />}
+        {place && <SaveButton busy={busy} blocked={blocked} />}
       </form>
     </Modal>
   );

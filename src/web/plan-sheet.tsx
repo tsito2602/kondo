@@ -460,33 +460,35 @@ function PlanEditForm({
           { day, time },
           initial.ownPlace ? place : undefined,
         );
+  const clockStart = clockTime(typedTime);
+  const clockEnd = clockTime(typedEndTime);
+  const details: ItineraryDetails = {
+    ...emptyItineraryDetails(category),
+    ...(initial.stay ? { stay: initial.stay } : {}),
+    endDay,
+    endTime: clockEnd,
+    ...(category === "transport"
+      ? {
+          transport: {
+            ...transport,
+            origin: transport.origin.trim(),
+            destination: transport.destination.trim(),
+          },
+        }
+      : {}),
+  };
+  const clock = /^\d{2}:\d{2}$/;
+  // Greyed out until it can be saved; an empty name explains itself.
+  const reason = !title.trim()
+    ? "なにをするか入れてください"
+    : (clockStart && !clock.test(clockStart)) ||
+        (clockEnd && !clock.test(clockEnd))
+      ? "時刻は 9:30 のように入れてください"
+      : itineraryDetailsError(day, clockStart, details);
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    const time = clockTime(typedTime);
-    const endTime = clockTime(typedEndTime);
-    const details: ItineraryDetails = {
-      ...emptyItineraryDetails(category),
-      ...(initial.stay ? { stay: initial.stay } : {}),
-      endDay,
-      endTime,
-      ...(category === "transport"
-        ? {
-            transport: {
-              ...transport,
-              origin: transport.origin.trim(),
-              destination: transport.destination.trim(),
-            },
-          }
-        : {}),
-    };
-    const clock = /^\d{2}:\d{2}$/;
-    const message = !title.trim()
-      ? "なにをするか入れてください"
-      : (time && !clock.test(time)) || (endTime && !clock.test(endTime))
-        ? "時刻は 9:30 のように入れてください"
-        : itineraryDetailsError(day, time, details);
-    setError(message);
-    if (message) return;
+    setError(reason);
+    if (reason) return;
     void run(() => {
       if (category !== "transport" && location === shownLocation) {
         details.location = initial.location;
@@ -504,7 +506,7 @@ function PlanEditForm({
       } else if (initial.ownPlace && place) travel.deletePlace(place.id);
       travel.updateItem(item.id, {
         day,
-        time,
+        time: clockStart,
         kind: itineraryCategories.find((entry) => entry.value === category)!
           .label,
         title: title.trim(),
@@ -694,7 +696,7 @@ function PlanEditForm({
           onChange={(event) => setNote(event.target.value)}
         />
       </label>
-      <ErrorText message={error} />
+      <ErrorText message={error || (title.trim() ? reason : "")} />
       <ThumbDock
         mode="edit"
         target={() => anchor.current?.closest("dialog") ?? null}
@@ -708,7 +710,7 @@ function PlanEditForm({
             />
           }
           primary={
-            <button type="submit" form={formId} disabled={busy}>
+            <button type="submit" form={formId} disabled={busy || !!reason}>
               保存
             </button>
           }

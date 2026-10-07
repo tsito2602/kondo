@@ -414,7 +414,12 @@ export function NoteEditor({
         panel
           ? {
               primary: (
-                <button type="button" onClick={add}>
+                <button
+                  type="button"
+                  onClick={add}
+                  // An empty memo is not added: greyed out until written.
+                  disabled={!draft.title?.trim() && !draft.body.trim()}
+                >
                   <Check size={18} aria-hidden="true" />
                   追加する
                 </button>

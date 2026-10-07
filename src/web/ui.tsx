@@ -356,6 +356,7 @@ export function Modal({
   const [saveAction, setSaveAction] = useState<{
     formId: string;
     busy: boolean;
+    blocked?: boolean;
   } | null>(null);
   const origin = useRef<HTMLElement | null>(null);
   const animation = useRef<Animation | null>(null);
@@ -626,7 +627,7 @@ export function Modal({
                     variant="ghost"
                     type="submit"
                     form={saveAction.formId}
-                    disabled={saveAction.busy}
+                    disabled={saveAction.busy || saveAction.blocked}
                   >
                     <Check size={18} aria-hidden="true" />
                     {saveAction.busy ? "保存中…" : "保存する"}
@@ -746,16 +747,23 @@ export function ErrorText({ message }: { message: string }) {
     </p>
   ) : null;
 }
-export function SaveButton({ busy = false }: { busy?: boolean }) {
+export function SaveButton({
+  busy = false,
+  blocked = false,
+}: {
+  busy?: boolean;
+  /** Something required is missing: greyed out until it is filled in. */
+  blocked?: boolean;
+}) {
   const ref = useRef<HTMLButtonElement>(null);
-  useThumbForm(ref, busy);
+  useThumbForm(ref, busy, blocked);
   return (
     <Button
       ref={ref}
       variant="ghost"
       className="primary form-save"
       type="submit"
-      disabled={busy}
+      disabled={busy || blocked}
     >
       <Check size={18} aria-hidden="true" />
       {busy ? "保存しています…" : "保存する"}
