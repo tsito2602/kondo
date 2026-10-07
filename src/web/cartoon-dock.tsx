@@ -429,8 +429,10 @@ export class CartoonDock extends Component<Props> {
   }
 
   moved = 0;
-  /** After a move between dialogs, repaint the islands from scratch on the
-      next two frames (once the new dialog is open and laid out). */
+  /** After a move between dialogs, repaint the islands from scratch at once
+      (the move happens before the dialog's first paint; waiting for a frame
+      left WebKit showing no dock, then a jump, Tsubasa 2026-10-07
+      「予約開いたらドックがチラつく」) and again on the next two frames. */
   onMoved = () => {
     cancelAnimationFrame(this.moved);
     const redraw = () => {
@@ -443,6 +445,7 @@ export class CartoonDock extends Component<Props> {
       this.layout(false);
       this.paint();
     };
+    redraw();
     this.moved = requestAnimationFrame(() => {
       redraw();
       this.moved = requestAnimationFrame(redraw);
