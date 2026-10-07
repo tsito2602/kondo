@@ -33,8 +33,8 @@ import {
   ordinaryPlans,
 } from "@/data/itinerary";
 import {
-  placeStatuses,
-  reservationStatuses,
+  reservationChoices,
+  reservationLabel,
   referenceUrl,
   mapUrl,
   registeredGoogleMapsUrl,
@@ -922,6 +922,10 @@ export function PlaceEditor({
     referenceLinks: place?.referenceLinks ?? [],
     itineraryItemId: place?.itineraryItemId,
   });
+  // A place a booking points at is booked; the 予約 tab owns that.
+  const booked = Boolean(
+    place && travel.bookings.some((booking) => booking.placeId === place.id),
+  );
   const [found, setFound] = useState<{ link: string; name: string | null }>();
   const [pasteError, setPasteError] = useState("");
   const autoName = useRef("");
@@ -1059,42 +1063,37 @@ export function PlaceEditor({
             }
           />
         </Field>
-        <div className="form-grid">
-          <Field label="訪問ステータス">
-            <select
-              value={draft.status}
-              onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  status: event.target.value as Place["status"],
-                })
-              }
-            >
-              {placeStatuses.map((entry) => (
-                <option key={entry.value} value={entry.value}>
-                  {entry.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="予約状況">
-            <select
-              value={draft.reservationStatus}
-              onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  reservationStatus: event.target
-                    .value as Place["reservationStatus"],
-                })
-              }
-            >
-              {reservationStatuses.map((entry) => (
-                <option key={entry.value} value={entry.value}>
-                  {entry.label}
-                </option>
-              ))}
-            </select>
-          </Field>
+        <div className="field">
+          <span id={`${formId}-res`}>予約</span>
+          <div
+            className="prep-cats"
+            role="radiogroup"
+            aria-labelledby={`${formId}-res`}
+          >
+            {[
+              ...reservationChoices.map((entry) => entry.value),
+              ...(place?.reservationStatus === "requested"
+                ? (["requested"] as const)
+                : []),
+            ].map((value) => (
+              <button
+                type="button"
+                role="radio"
+                key={value}
+                className={value === "requested" ? "is-legacy" : undefined}
+                disabled={booked}
+                aria-checked={
+                  (booked ? "confirmed" : draft.reservationStatus) === value
+                }
+                onClick={() => setDraft({ ...draft, reservationStatus: value })}
+              >
+                {reservationLabel(value)}
+              </button>
+            ))}
+          </div>
+          {booked && (
+            <p className="field-hint">予約タブの予約とつながっています</p>
+          )}
         </div>
         <Field label="メモ">
           <Textarea

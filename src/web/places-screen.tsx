@@ -75,13 +75,6 @@ const dayNumber = (start: string, day: string) =>
   Math.round((Date.parse(day) - Date.parse(start)) / 86400000) + 1;
 const timeKey = (when: PlaceVisit) =>
   `${when.day} ${when.time || "99:99"} ${when.key}`;
-/** 行った・見送り: done with, so dimmed beside the live candidates and plans. */
-const doneLabel = (mark: Mark) =>
-  mark.place?.status === "visited"
-    ? "行った"
-    : mark.place?.status === "skipped"
-      ? "見送り"
-      : null;
 
 function usePlacesModel() {
   const travel = useTravel();
@@ -887,7 +880,6 @@ function PlacesMap({
             mark.type,
             selected === mark.key && "is-selected",
             selected && selected !== mark.key && "is-dim",
-            doneLabel(mark) && "is-done",
           ]
             .filter(Boolean)
             .join(" ")}
@@ -903,9 +895,7 @@ function PlacesMap({
             } as CSSProperties
           }
           aria-label={
-            mark.number
-              ? `${mark.number} ${mark.name}${doneLabel(mark) ? `（${doneLabel(mark)}）` : ""}`
-              : `宿 ${mark.name}`
+            mark.number ? `${mark.number} ${mark.name}` : `宿 ${mark.name}`
           }
           aria-pressed={selected === mark.key}
           tabIndex={inside ? undefined : -1}
@@ -917,9 +907,6 @@ function PlacesMap({
           <PinShape mark={mark} />
           <span className="places-pin-label" aria-hidden="true">
             {mark.name}
-            {doneLabel(mark) && (
-              <em className="places-done">{doneLabel(mark)}</em>
-            )}
           </span>
         </button>
       ))}
@@ -1109,18 +1096,13 @@ function PlacesList({
     <button
       key={mark.key}
       data-mark={mark.key}
-      className={`places-row${selected === mark.key ? " is-selected" : ""}${doneLabel(mark) ? " is-done" : ""}`}
+      className={`places-row${selected === mark.key ? " is-selected" : ""}`}
       aria-pressed={mark.point ? selected === mark.key : undefined}
       onClick={() => onSelect(mark)}
     >
       <span className={`places-badge ${badgeClass}`}>{badge}</span>
       <span className="places-row-main">
-        <strong>
-          {mark.name}
-          {doneLabel(mark) && (
-            <em className="places-done">{doneLabel(mark)}</em>
-          )}
-        </strong>
+        <strong>{mark.name}</strong>
         {sub && <small>{sub}</small>}
       </span>
       <span className="places-row-distance">{distance}</span>
@@ -1255,14 +1237,6 @@ function PlaceSheetFor({
     tag = <span className="places-tag">候補 · まだ予定なし</span>;
     note = mark.place!.note;
   }
-  const done = doneLabel(mark);
-  if (done)
-    tag = (
-      <span className="places-card-tags is-done">
-        <span className="places-tag places-done-tag">{done}</span>
-        {tag}
-      </span>
-    );
   const lines: ReactNode[] = [];
   if (note) lines.push(note);
   if (fromHotel != null)

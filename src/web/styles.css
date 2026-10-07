@@ -3743,16 +3743,6 @@ input::-webkit-date-and-time-value {
   transform-origin: center;
 }
 
-.place-status-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-  vertical-align: middle;
-}
-.place-status-label svg {
-  flex-shrink: 0;
-}
 .place-card-actions {
   display: flex;
   align-items: center;

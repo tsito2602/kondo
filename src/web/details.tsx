@@ -1,5 +1,4 @@
 import { poofAway } from "./remove-motion";
-import { PlaceStatusLabel } from "./place-status";
 import { DocumentPreview } from "./document-preview";
 import { LinkedNotes } from "./linked-notes";
 import { BookingSchedule, ItemSchedule } from "./booking-schedule";
@@ -31,7 +30,7 @@ import {
   flightConnectionCandidates,
   formatConnectionDuration,
 } from "@/data/flight-connections";
-import { mapUrl, reservationStatuses, referenceUrl } from "@/data/places";
+import { mapUrl, reservationLabel, referenceUrl } from "@/data/places";
 import type {
   Booking,
   BookingDocument,
@@ -102,6 +101,14 @@ export function PlaceDetail({
   const linked = ordinaryPlans(travel.items).find(
     (entry) => entry.id === place.itineraryItemId,
   );
+  // Visits need no status (Tsubasa 2026-10-07): the list and しおり tell them.
+  const booked = travel.bookings.some(
+    (booking) => booking.placeId === place.id,
+  );
+  const reservation =
+    booked || place.reservationStatus !== "not_needed"
+      ? reservationLabel(booked ? "confirmed" : place.reservationStatus)
+      : null;
   const itineraryAction = linked ? (
     <button
       className="primary"
@@ -190,18 +197,11 @@ export function PlaceDetail({
       >
         <div className="detail-stack">
           <header className="detail-hero">
-            <div className="detail-tags">
-              <span className={`badge status-${place.status}`}>
-                <PlaceStatusLabel status={place.status} />
-              </span>
-              <span className="badge">
-                {
-                  reservationStatuses.find(
-                    (entry) => entry.value === place.reservationStatus,
-                  )?.label
-                }
-              </span>
-            </div>
+            {reservation && (
+              <div className="detail-tags">
+                <span className="badge">{reservation}</span>
+              </div>
+            )}
             <h1>{place.title}</h1>
           </header>
           {linked && (

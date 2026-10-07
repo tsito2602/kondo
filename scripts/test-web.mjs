@@ -964,7 +964,7 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await fill("メモ", "見たい展示");
     await fill("営業時間", "10:00〜18:00");
-    await fill("予約状況", "needed");
+    await click(byText('dialog [role="radio"]', "要予約"));
     await click(byText(".thumb-dock-host .cdock-group button", "追加する"));
     await waitFor(
       () => db.prepare("SELECT COUNT(*) AS n FROM places").get().n === 1,
@@ -1031,9 +1031,16 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     // 場所を編集 shows what the add panel saved; reference links are added here.
     await click(document.querySelector('.context-actions [aria-label="編集"]'));
-    assert.equal(field("訪問ステータス").closest("details"), null);
-    assert.equal(field("訪問ステータス").value, "want");
-    assert.equal(field("予約状況").value, "needed");
+    // No 訪問ステータス (Tsubasa 2026-10-07); 予約 is four chips.
+    assert.equal(
+      document.querySelector('dialog [aria-label="訪問ステータス"]'),
+      null,
+    );
+    assert.equal(
+      document.querySelector('dialog [role="radio"][aria-checked="true"]')
+        .textContent,
+      "要予約",
+    );
     assert.equal(field("メモ").value, "見たい展示");
     assert.equal(field("営業時間").value, "10:00〜18:00");
     await click(byText("dialog button", "リンクを追加"));
@@ -1129,8 +1136,9 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(document.querySelector('.context-actions [aria-label="編集"]'));
     assert.ok(document.querySelector('.context-actions button[type="submit"]'));
     assert.equal(
-      field("予約状況").value,
-      "needed",
+      document.querySelector('dialog [role="radio"][aria-checked="true"]')
+        .textContent,
+      "要予約",
       "existing reservation status remains visible",
     );
     assert.equal(field("URL").value, "https://example.com/museum");
@@ -1207,27 +1215,6 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.match(
       document.querySelector(".places-nopin-hint").textContent,
       /Googleマップのリンクを貼ると地図に載ります/,
-    );
-    // 見送り: dimmed and labelled, its number kept.
-    const cafeNumber = cafeRow.querySelector(".places-badge").textContent;
-    await click(cafeRow);
-    await click(document.querySelector('.context-actions [aria-label="編集"]'));
-    await fill("訪問ステータス", "skipped");
-    await submit();
-    await click(document.querySelector('.context-back [aria-label="戻る"]'));
-    await tick(50);
-    const skippedRow = [...document.querySelectorAll(".places-row")].find(
-      (row) =>
-        row.querySelector("strong").textContent.startsWith("駅前のカフェ"),
-    );
-    assert.ok(skippedRow.classList.contains("is-done"));
-    assert.equal(
-      skippedRow.querySelector(".places-done").textContent,
-      "見送り",
-    );
-    assert.equal(
-      skippedRow.querySelector(".places-badge").textContent,
-      cafeNumber,
     );
     // やること and 持ち物 are separate icon-only dock pages.
     const dockTab = (label) =>

@@ -1,13 +1,11 @@
-import type { PlaceStatus, ReservationStatus } from './types';
-export const placeStatuses: { value: PlaceStatus; label: string }[] = [
-  { value: 'want', label: '行きたい' }, { value: 'planned', label: '行く予定' },
-  { value: 'visited', label: '行った' }, { value: 'skipped', label: '見送り' },
+import type { ReservationStatus } from './types';
+/** 予約待ち is not offered any more; a place that has it keeps it until changed. */
+export const reservationChoices: { value: ReservationStatus; label: string }[] = [
+  { value: 'not_needed', label: '予約いらない' }, { value: 'needed', label: '要予約' },
+  { value: 'confirmed', label: '予約した' }, { value: 'unavailable', label: '予約できない' },
 ];
-export const reservationStatuses: { value: ReservationStatus; label: string }[] = [
-  { value: 'not_needed', label: '予約不要' }, { value: 'needed', label: '要予約' },
-  { value: 'requested', label: '予約待ち' }, { value: 'confirmed', label: '予約済み' },
-  { value: 'unavailable', label: '予約不可' },
-];
+export const reservationLabel = (status: ReservationStatus) =>
+  reservationChoices.find((entry) => entry.value === status)?.label ?? '予約待ち';
 export function referenceUrl(value: string): string | null {
   const text = value.trim();
   if (!/^https?:\/\//i.test(text)) return null;

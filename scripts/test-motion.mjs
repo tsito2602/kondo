@@ -33,7 +33,7 @@ const { outputFiles } = await build({
   stdin: {
     contents:
       "export { guardModalKeyboardFocus } from './src/web/modal-keyboard'; export { lockModalPage } from './src/web/modal-scroll-lock'; " +
-      "export { finishBootScreen } from './src/web/boot'; export { PlaceSheet, placeMapsHref } from './src/web/place-sheet'; export { PlaceStatusLabel } from './src/web/place-status'; export { DayStrip } from './src/web/day-strip'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { keyboardInset, revealModalField } from './src/web/viewport'; export { AnchoredMenu } from './src/web/anchored-menu'; export { TripDock } from './src/web/trip-dock'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
+      "export { finishBootScreen } from './src/web/boot'; export { PlaceSheet, placeMapsHref } from './src/web/place-sheet'; export { DayStrip } from './src/web/day-strip'; export { DatePicker } from './src/web/date-picker'; export { startTripTransition } from './src/web/trip-transition'; export { menuDepth } from './src/web/menu-depth'; export { installPressFeedback } from './src/web/press-feedback'; export { AppRouter } from './src/web/router'; export { useItineraryScroll } from './src/web/itinerary-scroll'; export { startRouteTransition } from './src/web/motion'; export { keyboardInset, revealModalField } from './src/web/viewport'; export { AnchoredMenu } from './src/web/anchored-menu'; export { TripDock } from './src/web/trip-dock'; export { ThumbDockProvider, ThumbDock, ThumbAction, ThumbActions, ContextDock } from './src/web/thumb-dock'; export { Modal, SaveButton, AddButton } from './src/web/ui'; export { dismissModal, useMotionNavigation } from './src/web/motion';",
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -56,7 +56,6 @@ const {
   finishBootScreen,
   PlaceSheet,
   placeMapsHref,
-  PlaceStatusLabel,
   DayStrip,
   DatePicker,
   startTripTransition,
@@ -1466,17 +1465,6 @@ test("place cards separate detail and scheduling actions, and open Google Maps o
     );
     await act(async () => render({ mapsHref: null }));
     assert.equal(document.querySelector(".places-card a"), null);
-    for (const [status, icon] of [
-      ["want", "heart"],
-      ["planned", "calendar-check"],
-      ["visited", "circle-check"],
-      ["skipped", "circle-pause"],
-    ]) {
-      await act(async () =>
-        root.render(React.createElement(PlaceStatusLabel, { status })),
-      );
-      assert.ok(document.querySelector(`.place-status-label .lucide-${icon}`));
-    }
     const pin = { lat: 48.2, lng: 16.37 };
     for (const location of [
       "https://maps.app.goo.gl/demo",
