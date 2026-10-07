@@ -82,15 +82,16 @@ dialog:has(.memo-editor),
   color: var(--m-mute);
 }
 
-/* tiles: masonry columns, so short notes don't leave holes */
+/* tiles: Google Keep-style columns, each tile into the shortest one
+   (MemoTiles); every column starts at the top. */
 .memo-tiles {
-  columns: 2;
-  column-gap: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
 }
-@media (min-width: 760px) {
-  .memo-tiles {
-    columns: 3;
-  }
+.memo-col {
+  flex: 1 1 0;
+  min-width: 0;
 }
 .memo-tile {
   position: relative;

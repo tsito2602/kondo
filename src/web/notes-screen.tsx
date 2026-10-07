@@ -1,5 +1,6 @@
 import {
   lazy,
+  type ReactNode,
   Suspense,
   useEffect,
   useLayoutEffect,
@@ -32,6 +33,75 @@ const NoteEditor = lazy(loadNoteEditor);
 /** How long the dock offers 元に戻す before the note is really deleted. */
 export const NOTE_UNDO_MS = 5000;
 const TILE_LINES = 5;
+
+/**
+ * Tiles laid out like Google Keep (Tsubasa 2026-10-07): in order, each into
+ * the column that is shortest so far, every column starting at the top.
+ * Heights are measured; until then a tile counts as average.
+ */
+function MemoTiles({
+  ids,
+  render,
+}: {
+  ids: string[];
+  render: (id: string) => ReactNode;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const [count, setCount] = useState(2);
+  const [heights, setHeights] = useState<Record<string, number>>({});
+  useLayoutEffect(() => {
+    const wide = matchMedia("(min-width: 760px)");
+    const update = () => setCount(wide.matches ? 3 : 2);
+    update();
+    wide.addEventListener("change", update);
+    return () => wide.removeEventListener("change", update);
+  }, []);
+  useLayoutEffect(() => {
+    const root = box.current;
+    if (!root) return;
+    const measure = () => {
+      const next: Record<string, number> = {};
+      root
+        .querySelectorAll<HTMLElement>(":scope > .memo-col > .memo-tile")
+        .forEach((tile) => {
+          const id = tile.dataset.noteId;
+          if (id) next[id] = tile.offsetHeight;
+        });
+      setHeights((current) =>
+        Object.keys(next).length === Object.keys(current).length &&
+        Object.entries(next).every(([id, h]) => current[id] === h)
+          ? current
+          : next,
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    root
+      .querySelectorAll(":scope > .memo-col > .memo-tile")
+      .forEach((tile) => observer.observe(tile));
+    return () => observer.disconnect();
+  });
+  const known = Object.values(heights);
+  const average = known.length
+    ? known.reduce((sum, h) => sum + h, 0) / known.length
+    : 120;
+  const columns: string[][] = Array.from({ length: count }, () => []);
+  const filled = Array<number>(count).fill(0);
+  for (const id of ids) {
+    const shortest = filled.indexOf(Math.min(...filled));
+    columns[shortest].push(id);
+    filled[shortest] += (heights[id] ?? average) + 10;
+  }
+  return (
+    <div className="memo-tiles" ref={box}>
+      {columns.map((column, index) => (
+        <div className="memo-col" key={index}>
+          {column.map(render)}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function NoteTile({
   note,
@@ -213,18 +283,22 @@ export function NotesScreen() {
     });
   };
   const tiles = (list: TravelNote[]) => (
-    <div className="memo-tiles">
-      {list.map((note) => (
-        <NoteTile
-          key={note.id}
-          note={note}
-          link={places.find((entry) => entry.place.id === note.placeId)}
-          canEdit={travel.canEdit}
-          onOpen={() => setOpen({ note, fresh: false })}
-          onToggle={(index) => toggle(note, index)}
-        />
-      ))}
-    </div>
+    <MemoTiles
+      ids={list.map((note) => note.id)}
+      render={(id) => {
+        const note = list.find((entry) => entry.id === id)!;
+        return (
+          <NoteTile
+            key={note.id}
+            note={note}
+            link={places.find((entry) => entry.place.id === note.placeId)}
+            canEdit={travel.canEdit}
+            onOpen={() => setOpen({ note, fresh: false })}
+            onToggle={(index) => toggle(note, index)}
+          />
+        );
+      }}
+    />
   );
   return (
     <div className="page notes-page" ref={page}>

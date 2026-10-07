@@ -590,8 +590,12 @@ function TaskSheet({
         : value || UNASSIGNED;
   const [error, setError] = useState("");
   const name = useRef<HTMLInputElement>(null);
+  // One save per panel: a second submit while it closes (return key then the
+  // dock button, or a double tap) must not add the same thing twice.
+  const saved = useRef(false);
   const save = (event: FormEvent) => {
     event.preventDefault();
+    if (saved.current) return;
     const value = title.trim();
     if (!value) {
       setError("やることの名前を入れてください");
@@ -603,6 +607,7 @@ function TaskSheet({
       name.current?.focus();
       return;
     }
+    saved.current = true;
     try {
       if (task) {
         travel.updateTask(task.id, {
@@ -631,6 +636,7 @@ function TaskSheet({
         onSaved(ids, ringFor(who));
       });
     } catch (cause) {
+      saved.current = false;
       setError(cause instanceof Error ? cause.message : "保存できませんでした");
     }
   };
@@ -1089,8 +1095,10 @@ function PackingSheet({
     item?.category && !isListedCategory(item.category) ? item.category : "";
   const [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null);
+  const saved = useRef(false);
   const save = (event: FormEvent) => {
     event.preventDefault();
+    if (saved.current) return;
     const value = name.trim();
     if (!value) {
       setError("名前を入れてください");
@@ -1102,6 +1110,7 @@ function PackingSheet({
       input.current?.focus();
       return;
     }
+    saved.current = true;
     try {
       if (item) {
         const before = packingInput(item);
@@ -1142,6 +1151,7 @@ function PackingSheet({
         onSaved(id);
       });
     } catch (cause) {
+      saved.current = false;
       setError(cause instanceof Error ? cause.message : "保存できませんでした");
     }
   };
