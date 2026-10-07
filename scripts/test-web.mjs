@@ -1291,7 +1291,7 @@ test("legacy account cache and pending changes survive React migration; real for
     const medicine = await addPacking("常備薬", "1つでいい");
     assert.match(kindRow(medicine).textContent, /まだ誰も持っていない/);
     assert.equal(kindRow(medicine).querySelector('[role="checkbox"]'), null);
-    await click(byText(`[data-item="${medicine}"] button`, "私が持つ"));
+    await click(byText(`[data-item="${medicine}"] button`, "自分が持つ"));
     await tick(30);
     assert.equal(
       db

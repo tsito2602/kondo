@@ -88,7 +88,7 @@ export type PackingItem = {
   quantity: number;
   /** For みんな各自 this is the viewer's own tick; otherwise the carrier's. */
   packed: boolean;
-  /** For 1つでいい, the member who said 「私が持つ」 (`member:<id>`). */
+  /** For 1つでいい, the member who said 「自分が持つ」 (`member:<id>`). */
   assignee?: string;
   shared?: boolean;
   /** Missing on legacy items, which read as 'one'. */

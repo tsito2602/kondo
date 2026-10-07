@@ -26,7 +26,7 @@ import { anim, RM, spring } from "./cartoon";
 import { useJellyScroll } from "./jelly-scroll";
 import { dismissModal } from "./motion";
 import { PageTop } from "./page-top";
-import { CheckIcon, LockIcon, Picture, pictureFor } from "./prep-pictures";
+import { CheckIcon, LockIcon } from "./prep-pictures";
 import { AddButton, DockFunction, ErrorText, Modal } from "./ui";
 
 /* ---------- motion, as kondo-prep3.html plays it ---------- */
@@ -789,7 +789,7 @@ const kinds: Record<PackingKind, [string, string]> = {
   each: ["みんな各自", "全員のリストに出る。チェックは自分の分だけ"],
   one: [
     "1つでいい",
-    "誰かが「私が持つ」で取る。全員のリストに「○○が持つ」と出る",
+    "誰かが「自分が持つ」で取る。全員のリストに「○○が持つ」と出る",
   ],
   mine: ["自分だけ", "あなたのリストにだけ出る。ほかの人には見えない"],
 };
@@ -916,7 +916,7 @@ function Packing() {
             data-haptic
             onClick={() => take(item)}
           >
-            私が持つ
+            自分が持つ
           </button>
         );
     } else
@@ -934,16 +934,6 @@ function Packing() {
         data-item={item.id}
         className={`prep-item${showCheck && item.packed ? " is-done" : ""}`}
       >
-        <button
-          type="button"
-          className="prep-item-picture"
-          tabIndex={-1}
-          aria-hidden="true"
-          disabled={!edit}
-          onClick={edit}
-        >
-          <Picture name={pictureFor(item.name, item.category)} />
-        </button>
         <button
           type="button"
           className="prep-item-name"
@@ -986,17 +976,12 @@ function Packing() {
         const items = travel.packingItems.filter(
           (item) => kindOf(item) === kind,
         );
-        const open = items.filter((item) => !item.assignee).length;
         return (
           <section key={kind} aria-label={kinds[kind][0]}>
             <div className="prep-heading prep-kind-heading">
               <b>{kinds[kind][0]}</b>
               <span>
-                {kind === "one"
-                  ? open
-                    ? `まだ決まってない ${open}`
-                    : "ぜんぶ決まった"
-                  : `${items.filter((item) => item.packed).length} / ${items.length}`}
+                {`${items.filter((item) => item.packed).length} / ${items.length}`}
               </span>
             </div>
             <div className="prep-list" role="list" data-kind={kind}>
