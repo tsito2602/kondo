@@ -239,6 +239,13 @@ const UNASSIGNED = "unassigned";
 const FORMER = "former";
 /** The who-picker's value for "leave it on the departed member". */
 const KEEP = "keep";
+/** A new task for everyone: one in each member's ring. */
+const ALL_MEMBERS = "all";
+/** やること's two kinds, worded as 持ち物's. */
+const taskKinds = {
+  true: ["全員がやる", ""],
+  false: ["1人がやる", "誰がやるかを選ぶ"],
+} as const;
 
 function DueText({ task, today }: { task: TravelTask; today: string }) {
   if (!task.dueOn) return <>期限なし</>;
@@ -305,42 +312,42 @@ function ActivityRing({
   );
 }
 
-/** Press and hold a row to change it (the row itself ticks, as in the mock). */
-function useHold(onHold: () => void) {
-  const timer = useRef(0);
-  const held = useRef(false);
-  const cancel = () => clearTimeout(timer.current);
-  return {
-    held,
-    handlers: {
-      onPointerDown: () => {
-        held.current = false;
-        cancel();
-        timer.current = window.setTimeout(() => {
-          held.current = true;
-          onHold();
-        }, 550);
-      },
-      onPointerUp: cancel,
-      onPointerLeave: cancel,
-      onPointerCancel: cancel,
-      onContextMenu: (event: React.MouseEvent) => {
-        event.preventDefault();
-        cancel();
-        if (!held.current) {
-          held.current = true;
-          onHold();
-        }
-      },
-    },
-  };
+/** A row's box: the only part that ticks (the name opens the editor). */
+function Check({
+  label,
+  checked,
+  tickable,
+  onToggle,
+}: {
+  label: string;
+  checked: boolean;
+  tickable: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      className="prep-check"
+      aria-checked={checked}
+      aria-disabled={!tickable}
+      aria-label={label}
+      data-haptic={tickable ? "" : undefined}
+      onClick={() => tickable && onToggle()}
+    >
+      <Box />
+    </button>
+  );
 }
 
+/** Tap the name to edit, the box to tick (Tsubasa 2026-10-07: 長押しは
+    画面からわからない). A task nobody has yet offers 自分がやる instead. */
 function TaskRow({
   task,
   today,
   tickable,
   canEdit,
+  take,
   onToggle,
   onEdit,
 }: {
@@ -348,10 +355,10 @@ function TaskRow({
   today: string;
   tickable: boolean;
   canEdit: boolean;
+  take?: ReactNode;
   onToggle: () => void;
   onEdit: () => void;
 }) {
-  const hold = useHold(() => canEdit && onEdit());
   return (
     <div
       role="listitem"
@@ -360,24 +367,10 @@ function TaskRow({
     >
       <button
         type="button"
-        role="checkbox"
         className="prep-row-main"
-        aria-checked={task.done}
-        aria-disabled={!tickable}
-        aria-label={
-          tickable
-            ? `${task.title}を${task.done ? "未完了" : "完了"}にする`
-            : `${task.title}（${task.done ? "済み" : "まだ"}）`
-        }
-        data-haptic={tickable ? "" : undefined}
-        {...hold.handlers}
-        onClick={() => {
-          if (hold.held.current) {
-            hold.held.current = false;
-            return;
-          }
-          if (tickable) onToggle();
-        }}
+        aria-label={`${task.title}を編集`}
+        disabled={!canEdit}
+        onClick={onEdit}
       >
         <span>
           <b>{task.title}</b>
@@ -385,14 +378,17 @@ function TaskRow({
             <DueText task={task} today={today} />
           </small>
         </span>
-        <Box />
       </button>
-      {canEdit && (
-        <button
-          type="button"
-          className="prep-sr"
-          aria-label={`${task.title}を編集`}
-          onClick={onEdit}
+      {take ?? (
+        <Check
+          label={
+            tickable
+              ? `${task.title}を${task.done ? "未完了" : "完了"}にする`
+              : `${task.title}（${task.done ? "済み" : "まだ"}）`
+          }
+          checked={task.done}
+          tickable={tickable}
+          onToggle={onToggle}
         />
       )}
     </div>
@@ -435,7 +431,7 @@ function Tasks() {
   if (nobody.length)
     rings.push({
       key: UNASSIGNED,
-      label: "担当なし",
+      label: "決めていない",
       assignee: "",
       tasks: nobody,
     });
@@ -467,10 +463,23 @@ function Tasks() {
     setFresh([]);
   }, [fresh, travel.tasks]);
   const mine = ring?.key === self;
+  const me = memberAssignee(self ?? "");
+  // A task nobody has (or whose member left) has no box: anyone takes it on
+  // with 自分がやる, as a 1人が持つ item is (Tsubasa 2026-10-07).
+  const open = (task: TravelTask) => !memberKeys.has(task.assignee);
   const tickable = (task: TravelTask) =>
-    travel.canEdit &&
-    (task.assignee === memberAssignee(self ?? "") ||
-      !memberKeys.has(task.assignee));
+    travel.canEdit && (task.assignee === me || open(task));
+  const bubble = useBubble();
+  const takeOn = (task: TravelTask) => {
+    const { id, title, dueOn, done } = task;
+    travel.updateTask(id, { title, dueOn, assignee: me, done });
+    if (self) setChosen(self);
+    setFresh([id]);
+    requestAnimationFrame(() => {
+      const row = page.current?.querySelector(`[data-task="${id}"]`);
+      if (row) bubble(row, `${title}はあなたがやる`);
+    });
+  };
   const toggle = (task: TravelTask) => {
     const { id, title, dueOn, assignee, done } = task;
     travel.updateTask(id, { title, dueOn, assignee, done: !done });
@@ -510,12 +519,18 @@ function Tasks() {
           {ring && (
             <>
               <div className="prep-heading prep-task-heading">
-                <b>{mine ? "あなたのやること" : `${ring.label}のやること`}</b>
+                <b>
+                  {mine
+                    ? "あなたのやること"
+                    : ring.key === UNASSIGNED
+                      ? "まだ決めていないやること"
+                      : `${ring.label}のやること`}
+                </b>
                 <span>
                   {mine
                     ? "押すとリングが閉じていく"
                     : ring.key === UNASSIGNED || ring.key === FORMER
-                      ? "誰でもチェックできる"
+                      ? ""
                       : "見るだけ（チェックは本人）"}
                 </span>
               </div>
@@ -531,6 +546,22 @@ function Tasks() {
                     today={today}
                     tickable={tickable(task)}
                     canEdit={travel.canEdit}
+                    take={
+                      open(task) && !task.done ? (
+                        travel.canEdit && self ? (
+                          <button
+                            type="button"
+                            className="prep-take"
+                            data-haptic
+                            onClick={() => takeOn(task)}
+                          >
+                            自分がやる
+                          </button>
+                        ) : (
+                          <span />
+                        )
+                      ) : undefined
+                    }
                     onToggle={() => toggle(task)}
                     onEdit={() => setSheet({ task })}
                   />
@@ -568,7 +599,7 @@ function TaskSheet({
   /** The ring to show afterwards (empty: stay). */
   onSaved: (ids: string[], ring: string) => void;
 }) {
-  const { travel, members, label } = useTravellers();
+  const { travel, members } = useTravellers();
   const formId = useId();
   const [title, setTitle] = useState(task?.title ?? "");
   const [due, setDue] = useState(task?.dueOn ?? "");
@@ -578,10 +609,12 @@ function TaskSheet({
   const kept = task?.assignee && !current ? task.assignee : "";
   const initialWho = task ? (current?.id ?? (kept ? KEEP : "")) : defaultWho;
   const [who, setWho] = useState(initialWho);
+  // A new task is everyone's (one each) or one person's, as 持ち物 is.
+  const [everyone, setEveryone] = useState(false);
   const assigneeFor = (value: string) =>
     value === KEEP ? kept : value ? memberAssignee(value) : "";
   const ringFor = (value: string) =>
-    value === "all"
+    value === ALL_MEMBERS
       ? ""
       : value === KEEP
         ? kept.startsWith("member:")
@@ -622,7 +655,7 @@ function TaskSheet({
         });
         return;
       }
-      const people = who === "all" ? members.map((member) => member.id) : [who];
+      const people = everyone ? members.map((member) => member.id) : [who];
       const ids = people.map((person) =>
         travel.createTask({
           title: value,
@@ -633,7 +666,7 @@ function TaskSheet({
       );
       dismissModal(() => {
         onClose();
-        onSaved(ids, ringFor(who));
+        onSaved(ids, ringFor(everyone ? ALL_MEMBERS : who));
       });
     } catch (cause) {
       saved.current = false;
@@ -684,74 +717,47 @@ function TaskSheet({
           trip={travel.selectedTrip ?? undefined}
           onChange={(day) => setDue(day)}
         />
-        <span className="prep-label" id={`${formId}-who`}>
-          誰がやる
-        </span>
-        <div
-          className="prep-whos"
-          role="group"
-          aria-labelledby={`${formId}-who`}
-        >
-          {members.map((member) => (
-            <button
-              type="button"
-              key={member.id}
-              aria-pressed={who === member.id}
-              onClick={(event) => {
-                setWho(member.id);
-                void boing(event.currentTarget, "scale(.9)");
-              }}
-            >
-              <AssigneeAvatar
-                value={memberAssignee(member.id)}
-                members={travel.members}
-              />
-              {label(member)}
-            </button>
-          ))}
-          {kept && (
-            <button
-              type="button"
-              aria-pressed={who === KEEP}
-              onClick={(event) => {
-                setWho(KEEP);
-                void boing(event.currentTarget, "scale(.9)");
-              }}
-            >
-              <AssigneeAvatar value={kept} members={travel.members} />
-              {kept.startsWith("member:") ? "元メンバー" : kept}
-            </button>
-          )}
-          <button
-            type="button"
-            className="prep-who-none"
-            aria-pressed={who === ""}
-            onClick={(event) => {
-              setWho("");
-              void boing(event.currentTarget, "scale(.9)");
-            }}
+        {!task && members.length > 1 && (
+          <div
+            className="prep-kinds"
+            role="radiogroup"
+            aria-label="やることの種類"
           >
-            担当なし
-          </button>
-          {!task && members.length > 1 && (
-            <button
-              type="button"
-              className="prep-who-all"
-              aria-pressed={who === "all"}
-              onClick={(event) => {
-                setWho("all");
-                void boing(event.currentTarget, "scale(.9)");
-              }}
-            >
-              みんな各自
-            </button>
-          )}
-          {who === "all" && (
-            <span className="prep-who-note">
-              {members.length}人それぞれのリングに1つずつ入ります
-            </span>
-          )}
-        </div>
+            {([true, false] as const).map((value) => (
+              <button
+                type="button"
+                role="radio"
+                key={String(value)}
+                aria-checked={everyone === value}
+                onClick={(event) => {
+                  setEveryone(value);
+                  void spring(
+                    event.currentTarget,
+                    [{ transform: "scale(.96)" }, { transform: "none" }],
+                    "squish",
+                  );
+                }}
+              >
+                <i aria-hidden="true" />
+                <b>{taskKinds[value ? "true" : "false"][0]}</b>
+                <small>
+                  {value
+                    ? `${members.length}人それぞれのリングに1つずつ入る`
+                    : taskKinds.false[1]}
+                </small>
+              </button>
+            ))}
+          </div>
+        )}
+        <Reveal open={!everyone}>
+          <WhoPicker
+            id={`${formId}-who`}
+            label="誰がやる"
+            who={who}
+            kept={kept}
+            onPick={setWho}
+          />
+        </Reveal>
       </form>
     </PrepSheet>
   );
@@ -765,7 +771,7 @@ function TaskSheet({
  * is split by kind, so rows carry no note; 自分だけ's heading says it is hidden.
  */
 const kinds: Record<PackingKind, [string, string]> = {
-  each: ["みんな各自", "全員の一覧に出る。チェックは自分の分だけ"],
+  each: ["全員が持つ", "全員の一覧に出る。チェックは自分の分だけ"],
   one: ["1人が持つ", "誰が持つかを選ぶ。全員の一覧に「○○が持つ」と出る"],
   mine: ["自分だけ", "あなたの一覧にだけ出る。ほかの人には見えない"],
 };
@@ -784,7 +790,7 @@ const packingInput = (item: PackingItem) => ({
   kind: kindOf(item),
 });
 
-/** A 持ち物 row, as a やること row: tap anywhere to tick, hold to edit. */
+/** A 持ち物 row, as a やること row: the name edits, the box ticks. */
 function PackRow({
   item,
   sub,
@@ -804,7 +810,6 @@ function PackRow({
   onToggle: () => void;
   onEdit?: () => void;
 }) {
-  const hold = useHold(() => onEdit?.());
   const done = showCheck && item.packed;
   return (
     <div
@@ -814,24 +819,10 @@ function PackRow({
     >
       <button
         type="button"
-        role={showCheck ? "checkbox" : undefined}
         className="prep-row-main"
-        aria-checked={showCheck ? item.packed : undefined}
-        aria-disabled={!tickable}
-        aria-label={
-          tickable
-            ? `${item.name}を${item.packed ? "まだにする" : "入れた"}`
-            : item.name
-        }
-        data-haptic={tickable ? "" : undefined}
-        {...hold.handlers}
-        onClick={() => {
-          if (hold.held.current) {
-            hold.held.current = false;
-            return;
-          }
-          if (tickable) onToggle();
-        }}
+        aria-label={`${item.name}を編集`}
+        disabled={!onEdit}
+        onClick={onEdit}
       >
         <span>
           <b>
@@ -843,15 +834,18 @@ function PackRow({
           {sub && <small className="prep-item-sub">{sub}</small>}
         </span>
         {side}
-        {showCheck && <Box />}
       </button>
       {take}
-      {onEdit && (
-        <button
-          type="button"
-          className="prep-sr"
-          aria-label={`${item.name}を編集`}
-          onClick={onEdit}
+      {showCheck && (
+        <Check
+          label={
+            tickable
+              ? `${item.name}を${item.packed ? "まだにする" : "入れた"}`
+              : item.name
+          }
+          checked={item.packed}
+          tickable={tickable}
+          onToggle={onToggle}
         />
       )}
     </div>
@@ -1139,6 +1133,68 @@ function Reveal({ open, children }: { open: boolean; children: ReactNode }) {
   ) : null;
 }
 
+/** 誰が持つ / 誰がやる: the members, an old carrier kept as is, or nobody yet. */
+function WhoPicker({
+  id,
+  label: heading,
+  who,
+  kept,
+  onPick,
+}: {
+  id: string;
+  label: string;
+  who: string;
+  kept: string;
+  onPick: (who: string) => void;
+}) {
+  const { travel, members, label } = useTravellers();
+  const chip = (value: string, children: ReactNode, className?: string) => (
+    <button
+      type="button"
+      role="radio"
+      key={value || "none"}
+      className={className}
+      aria-checked={who === value}
+      onClick={(event) => {
+        onPick(value);
+        void boing(event.currentTarget, "scale(.9)");
+      }}
+    >
+      {children}
+    </button>
+  );
+  return (
+    <>
+      <span className="prep-label" id={id}>
+        {heading}
+      </span>
+      <div className="prep-whos" role="radiogroup" aria-labelledby={id}>
+        {members.map((member) =>
+          chip(
+            member.id,
+            <>
+              <AssigneeAvatar
+                value={memberAssignee(member.id)}
+                members={travel.members}
+              />
+              {label(member)}
+            </>,
+          ),
+        )}
+        {kept &&
+          chip(
+            KEEP,
+            <>
+              <AssigneeAvatar value={kept} members={travel.members} />
+              {kept.startsWith("member:") ? "元メンバー" : kept}
+            </>,
+          )}
+        {chip("", "まだ決めない", "prep-who-none")}
+      </div>
+    </>
+  );
+}
+
 function PackingSheet({
   item,
   self,
@@ -1150,7 +1206,7 @@ function PackingSheet({
   onClose: () => void;
   onSaved: (id: string) => void;
 }) {
-  const { travel, members, label } = useTravellers();
+  const { travel, members } = useTravellers();
   const formId = useId();
   const [name, setName] = useState(item?.name ?? "");
   const [kind, setKind] = useState<PackingKind>(item ? kindOf(item) : "each");
@@ -1353,61 +1409,13 @@ function PackingSheet({
           ))}
         </div>
         <Reveal open={kind === "one"}>
-          <>
-            <span className="prep-label" id={`${formId}-who`}>
-              誰が持つ
-            </span>
-            <div
-              className="prep-whos"
-              role="radiogroup"
-              aria-labelledby={`${formId}-who`}
-            >
-              {members.map((member) => (
-                <button
-                  type="button"
-                  role="radio"
-                  key={member.id}
-                  aria-checked={who === member.id}
-                  onClick={(event) => {
-                    setWho(member.id);
-                    void boing(event.currentTarget, "scale(.9)");
-                  }}
-                >
-                  <AssigneeAvatar
-                    value={memberAssignee(member.id)}
-                    members={travel.members}
-                  />
-                  {label(member)}
-                </button>
-              ))}
-              {kept && (
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={who === KEEP}
-                  onClick={(event) => {
-                    setWho(KEEP);
-                    void boing(event.currentTarget, "scale(.9)");
-                  }}
-                >
-                  <AssigneeAvatar value={kept} members={travel.members} />
-                  {kept.startsWith("member:") ? "元メンバー" : kept}
-                </button>
-              )}
-              <button
-                type="button"
-                role="radio"
-                className="prep-who-none"
-                aria-checked={who === ""}
-                onClick={(event) => {
-                  setWho("");
-                  void boing(event.currentTarget, "scale(.9)");
-                }}
-              >
-                まだ決めない
-              </button>
-            </div>
-          </>
+          <WhoPicker
+            id={`${formId}-who`}
+            label="誰が持つ"
+            who={who}
+            kept={kept}
+            onPick={setWho}
+          />
         </Reveal>
       </form>
     </PrepSheet>

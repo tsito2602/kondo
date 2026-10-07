@@ -1291,12 +1291,12 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.equal(document.querySelector("dialog input[autofocus]"), null);
     assert.equal(
-      document.querySelector(".prep-who-all"),
+      document.querySelector('[aria-label="やることの種類"]'),
       null,
-      "みんな各自 needs more than one member",
+      "全員がやる needs more than one member",
     );
     assert.match(
-      document.querySelector('.prep-whos [aria-pressed="true"]').textContent,
+      document.querySelector('.prep-whos [aria-checked="true"]').textContent,
       /あなた$/,
       "a new task is mine unless I choose someone else",
     );
@@ -1409,7 +1409,7 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     // A task can be put back on nobody (production's 未指定).
     await click(document.querySelector('[aria-label="チケットを予約を編集"]'));
-    await click(byText("dialog .prep-whos button", "担当なし"));
+    await click(byText("dialog .prep-whos button", "まだ決めない"));
     await submitSheet("保存");
     assert.equal(
       db.prepare("SELECT assignee FROM travel_tasks").get().assignee,
@@ -1417,7 +1417,7 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.equal(
       document.querySelector(`[data-ring="unassigned"] b`).textContent,
-      "担当なし",
+      "決めていない",
     );
     assert.ok(document.querySelector(`[data-task="${savedTask.id}"]`));
     await click(document.querySelector('[aria-label="チケットを予約を編集"]'));
@@ -1468,8 +1468,8 @@ test("legacy account cache and pending changes survive React migration; real for
       assert.equal(
         document.querySelector('[role="radio"][aria-checked="true"] b')
           .textContent,
-        "みんな各自",
-        "みんな各自 is the default kind",
+        "全員が持つ",
+        "全員が持つ is the default kind",
       );
       await typeInto(
         document.querySelector('dialog input[aria-label="持ち物"]'),
@@ -1489,7 +1489,7 @@ test("legacy account cache and pending changes survive React migration; real for
     };
     const kindRow = (id) => document.querySelector(`[data-item="${id}"]`);
     const filters = () => document.querySelector(".prep-filters");
-    const charger = await addPacking("充電器", "みんな各自");
+    const charger = await addPacking("充電器", "全員が持つ");
     assert.equal(
       db
         .prepare("SELECT kind FROM packing_kinds WHERE item_id = ?")

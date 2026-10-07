@@ -203,12 +203,18 @@
   font-size: 18px;
 }
 
-/* ---------- .it (やること rows): the whole row ticks ---------- */
+/* ---------- .it (やること rows): the name edits, the box ticks ---------- */
+.prep-row {
+  display: flex;
+  align-items: stretch;
+}
 .prep-row + .prep-row,
 .prep-item + .prep-item {
   border-top: 1.5px solid var(--p-line);
 }
 .prep-row-main {
+  flex: 1;
+  min-width: 0;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 10px;
@@ -225,8 +231,36 @@
   -webkit-touch-callout: none;
   user-select: none;
 }
-.is-readonly .prep-row-main {
+.prep-row-main:disabled {
   cursor: default;
+  opacity: 1;
+}
+/* The name answers the press, so it reads as the way into the editor. */
+.prep-row-main:not(:disabled):active > span {
+  opacity: 0.55;
+  transition: opacity 0s;
+}
+.prep-row-main > span {
+  transition: opacity 0.2s;
+}
+/* The box's target runs to the row's right edge and its full height. */
+.prep-check {
+  display: grid;
+  flex: none;
+  place-items: center;
+  min-height: 0;
+  padding: 0 14px 0 8px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.is-readonly .prep-check {
+  cursor: default;
+}
+.prep-row > .prep-take {
+  align-self: center;
+  margin-right: 12px;
 }
 .prep-row-main b {
   position: relative;
@@ -295,15 +329,10 @@
   align-items: center;
 }
 .prep-item > .prep-row-main {
-  flex: 1;
-  min-width: 0;
   grid-template-columns: 1fr;
   grid-auto-columns: auto;
   grid-auto-flow: column;
   padding-left: 18px;
-}
-.prep-item > .prep-take {
-  margin-right: 12px;
 }
 .prep-row-main small.prep-item-sub {
   display: flex;
