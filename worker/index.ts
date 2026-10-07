@@ -248,23 +248,18 @@ function pinInPage(html: string): Coordinates | null {
   }
   return null;
 }
-// Google answers a phone with 「Maps lite」, a page that carries no pin; a
-// desktop browser gets the full page whose opening camera is the place.
+// The Maps page itself is read as a desktop browser: a phone gets 「Maps lite」,
+// four times larger and with no more to read.
 const DESKTOP = { 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36', 'accept-language': 'ja,en;q=0.8' };
 const BROWSER = { 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', 'accept-language': 'ja,en;q=0.8' };
-async function followMapLink(link: string, trace?: string[]): Promise<string> {
+async function followMapLink(link: string): Promise<string> {
   let target = link;
   for (let hop = 0; hop < 4 && !mapCoordinates(target); hop++) {
     const response = await fetch(target, { redirect: 'manual', headers: BROWSER, signal: AbortSignal.timeout(4000) });
     let next = response.headers.get('location');
-    trace?.push(`hop ${response.status} ${target} -> ${next ?? ''}`);
     // Some share links answer with a page that sends the browser on by script
     // or meta refresh instead of a redirect: take the first Maps link in it.
-    if (!next && response.ok && isShortMapsLink(target)) {
-      const page = (await response.text()).slice(0, 500_000);
-      next = mapsLinkInPage(page);
-      trace?.push(`short page ${page.length} ${page.slice(0, 1500)}`);
-    }
+    if (!next && response.ok && isShortMapsLink(target)) next = mapsLinkInPage((await response.text()).slice(0, 500_000));
     else await response.body?.cancel();
     if (!next) break;
     const href = new URL(next, target).href;
@@ -299,25 +294,22 @@ async function geocode(query: string): Promise<Coordinates | null> {
 function withoutJapanese(text: string) {
   return text.replace(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー・、。（）]+/gu, ' ').split(',').map((part) => part.trim()).filter((part) => /\p{L}|\d/u.test(part)).join(', ');
 }
-async function locateMapLink(link: string, trace?: string[]): Promise<{ target: string; pin: Coordinates | null; title?: string }> {
+async function locateMapLink(link: string): Promise<{ target: string; pin: Coordinates | null; title?: string }> {
   let target = link;
   try {
-    if (isShortMapsLink(link)) target = await followMapLink(link, trace);
-  } catch (error) { trace?.push(`follow error ${error}`); }
+    if (isShortMapsLink(link)) target = await followMapLink(link);
+  } catch { /* keep the link */ }
   let pin = mapCoordinates(target);
   if (pin) return { target, pin };
   let title = '';
   try {
     const response = await fetch(target, { headers: DESKTOP, signal: AbortSignal.timeout(5000) });
-    trace?.push(`page ${response.status} ${response.url}`);
     if (response.ok) {
       const html = (await response.text()).slice(0, 2_000_000);
       pin = pinInPage(html);
       title = titleInPage(html);
-      trace?.push(`coords ${[...html.matchAll(/.{0,40}-?\d{1,3}\.\d{5,}[,\]\s]{1,3}-?\d{1,3}\.\d{5,}.{0,10}/g)].slice(0, 6).map((m) => m[0]).join(' | ')}`);
-      trace?.push(`page ${html.length} pin=${JSON.stringify(pin)} title=${title} camera=${html.match(/APP_INITIALIZATION_STATE=.{0,120}/)?.[0] ?? ''} og=${html.match(/og:image"[^>]{0,300}/)?.[0] ?? ''} head=${html.slice(0, 800)}`);
     } else await response.body?.cancel();
-  } catch (error) { trace?.push(`page error ${error}`); }
+  } catch { /* try the address */ }
   if (pin) return { target, pin, title };
   const url = new URL(target);
   // A link to a place id only (「?cid=…」) carries no words; the page's title does.
@@ -331,8 +323,7 @@ async function locateMapLink(link: string, trace?: string[]): Promise<{ target: 
       await new Promise((done) => setTimeout(done, 1000));
       pin = await geocode(latin);
     }
-    trace?.push(`geocode ${query} -> ${JSON.stringify(pin)}`);
-  } catch (error) { trace?.push(`geocode error ${query} ${error}`); }
+  } catch { /* no pin */ }
   return { target, pin, title };
 }
 /** Coordinates from a pasted Google Maps link (see locateMapLink). */
@@ -343,16 +334,10 @@ async function placeCoordinates(location: string): Promise<Coordinates | null> {
   return link ? (await locateMapLink(link)).pin : null;
 }
 /** A pasted Google Maps link → the place's name and pin. */
-async function resolveMapLink(env: Env, text: string) {
+async function resolveMapLink(text: string) {
   const link = registeredGoogleMapsUrl(text.trim());
   if (!link) return json({ error: 'Googleマップのリンクを入力してください' }, 400);
-  // TEMPORARY (2026-10-07): staging keeps a trace of how a link was read, to see what Google answers the Worker.
-  const trace = env.ALLOWED_ORIGINS?.includes('staging') ? [] as string[] : undefined;
-  const { target, pin, title } = await locateMapLink(link, trace);
-  if (trace) {
-    await env.DB.prepare('CREATE TABLE IF NOT EXISTS link_traces (at INTEGER NOT NULL DEFAULT (unixepoch()), link TEXT, trace TEXT)').run();
-    await env.DB.prepare('INSERT INTO link_traces (link, trace) VALUES (?, ?)').bind(link, trace.join('\n\n')).run();
-  }
+  const { target, pin, title } = await locateMapLink(link);
   const name = placeNameFromLink(target) ?? (title ? title.split(/[,、]/)[0].trim() || null : null);
   return json({ link, name, lat: pin?.lat ?? null, lng: pin?.lng ?? null });
 }
@@ -363,8 +348,8 @@ async function resolveMapLink(env: Env, text: string) {
  * so the list never waits long. A link that gave nothing is skipped for a
  * day. Never fails the list.
  */
-/** When link reading last got better: misses from before it are tried again (Android links, 2026-10-07). */
-const RESOLVER_SINCE = 1791367986;
+/** When link reading last got better: misses from before it are tried again (Maps pages read as a desktop, 2026-10-07). */
+const RESOLVER_SINCE = 1791374200;
 async function fillMissingCoordinates(env: Env, tripId: string, rows: Record<string, unknown>[]) {
   const misses = new Set(((await env.DB.prepare(`SELECT m.place_id FROM place_coordinate_misses m JOIN places p ON p.id = m.place_id
     WHERE p.trip_id = ? AND m.location = p.location AND m.tried_at > MAX(unixepoch() - 86400, ?)`).bind(tripId, RESOLVER_SINCE).all()).results).map((row) => row.place_id));
@@ -1273,7 +1258,7 @@ app.delete('/v1/trips/:tripId/invites', (c) => revokeInvites(c.env, c.get('user'
 app.post('/v1/invites/:token/accept', (c) => acceptInvite(c.env, c.get('user'), c.req.param('token')));
 app.all('/v1/trips/:tripId/members', (c) => membersRoute(c.req.raw, c.env, c.get('user'), c.req.param('tripId')));
 app.all('/v1/trips/:tripId/members/:id', (c) => membersRoute(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('id')));
-app.get('/v1/maps/resolve', (c) => resolveMapLink(c.env, c.req.query('url') ?? ''));
+app.get('/v1/maps/resolve', (c) => resolveMapLink(c.req.query('url') ?? ''));
 app.all('/v1/trips/:tripId/places', (c) => placesRoute(c.req.raw, c.env, c.get('user'), c.req.param('tripId')));
 app.all('/v1/trips/:tripId/places/:id', (c) => placesRoute(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('id')));
 app.all('/v1/trips/:tripId/notes', (c) => notesRoute(c.req.raw, c.env, c.get('user'), c.req.param('tripId')));
