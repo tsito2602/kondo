@@ -285,6 +285,20 @@ CREATE TABLE IF NOT EXISTS packing_marks (
   PRIMARY KEY (item_id, user_id)
 );
 
+-- Task kinds: 全員がやる (each: one row, every member ticks their own) and
+-- 1人がやる (one). Tasks without a row are 'one', as every task was before.
+CREATE TABLE IF NOT EXISTS task_kinds (
+  task_id TEXT PRIMARY KEY REFERENCES travel_tasks(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL DEFAULT 'one' CHECK(kind IN ('each', 'one'))
+);
+
+-- Per-member done marks for 全員がやる tasks: one row per member who did it.
+CREATE TABLE IF NOT EXISTS task_marks (
+  task_id TEXT NOT NULL REFERENCES travel_tasks(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  PRIMARY KEY (task_id, user_id)
+);
+
 -- Optional link from a booking to one of the trip's places (the venue on the map).
 -- Omission by old clients preserves it; deleting the place clears it.
 CREATE TABLE IF NOT EXISTS booking_places (

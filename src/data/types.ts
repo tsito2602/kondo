@@ -99,12 +99,20 @@ export type PackingItem = {
   updatedAt?: number;
 };
 
+/** 全員がやる (everyone does it, each ticks their own) or 1人がやる. */
+export type TaskKind = 'each' | 'one';
+
 export type TravelTask = {
   id: string;
   title: string;
   dueOn: string;
   assignee: string;
+  /** For 全員がやる this is the viewer's own tick; otherwise the doer's. */
   done: boolean;
+  /** Missing on tasks from before kinds: they are 1人がやる. */
+  kind?: TaskKind;
+  /** 全員がやる: member ids that have done it. */
+  doneBy?: string[];
   updatedBy?: string;
   updatedAt?: number;
 };

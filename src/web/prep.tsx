@@ -19,6 +19,7 @@ import { assigneeName, memberAssignee } from "@/data/assignee";
 import type {
   PackingItem,
   PackingKind,
+  TaskKind,
   TravelTask,
   TripMember,
 } from "@/data/types";
@@ -41,7 +42,7 @@ import { AddButton, ErrorText, Modal } from "./ui";
 
 /* ---------- motion, as kondo-prep3.html plays it ---------- */
 
-/** A spring back from `from` to rest: scale pops, the ring's boing. */
+/** A spring back from `from` to rest: the boing of a pop. */
 const boing = (el: Element | null | undefined, from: string) =>
   el ? spring(el, [{ transform: from }, { transform: "none" }], "boing") : 0;
 /** The mock's own sink: lands from above, squashes (1.06 × .9), settles. */
@@ -52,11 +53,11 @@ const SINK = (from: number): Keyframe[] => [
   { transform: "translateY(-2px) scale(.99,1.02)", offset: 0.8 },
   { transform: "none", opacity: 1 },
 ];
-/** Opening a page: its rings, headings and lists sink in, 35 ms apart. */
+/** Opening a page: its headings and lists sink in, 35 ms apart. */
 function useSinkIn(page: React.RefObject<HTMLElement | null>) {
   useLayoutEffect(() => {
     const parts = page.current?.querySelectorAll<HTMLElement>(
-      ".prep-ring, .prep-list, .prep-kind-heading",
+      ".prep-list, .prep-kind-heading",
     );
     parts?.forEach((el, i) =>
       anim(el, SINK(-20), {
@@ -228,24 +229,25 @@ function PrepSheet({
 
 /* ---------- やること ---------- */
 
-type Ring = {
-  key: string;
-  label: string;
-  assignee: string;
-  tasks: TravelTask[];
-};
-const UNASSIGNED = "unassigned";
-/** Tasks still on a member who has left the trip. */
-const FORMER = "former";
 /** The who-picker's value for "leave it on the departed member". */
 const KEEP = "keep";
-/** A new task for everyone: one in each member's ring. */
-const ALL_MEMBERS = "all";
-/** やること's two kinds, worded as 持ち物's. */
-const taskKinds = {
-  true: ["全員がやる", ""],
-  false: ["1人がやる", "誰がやるかを選ぶ"],
-} as const;
+
+/**
+ * Two kinds, laid out as 持ち物's (Tsubasa 2026-10-07: the rings sat out of
+ * sight while ticking lower rows, so the page now matches 持ち物).
+ */
+const taskKinds: Record<TaskKind, [string, string]> = {
+  each: ["全員がやる", "全員の一覧に出る。チェックは自分の分だけ"],
+  one: ["1人がやる", "誰がやるかを選ぶ。全員の一覧に「○○がやる」と出る"],
+};
+const taskKindOf = (task: TravelTask): TaskKind => task.kind ?? "one";
+const taskInput = (task: TravelTask) => ({
+  title: task.title,
+  dueOn: task.dueOn,
+  assignee: task.assignee,
+  done: task.done,
+  kind: taskKindOf(task),
+});
 
 function DueText({ task, today }: { task: TravelTask; today: string }) {
   if (!task.dueOn) return <>期限なし</>;
@@ -260,57 +262,6 @@ const byDue = (a: TravelTask, b: TravelTask) =>
   (a.dueOn || "9").localeCompare(b.dueOn || "9") ||
   a.title.localeCompare(b.title) ||
   a.id.localeCompare(b.id);
-
-function ActivityRing({
-  ring,
-  selected,
-  members,
-  onSelect,
-}: {
-  ring: Ring;
-  selected: boolean;
-  members: TripMember[];
-  onSelect: () => void;
-}) {
-  const done = ring.tasks.filter((task) => task.done).length;
-  const total = ring.tasks.length;
-  const fraction = total ? done / total : 0;
-  const circumference = 2 * Math.PI * 40;
-  const closed = fraction >= 1;
-  return (
-    <button
-      type="button"
-      className={`prep-ring${closed ? " is-closed" : ""}`}
-      data-ring={ring.key}
-      aria-pressed={selected}
-      aria-label={`${ring.label}　あと${total - done}`}
-      onClick={onSelect}
-    >
-      <span className="prep-ring-view">
-        <svg viewBox="0 0 100 100" aria-hidden="true">
-          <circle className="prep-ring-track" cx="50" cy="50" r="40" />
-          <circle
-            className="prep-ring-fill"
-            cx="50"
-            cy="50"
-            r="40"
-            strokeDasharray={circumference}
-            strokeDashoffset={circumference * (1 - fraction)}
-          />
-        </svg>
-        {ring.key === UNASSIGNED || ring.key === FORMER ? (
-          <span className="assignee-avatar" aria-hidden="true">
-            ?
-          </span>
-        ) : (
-          <AssigneeAvatar value={ring.assignee} members={members} />
-        )}
-      </span>
-      <b>{ring.label}</b>
-      <small>あと{total - done}</small>
-    </button>
-  );
-}
 
 /** A row's box: the only part that ticks (the name opens the editor). */
 function Check({
@@ -341,29 +292,34 @@ function Check({
 }
 
 /** Tap the name to edit, the box to tick (Tsubasa 2026-10-07: 長押しは
-    画面からわからない). A task nobody has yet offers 自分がやる instead. */
+    画面からわからない), as a 持ち物 row. */
 function TaskRow({
   task,
-  today,
+  sub,
+  side,
+  take,
+  showCheck,
   tickable,
   canEdit,
-  take,
   onToggle,
   onEdit,
 }: {
   task: TravelTask;
-  today: string;
+  sub: ReactNode;
+  side: ReactNode;
+  take: ReactNode;
+  showCheck: boolean;
   tickable: boolean;
   canEdit: boolean;
-  take?: ReactNode;
   onToggle: () => void;
   onEdit: () => void;
 }) {
+  const done = showCheck && task.done;
   return (
     <div
       role="listitem"
       data-task={task.id}
-      className={`prep-row${task.done ? " is-done" : ""}${tickable ? "" : " is-readonly"}`}
+      className={`prep-row prep-item${done ? " is-done" : ""}${tickable ? "" : " is-readonly"}`}
     >
       <button
         type="button"
@@ -374,12 +330,12 @@ function TaskRow({
       >
         <span>
           <b>{task.title}</b>
-          <small>
-            <DueText task={task} today={today} />
-          </small>
+          <small className="prep-item-sub">{sub}</small>
         </span>
+        {side}
       </button>
-      {take ?? (
+      {take}
+      {showCheck && (
         <Check
           label={
             tickable
@@ -405,87 +361,131 @@ export function TasksScreen() {
 
 function Tasks() {
   const { travel, self, members, label } = useTravellers();
+  const bubble = useBubble();
   const today = localDate();
+  const me = memberAssignee(self ?? "");
   const memberKeys = new Set(
     members.map((member) => memberAssignee(member.id)),
   );
-  const rings: Ring[] = members.map((member) => ({
-    key: member.id,
-    label: label(member),
-    assignee: memberAssignee(member.id),
-    tasks: travel.tasks.filter(
-      (task) => task.assignee === memberAssignee(member.id),
-    ),
-  }));
-  // A task may have nobody on it, or a member who has since left the trip.
-  const loose = travel.tasks.filter((task) => !memberKeys.has(task.assignee));
-  const former = loose.filter((task) => task.assignee.startsWith("member:"));
-  const nobody = loose.filter((task) => !task.assignee.startsWith("member:"));
-  if (former.length)
-    rings.push({
-      key: FORMER,
-      label: "元メンバー",
-      assignee: "",
-      tasks: former,
-    });
-  if (nobody.length)
-    rings.push({
-      key: UNASSIGNED,
-      label: "決めていない",
-      assignee: "",
-      tasks: nobody,
-    });
-  const [chosen, setChosen] = useState(self ?? "");
-  const ring =
-    rings.find((entry) => entry.key === chosen) ?? rings[0] ?? undefined;
+  const others = members.filter((member) => member.id !== self);
   const [sheet, setSheet] = useState<{ task?: TravelTask } | null>(null);
-  const [fresh, setFresh] = useState<string[]>([]);
+  const [fresh, setFresh] = useState("");
   const page = useRef<HTMLDivElement>(null);
   useSinkIn(page);
-  useJellyScroll(page, ".prep-rings, .prep-heading, .prep-list");
+  useJellyScroll(page, ".prep-heading, .prep-list");
+  const row$ = (id: string) =>
+    page.current?.querySelector(`[data-task="${id}"]`);
   useLayoutEffect(() => {
-    if (!fresh.length) return;
-    const root = page.current;
-    const row = root?.querySelector(
-      fresh.map((id) => `[data-task="${id}"]`).join(","),
-    );
+    if (!fresh) return;
+    const row = page.current?.querySelector(`[data-task="${fresh}"]`);
     row?.scrollIntoView?.({ block: "center" });
     void boing(row, "scale(.85)");
-    for (const key of new Set(
-      travel.tasks
-        .filter((task) => fresh.includes(task.id))
-        .map((task) => task.assignee.slice(7)),
-    ))
-      void boing(
-        root?.querySelector(`[data-ring="${key}"] .prep-ring-view`),
-        "scale(.86)",
-      );
-    setFresh([]);
-  }, [fresh, travel.tasks]);
-  const mine = ring?.key === self;
-  const me = memberAssignee(self ?? "");
-  // A task nobody has (or whose member left) has no box: anyone takes it on
-  // with 自分がやる, as a 1人が持つ item is (Tsubasa 2026-10-07).
+    setFresh("");
+  }, [fresh]);
+  // A 1人がやる task nobody has (or whose member left) is anyone's to take on.
   const open = (task: TravelTask) => !memberKeys.has(task.assignee);
   const tickable = (task: TravelTask) =>
-    travel.canEdit && (task.assignee === me || open(task));
-  const bubble = useBubble();
+    travel.canEdit &&
+    (taskKindOf(task) === "each" || task.assignee === me || open(task));
+  // As 1人が持つ: only the doer has a box; nobody has one until it is
+  // decided, except an old task already ticked (so it can be unticked).
+  const showsCheck = (task: TravelTask) =>
+    taskKindOf(task) === "each" ||
+    task.assignee === me ||
+    (open(task) && task.done);
+  const toggle = (task: TravelTask) => {
+    travel.updateTask(task.id, { ...taskInput(task), done: !task.done });
+    if (!task.done)
+      requestAnimationFrame(() =>
+        boing(row$(task.id)?.querySelector(".prep-box"), "scale(1.3)"),
+      );
+  };
   const takeOn = (task: TravelTask) => {
-    const { id, title, dueOn, done } = task;
-    travel.updateTask(id, { title, dueOn, assignee: me, done });
-    if (self) setChosen(self);
-    setFresh([id]);
+    travel.updateTask(task.id, { ...taskInput(task), assignee: me });
     requestAnimationFrame(() => {
-      const row = page.current?.querySelector(`[data-task="${id}"]`);
-      if (row) bubble(row, `${title}はあなたがやる`);
+      const row = row$(task.id);
+      if (!row) return;
+      void boing(row, "scale(.9)");
+      bubble(
+        row,
+        others.length
+          ? `${task.title}はあなたがやる。${others.length}人にもそう出ます`
+          : `${task.title}はあなたがやる`,
+      );
     });
   };
-  const toggle = (task: TravelTask) => {
-    const { id, title, dueOn, assignee, done } = task;
-    travel.updateTask(id, { title, dueOn, assignee, done: !done });
-    void boing(
-      page.current?.querySelector(`[data-ring="${ring?.key}"] .prep-ring-view`),
-      "scale(1.12)",
+  const doer = (task: TravelTask) =>
+    task.assignee === me
+      ? "あなた"
+      : assigneeName(task.assignee, travel.members);
+  const row = (task: TravelTask) => {
+    const kind = taskKindOf(task);
+    let sub: ReactNode = <DueText task={task} today={today} />;
+    let side: ReactNode = null;
+    let take: ReactNode = null;
+    if (kind === "each")
+      side = (
+        <span className="prep-others">
+          {others.map((member) => {
+            const done = task.doneBy?.includes(member.id) ?? false;
+            return (
+              <span
+                key={member.id}
+                className={done ? "is-on" : "is-off"}
+                role="img"
+                aria-label={`${label(member)}：${done ? "済み" : "まだ"}`}
+              >
+                <AssigneeAvatar
+                  value={memberAssignee(member.id)}
+                  members={travel.members}
+                />
+              </span>
+            );
+          })}
+        </span>
+      );
+    else if (open(task)) {
+      sub = (
+        <>
+          まだ決めていない · <DueText task={task} today={today} />
+        </>
+      );
+      if (!task.done && travel.canEdit && self)
+        take = (
+          <button
+            type="button"
+            className="prep-take"
+            data-haptic
+            onClick={() => takeOn(task)}
+          >
+            自分がやる
+          </button>
+        );
+    } else
+      sub = (
+        <>
+          <AssigneeAvatar value={task.assignee} members={travel.members} />
+          {doer(task)}がやる ·{" "}
+          {task.assignee !== me && task.done ? (
+            "済み"
+          ) : (
+            <DueText task={task} today={today} />
+          )}
+        </>
+      );
+    return (
+      <TaskRow
+        key={task.id}
+        task={task}
+        sub={sub}
+        side={side}
+        take={take}
+        showCheck={showsCheck(task)}
+        tickable={tickable(task)}
+        canEdit={travel.canEdit}
+        onToggle={() => toggle(task)}
+        onEdit={() => setSheet({ task })}
+      />
     );
   };
   return (
@@ -495,92 +495,31 @@ function Tasks() {
         addLabel="やることを追加"
         onAdd={travel.canEdit ? () => setSheet({}) : undefined}
       />
-      {!rings.length ? (
-        <p className="prep-empty">
-          メンバーが読み込まれると、ここにリングが並びます。
-        </p>
-      ) : (
-        <>
-          <div
-            className="prep-rings"
-            role="group"
-            aria-label="メンバーのやること"
-          >
-            {rings.map((entry) => (
-              <ActivityRing
-                key={entry.key}
-                ring={entry}
-                selected={entry.key === ring?.key}
-                members={travel.members}
-                onSelect={() => setChosen(entry.key)}
-              />
-            ))}
-          </div>
-          {ring && (
-            <>
-              <div className="prep-heading prep-task-heading">
-                <b>
-                  {mine
-                    ? "あなたのやること"
-                    : ring.key === UNASSIGNED
-                      ? "まだ決めていないやること"
-                      : `${ring.label}のやること`}
-                </b>
-                <span>
-                  {mine
-                    ? "押すとリングが閉じていく"
-                    : ring.key === UNASSIGNED || ring.key === FORMER
-                      ? ""
-                      : "見るだけ（チェックは本人）"}
-                </span>
-              </div>
-              <div
-                className="prep-list"
-                role="list"
-                aria-label={`${ring.label}のやること`}
-              >
-                {[...ring.tasks].sort(byDue).map((task) => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    today={today}
-                    tickable={tickable(task)}
-                    canEdit={travel.canEdit}
-                    take={
-                      open(task) && !task.done ? (
-                        travel.canEdit && self ? (
-                          <button
-                            type="button"
-                            className="prep-take"
-                            data-haptic
-                            onClick={() => takeOn(task)}
-                          >
-                            自分がやる
-                          </button>
-                        ) : (
-                          <span />
-                        )
-                      ) : undefined
-                    }
-                    onToggle={() => toggle(task)}
-                    onEdit={() => setSheet({ task })}
-                  />
-                ))}
-                {!ring.tasks.length && <p className="prep-none">ありません</p>}
-              </div>
-            </>
-          )}
-        </>
-      )}
+      {(["each", "one"] as const).map((kind) => {
+        const tasks = travel.tasks
+          .filter((task) => taskKindOf(task) === kind)
+          .sort(byDue);
+        return (
+          <section key={kind} aria-label={taskKinds[kind][0]}>
+            <div className="prep-heading prep-kind-heading">
+              <b>{taskKinds[kind][0]}</b>
+              <span>
+                {`${tasks.filter((task) => task.done).length} / ${tasks.length}`}
+              </span>
+            </div>
+            <div className="prep-list" role="list" data-kind={kind}>
+              {tasks.map(row)}
+              {!tasks.length && <p className="prep-none">ありません</p>}
+            </div>
+          </section>
+        );
+      })}
       {sheet && (
         <TaskSheet
           task={sheet.task}
-          defaultWho={self ?? ""}
+          self={self}
           onClose={() => setSheet(null)}
-          onSaved={(ids, key) => {
-            if (key) setChosen(key);
-            setFresh(ids);
-          }}
+          onSaved={setFresh}
         />
       )}
     </div>
@@ -589,38 +528,31 @@ function Tasks() {
 
 function TaskSheet({
   task,
-  defaultWho,
+  self,
   onClose,
   onSaved,
 }: {
   task?: TravelTask;
-  defaultWho: string;
+  self?: string;
   onClose: () => void;
-  /** The ring to show afterwards (empty: stay). */
-  onSaved: (ids: string[], ring: string) => void;
+  onSaved: (id: string) => void;
 }) {
   const { travel, members } = useTravellers();
   const formId = useId();
+  const me = memberAssignee(self ?? "");
   const [title, setTitle] = useState(task?.title ?? "");
   const [due, setDue] = useState(task?.dueOn ?? "");
+  // Most tasks are one person's: a new one starts as yours.
+  const [kind, setKind] = useState<TaskKind>(task ? taskKindOf(task) : "one");
   // KEEP: the task stays on someone outside the list (a member who left).
   const current =
     task && members.find((m) => memberAssignee(m.id) === task.assignee);
   const kept = task?.assignee && !current ? task.assignee : "";
-  const initialWho = task ? (current?.id ?? (kept ? KEEP : "")) : defaultWho;
-  const [who, setWho] = useState(initialWho);
-  // A new task is everyone's (one each) or one person's, as 持ち物 is.
-  const [everyone, setEveryone] = useState(false);
-  const assigneeFor = (value: string) =>
-    value === KEEP ? kept : value ? memberAssignee(value) : "";
-  const ringFor = (value: string) =>
-    value === ALL_MEMBERS
-      ? ""
-      : value === KEEP
-        ? kept.startsWith("member:")
-          ? FORMER
-          : UNASSIGNED
-        : value || UNASSIGNED;
+  const [who, setWho] = useState(
+    task ? (current?.id ?? (kept ? KEEP : "")) : (self ?? ""),
+  );
+  const assignee =
+    kind !== "one" ? "" : who === KEEP ? kept : who ? memberAssignee(who) : "";
   const [error, setError] = useState("");
   const name = useRef<HTMLInputElement>(null);
   // One save per panel: a second submit while it closes (return key then the
@@ -643,30 +575,40 @@ function TaskSheet({
     saved.current = true;
     try {
       if (task) {
+        // Your own tick carries over between the kinds; a new doer starts
+        // undone, and 全員がやる keeps each member's own tick.
+        const before = taskKindOf(task);
+        const done =
+          kind === "each"
+            ? before === "each"
+              ? task.done
+              : task.assignee === me && task.done
+            : before === "each"
+              ? assignee === me && task.done
+              : assignee === task.assignee && task.done;
         travel.updateTask(task.id, {
           title: value,
           dueOn: due,
-          assignee: assigneeFor(who),
-          done: task.done,
+          assignee,
+          done,
+          kind,
         });
         dismissModal(() => {
           onClose();
-          onSaved([task.id], ringFor(who));
+          onSaved(task.id);
         });
         return;
       }
-      const people = everyone ? members.map((member) => member.id) : [who];
-      const ids = people.map((person) =>
-        travel.createTask({
-          title: value,
-          dueOn: due,
-          assignee: assigneeFor(person),
-          done: false,
-        }),
-      );
+      const id = travel.createTask({
+        title: value,
+        dueOn: due,
+        assignee,
+        done: false,
+        kind,
+      });
       dismissModal(() => {
         onClose();
-        onSaved(ids, ringFor(everyone ? ALL_MEMBERS : who));
+        onSaved(id);
       });
     } catch (cause) {
       saved.current = false;
@@ -717,39 +659,33 @@ function TaskSheet({
           trip={travel.selectedTrip ?? undefined}
           onChange={(day) => setDue(day)}
         />
-        {!task && members.length > 1 && (
-          <div
-            className="prep-kinds"
-            role="radiogroup"
-            aria-label="やることの種類"
-          >
-            {([true, false] as const).map((value) => (
-              <button
-                type="button"
-                role="radio"
-                key={String(value)}
-                aria-checked={everyone === value}
-                onClick={(event) => {
-                  setEveryone(value);
-                  void spring(
-                    event.currentTarget,
-                    [{ transform: "scale(.96)" }, { transform: "none" }],
-                    "squish",
-                  );
-                }}
-              >
-                <i aria-hidden="true" />
-                <b>{taskKinds[value ? "true" : "false"][0]}</b>
-                <small>
-                  {value
-                    ? `${members.length}人それぞれのリングに1つずつ入る`
-                    : taskKinds.false[1]}
-                </small>
-              </button>
-            ))}
-          </div>
-        )}
-        <Reveal open={!everyone}>
+        <div
+          className="prep-kinds"
+          role="radiogroup"
+          aria-label="やることの種類"
+        >
+          {(Object.keys(taskKinds) as TaskKind[]).map((value) => (
+            <button
+              type="button"
+              role="radio"
+              key={value}
+              aria-checked={kind === value}
+              onClick={(event) => {
+                setKind(value);
+                void spring(
+                  event.currentTarget,
+                  [{ transform: "scale(.96)" }, { transform: "none" }],
+                  "squish",
+                );
+              }}
+            >
+              <i aria-hidden="true" />
+              <b>{taskKinds[value][0]}</b>
+              <small>{taskKinds[value][1]}</small>
+            </button>
+          ))}
+        </div>
+        <Reveal open={kind === "one"}>
           <WhoPicker
             id={`${formId}-who`}
             label="誰がやる"

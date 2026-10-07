@@ -209,6 +209,34 @@ test('packing kinds: legacy rows read as 1つでいい, みんな各自 ticks pe
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM packing_kinds WHERE item_id = ?').get(each.id).n, 0);
   } finally { db.close(); }
 });
+test('task kinds: old tasks read as 1人がやる, 全員がやる is one row ticked per member', async () => {
+  const { db, call, trip } = await fixture();
+  try {
+    const base = `/trips/${trip.id}/tasks`;
+    const find = async (id, user = 'owner') => (await (await call(base, 'GET', undefined, user)).json()).tasks.find((task) => task.id === id);
+    const old = { id: randomUUID(), title: 'ホテルを予約', dueOn: '', assignee: 'member:editor', done: true };
+    assert.equal((await call(base, 'POST', old)).status, 201);
+    assert.equal((await find(old.id)).kind, 'one', 'tasks without a kind are 1人がやる');
+    assert.equal((await find(old.id)).done, true);
+    const each = { id: randomUUID(), title: '保険に入る', dueOn: '', assignee: '', done: false, kind: 'each' };
+    assert.equal((await call(base, 'POST', each)).status, 201);
+    const ticked = await call(`${base}/${each.id}`, 'PATCH', { ...each, done: true }, 'editor');
+    assert.deepEqual((await ticked.json()).task.doneBy, ['editor']);
+    assert.equal((await find(each.id, 'editor')).done, true, 'done is the reader’s own tick');
+    assert.equal((await find(each.id, 'owner')).done, false);
+    // An older client omits the kind; the stored kind stays.
+    const { kind: _kind, ...older } = each;
+    assert.equal((await call(`${base}/${each.id}`, 'PATCH', { ...older, done: true }, 'owner')).status, 200);
+    assert.equal((await find(each.id)).kind, 'each');
+    assert.deepEqual((await find(each.id)).doneBy, ['editor', 'owner']);
+    assert.equal((await call(`${base}/${each.id}`, 'PATCH', { ...each, kind: 'many' })).status, 400);
+    db.exec(await readFile('worker/schema.sql', 'utf8'));
+    assert.equal((await find(each.id)).kind, 'each', 'kinds survive schema reruns');
+    assert.equal((await call(`${base}/${each.id}`, 'DELETE')).status, 204);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM task_marks WHERE task_id = ?').get(each.id).n, 0);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM task_kinds WHERE task_id = ?').get(each.id).n, 0);
+  } finally { db.close(); }
+});
 test('multiple place links and unavailable reservations round-trip without losing legacy data', async () => {
   const { db, call, trip } = await fixture();
   try {

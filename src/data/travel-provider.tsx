@@ -20,7 +20,13 @@ const withOwnTick = (item: PackingItem, self: string | undefined): PackingItem =
   const others = (item.packedBy ?? []).filter((id) => id !== self);
   return { ...item, packedBy: item.packed ? [...others, self].sort() : others };
 };
-type TaskInput = Pick<TravelTask, 'title' | 'dueOn' | 'assignee' | 'done'>;
+type TaskInput = Pick<TravelTask, 'title' | 'dueOn' | 'assignee' | 'done' | 'kind'>;
+/** 全員がやる keeps one tick per member; `done` is always the viewer's own. */
+const withOwnDone = (task: TravelTask, self: string | undefined): TravelTask => {
+  if (task.kind !== 'each' || !self) return task;
+  const others = (task.doneBy ?? []).filter((id) => id !== self);
+  return { ...task, doneBy: task.done ? [...others, self].sort() : others };
+};
 type BookingDocumentInput = { filename: string; contentType: string; size: number; bytes: ArrayBuffer };
 
 type TravelContextValue = {
@@ -599,14 +605,14 @@ export function TravelProvider({ children }: PropsWithChildren) {
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
     const id = crypto.randomUUID();
-    const task: TravelTask = { id, ...input };
+    const task = withOwnDone({ id, ...input }, user?.id);
     commit((current) => ({
       ...current,
       tasksByTrip: { ...current.tasksByTrip, [tripId]: [...(current.tasksByTrip[tripId] ?? []), task] },
     }));
     enqueue({ method: 'POST', path: `/v1/trips/${tripId}/tasks`, body: { id, ...input } });
     return id;
-  }, [commit, enqueue]);
+  }, [commit, enqueue, user?.id]);
 
   const updateTask = useCallback((id: string, input: TaskInput) => {
     const tripId = cacheRef.current.selectedTripId;
@@ -616,11 +622,11 @@ export function TravelProvider({ children }: PropsWithChildren) {
       ...current,
       tasksByTrip: {
         ...current.tasksByTrip,
-        [tripId]: (current.tasksByTrip[tripId] ?? []).map((task) => task.id === id ? { ...task, ...input } : task),
+        [tripId]: (current.tasksByTrip[tripId] ?? []).map((task) => task.id === id ? withOwnDone({ ...task, ...input }, user?.id) : task),
       },
     }));
     enqueue({ method: 'PATCH', path: `/v1/trips/${tripId}/tasks/${id}`, body: input });
-  }, [commit, enqueue]);
+  }, [commit, enqueue, user?.id]);
 
   const deleteTask = useCallback((id: string, inTrip?: string) => {
     const tripId = inTrip ?? cacheRef.current.selectedTripId;

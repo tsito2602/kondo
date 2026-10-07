@@ -1269,18 +1269,18 @@ test("legacy account cache and pending changes survive React migration; real for
       );
       await tick(30);
     };
+    // 1人がやる's heading counts done / all, as 持ち物's headings do.
     const ringCount = () =>
-      document.querySelector('[data-ring="owner"] small').textContent;
+      document.querySelector(
+        'section[aria-label="1人がやる"] .prep-heading span',
+      ).textContent;
     await click(dockTab("やること"));
     assert.equal(
       document.querySelector(".page-top h2").textContent,
       "やること",
     );
-    assert.equal(
-      document.querySelector('[data-ring="owner"] b').textContent,
-      "あなた",
-    );
-    assert.equal(ringCount(), "あと0");
+    assert.equal(document.querySelector("[data-ring]"), null, "no rings");
+    assert.equal(ringCount(), "0 / 0");
     await click(
       document.querySelector('.persistent-add[aria-label="やることを追加"]'),
     );
@@ -1291,9 +1291,11 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.equal(document.querySelector("dialog input[autofocus]"), null);
     assert.equal(
-      document.querySelector('[aria-label="やることの種類"]'),
-      null,
-      "全員がやる needs more than one member",
+      document.querySelector(
+        '[aria-label="やることの種類"] [aria-checked="true"]',
+      ).textContent,
+      "1人がやる誰がやるかを選ぶ。全員の一覧に「○○がやる」と出る",
+      "a new task is one person's",
     );
     assert.match(
       document.querySelector('.prep-whos [aria-checked="true"]').textContent,
@@ -1356,13 +1358,15 @@ test("legacy account cache and pending changes survive React migration; real for
       [savedTask.title, savedTask.due_on, savedTask.assignee, savedTask.done],
       ["チケットを予約", due, "member:owner", 0],
     );
-    assert.equal(ringCount(), "あと1");
-    assert.equal(
+    assert.equal(ringCount(), "0 / 1");
+    assert.match(
       document.querySelector(`[data-task="${savedTask.id}"] small`).textContent,
-      `${+due.slice(5, 7)}/${+due.slice(8)}まで`,
+      new RegExp(`あなたがやる · ${+due.slice(5, 7)}/${+due.slice(8)}まで$`),
     );
     const ringAvatar = () =>
-      document.querySelector('[data-ring="owner"] .assignee-avatar');
+      document.querySelector(
+        `[data-task="${savedTask.id}"] .prep-item-sub .assignee-avatar`,
+      );
     assert.equal(ringAvatar().getAttribute("aria-label"), "テスト");
     const avatarImage = ringAvatar().querySelector("img");
     assert.equal(avatarImage.src, "https://example.test/avatar.png");
@@ -1376,13 +1380,7 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await tick(30);
     assert.equal(db.prepare("SELECT done FROM travel_tasks").get().done, 1);
-    assert.equal(ringCount(), "あと0");
-    assert.ok(
-      document
-        .querySelector('[data-ring="owner"]')
-        .classList.contains("is-closed"),
-      "the ring closes when every task is done",
-    );
+    assert.equal(ringCount(), "1 / 1");
     await click(document.querySelector('[aria-label="チケットを予約を編集"]'));
     assert.equal(
       document.querySelector("dialog h2").textContent,
@@ -1403,9 +1401,9 @@ test("legacy account cache and pending changes survive React migration; real for
       .prepare("SELECT due_on, done FROM travel_tasks")
       .get();
     assert.deepEqual([editedTask.due_on, editedTask.done], ["", 1]);
-    assert.equal(
+    assert.match(
       document.querySelector(`[data-task="${savedTask.id}"] small`).textContent,
-      "期限なし",
+      /あなたがやる · 期限なし$/,
     );
     // A task can be put back on nobody (production's 未指定).
     await click(document.querySelector('[aria-label="チケットを予約を編集"]'));
@@ -1415,11 +1413,24 @@ test("legacy account cache and pending changes survive React migration; real for
       db.prepare("SELECT assignee FROM travel_tasks").get().assignee,
       "",
     );
-    assert.equal(
-      document.querySelector(`[data-ring="unassigned"] b`).textContent,
-      "決めていない",
+    assert.match(
+      document.querySelector(`[data-task="${savedTask.id}"] small`).textContent,
+      /^まだ決めていない/,
     );
-    assert.ok(document.querySelector(`[data-task="${savedTask.id}"]`));
+    assert.equal(
+      document.querySelector(`[data-task="${savedTask.id}"] [role="checkbox"]`),
+      null,
+      "nobody has a box until someone takes it on",
+    );
+    await click(byText(`[data-task="${savedTask.id}"] button`, "自分がやる"));
+    await tick(30);
+    assert.equal(
+      db.prepare("SELECT assignee FROM travel_tasks").get().assignee,
+      "member:owner",
+    );
+    assert.ok(
+      document.querySelector(`[data-task="${savedTask.id}"] [role="checkbox"]`),
+    );
     await click(document.querySelector('[aria-label="チケットを予約を編集"]'));
     const taskDelete = document.querySelector(
       '.context-actions [aria-label="やることを削除"]',
@@ -1457,6 +1468,51 @@ test("legacy account cache and pending changes survive React migration; real for
     await waitFor(
       () => db.prepare("SELECT COUNT(*) AS n FROM travel_tasks").get().n === 0,
       "the undo window ends in a real delete",
+    );
+    // 全員がやる: one row for everyone; the box is your own tick.
+    await click(
+      document.querySelector('.persistent-add[aria-label="やることを追加"]'),
+    );
+    await typeInto(
+      document.querySelector('dialog input[aria-label="やること"]'),
+      "保険に入る",
+    );
+    await click(
+      [
+        ...document.querySelectorAll(
+          '[aria-label="やることの種類"] [role=radio]',
+        ),
+      ].find((node) => node.querySelector("b").textContent === "全員がやる"),
+    );
+    await tick(260);
+    await submitSheet("追加する");
+    const everyone = db
+      .prepare(
+        "SELECT id, assignee FROM travel_tasks WHERE title = '保険に入る'",
+      )
+      .get();
+    assert.equal(everyone.assignee, "");
+    assert.equal(
+      db
+        .prepare("SELECT kind FROM task_kinds WHERE task_id = ?")
+        .get(everyone.id).kind,
+      "each",
+    );
+    assert.ok(
+      document.querySelector(
+        `section[aria-label="全員がやる"] [data-task="${everyone.id}"]`,
+      ),
+    );
+    await click(
+      document.querySelector(`[data-task="${everyone.id}"] [role="checkbox"]`),
+    );
+    await tick(30);
+    assert.deepEqual(
+      db
+        .prepare("SELECT user_id FROM task_marks WHERE task_id = ?")
+        .all(everyone.id)
+        .map((row) => row.user_id),
+      ["owner"],
     );
 
     await click(dockTab("持ち物"));

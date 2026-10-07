@@ -982,12 +982,17 @@ async function deletePackingItem(env: Env, user: User, tripId: string, itemId: s
   return result.meta.changes ? new Response(null, { status: 204 }) : json({ error: '持ち物が見つかりません' }, 404);
 }
 
+type TaskKind = 'each' | 'one';
+const taskKinds = new Set<TaskKind>(['each', 'one']);
+
 type TaskRow = {
   id: string;
   title: string;
   dueOn: string;
   assignee: string;
   done: number;
+  kind: TaskKind;
+  marks: string | null;
   updatedBy: string;
   updatedAt: number;
 };
@@ -998,17 +1003,33 @@ function taskFields(body: Record<string, unknown>) {
   const assignee = textField(body.assignee, 80);
   const done = typeof body.done === 'boolean' ? body.done : false;
   if (!title || dueOn === null || assignee === null) return null;
-  return { title, dueOn, assignee, done };
+  // Older clients omit the kind; the stored kind (or 'one') is kept.
+  const kind = body.kind === undefined ? undefined : taskKinds.has(body.kind as TaskKind) ? body.kind as TaskKind : null;
+  if (kind === null) return null;
+  return { title, dueOn, assignee, done, kind };
 }
+
+/** Each member sees their own tick as `done`; 全員がやる also lists who has done it. */
+function taskView(row: TaskRow, userId: string) {
+  const { marks, ...task } = row;
+  const doneBy = row.kind === 'each' ? (marks ?? '').split('\n').filter(Boolean).sort() : [];
+  return { ...task, done: row.kind === 'each' ? doneBy.includes(userId) : Boolean(row.done), doneBy };
+}
+
+const taskSelect = `
+  SELECT t.id, t.title, t.due_on AS dueOn, t.assignee, t.done, t.updated_by AS updatedBy, t.updated_at AS updatedAt,
+    COALESCE(k.kind, 'one') AS kind,
+    (SELECT group_concat(m.user_id, char(10)) FROM task_marks m
+      JOIN trip_members tm ON tm.trip_id = t.trip_id AND tm.user_id = m.user_id WHERE m.task_id = t.id) AS marks
+  FROM travel_tasks t LEFT JOIN task_kinds k ON k.task_id = t.id`;
 
 async function listTasks(env: Env, user: User, tripId: string) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
-  const result = await env.DB.prepare(`
-    SELECT id, title, due_on AS dueOn, assignee, done, updated_by AS updatedBy, updated_at AS updatedAt
-    FROM travel_tasks WHERE trip_id = ? ORDER BY done, CASE WHEN due_on = '' THEN 1 ELSE 0 END, due_on, title, id
+  const result = await env.DB.prepare(`${taskSelect}
+    WHERE t.trip_id = ? ORDER BY t.done, CASE WHEN t.due_on = '' THEN 1 ELSE 0 END, t.due_on, t.title, t.id
   `).bind(tripId).all<TaskRow>();
-  return json({ tasks: result.results.map((task) => ({ ...task, done: Boolean(task.done) })) });
+  return json({ tasks: result.results.map((task) => taskView(task, user.id)) });
 }
 
 async function validateAssignee(env: Env, tripId: string, assignee: string, taskId: string | null) {
@@ -1019,43 +1040,45 @@ async function validateAssignee(env: Env, tripId: string, assignee: string, task
   return json({ error: 'この旅行のメンバーから担当を選んでください' }, 400);
 }
 
-async function createTask(request: Request, env: Env, user: User, tripId: string) {
+async function writeTask(request: Request, env: Env, user: User, tripId: string, taskId?: string) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
   const body = await request.json().catch(() => null);
   const fields = isObject(body) ? taskFields(body) : null;
   if (!fields) return json({ error: '正しいタスク情報を入力してください' }, 400);
-  const id = idField(isObject(body) ? body.id : undefined) ?? crypto.randomUUID();
-  const invalidAssignee = await validateAssignee(env, tripId, fields.assignee, id);
+  const id = taskId ?? idField(isObject(body) ? body.id : undefined) ?? crypto.randomUUID();
+  const invalidAssignee = await validateAssignee(env, tripId, fields.assignee, taskId ?? id);
   if (invalidAssignee) return invalidAssignee;
-  const result = await env.DB.prepare(`
-    INSERT INTO travel_tasks (id, trip_id, title, due_on, assignee, done, updated_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET
-      title = excluded.title, due_on = excluded.due_on, assignee = excluded.assignee,
-      done = excluded.done, updated_by = excluded.updated_by, updated_at = unixepoch()
-    WHERE travel_tasks.trip_id = excluded.trip_id
-  `).bind(id, tripId, fields.title, fields.dueOn, fields.assignee, fields.done ? 1 : 0, user.id).run();
-  if (!result.meta.changes) return json({ error: 'タスクIDが競合しました' }, 409);
-  return json({ task: { id, ...fields, updatedBy: user.id } }, 201);
+  const stored = await env.DB.prepare('SELECT kind FROM task_kinds WHERE task_id = ?').bind(id).first<{ kind: TaskKind }>();
+  const kind = fields.kind ?? stored?.kind ?? 'one';
+  // 全員がやる: `done` is the caller's own tick; the shared column stays 0.
+  const done = kind === 'each' ? 0 : fields.done ? 1 : 0;
+  const statement = taskId
+    ? env.DB.prepare(`UPDATE travel_tasks SET title = ?, due_on = ?, assignee = ?, done = ?, updated_by = ?, updated_at = unixepoch()
+      WHERE id = ? AND trip_id = ?`).bind(fields.title, fields.dueOn, fields.assignee, done, user.id, id, tripId)
+    : env.DB.prepare(`INSERT INTO travel_tasks (id, trip_id, title, due_on, assignee, done, updated_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        title = excluded.title, due_on = excluded.due_on, assignee = excluded.assignee,
+        done = excluded.done, updated_by = excluded.updated_by, updated_at = unixepoch()
+      WHERE travel_tasks.trip_id = excluded.trip_id`).bind(id, tripId, fields.title, fields.dueOn, fields.assignee, done, user.id);
+  const inTrip = 'EXISTS (SELECT 1 FROM travel_tasks WHERE id = ? AND trip_id = ?)';
+  const statements = [statement];
+  if (fields.kind)
+    statements.push(env.DB.prepare(`INSERT INTO task_kinds (task_id, kind) SELECT ?, ? WHERE ${inTrip}
+      ON CONFLICT(task_id) DO UPDATE SET kind = excluded.kind`).bind(id, fields.kind, id, tripId));
+  if (kind === 'each')
+    statements.push(fields.done
+      ? env.DB.prepare(`INSERT INTO task_marks (task_id, user_id) SELECT ?, ? WHERE ${inTrip} ON CONFLICT DO NOTHING`).bind(id, user.id, id, tripId)
+      : env.DB.prepare('DELETE FROM task_marks WHERE task_id = ? AND user_id = ? AND ' + inTrip).bind(id, user.id, id, tripId));
+  const [result] = await env.DB.batch(statements);
+  if (!result.meta.changes) return taskId ? json({ error: 'タスクが見つかりません' }, 404) : json({ error: 'タスクIDが競合しました' }, 409);
+  const saved = await env.DB.prepare(`${taskSelect} WHERE t.id = ? AND t.trip_id = ?`).bind(id, tripId).first<TaskRow>();
+  return json({ task: { ...(saved ? taskView(saved, user.id) : { id, ...fields, kind }), updatedBy: user.id } }, taskId ? 200 : 201);
 }
 
-async function updateTask(request: Request, env: Env, user: User, tripId: string, taskId: string) {
-  const forbidden = await requireMember(env, tripId, user.id);
-  if (forbidden) return forbidden;
-  const body = await request.json().catch(() => null);
-  const fields = isObject(body) ? taskFields(body) : null;
-  if (!fields) return json({ error: '正しいタスク情報を入力してください' }, 400);
-  const invalidAssignee = await validateAssignee(env, tripId, fields.assignee, taskId);
-  if (invalidAssignee) return invalidAssignee;
-  const result = await env.DB.prepare(`
-    UPDATE travel_tasks SET title = ?, due_on = ?, assignee = ?, done = ?, updated_by = ?, updated_at = unixepoch()
-    WHERE id = ? AND trip_id = ?
-  `).bind(fields.title, fields.dueOn, fields.assignee, fields.done ? 1 : 0, user.id, taskId, tripId).run();
-  return result.meta.changes
-    ? json({ task: { id: taskId, ...fields, updatedBy: user.id } })
-    : json({ error: 'タスクが見つかりません' }, 404);
-}
+const createTask = (request: Request, env: Env, user: User, tripId: string) => writeTask(request, env, user, tripId);
+const updateTask = (request: Request, env: Env, user: User, tripId: string, taskId: string) => writeTask(request, env, user, tripId, taskId);
 
 async function deleteTask(env: Env, user: User, tripId: string, taskId: string) {
   const forbidden = await requireMember(env, tripId, user.id);

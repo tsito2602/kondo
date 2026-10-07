@@ -28,7 +28,7 @@ const people = (...keys: string[]) => keys.map((key) => DEMO_PEOPLE[key]);
 export const demoMembers = people('self', 'misaki');
 
 /** Bump when the sample content changes, so devices drop an older saved sample. */
-export const DEMO_REVISION = '2026-10-07-vienna-6';
+export const DEMO_REVISION = '2026-10-07-vienna-7';
 
 /**
  * Demo mode's data: one five-day trip to Vienna starting 13 days from today
@@ -42,19 +42,22 @@ export function createDemoCache(): TravelCache {
   const tripId = 'sample-vienna';
   const self = 'member:demo-self', misaki = 'member:demo-companion';
   const task = (id: string, title: string, due: number | null, assignee: string, done = false): TravelTask => ({ id, title, dueOn: due === null ? '' : addDays(today, due), assignee, done });
+  // 全員がやる: one row; `done` is the viewer's (demo-self's) own tick.
+  const everyone = (id: string, title: string, due: number, doneBy: string[]): TravelTask => ({ ...task(id, title, due, ''), kind: 'each', doneBy, done: doneBy.includes('demo-self') });
   const tasks = [
     task('sample-task-flight', '航空券を取る（エミレーツ、ドバイ経由）', -58, self, true),
     task('sample-task-hotel', 'ホテルを予約する', -52, self, true),
     task('sample-task-opera', '国立歌劇場の「魔笛」の席を取る', -30, misaki, true),
     task('sample-task-concert', '楽友協会のコンサートを予約する', -21, self, true),
-    task('sample-task-passport', 'パスポートの有効期限を確かめる', -14, misaki, true),
+    everyone('sample-task-passport', 'パスポートの有効期限を確かめる', -14, ['demo-self', 'demo-companion']),
     task('sample-task-belvedere', 'ベルヴェデーレの時間指定券を取る', -3, misaki, true),
-    task('sample-task-insurance', '海外旅行保険に入る', 3, misaki),
+    everyone('sample-task-insurance', '海外旅行保険に入る', 3, ['demo-companion']),
     task('sample-task-schoenbrunn', 'シェーンブルン宮殿の入場券を予約する', 5, self),
     task('sample-task-card', 'クレジットカードの海外利用を確認する', 7, self),
-    task('sample-task-esim', 'ヨーロッパで使えるeSIMを買う', 10, self),
+    everyone('sample-task-esim', 'ヨーロッパで使えるeSIMを買う', 10, []),
+    task('sample-task-money', 'ユーロに両替する', 9, ''),
     task('sample-task-checkin', 'エミレーツのオンラインチェックイン', 12, self),
-    task('sample-task-weather', '天気予報を見て上着を決める', 11, misaki),
+    everyone('sample-task-weather', '天気予報を見て上着を決める', 11, []),
   ];
   const pack = (id: string, name: string, category: string, rest: Partial<PackingItem>): PackingItem => ({ id, name, category, quantity: 1, packed: false, assignee: '', shared: false, ...rest });
   const packing = [
