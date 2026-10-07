@@ -36,7 +36,7 @@ import {
   packingCategories,
   presentCategories,
 } from "./packing-categories";
-import { CheckIcon, LockIcon } from "./prep-pictures";
+import { CheckIcon } from "./prep-pictures";
 import { AddButton, ErrorText, Modal } from "./ui";
 
 /* ---------- motion, as kondo-prep3.html plays it ---------- */
@@ -993,10 +993,11 @@ function Packing() {
           </button>
         );
     } else
+      // An old 自分だけ item reads like any other you carry.
       sub = (
         <>
-          <LockIcon />
-          あなたが持つ · ほかの人には見えない
+          <AssigneeAvatar value={me} members={travel.members} />
+          あなたが持つ
         </>
       );
     const showCheck = showsCheck(item);
