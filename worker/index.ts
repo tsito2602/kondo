@@ -232,17 +232,20 @@ function placeFields(body: Record<string, unknown>) {
  * the Maps page itself is read for its pin, and as a last resort the
  * address is looked up on OpenStreetMap (Tsubasa 2026-10-07: 全部位置なし).
  */
-const PAGE_PIN = [
-  /[?&;]markers=(-?\d{1,3}\.\d+)(?:%2C|,)(-?\d{1,3}\.\d+)/,
-  /[?&;]center=(-?\d{1,3}\.\d+)(?:%2C|,)(-?\d{1,3}\.\d+)/,
-  /!3d(-?\d{1,3}\.\d+)!4d(-?\d{1,3}\.\d+)/,
-  /\[null,null,(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)\]/,
+const PAGE_PIN: [RegExp, 'latLng' | 'lngLat'][] = [
+  [/[?&;]markers=(-?\d{1,3}\.\d+)(?:%2C|,)(-?\d{1,3}\.\d+)/, 'latLng'],
+  [/[?&;]center=(-?\d{1,3}\.\d+)(?:%2C|,)(-?\d{1,3}\.\d+)/, 'latLng'],
+  [/!3d(-?\d{1,3}\.\d+)!4d(-?\d{1,3}\.\d+)/, 'latLng'],
+  [/\[null,null,(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)\]/, 'latLng'],
+  // The page's opening camera, which a place page centres on the place: [[[zoom, lng, lat]
+  [/APP_INITIALIZATION_STATE=\[\[\[-?[\d.]+,(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)\]/, 'lngLat'],
 ];
 function pinInPage(html: string): Coordinates | null {
-  for (const pattern of PAGE_PIN) {
+  for (const [pattern, order] of PAGE_PIN) {
     const match = html.match(pattern);
     if (!match) continue;
-    const point = { lat: Number(match[1]), lng: Number(match[2]) };
+    const [lat, lng] = order === 'latLng' ? [match[1], match[2]] : [match[2], match[1]];
+    const point = { lat: Number(lat), lng: Number(lng) };
     if (Math.abs(point.lat) <= 90 && Math.abs(point.lng) <= 180 && (point.lat || point.lng)) return point;
   }
   return null;
@@ -252,14 +255,29 @@ async function followMapLink(link: string): Promise<string> {
   let target = link;
   for (let hop = 0; hop < 4 && !mapCoordinates(target); hop++) {
     const response = await fetch(target, { redirect: 'manual', headers: BROWSER, signal: AbortSignal.timeout(4000) });
-    const next = response.headers.get('location');
-    await response.body?.cancel();
+    let next = response.headers.get('location');
+    // Some share links answer with a page that sends the browser on by script
+    // or meta refresh instead of a redirect: take the first Maps link in it.
+    if (!next && response.ok && isShortMapsLink(target)) next = mapsLinkInPage((await response.text()).slice(0, 500_000));
+    else await response.body?.cancel();
     if (!next) break;
     const href = new URL(next, target).href;
     if (!registeredGoogleMapsUrl(href)) break;
     target = href;
   }
   return target;
+}
+function mapsLinkInPage(html: string): string | null {
+  const text = html.replace(/\\u0026/g, '&').replace(/\\\//g, '/').replace(/&amp;/g, '&');
+  for (const match of text.matchAll(/https:\/\/(?:www\.google\.[a-z.]+\/maps|maps\.google\.[a-z.]+)[^"'<>\s\\]*/g))
+    if (registeredGoogleMapsUrl(match[0]) && !/\/maps\/api\//.test(match[0])) return match[0];
+  return null;
+}
+/** A Maps page's own name for the place: 「Café Central · Herrengasse 14 - Google マップ」. */
+function titleInPage(html: string): string {
+  const raw = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/)?.[1] ?? html.match(/<title>([^<]+)<\/title>/)?.[1] ?? '';
+  const title = raw.replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\s*[-–]\s*Google\s*(?:マップ|Maps)\s*$/i, '').trim();
+  return /^Google\s*(?:マップ|Maps)$/i.test(title) ? '' : title.replace(/\s*·\s*/g, ', ');
 }
 async function geocode(query: string): Promise<Coordinates | null> {
   const url = new URL('https://nominatim.openstreetmap.org/search');
@@ -272,25 +290,30 @@ async function geocode(query: string): Promise<Coordinates | null> {
   const point = { lat: Number(first?.lat), lng: Number(first?.lon) };
   return Number.isFinite(point.lat) && Number.isFinite(point.lng) && (point.lat || point.lng) ? point : null;
 }
-async function locateMapLink(link: string): Promise<{ target: string; pin: Coordinates | null }> {
+async function locateMapLink(link: string): Promise<{ target: string; pin: Coordinates | null; title?: string }> {
   let target = link;
   try {
     if (isShortMapsLink(link)) target = await followMapLink(link);
   } catch { /* keep the link */ }
   let pin = mapCoordinates(target);
   if (pin) return { target, pin };
+  let title = '';
   try {
     const response = await fetch(target, { headers: BROWSER, signal: AbortSignal.timeout(5000) });
-    if (response.ok) pin = pinInPage((await response.text()).slice(0, 2_000_000));
-    else await response.body?.cancel();
+    if (response.ok) {
+      const html = (await response.text()).slice(0, 2_000_000);
+      pin = pinInPage(html);
+      title = titleInPage(html);
+    } else await response.body?.cancel();
   } catch { /* try the address */ }
-  if (pin) return { target, pin };
+  if (pin) return { target, pin, title };
   const url = new URL(target);
-  const query = url.searchParams.get('q') ?? url.searchParams.get('query') ?? decodeURIComponent(url.pathname.match(/\/place\/([^/@]+)/)?.[1] ?? '').replace(/\+/g, ' ');
+  // A link to a place id only (「?cid=…」) carries no words; the page's title does.
+  const query = url.searchParams.get('q') ?? url.searchParams.get('query') ?? (decodeURIComponent(url.pathname.match(/\/place\/([^/@]+)/)?.[1] ?? '').replace(/\+/g, ' ') || title);
   try {
     if (query.trim()) pin = await geocode(query.trim());
   } catch { /* no pin */ }
-  return { target, pin };
+  return { target, pin, title };
 }
 /** Coordinates from a pasted Google Maps link (see locateMapLink). */
 async function placeCoordinates(location: string): Promise<Coordinates | null> {
@@ -303,8 +326,9 @@ async function placeCoordinates(location: string): Promise<Coordinates | null> {
 async function resolveMapLink(text: string) {
   const link = registeredGoogleMapsUrl(text.trim());
   if (!link) return json({ error: 'Googleマップのリンクを入力してください' }, 400);
-  const { target, pin } = await locateMapLink(link);
-  return json({ link, name: placeNameFromLink(target), lat: pin?.lat ?? null, lng: pin?.lng ?? null });
+  const { target, pin, title } = await locateMapLink(link);
+  const name = placeNameFromLink(target) ?? (title ? title.split(/[,、]/)[0].trim() || null : null);
+  return json({ link, name, lat: pin?.lat ?? null, lng: pin?.lng ?? null });
 }
 /**
  * Places saved without a pin (short share links, iPhone links, older rows)

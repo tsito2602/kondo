@@ -20,14 +20,20 @@ globalThis.fetch = async (input, init) => {
   const url = new URL(input instanceof Request ? input.url : input);
   if (url.hostname === 'maps.google.com') {
     pageRequests.push(url.href);
+    const cid = url.searchParams.get('cid');
+    if (cid) return new Response(`<title>${cid === '4242' ? 'Café Central · Herrengasse 14, 1010 Wien' : 'Café Sacher · Philharmoniker Str. 4, 1010 Wien'} - Google マップ</title>${cid === '4242' ? '<script>window.APP_INITIALIZATION_STATE=[[[1500.2,16.3654,48.2105],[0,0,0]]]</script>' : ''}`, { status: 200 });
     const html = url.searchParams.get('q')?.startsWith('Porsche') ? '<meta content="https://maps.google.com/maps/api/staticmap?center=48.8341%2C9.1522&amp;zoom=15&amp;markers=48.83411%2C9.15224&amp;size=256x256" itemprop="image">' : '<html></html>';
     return new Response(html, { status: 200 });
   }
   if (url.hostname === 'nominatim.openstreetmap.org') {
     pageRequests.push(url.href);
-    return Response.json(url.searchParams.get('q')?.startsWith('Weihnachtsmarkt') ? [{ lat: '48.7758', lon: '9.1829' }] : []);
+    const q = url.searchParams.get('q') ?? '';
+    return Response.json(q.startsWith('Weihnachtsmarkt') ? [{ lat: '48.7758', lon: '9.1829' }] : q.startsWith('Café Sacher') ? [{ lat: '48.2039', lon: '16.3695' }] : []);
   }
   if (url.hostname !== 'maps.app.goo.gl') throw new Error(`unexpected fetch ${url}`);
+  // An Android share link (「?g_st=ac」) may answer with a page that moves on by meta refresh to a place id.
+  if (url.pathname === '/android' || url.pathname === '/android2')
+    return new Response(`<meta http-equiv="refresh" content="0;url=https://maps.google.com/?cid=${url.pathname === '/android' ? '4242' : '99'}&amp;g_st=ac">`, { status: 200 });
   if (url.pathname === '/iphone' || url.pathname === '/market') {
     const q = url.pathname === '/iphone' ? 'Porsche Museum, Porscheplatz 1, 70435 Stuttgart' : 'Weihnachtsmarkt, Schillerplatz, Stuttgart';
     return new Response(null, { status: 302, headers: { location: `https://maps.google.com/?q=${encodeURIComponent(q)}&ftid=0x1:0x2&entry=gps&g_st=ic` } });
@@ -307,6 +313,10 @@ test('place coordinates come from Google Maps links, follow one short-link redir
     assert.deepEqual(pins[market], [48.7758, 9.1829]);
     const resolved = await (await call(`/maps/resolve?url=${encodeURIComponent('https://maps.app.goo.gl/iphone?g_st=ic')}`)).json();
     assert.deepEqual([resolved.name, resolved.lat], ['Porsche Museum', 48.83411]);
+    const android = await (await call(`/maps/resolve?url=${encodeURIComponent('https://maps.app.goo.gl/android?g_st=ac')}`)).json();
+    assert.deepEqual([android.name, android.lat, android.lng], ['Café Central', 48.2105, 16.3654], 'the page camera gives the pin');
+    const titled = await (await call(`/maps/resolve?url=${encodeURIComponent('https://maps.app.goo.gl/android2?g_st=ac')}`)).json();
+    assert.deepEqual([titled.name, titled.lat], ['Café Sacher', 48.2039], 'else the page title is looked up');
     // A link that gives nothing is not asked again on the next list read.
     db.prepare('INSERT INTO places (id, trip_id, title, location, updated_by) VALUES (?,?,?,?,?)').run(nowhere, trip.id, 'どこか', 'https://maps.app.goo.gl/somewhere', 'owner');
     await call(base);
