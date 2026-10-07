@@ -39,6 +39,7 @@ import { watchPanelFit } from "./panel-fit";
 import { ThumbDock } from "./thumb-dock";
 import { enterHint, FormBackButton, Modal, useToast } from "./ui";
 import { AiGlow, StudioActionLabel } from "./studio";
+import { StampReader } from "./stamp-reader";
 import { menuDepth } from "./menu-depth";
 import { MomentRows } from "./moment-rows";
 
@@ -518,6 +519,10 @@ export function AddBookingSheet({
   const [seconds, setSeconds] = useState(0);
   const [editing, setEditing] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  /** Rows the stamp has delivered to the list while reading. */
+  const [landed, setLanded] = useState(0);
+  const landedNow = useRef(0);
+  landedNow.current = landed;
   const run = useRef<AbortController | null>(null);
   const bookings = useRef(travel.bookings);
   bookings.current = travel.bookings;
@@ -531,21 +536,6 @@ export function AddBookingSheet({
     );
     return () => clearInterval(timer);
   }, [step]);
-  // New rows land at the bottom while reading; keep them in view.
-  useEffect(() => {
-    if (step !== "run") return;
-    const rendered = body.current?.querySelectorAll(".bk-irow:not(.skel)");
-    const last = rendered?.[rendered.length - 1];
-    if (last && !reduceMotion())
-      last.animate(
-        [
-          { opacity: 0, transform: "translateY(12px)" },
-          { opacity: 1, transform: "none" },
-        ],
-        { duration: 420, easing: "cubic-bezier(.2,1,.3,1)" },
-      );
-    last?.scrollIntoView({ block: "nearest" });
-  }, [rows.length, step]);
 
   const addFiles = (chosen: File[]) => {
     const accepted = chosen.filter((file) =>
@@ -573,6 +563,13 @@ export function AddBookingSheet({
     const controller = new AbortController();
     run.current = controller;
     setRows([]);
+    setLanded(0);
+    landedNow.current = 0;
+    let found = 0;
+    const take = (row: ImportedBooking) => {
+      found += 1;
+      accept(row);
+    };
     setSeconds(0);
     setStep("run");
     try {
@@ -592,7 +589,7 @@ export function AddBookingSheet({
           });
         await wait(2400);
         for (const row of sample) {
-          accept({ ...row, source: row.source % files.length });
+          take({ ...row, source: row.source % files.length });
           await wait(1100);
         }
         await wait(900);
@@ -610,11 +607,16 @@ export function AddBookingSheet({
         );
         await receiveBookingImport(
           response,
-          accept,
+          take,
           controller.signal,
           files.length,
         );
       }
+      // The stamp still has rows to deliver: the result waits for the last.
+      while (!controller.signal.aborted && landedNow.current < found)
+        await new Promise((resolve) => setTimeout(resolve, 120));
+      if (controller.signal.aborted) return;
+      await new Promise((resolve) => setTimeout(resolve, 500));
       if (controller.signal.aborted) return;
       setStep("review");
       requestAnimationFrame(() =>
@@ -1078,25 +1080,14 @@ export function AddBookingSheet({
           </>
         ) : step === "run" ? (
           <>
-            <div className="bk-phase">
-              <div className="bk-phase-head">
-                <b>{rows.length ? "予約ごとに整理中" : "書類を読み取り中"}</b>
-                <span>
-                  {Math.floor(seconds / 60)}:
-                  {String(seconds % 60).padStart(2, "0")}
-                </span>
-              </div>
-              <div className="bk-bar" aria-hidden="true">
-                <i />
-              </div>
-              <small>
-                {files.length}ファイルから {rows.length}件 読み取り済み
-              </small>
-            </div>
-            {rows.map((entry) => importRow(entry, false))}
-            {Array.from({ length: rows.length ? 1 : 3 }, (_, index) => (
-              <div className="bk-irow skel" key={`skel-${index}`} />
-            ))}
+            <StampReader
+              tags={files.map(fileBadge)}
+              found={rows.length}
+              landed={landed}
+              onLand={() => setLanded((count) => count + 1)}
+              list={body}
+            />
+            {rows.slice(0, landed).map((entry) => importRow(entry, false))}
           </>
         ) : (
           <>

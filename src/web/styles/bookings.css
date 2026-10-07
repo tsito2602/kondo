@@ -1066,3 +1066,126 @@ button.bk-card {
   color: var(--muted);
   font-size: 11.5px;
 }
+
+/* 読み取り中: the stamp desk (stamp-reader.tsx, mock kondo-reading.html A). */
+.bk-desk {
+  position: relative;
+  flex: none;
+  height: 236px;
+  margin-bottom: 4px;
+  border-radius: 22px;
+  background: var(--bk-card);
+  overflow: hidden;
+}
+.bk-doc {
+  position: absolute;
+  left: 50%;
+  top: 52px;
+  width: 120px;
+  height: 158px;
+  margin-left: -60px;
+  padding: 14px 12px;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  border-radius: 10px;
+  background: var(--p-paper);
+  box-shadow: 0 0 0 1.5px var(--bk-pale);
+  transform-origin: 50% 80%;
+}
+.bk-doc i {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--p-line);
+}
+.bk-doc i:nth-child(1) {
+  width: 60%;
+  height: 9px;
+  background: var(--bk-pale);
+}
+.bk-doc i:nth-child(3n) {
+  width: 75%;
+}
+.bk-doc span {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  font-family: var(--f-mono);
+  font-size: 9px;
+  color: var(--muted);
+}
+.bk-stamp {
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  z-index: 5;
+  width: 70px;
+  margin-left: -35px;
+  transform-origin: 50% 100%;
+}
+.bk-stamp i {
+  display: block;
+  margin: 0 auto;
+  background: var(--p-ink);
+}
+.bk-stamp i:nth-child(1) {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+}
+.bk-stamp i:nth-child(2) {
+  width: 14px;
+  height: 18px;
+  margin-top: -4px;
+}
+.bk-stamp i:nth-child(3) {
+  width: 70px;
+  height: 22px;
+  border-radius: 8px;
+  box-shadow: inset 0 -5px 0 color-mix(in srgb, var(--p-paper) 20%, transparent);
+}
+.bk-mark {
+  position: absolute;
+  left: calc(50% - 27px);
+  top: 118px;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border: 2.5px solid var(--p-ink);
+  border-radius: 50%;
+  color: var(--p-ink);
+  font-size: 15px;
+  font-weight: 900;
+  opacity: 0;
+}
+.bk-mark span {
+  position: absolute;
+  inset: 3px;
+  border: 1px dashed currentColor;
+  border-radius: 50%;
+}
+.bk-splat,
+.bk-puff {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--p-ink);
+  pointer-events: none;
+}
+.bk-puff {
+  position: fixed;
+  z-index: 30;
+  width: 6px;
+  height: 6px;
+}
+.bk-fly {
+  position: fixed;
+  z-index: 30;
+  margin: 0;
+  pointer-events: none;
+  transform-origin: 50% 100%;
+}
