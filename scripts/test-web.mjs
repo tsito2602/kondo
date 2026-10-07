@@ -965,9 +965,10 @@ test("legacy account cache and pending changes survive React migration; real for
       "美術館",
       "the link names the place",
     );
+    // A link with no pin in it says so instead of promising a map spot.
     assert.match(
       document.querySelector("dialog .it-plres").textContent,
-      /美術館.*地図の 1 として載ります/,
+      /このリンクから位置を読み取れませんでした/,
     );
     await fill("メモ", "見たい展示");
     await fill("営業時間", "10:00〜18:00");

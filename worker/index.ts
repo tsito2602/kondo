@@ -337,9 +337,11 @@ async function resolveMapLink(text: string) {
  * so the list never waits long. A link that gave nothing is skipped for a
  * day. Never fails the list.
  */
+/** When link reading last got better: misses from before it are tried again (Android links, 2026-10-07). */
+const RESOLVER_SINCE = 1791367986;
 async function fillMissingCoordinates(env: Env, tripId: string, rows: Record<string, unknown>[]) {
   const misses = new Set(((await env.DB.prepare(`SELECT m.place_id FROM place_coordinate_misses m JOIN places p ON p.id = m.place_id
-    WHERE p.trip_id = ? AND m.location = p.location AND m.tried_at > unixepoch() - 86400`).bind(tripId).all()).results).map((row) => row.place_id));
+    WHERE p.trip_id = ? AND m.location = p.location AND m.tried_at > MAX(unixepoch() - 86400, ?)`).bind(tripId, RESOLVER_SINCE).all()).results).map((row) => row.place_id));
   const missing = rows
     .filter((row) => row.lat == null && typeof row.location === 'string' && registeredGoogleMapsUrl(row.location) && !misses.has(row.id))
     .sort(() => Math.random() - 0.5)

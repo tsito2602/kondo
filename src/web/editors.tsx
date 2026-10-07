@@ -38,6 +38,8 @@ import {
   referenceUrl,
   mapUrl,
   registeredGoogleMapsUrl,
+  mapCoordinates,
+  type Coordinates,
 } from "@/data/places";
 import { localDate, validDate } from "@/utils/dates";
 import type {
@@ -921,7 +923,11 @@ export function PlaceEditor({
   const booked = Boolean(
     place && travel.bookings.some((booking) => booking.placeId === place.id),
   );
-  const [found, setFound] = useState<{ link: string; name: string | null }>();
+  const [found, setFound] = useState<{
+    link: string;
+    name: string | null;
+    pin: Coordinates | null;
+  }>();
   const [pasteError, setPasteError] = useState("");
   const autoName = useRef("");
   const link = registeredGoogleMapsUrl(draft.location.trim());
@@ -929,13 +935,27 @@ export function PlaceEditor({
   useEffect(() => {
     if (!link || link === place?.location) return;
     const named = placeNameFromLink(link);
-    if (named || isDemo) return setFound({ link, name: named });
+    const direct = mapCoordinates(link);
+    if ((named && direct) || isDemo)
+      return setFound({ link, name: named, pin: direct });
     let live = true;
-    request<{ name: string | null }>(
+    request<{ name: string | null; lat: number | null; lng: number | null }>(
       `/v1/maps/resolve?url=${encodeURIComponent(link)}`,
     )
-      .then((result) => live && setFound({ link, name: result.name }))
-      .catch(() => live && setFound({ link, name: null }));
+      .then(
+        (result) =>
+          live &&
+          setFound({
+            link,
+            name: named ?? result.name,
+            pin:
+              direct ??
+              (result.lat != null && result.lng != null
+                ? { lat: result.lat, lng: result.lng }
+                : null),
+          }),
+      )
+      .catch(() => live && setFound({ link, name: named, pin: direct }));
     return () => {
       live = false;
     };
@@ -964,8 +984,9 @@ export function PlaceEditor({
   const { error, busy, submit } = useSubmit(
     () => {
       const input = { ...draft, title: draft.title.trim() };
-      if (place) travel.updatePlace(place.id, input);
-      else travel.createPlace(input);
+      const pin = found?.link === link ? found.pin : null;
+      if (place) travel.updatePlace(place.id, input, pin);
+      else travel.createPlace(input, pin);
     },
     () =>
       !draft.title.trim()
@@ -1039,15 +1060,25 @@ export function PlaceEditor({
           )}
         </div>
         {looking && <p className="it-plres">場所を読み込んでいます…</p>}
-        {!place && link && !looking && draft.title.trim() && (
-          <p className="it-plres">
-            <MapPin number={number || undefined} />
-            {draft.title.trim()}
-            <small>
-              {number ? `地図の ${number} として載ります` : "地図に載ります"}
-            </small>
-          </p>
-        )}
+        {/* What the link gave, for a new place and for a changed link alike
+            (Tsubasa 2026-10-07: 既存の場所はリンクを読み取れない). */}
+        {link &&
+          link !== place?.location &&
+          !looking &&
+          found?.link === link &&
+          (found.pin ? (
+            <p className="it-plres">
+              <MapPin number={number || undefined} />
+              {draft.title.trim() || found.name}
+              <small>
+                {number ? `地図の ${number} として載ります` : "地図に載ります"}
+              </small>
+            </p>
+          ) : (
+            <p className="it-plres is-miss">
+              このリンクから位置を読み取れませんでした
+            </p>
+          ))}
         <Field label="場所の名前">
           <Input
             required

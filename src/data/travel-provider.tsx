@@ -8,6 +8,7 @@ import { loadDemoDocument, saveDemoDocument } from './demo-documents';
 import { loadTravelCache, saveTravelCache } from './cache';
 import { connectionBetween, createsFlightConnectionCycle } from './flight-connections';
 import { matchBookingPlace } from './booking-place';
+import type { Coordinates } from './places';
 import { Booking, BookingDocument, emptyTravelCache, ItineraryItem, PackingItem, PendingMutation, Place, PlaceInput, TravelCache, TravelTask, Trip, TripMember, TravelNote, NoteInput } from './types';
 
 type TripInput = Pick<Trip, 'name' | 'destination' | 'startsOn' | 'endsOn' | 'coverImage'>;
@@ -48,8 +49,9 @@ type TravelContextValue = {
   notes: TravelNote[];
   saveNote: (id: string, input: NoteInput, targetTripId?: string) => void;
   deleteNote: (id: string) => void;
-  createPlace: (input: PlaceInput) => string;
-  updatePlace: (id: string, input: PlaceInput) => void;
+  /** `pin`: where the editor already found the link to point, shown until the Worker's answer syncs. */
+  createPlace: (input: PlaceInput, pin?: Coordinates | null) => string;
+  updatePlace: (id: string, input: PlaceInput, pin?: Coordinates | null) => void;
   deletePlace: (id: string, tripId?: string) => void;
   deleteTrip: (id: string) => Promise<void>;
   saveTripOffline: (onProgress: (done: number, total: number) => void) => Promise<number>;
@@ -327,20 +329,20 @@ export function TravelProvider({ children }: PropsWithChildren) {
     enqueue({ method: 'DELETE', path: `/v1/trips/${tripId}/notes/${id}` });
   }, [commit, enqueue]);
 
-  const createPlace = useCallback((input: PlaceInput) => {
+  const createPlace = useCallback((input: PlaceInput, pin?: Coordinates | null) => {
     const tripId = cacheRef.current.selectedTripId;
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
     const id = crypto.randomUUID();
-    commit((current) => ({ ...current, placesByTrip: { ...current.placesByTrip, [tripId]: [...(current.placesByTrip[tripId] ?? []), { id, ...input }] } }));
+    commit((current) => ({ ...current, placesByTrip: { ...current.placesByTrip, [tripId]: [...(current.placesByTrip[tripId] ?? []), { id, ...input, ...(pin ?? {}) }] } }));
     enqueue({ method: 'POST', path: `/v1/trips/${tripId}/places`, body: { id, ...input } });
     return id;
   }, [commit, enqueue]);
-  const updatePlace = useCallback((id: string, input: PlaceInput) => {
+  const updatePlace = useCallback((id: string, input: PlaceInput, pin?: Coordinates | null) => {
     const tripId = cacheRef.current.selectedTripId;
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) return;
-    commit((current) => ({ ...current, placesByTrip: { ...current.placesByTrip, [tripId]: (current.placesByTrip[tripId] ?? []).map((place) => place.id === id ? { ...place, ...input, ...(input.location !== place.location ? { lat: null, lng: null } : {}) } : place) } }));
+    commit((current) => ({ ...current, placesByTrip: { ...current.placesByTrip, [tripId]: (current.placesByTrip[tripId] ?? []).map((place) => place.id === id ? { ...place, ...input, ...(input.location !== place.location ? { lat: pin?.lat ?? null, lng: pin?.lng ?? null } : {}) } : place) } }));
     enqueue({ method: 'PATCH', path: `/v1/trips/${tripId}/places/${id}`, body: input });
   }, [commit, enqueue]);
   const deletePlace = useCallback((id: string, inTrip?: string) => {

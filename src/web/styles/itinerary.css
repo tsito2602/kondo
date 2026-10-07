@@ -1627,6 +1627,9 @@ dialog[data-panel="add"],
   font-weight: 400;
   color: var(--it-mute);
 }
+.it-plres.is-miss {
+  color: var(--p-mute);
+}
 
 /* ===== the ＋ button's floating panel (Modal addPanel): every add screen
    (予定・場所・やること・持ち物・メモ, and 予約's own sheet in bookings.css)
