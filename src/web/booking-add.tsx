@@ -503,9 +503,12 @@ export function AddBookingSheet({
     const sheet = body.current;
     if (!sheet) return;
     const from = sheetHeight.current;
-    const to = sheet.offsetHeight;
-    if (!from || Math.abs(to - from) < 2 || RM()) return;
-    sheet.animate([{ height: `${from}px` }, { height: `${to}px` }], {
+    if (!from || Math.abs(sheet.offsetHeight - from) < 2 || RM()) return;
+    // No end keyframe: it grows to whatever the full panel's height settles
+    // at. Measured here it could still be the small panel's: the dock moves
+    // back from the closing 読み取りの確認 a frame later, and the full-height
+    // rule waits for it, so the panel stopped short and then jumped.
+    sheet.animate([{ height: `${from}px`, offset: 0 }], {
       duration: 460,
       easing: "cubic-bezier(.2,1.2,.4,1)",
     });

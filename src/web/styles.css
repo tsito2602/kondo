@@ -177,6 +177,11 @@ select {
   outline: none;
   box-shadow: none;
 }
+/* A panel's title takes focus only so opening it focuses nothing else
+   (予約を取り込む drew a ring on its title, Tsubasa 2026-10-07). */
+[tabindex="-1"]:focus {
+  outline: none;
+}
 h1,
 h2,
 h3,
