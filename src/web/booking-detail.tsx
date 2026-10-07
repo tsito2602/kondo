@@ -150,7 +150,7 @@ export function BookingDetail({
         "booking",
         id,
         "予約を消しました",
-        `[data-booking="${id}"]`,
+        `[data-booking="${id}"], [data-entry-key^="booking-${id}-"] .it-card`,
       );
     });
   const press = (element: Element) =>

@@ -111,6 +111,8 @@ export async function poof(element: HTMLElement | null | undefined) {
     .finished.catch(() => undefined);
   const box = element.getBoundingClientRect();
   element.style.opacity = "0";
+  // Nothing on screen to burst from (a hidden or detached card): no dots at 0,0.
+  if (!box.width || !box.height) return;
   const cx = box.left + box.width / 2;
   const cy = box.top + box.height / 2;
   for (let index = 0; index < 12; index++) {
