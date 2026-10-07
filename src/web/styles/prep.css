@@ -492,6 +492,58 @@ dialog.modal:has(.prep-sheet):not([data-panel]) .modal-header h2 {
   color: var(--p-mute);
   font-size: 12px;
 }
+/* カテゴリ: single-select chips; an old free-text category is dashed until chosen. */
+.prep-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.prep-cats button,
+.prep-filters button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 99px;
+  background: var(--p-soft);
+  color: var(--p-ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.prep-cats button.is-legacy {
+  padding: 6.5px 12.5px;
+  border: 1.5px dashed var(--p-mute);
+  background: none;
+}
+.prep-cats button[aria-checked="true"],
+.prep-filters button[aria-pressed="true"] {
+  border-style: solid;
+  border-color: var(--p-ink);
+  background: var(--p-ink);
+  color: var(--p-paper);
+}
+/* The filter row over the 持ち物 list scrolls sideways. */
+.prep-filters {
+  display: flex;
+  gap: 6px;
+  margin: 0 -16px 12px;
+  padding: 2px 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.prep-filters::-webkit-scrollbar {
+  display: none;
+}
+.prep-filters button {
+  padding: 6px 12px;
+  font-size: 13px;
+}
 /* 個数: a − n ＋ stepper. */
 .prep-qty-field {
   display: flex;

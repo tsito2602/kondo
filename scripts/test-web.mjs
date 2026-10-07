@@ -1298,7 +1298,7 @@ test("legacy account cache and pending changes survive React migration; real for
 
     await click(dockTab("持ち物"));
     assert.equal(document.querySelector(".page-top h2").textContent, "持ち物");
-    const addPacking = async (name, kind) => {
+    const addPacking = async (name, kind, category) => {
       await click(
         document.querySelector('.persistent-add[aria-label="持ち物を追加"]'),
       );
@@ -1313,11 +1313,18 @@ test("legacy account cache and pending changes survive React migration; real for
         name,
       );
       await click(byText('[role="radio"] b', kind).closest("button"));
+      assert.equal(
+        document.querySelector('.prep-cats [aria-checked="true"]').textContent,
+        "その他",
+        "その他 is the default category",
+      );
+      if (category) await click(byText(".prep-cats [role=radio]", category));
       await submitSheet("追加する");
       return db.prepare("SELECT id FROM packing_items WHERE name = ?").get(name)
         .id;
     };
     const kindRow = (id) => document.querySelector(`[data-item="${id}"]`);
+    const filters = () => document.querySelector(".prep-filters");
     const charger = await addPacking("充電器", "みんな各自");
     assert.equal(
       db
@@ -1338,7 +1345,35 @@ test("legacy account cache and pending changes survive React migration; real for
       ["owner"],
       "みんな各自 keeps each member's own tick",
     );
-    const medicine = await addPacking("常備薬", "1つでいい");
+    assert.equal(filters(), null, "no filter row while every item is その他");
+    const medicine = await addPacking("常備薬", "1つでいい", "薬");
+    assert.equal(
+      db
+        .prepare("SELECT category FROM packing_items WHERE id = ?")
+        .get(medicine).category,
+      "薬",
+    );
+    assert.deepEqual(
+      [...filters().querySelectorAll("button")].map((b) => b.textContent),
+      ["すべて", "薬", "その他"],
+    );
+    assert.equal(
+      filters().querySelector('[data-kind="pack-medicine"] svg') !== null,
+      true,
+      "the category icon carries its colour key",
+    );
+    await click(byText(".prep-filters button", "薬"));
+    assert.ok(kindRow(medicine));
+    assert.equal(kindRow(charger), null, "filtering hides other categories");
+    assert.deepEqual(
+      [...document.querySelectorAll(".prep-kind-heading b")].map(
+        (b) => b.textContent,
+      ),
+      ["1つでいい"],
+      "kinds with nothing left are hidden",
+    );
+    await click(byText(".prep-filters button", "すべて"));
+    assert.ok(kindRow(charger));
     assert.match(kindRow(medicine).textContent, /まだ誰も持っていない/);
     // Nobody holds it yet: anyone ticks it, and taking it keeps the tick.
     await click(kindRow(medicine).querySelector('[role="checkbox"]'));
@@ -1600,6 +1635,18 @@ test("legacy account cache and pending changes survive React migration; real for
       "the version moved to the app row",
     );
     assert.ok(foot.querySelector("button[aria-label='kondo'] svg"));
+    assert.ok(
+      byText("dialog .settings-label", "持ち物のカテゴリの色"),
+      "持ち物 categories have their own colour section",
+    );
+    assert.deepEqual(
+      [
+        ...document.querySelectorAll(
+          'dialog .settings-row[data-kind^="pack-"] b',
+        ),
+      ].map((b) => b.textContent),
+      ["書類・お金", "衣類", "洗面・コスメ", "薬", "電子機器", "その他"],
+    );
     assert.match(
       document.querySelector("dialog .passport-stamps").textContent,
       /これまでの旅 \d+回/,

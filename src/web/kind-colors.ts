@@ -13,14 +13,26 @@ export type KindKey =
   | "stay"
   | "ticket"
   | "shopping"
-  | "other";
+  | "other"
+  | PackingColorKey;
 
-/** Every kind, in the order the settings list them, with its glyph and default. */
+/** 持ち物のカテゴリ (packing-categories.tsx) colour their icons the same way. */
+export type PackingColorKey =
+  | "pack-docs"
+  | "pack-clothes"
+  | "pack-toiletries"
+  | "pack-medicine"
+  | "pack-devices"
+  | "pack-other";
+
+/** Every kind, in the order the settings list them, with its glyph and default.
+ * 持ち物 entries have no glyph: their icon comes from packing-categories.tsx. */
 export const KINDS: {
   key: KindKey;
   label: string;
   glyph: string;
   color: string;
+  group?: "packing";
 }[] = [
   { key: "sightseeing", label: "観光", glyph: "sight", color: "#738778" },
   { key: "meal", label: "食事", glyph: "meal", color: "#b78d6a" },
@@ -29,6 +41,23 @@ export const KINDS: {
   { key: "ticket", label: "チケット", glyph: "ticket", color: "#8a87a4" },
   { key: "shopping", label: "買い物", glyph: "shop", color: "#b48a96" },
   { key: "other", label: "その他", glyph: "other", color: "#989898" },
+  // 持ち物: no red (it is kept for warnings).
+  ...(
+    [
+      ["pack-docs", "書類・お金", "#b7863a"],
+      ["pack-clothes", "衣類", "#6f98a1"],
+      ["pack-toiletries", "洗面・コスメ", "#4d977e"],
+      ["pack-medicine", "薬", "#c4739e"],
+      ["pack-devices", "電子機器", "#328cae"],
+      ["pack-other", "その他", "#989898"],
+    ] as const
+  ).map(([key, label, color]) => ({
+    key,
+    label,
+    glyph: "",
+    color,
+    group: "packing" as const,
+  })),
 ];
 
 /** uchiwake's shared 6 × 4 palette (card-colors.ts), ordered by hue. */

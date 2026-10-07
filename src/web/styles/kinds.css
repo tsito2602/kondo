@@ -24,9 +24,29 @@
 [data-kind="other"] {
   --kind: var(--kind-other);
 }
+[data-kind="pack-docs"] {
+  --kind: var(--kind-pack-docs);
+}
+[data-kind="pack-clothes"] {
+  --kind: var(--kind-pack-clothes);
+}
+[data-kind="pack-toiletries"] {
+  --kind: var(--kind-pack-toiletries);
+}
+[data-kind="pack-medicine"] {
+  --kind: var(--kind-pack-medicine);
+}
+[data-kind="pack-devices"] {
+  --kind: var(--kind-pack-devices);
+}
+[data-kind="pack-other"] {
+  --kind: var(--kind-pack-other);
+}
 
 :is(.it-lab, .it-lnr, .bk-hd, .ps-kick)[data-kind] > svg,
-:is(.ps-chips, .it-chips, .bk-kinds) > button[data-kind] svg {
+:is(.ps-chips, .it-chips, .bk-kinds, .prep-cats, .prep-filters)
+  > button[data-kind]
+  svg {
   color: var(--kind);
 }
 

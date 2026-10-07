@@ -28,6 +28,14 @@ import { anim, RM, spring } from "./cartoon";
 import { useJellyScroll } from "./jelly-scroll";
 import { dismissModal } from "./motion";
 import { PageTop } from "./page-top";
+import {
+  CategoryIcon,
+  categoryColorKey,
+  defaultPackingCategory,
+  isListedCategory,
+  packingCategories,
+  presentCategories,
+} from "./packing-categories";
 import { CheckIcon, LockIcon } from "./prep-pictures";
 import { AddButton, DockFunction, ErrorText, Modal } from "./ui";
 
@@ -754,6 +762,9 @@ const kinds: Record<PackingKind, [string, string]> = {
   mine: ["自分だけ", "あなたのリストにだけ出る。ほかの人には見えない"],
 };
 const kindOf = (item: PackingItem): PackingKind => item.kind ?? "one";
+const categoryOf = (item: PackingItem) =>
+  item.category || defaultPackingCategory;
+const ALL = "すべて";
 
 const packingInput = (item: PackingItem) => ({
   name: item.name,
@@ -852,6 +863,8 @@ function Packing() {
   const bubble = useBubble();
   const [sheet, setSheet] = useState<{ item?: PackingItem } | null>(null);
   const [fresh, setFresh] = useState("");
+  // The category filter lasts for this visit only.
+  const [filter, setFilter] = useState(ALL);
   const page = useRef<HTMLDivElement>(null);
   const me = memberAssignee(self ?? "");
   useSinkIn(page);
@@ -985,6 +998,9 @@ function Packing() {
       />
     );
   };
+  const categories = presentCategories(travel.packingItems.map(categoryOf));
+  const shown =
+    categories.length > 1 && categories.includes(filter) ? filter : ALL;
   return (
     <div className="page prep-page" ref={page}>
       <PrepHeader
@@ -992,11 +1008,36 @@ function Packing() {
         addLabel="持ち物を追加"
         onAdd={travel.canEdit ? () => setSheet({}) : undefined}
       />
+      {categories.length > 1 && (
+        <div
+          className="prep-filters"
+          role="group"
+          aria-label="カテゴリで絞り込む"
+        >
+          {[ALL, ...categories].map((category) => (
+            <button
+              type="button"
+              key={category}
+              data-kind={
+                category === ALL ? undefined : categoryColorKey(category)
+              }
+              aria-pressed={shown === category}
+              onClick={() => setFilter(category)}
+            >
+              {category !== ALL && <CategoryIcon category={category} />}
+              {category}
+            </button>
+          ))}
+        </div>
+      )}
       {(["each", "one", "mine"] as const).map((kind) => {
         // The list's own order (oldest first), so ticking never moves a row.
         const items = travel.packingItems.filter(
-          (item) => kindOf(item) === kind,
+          (item) =>
+            kindOf(item) === kind &&
+            (shown === ALL || categoryOf(item) === shown),
         );
+        if (shown !== ALL && !items.length) return null;
         return (
           <section key={kind} aria-label={kinds[kind][0]}>
             <div className="prep-heading prep-kind-heading">
@@ -1040,6 +1081,12 @@ function PackingSheet({
   const [name, setName] = useState(item?.name ?? "");
   const [kind, setKind] = useState<PackingKind>(item ? kindOf(item) : "each");
   const [quantity, setQuantity] = useState(item?.quantity ?? 1);
+  // Stored as is until the user picks; an old free-text category gets its own chip.
+  const [category, setCategory] = useState(
+    item?.category || defaultPackingCategory,
+  );
+  const legacy =
+    item?.category && !isListedCategory(item.category) ? item.category : "";
   const [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null);
   const save = (event: FormEvent) => {
@@ -1064,6 +1111,7 @@ function PackingSheet({
         travel.updatePackingItem(item.id, {
           ...before,
           name: value,
+          category,
           quantity,
           kind,
           shared: kind === "one",
@@ -1082,7 +1130,7 @@ function PackingSheet({
       }
       const id = travel.createPackingItem({
         name: value,
-        category: "その他",
+        category,
         quantity,
         packed: false,
         assignee: "",
@@ -1159,6 +1207,39 @@ function PackingSheet({
           }}
         />
         <ErrorText message={error} />
+        <span className="prep-label" id={`${formId}-cat`}>
+          カテゴリ
+        </span>
+        <div
+          className="prep-cats"
+          role="radiogroup"
+          aria-labelledby={`${formId}-cat`}
+        >
+          {[
+            ...packingCategories.map(([value]) => value),
+            ...(legacy ? [legacy] : []),
+          ].map((value) => (
+            <button
+              type="button"
+              role="radio"
+              key={value}
+              data-kind={categoryColorKey(value)}
+              className={value === legacy ? "is-legacy" : undefined}
+              aria-checked={category === value}
+              onClick={(event) => {
+                setCategory(value);
+                void spring(
+                  event.currentTarget,
+                  [{ transform: "scale(.96)" }, { transform: "none" }],
+                  "squish",
+                );
+              }}
+            >
+              <CategoryIcon category={value} />
+              {value}
+            </button>
+          ))}
+        </div>
         <div className="prep-qty-field" role="group" aria-label="個数">
           <span className="prep-label">個数</span>
           <button
