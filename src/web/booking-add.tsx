@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -843,11 +844,17 @@ export function AddBookingSheet({
                     <div className="bk-two" key={index}>
                       {row.map(field)}
                     </div>
+                  ) : row[0][0] === "title" ? (
+                    // 予約番号 right under the name, above places and dates
+                    // (Tsubasa 2026-10-07).
+                    <Fragment key={index}>
+                      {field(row[0])}
+                      {field(["code", "予約番号", ""])}
+                    </Fragment>
                   ) : (
                     field(row[0])
                   ),
                 )}
-                {field(["code", "予約番号", ""])}
                 {form.kind !== "hotel" && travel.places.length > 0 && (
                   <datalist id="booking-add-places">
                     {travel.places.map((place) => (

@@ -720,6 +720,8 @@ export function BookingForm({
             </p>
           )}
           {!carrier && field("detail", "予約内容")}
+          {/* 予約番号 above places and dates (Tsubasa 2026-10-07). */}
+          {field("confirmationCode", "予約番号")}
           {route && (
             <div className={kind === "flight" ? "airport-fields" : "form-grid"}>
               {kind === "flight" ? (
@@ -839,7 +841,6 @@ export function BookingForm({
               重複する予定「{candidate.item.title}」をこの予約へまとめる
             </label>
           )}
-          {field("confirmationCode", "予約番号")}
           <Field label="メモ">
             <Textarea
               rows={5}

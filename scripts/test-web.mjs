@@ -1921,11 +1921,11 @@ test("legacy account cache and pending changes survive React migration; real for
       [
         "航空会社",
         "便名",
+        "予約番号",
         "出発の空港",
         "到着の空港",
         "出発",
         "到着",
-        "予約番号",
       ],
     );
     assert.equal(field("便名").placeholder, "便名を入力");
