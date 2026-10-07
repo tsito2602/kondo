@@ -1074,6 +1074,8 @@ function Packing() {
  * 誰が持つ opens under 1人が持つ: the space grows on a soft spring and the
  * label and faces pop in one after another; it folds away when unpicked.
  */
+const CLIP_ROWS = "inset(0 -40px)";
+
 function Reveal({ open, children }: { open: boolean; children: ReactNode }) {
   const [shown, setShown] = useState(open);
   const box = useRef<HTMLDivElement>(null);
@@ -1088,7 +1090,7 @@ function Reveal({ open, children }: { open: boolean; children: ReactNode }) {
     const el = box.current;
     if (!el) return setShown(false);
     let live = true;
-    el.style.overflow = "hidden";
+    el.style.clipPath = CLIP_ROWS;
     void anim(
       el,
       [
@@ -1105,13 +1107,15 @@ function Reveal({ open, children }: { open: boolean; children: ReactNode }) {
     const el = box.current;
     if (!shown || !el || !entering.current) return;
     entering.current = false;
-    el.style.overflow = "hidden";
+    // Clip only top and bottom: the chips overshoot as they pop, and
+    // overflow: hidden cut the first one's left edge (Tsubasa 2026-10-07).
+    el.style.clipPath = CLIP_ROWS;
     void spring(
       el,
       [{ height: "0px" }, { height: `${el.offsetHeight}px` }],
       "soft",
     ).then(() => {
-      el.style.overflow = "";
+      el.style.clipPath = "";
     });
     el.querySelectorAll<HTMLElement>(".prep-label, [role=radio]").forEach(
       (part, index) =>
