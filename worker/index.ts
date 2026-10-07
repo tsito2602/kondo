@@ -291,8 +291,26 @@ async function geocode(query: string): Promise<Coordinates | null> {
   const point = { lat: Number(first?.lat), lng: Number(first?.lon) };
   return Number.isFinite(point.lat) && Number.isFinite(point.lng) && (point.lat || point.lng) ? point : null;
 }
-function withoutJapanese(text: string) {
-  return text.replace(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー・、。（）]+/gu, ' ').split(',').map((part) => part.trim()).filter((part) => /\p{L}|\d/u.test(part)).join(', ');
+/**
+ * What to ask OpenStreetMap, best first. It knows addresses in their own
+ * letters but not a shop's name in front of them, so after the whole text
+ * come the address without its Japanese parts, then without the name:
+ * 「Leschanz, Freisingergasse 1, 1010 Wien」 → 「Freisingergasse 1, 1010 Wien」,
+ * 「Demel Kohlmarkt 14, 1010 Wien」 → 「Kohlmarkt 14, 1010 Wien」.
+ */
+function addressQueries(text: string): string[] {
+  const latin = text.replace(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー・、。（）]+/gu, ' ').split(',').map((part) => part.replace(/\s+/g, ' ').trim()).filter((part) => /\p{L}|\d/u.test(part));
+  const queries = [text.trim(), latin.join(', ')];
+  const [first, ...rest] = latin;
+  if (first && rest.length) {
+    // A name alone first, or a name before a street and its number.
+    if (!/\d/.test(first)) queries.push(rest.join(', '));
+    else {
+      const words = first.split(' ');
+      for (let drop = 1; drop <= words.length - 2; drop++) queries.push([words.slice(drop).join(' '), ...rest].join(', '));
+    }
+  }
+  return [...new Set(queries.filter(Boolean))].slice(0, 4);
 }
 async function locateMapLink(link: string): Promise<{ target: string; pin: Coordinates | null; title?: string }> {
   let target = link;
@@ -315,13 +333,11 @@ async function locateMapLink(link: string): Promise<{ target: string; pin: Coord
   // A link to a place id only (「?cid=…」) carries no words; the page's title does.
   const query = url.searchParams.get('q') ?? url.searchParams.get('query') ?? (decodeURIComponent(url.pathname.match(/\/place\/([^/@]+)/)?.[1] ?? '').replace(/\+/g, ' ') || title);
   try {
-    if (query.trim()) pin = await geocode(query.trim());
-    // OpenStreetMap knows the address in its own letters, not a Japanese name
-    // in front of it: 「シュロスプラッツ Schloßpl., 70173 Stuttgart, ドイツ」.
-    const latin = withoutJapanese(query);
-    if (!pin && latin && latin !== query.trim()) {
-      await new Promise((done) => setTimeout(done, 1000));
-      pin = await geocode(latin);
+    // OpenStreetMap asks for one request a second.
+    for (const [index, text] of addressQueries(query).entries()) {
+      if (index) await new Promise((done) => setTimeout(done, 1000));
+      pin = await geocode(text);
+      if (pin) break;
     }
   } catch { /* no pin */ }
   return { target, pin, title };
@@ -348,8 +364,8 @@ async function resolveMapLink(text: string) {
  * so the list never waits long. A link that gave nothing is skipped for a
  * day. Never fails the list.
  */
-/** When link reading last got better: misses from before it are tried again (Maps pages read as a desktop, 2026-10-07). */
-const RESOLVER_SINCE = 1791374200;
+/** When link reading last got better: misses from before it are tried again (addresses without the shop name, 2026-10-07). */
+const RESOLVER_SINCE = 1791376400;
 async function fillMissingCoordinates(env: Env, tripId: string, rows: Record<string, unknown>[]) {
   const misses = new Set(((await env.DB.prepare(`SELECT m.place_id FROM place_coordinate_misses m JOIN places p ON p.id = m.place_id
     WHERE p.trip_id = ? AND m.location = p.location AND m.tried_at > MAX(unixepoch() - 86400, ?)`).bind(tripId, RESOLVER_SINCE).all()).results).map((row) => row.place_id));
