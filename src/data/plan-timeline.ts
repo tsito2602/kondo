@@ -2,6 +2,7 @@ import { findAirportByCode } from './airports';
 import { findFlightConnections, type FlightConnection } from './flight-connections';
 import { coordsFromLink, distanceMeters, walkMinutes, type LatLng } from './geo';
 import { itemDetails, orderItineraryEntries } from './itinerary';
+import { placeCoordinates } from './places';
 import type { Booking, ItineraryItem, Place } from './types';
 
 export type Entry = {
@@ -118,12 +119,13 @@ export function entryCoords(entry: Entry, places: readonly Place[]): LatLng | nu
     const details = itemDetails(entry.item);
     if (details.category === 'transport') return null;
     const place = planPlace(entry.item, places);
-    return (place && (coordsFromLink(place.location) ?? place.referenceLinks?.map((link) => coordsFromLink(link.url)).find(Boolean))) || coordsFromLink(details.location);
+    // Stored coordinates first: a short share link's pin comes from the Worker.
+    return (place && (placeCoordinates(place) ?? coordsFromLink(place.location) ?? place.referenceLinks?.map((link) => coordsFromLink(link.url)).find(Boolean))) || coordsFromLink(details.location);
   }
   if (entry.booking && !isJourney(entry.booking)) {
     // A booking linked to a place walks from and to that place's pin (hotels keep their own link).
     const place = entry.booking.kind === 'hotel' || !entry.booking.placeId ? undefined : places.find((candidate) => candidate.id === entry.booking!.placeId);
-    const linked = place && (place.lat != null && place.lng != null ? { lat: place.lat, lng: place.lng } : coordsFromLink(place.location));
+    const linked = place && (placeCoordinates(place) ?? coordsFromLink(place.location));
     return linked || coordsFromLink(entry.booking.location) || coordsFromLink(entry.booking.detail);
   }
   return null;

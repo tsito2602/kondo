@@ -4,9 +4,14 @@ import {
   emptyItineraryDetails,
   itineraryCategories,
   itineraryDetailsError,
+  transportModes,
 } from "@/data/itinerary";
 import { registeredGoogleMapsUrl } from "@/data/places";
-import type { ItineraryCategory, ItineraryDetails } from "@/data/types";
+import type {
+  ItineraryCategory,
+  ItineraryDetails,
+  TransportMode,
+} from "@/data/types";
 import { dismissModal } from "./motion";
 import { ErrorText, Modal, useAction } from "./ui";
 import { categoryGlyph, Glyph, MapPin } from "./itinerary-icons";
@@ -39,6 +44,11 @@ export function PlanAddSheet({
   const [endDayOffset, setEndDayOffset] = useState(0);
   const [picking, setPicking] = useState(false);
   const [place, setPlace] = useState("");
+  const [note, setNote] = useState("");
+  // 移動: the same fields as the plan's edit sheet (plan-sheet.tsx).
+  const [mode, setMode] = useState<TransportMode>("train");
+  const [origin, setOrigin] = useState("");
+  const [duration, setDuration] = useState("");
   const [error, setError] = useState("");
   const { busy, run } = useAction();
   const resolved = previewPlace(place, title, travel, {
@@ -55,7 +65,12 @@ export function PlanAddSheet({
         : {}),
       ...(category === "transport"
         ? {
-            transport: { mode: "other", origin: "", destination: place.trim() },
+            transport: {
+              mode,
+              origin: origin.trim(),
+              destination: place.trim(),
+              ...(duration ? { durationMinutes: Number(duration) } : {}),
+            },
           }
         : {}),
     };
@@ -75,7 +90,7 @@ export function PlanAddSheet({
         kind: itineraryCategories.find((entry) => entry.value === category)!
           .label,
         title: title.trim(),
-        note: "",
+        note,
         details,
       });
       // The plan exists first, so the new place can point at it.
@@ -153,7 +168,11 @@ export function PlanAddSheet({
                   ? "行き先を入力"
                   : "マップのリンクか場所の名前を入力"
               }
-              aria-label="場所の名前、または Google マップのリンク"
+              aria-label={
+                category === "transport"
+                  ? "行き先"
+                  : "場所の名前、または Google マップのリンク"
+              }
               autoComplete="off"
               onChange={(event) => setPlace(event.target.value)}
             />
@@ -173,6 +192,60 @@ export function PlanAddSheet({
               名前だけなので地図には載りません
             </small>
           )}
+        {category === "transport" && (
+          <>
+            <div className="field">
+              <span>手段</span>
+              <div className="ps-chips" role="group" aria-label="手段">
+                {transportModes.map((entry) => (
+                  <button
+                    type="button"
+                    key={entry.value}
+                    aria-pressed={mode === entry.value}
+                    onClick={() => setMode(entry.value)}
+                  >
+                    {entry.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <label className="field">
+              <span>出発地</span>
+              <input
+                className="it-inp"
+                placeholder="出発地を入力"
+                maxLength={160}
+                autoComplete="off"
+                value={origin}
+                onChange={(event) => setOrigin(event.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>所要時間（分）</span>
+              <input
+                className="it-inp"
+                placeholder="所要時間を入力"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={10080}
+                value={duration}
+                onChange={(event) => setDuration(event.target.value)}
+              />
+            </label>
+          </>
+        )}
+        <label className="field">
+          <span>メモ</span>
+          <textarea
+            className="it-inp"
+            placeholder="メモを入力"
+            rows={2}
+            maxLength={4000}
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+          />
+        </label>
         <ErrorText message={error} />
       </form>
       {picking && (

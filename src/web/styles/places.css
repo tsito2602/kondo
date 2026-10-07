@@ -627,3 +627,43 @@
 :root.places-full body::after {
   display: none;
 }
+
+/* 行った・見送り: dimmed on the map, in the list and on the card, with a small
+   status word so they read apart from live candidates (numbers unchanged). */
+.places-pin.is-done svg {
+  opacity: 0.45;
+}
+.places-pin.is-done .places-pin-label {
+  color: var(--pl-mute);
+}
+.places-done {
+  margin-left: 6px;
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 700;
+  color: var(--pl-mute);
+}
+.places-row.is-done .places-badge {
+  opacity: 0.45;
+}
+.places-row.is-done strong {
+  color: var(--pl-mute);
+  font-weight: 500;
+}
+.places-card-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.places-card-tags.is-done > .places-tag:not(.places-done-tag) {
+  opacity: 0.5;
+}
+.places-tag.places-done-tag {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--pl-line);
+}
+.places-nopin-hint {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  color: var(--pl-mute);
+}

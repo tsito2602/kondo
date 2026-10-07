@@ -253,11 +253,37 @@ async function resolveMapLink(text: string) {
   const pin = mapCoordinates(target);
   return json({ link, name: placeNameFromLink(target), lat: pin?.lat ?? null, lng: pin?.lng ?? null });
 }
+/**
+ * Places saved before coordinates were stored (older short share links) have no
+ * place_coordinates row. Each list request resolves up to 3 of them in parallel
+ * and stores the pin; a link that fails is simply tried again on a later request.
+ * Never fails the list.
+ */
+async function fillMissingCoordinates(env: Env, tripId: string, rows: Record<string, unknown>[]) {
+  const missing = rows
+    .filter((row) => row.lat == null && typeof row.location === 'string' && (isShortMapsLink(row.location) || mapCoordinates(row.location)))
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 3);
+  await Promise.all(missing.map(async (row) => {
+    try {
+      const location = row.location as string;
+      const coordinates = await placeCoordinates(location);
+      if (!coordinates) return;
+      // Only while the place still has this link; a newer save keeps its own pin.
+      await env.DB.prepare(`INSERT INTO place_coordinates (place_id, lat, lng)
+        SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM places WHERE id = ? AND trip_id = ? AND location = ?)
+        ON CONFLICT(place_id) DO NOTHING`).bind(row.id, coordinates.lat, coordinates.lng, row.id, tripId, location).run();
+      row.lat = coordinates.lat;
+      row.lng = coordinates.lng;
+    } catch { /* leave it without a pin; the next request tries again */ }
+  }));
+}
 async function placesRoute(request: Request, env: Env, user: User, tripId: string, placeId?: string) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
   if (!placeId && request.method === 'GET') {
     const rows = await env.DB.prepare(`SELECT p.id, p.title, p.note, p.opening_hours AS openingHours, COALESCE(d.reservation_status, p.reservation_status) AS reservationStatus, p.location, p.status, p.updated_at AS updatedAt, COALESCE(d.reference_links, '[]') AS referenceLinks, l.item_id AS itineraryItemId, c.lat, c.lng FROM places p LEFT JOIN place_itinerary_links l ON l.place_id = p.id LEFT JOIN place_details d ON d.place_id = p.id LEFT JOIN place_coordinates c ON c.place_id = p.id WHERE p.trip_id = ? ORDER BY p.updated_at DESC, p.id`).bind(tripId).all();
+    await fillMissingCoordinates(env, tripId, rows.results);
     return json({ places: rows.results.map((row) => ({ ...row, referenceLinks: JSON.parse(row.referenceLinks as string) })) });
   }
   if (placeId && request.method === 'DELETE') {

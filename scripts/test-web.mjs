@@ -694,10 +694,18 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(document.querySelector('[aria-label="予定を追加"]'));
     await fill("なにをする？", "市内を歩く");
     await fill("時刻", "14:00");
+    await fill("メモ", "歩きやすい靴で");
     await submit();
     assert.equal(
       db.prepare("SELECT COUNT(*) AS n FROM itinerary_items").get().n,
       2,
+    );
+    assert.equal(
+      db
+        .prepare("SELECT note FROM itinerary_items WHERE title = ?")
+        .get("市内を歩く").note,
+      "歩きやすい靴で",
+      "the add panel saves the plan's memo",
     );
     await click(
       [...document.querySelectorAll(".it-ev")].find((entry) =>
@@ -858,33 +866,70 @@ test("legacy account cache and pending changes survive React migration; real for
     await tick(30);
     await click(byText("nav a", "場所"));
     await click(document.querySelector('[aria-label="場所を追加"]'));
-    // 行きたい場所 is its Google Maps link and nothing else: the name comes
-    // from the link (Tsubasa 2026-10-07).
-    assert.equal(field("場所の名前"), undefined);
+    // 行きたい場所を追加 offers everything 場所を編集 has (production parity):
+    // a Google Maps link fills the name, a plain address is fine too.
     assert.notEqual(
       document.activeElement,
-      field("Googleマップのリンク"),
+      field("住所・Googleマップのリンク"),
       "opening does not activate the keyboard",
     );
-    await fill("Googleマップのリンク", "美術館");
+    assert.equal(
+      field("住所・Googleマップのリンク").placeholder,
+      "住所・Googleマップのリンクを入力",
+    );
+    assert.equal(field("場所の名前").placeholder, "場所の名前を入力");
+    await fill("住所・Googleマップのリンク", "ウィーン 美術館通り 1");
     assert.match(
       document.querySelector("dialog .place-link-note").textContent,
-      /共有/,
-      "plain text is not a place",
+      /リンクを貼ると地図に載ります/,
+      "an address is accepted; a link would add the pin",
     );
+    // (The browser stops an empty required name first; the form says it too.)
+    await submit();
+    assert.match(
+      document.querySelector("dialog[open]").textContent,
+      /場所の名前を入力してください/,
+    );
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM places").get().n, 0);
     await fill(
-      "Googleマップのリンク",
+      "住所・Googleマップのリンク",
       "https://www.google.com/maps/place/%E7%BE%8E%E8%A1%93%E9%A4%A8",
     );
     await tick(30);
-    assert.match(
-      document.querySelector("dialog .it-plres").textContent,
-      /美術館/,
+    assert.equal(
+      field("場所の名前").value,
+      "美術館",
       "the link names the place",
     );
-    assert.equal(field("場所の名前"), undefined);
-    await submit();
-    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM places").get().n, 1);
+    assert.match(
+      document.querySelector("dialog .it-plres").textContent,
+      /美術館.*地図の 1 として載ります/,
+    );
+    await fill("メモ", "見たい展示");
+    await fill("営業時間", "10:00〜18:00");
+    await fill("予約状況", "needed");
+    await click(byText(".thumb-dock-host .cdock-group button", "追加する"));
+    await waitFor(
+      () => db.prepare("SELECT COUNT(*) AS n FROM places").get().n === 1,
+      "the place reaches the server",
+    );
+    assert.deepEqual(
+      {
+        ...db
+          .prepare(
+            "SELECT title, note, opening_hours, reservation_status, status FROM places",
+          )
+          .get(),
+      },
+      {
+        title: "美術館",
+        note: "見たい展示",
+        opening_hours: "10:00〜18:00",
+        reservation_status: "needed",
+        status: "want",
+      },
+      "the add panel saves memo, hours and statuses",
+    );
     const placeRow = document.querySelector(".places-row");
     assert.equal(placeRow.querySelector(".places-badge").textContent, "1");
     assert.equal(
@@ -905,14 +950,13 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.ok(
       document.querySelector('.context-actions [aria-label="場所を削除"]'),
     );
-    // The rest is set in 場所を編集.
+    // 場所を編集 shows what the add panel saved; reference links are added here.
     await click(document.querySelector('.context-actions [aria-label="編集"]'));
     assert.equal(field("訪問ステータス").closest("details"), null);
     assert.equal(field("訪問ステータス").value, "want");
-    assert.equal(field("予約状況").value, "not_needed");
-    await fill("メモ", "見たい展示");
-    await fill("営業時間", "10:00〜18:00");
-    await fill("予約状況", "needed");
+    assert.equal(field("予約状況").value, "needed");
+    assert.equal(field("メモ").value, "見たい展示");
+    assert.equal(field("営業時間").value, "10:00〜18:00");
     await click(byText("dialog button", "リンクを追加"));
     await fill("URL", "https://example.com/museum");
     await fill("名前", "公式サイト");
@@ -1019,7 +1063,7 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await click(document.querySelector('.context-actions [aria-label="編集"]'));
     await fill(
-      "Googleマップのリンク",
+      "住所・Googleマップのリンク",
       "https://www.google.com/maps/place/Kunsthistorisches+Museum/@48.2037,16.3616,17z/data=!4m6!3m5!8m2!3d48.20379!4d16.36166",
     );
     await submit();
@@ -1059,6 +1103,53 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await tick(50);
     assert.equal(document.querySelector(".places-card"), null);
+    // A place by its name only: no pin, and the list says how to add one.
+    await click(document.querySelector('[aria-label="場所を追加"]'));
+    await fill("場所の名前", "駅前のカフェ");
+    await click(byText(".thumb-dock-host .cdock-group button", "追加する"));
+    await waitFor(
+      () => db.prepare("SELECT COUNT(*) AS n FROM places").get().n === 2,
+      "a place with only a name is saved",
+    );
+    assert.equal(
+      db
+        .prepare("SELECT location FROM places WHERE title = '駅前のカフェ'")
+        .get().location,
+      "",
+    );
+    await tick(50);
+    const cafeRow = [...document.querySelectorAll(".places-row")].find((row) =>
+      row.querySelector("strong").textContent.startsWith("駅前のカフェ"),
+    );
+    assert.equal(
+      cafeRow.querySelector(".places-row-distance").textContent,
+      "位置なし",
+    );
+    assert.match(
+      document.querySelector(".places-nopin-hint").textContent,
+      /Googleマップのリンクを貼ると地図に載ります/,
+    );
+    // 見送り: dimmed and labelled, its number kept.
+    const cafeNumber = cafeRow.querySelector(".places-badge").textContent;
+    await click(cafeRow);
+    await click(document.querySelector('.context-actions [aria-label="編集"]'));
+    await fill("訪問ステータス", "skipped");
+    await submit();
+    await click(document.querySelector('.context-back [aria-label="戻る"]'));
+    await tick(50);
+    const skippedRow = [...document.querySelectorAll(".places-row")].find(
+      (row) =>
+        row.querySelector("strong").textContent.startsWith("駅前のカフェ"),
+    );
+    assert.ok(skippedRow.classList.contains("is-done"));
+    assert.equal(
+      skippedRow.querySelector(".places-done").textContent,
+      "見送り",
+    );
+    assert.equal(
+      skippedRow.querySelector(".places-badge").textContent,
+      cafeNumber,
+    );
     // やること and 持ち物 are separate icon-only dock pages.
     const dockTab = (label) =>
       document.querySelector(
