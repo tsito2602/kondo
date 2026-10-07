@@ -51,6 +51,13 @@ export function useLayer(onEscape: () => void) {
   useLayoutEffect(() => {
     const dialog = ref.current!;
     const release = lockModalPage();
+    // Open on the title, as Modal does. Left to itself,
+    // showModal focused the import's file input, and iOS shrank the layout for
+    // a few frames as if a keyboard were coming: the dock jumped up and the
+    // page showed unblurred below (Tsubasa 2026-10-07「チラつく」).
+    const title = dialog.querySelector<HTMLElement>("h2, h3") ?? dialog;
+    title.setAttribute("autofocus", "");
+    title.tabIndex = -1;
     dialog.showModal();
     const cancel = (event: Event) => {
       event.preventDefault();

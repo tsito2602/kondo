@@ -491,14 +491,31 @@ export function AddBookingSheet({
     const timer = setTimeout(finish, 500);
     return () => clearTimeout(timer);
   }, [leaving]);
+  const body = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState<"pick" | "run" | "review">("pick");
+  // Reading takes the full-height panel: it grows up from where it was,
+  // with the same spring it rose with (Tsubasa 2026-10-07: アニメーションがない).
+  const sheetHeight = useRef(0);
+  const full = !manual && step !== "pick";
+  // Read before this commit lands: the height it grows from.
+  if (body.current) sheetHeight.current = body.current.offsetHeight;
+  useLayoutEffect(() => {
+    const sheet = body.current;
+    if (!sheet) return;
+    const from = sheetHeight.current;
+    const to = sheet.offsetHeight;
+    if (!from || Math.abs(to - from) < 2 || RM()) return;
+    sheet.animate([{ height: `${from}px` }, { height: `${to}px` }], {
+      duration: 460,
+      easing: "cubic-bezier(.2,1.2,.4,1)",
+    });
+  }, [full]);
   const [files, setFiles] = useState<File[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [seconds, setSeconds] = useState(0);
   const [editing, setEditing] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const run = useRef<AbortController | null>(null);
-  const body = useRef<HTMLDivElement>(null);
   const bookings = useRef(travel.bookings);
   bookings.current = travel.bookings;
   useEffect(() => () => run.current?.abort(), []);
@@ -885,11 +902,7 @@ export function AddBookingSheet({
       <div className="bk-scrim" onClick={() => leave()} />
       {/* Reading and its result take the full-height panel (Tsubasa
           2026-10-07: 「AIの読み取り画面は全画面パネルがいいね」). */}
-      <div
-        className="bk-sheet"
-        ref={body}
-        data-ai={(!manual && step !== "pick") || undefined}
-      >
+      <div className="bk-sheet" ref={body} data-ai={full || undefined}>
         <h3>{title}</h3>
         {manual ? (
           <>
@@ -1150,11 +1163,14 @@ export function AddBookingSheet({
         disabled={Boolean(leaving)}
       >
         {step === "run" && !manual ? (
-          <DockGroup slot="r">
-            <button type="button" onClick={stop}>
-              取り込みを中止
-            </button>
-          </DockGroup>
+          <>
+            {cancel}
+            <DockGroup slot="r">
+              <button type="button" onClick={stop}>
+                取り込みを中止
+              </button>
+            </DockGroup>
+          </>
         ) : (
           <>
             {cancel}
