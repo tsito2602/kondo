@@ -710,11 +710,6 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
     await click(document.querySelector('[aria-label="予定を追加"]'));
-    assert.match(
-      document.querySelector("dialog").textContent,
-      /予約タブから入れるとしおりにも並びます/,
-      "bookings are added in the 予約 tab, not here",
-    );
     await fill("なにをする？", "市内を歩く");
     await fill("時刻", "14:00");
     await submit();

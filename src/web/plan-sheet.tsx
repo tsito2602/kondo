@@ -590,9 +590,6 @@ function PlanEditForm({
             onClose={() => setPicking(false)}
           />
         )}
-        <p className="ps-hint">
-          日付と時刻は、タイムラインで予定を動かして決めます。時刻を空けると「未定」でその日の最後に入ります。
-        </p>
       </div>
       {category === "transport" ? (
         <>

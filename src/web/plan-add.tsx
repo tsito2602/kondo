@@ -119,9 +119,6 @@ export function PlanAddSheet({
             ))}
           </div>
         </div>
-        <p className="it-hint is-booking">
-          便・宿・チケットなどの予約は、予約タブから入れるとしおりにも並びます。
-        </p>
         <label className="field">
           <span>なにをする？</span>
           <input
@@ -167,11 +164,6 @@ export function PlanAddSheet({
             <small>地図の {resolved.number} として載ります</small>
           </p>
         )}
-        <p className="it-hint">
-          日付と時刻は、タイムラインで予定を動かして決めます。時刻を空けると「未定」でその日の最後に入ります。場所は
-          Google
-          マップの「共有」でコピーしたリンクを貼ると、地図に番号付きで載ります。
-        </p>
         <ErrorText message={error} />
       </form>
       {picking && (
