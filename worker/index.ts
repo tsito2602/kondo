@@ -250,6 +250,9 @@ function pinInPage(html: string): Coordinates | null {
   }
   return null;
 }
+// Google answers a phone with 「Maps lite」, a page that carries no pin; a
+// desktop browser gets the full page whose opening camera is the place.
+const DESKTOP = { 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36', 'accept-language': 'ja,en;q=0.8' };
 const BROWSER = { 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', 'accept-language': 'ja,en;q=0.8' };
 async function followMapLink(link: string, trace?: string[]): Promise<string> {
   let target = link;
@@ -295,6 +298,9 @@ async function geocode(query: string): Promise<Coordinates | null> {
   const point = { lat: Number(first?.lat), lng: Number(first?.lon) };
   return Number.isFinite(point.lat) && Number.isFinite(point.lng) && (point.lat || point.lng) ? point : null;
 }
+function withoutJapanese(text: string) {
+  return text.replace(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー・、。（）]+/gu, ' ').split(',').map((part) => part.trim()).filter((part) => /\p{L}|\d/u.test(part)).join(', ');
+}
 async function locateMapLink(link: string, trace?: string[]): Promise<{ target: string; pin: Coordinates | null; title?: string }> {
   let target = link;
   try {
@@ -304,12 +310,13 @@ async function locateMapLink(link: string, trace?: string[]): Promise<{ target: 
   if (pin) return { target, pin };
   let title = '';
   try {
-    const response = await fetch(target, { headers: BROWSER, signal: AbortSignal.timeout(5000) });
+    const response = await fetch(target, { headers: DESKTOP, signal: AbortSignal.timeout(5000) });
     trace?.push(`page ${response.status} ${response.url}`);
     if (response.ok) {
       const html = (await response.text()).slice(0, 2_000_000);
       pin = pinInPage(html);
       title = titleInPage(html);
+      trace?.push(`coords ${[...html.matchAll(/.{0,40}-?\d{1,3}\.\d{5,}[,\]\s]{1,3}-?\d{1,3}\.\d{5,}.{0,10}/g)].slice(0, 6).map((m) => m[0]).join(' | ')}`);
       trace?.push(`page ${html.length} pin=${JSON.stringify(pin)} title=${title} camera=${html.match(/APP_INITIALIZATION_STATE=.{0,120}/)?.[0] ?? ''} og=${html.match(/og:image"[^>]{0,300}/)?.[0] ?? ''} head=${html.slice(0, 800)}`);
     } else await response.body?.cancel();
   } catch (error) { trace?.push(`page error ${error}`); }
@@ -319,6 +326,13 @@ async function locateMapLink(link: string, trace?: string[]): Promise<{ target: 
   const query = url.searchParams.get('q') ?? url.searchParams.get('query') ?? (decodeURIComponent(url.pathname.match(/\/place\/([^/@]+)/)?.[1] ?? '').replace(/\+/g, ' ') || title);
   try {
     if (query.trim()) pin = await geocode(query.trim());
+    // OpenStreetMap knows the address in its own letters, not a Japanese name
+    // in front of it: 「シュロスプラッツ Schloßpl., 70173 Stuttgart, ドイツ」.
+    const latin = withoutJapanese(query);
+    if (!pin && latin && latin !== query.trim()) {
+      await new Promise((done) => setTimeout(done, 1000));
+      pin = await geocode(latin);
+    }
     trace?.push(`geocode ${query} -> ${JSON.stringify(pin)}`);
   } catch (error) { trace?.push(`geocode error ${query} ${error}`); }
   return { target, pin, title };
