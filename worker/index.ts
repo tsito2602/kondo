@@ -397,7 +397,7 @@ async function placesRoute(request: Request, env: Env, user: User, tripId: strin
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
   if (!placeId && request.method === 'GET') {
-    const rows = await env.DB.prepare(`SELECT p.id, p.title, p.note, p.opening_hours AS openingHours, COALESCE(d.reservation_status, p.reservation_status) AS reservationStatus, p.location, p.updated_at AS updatedAt, COALESCE(d.reference_links, '[]') AS referenceLinks, l.item_id AS itineraryItemId, c.lat, c.lng FROM places p LEFT JOIN place_itinerary_links l ON l.place_id = p.id LEFT JOIN place_details d ON d.place_id = p.id LEFT JOIN place_coordinates c ON c.place_id = p.id WHERE p.trip_id = ? ORDER BY p.updated_at DESC, p.id`).bind(tripId).all();
+    const rows = await env.DB.prepare(`SELECT p.id, p.title, p.note, p.opening_hours AS openingHours, COALESCE(d.reservation_status, p.reservation_status) AS reservationStatus, p.location, p.updated_at AS updatedAt, COALESCE(d.reference_links, '[]') AS referenceLinks, l.item_id AS itineraryItemId, c.lat, c.lng, a.added_at AS addedAt FROM places p LEFT JOIN place_added a ON a.place_id = p.id LEFT JOIN place_itinerary_links l ON l.place_id = p.id LEFT JOIN place_details d ON d.place_id = p.id LEFT JOIN place_coordinates c ON c.place_id = p.id WHERE p.trip_id = ? ORDER BY p.updated_at DESC, p.id`).bind(tripId).all();
     await fillMissingCoordinates(env, tripId, rows.results);
     return json({ places: rows.results.map((row) => ({ ...row, referenceLinks: JSON.parse(row.referenceLinks as string) })) });
   }
@@ -444,9 +444,12 @@ async function placesRoute(request: Request, env: Env, user: User, tripId: strin
         SELECT ?, COALESCE(?, '[]'), ? WHERE EXISTS (SELECT 1 FROM places WHERE id = ? AND trip_id = ?)
         ON CONFLICT(place_id) DO UPDATE SET reference_links = COALESCE(?, place_details.reference_links), reservation_status = excluded.reservation_status
       `).bind(id, linksJson, reservationStatus === 'unavailable' ? reservationStatus : null, id, tripId, linksJson),
+      // A replayed add keeps its first time.
+      ...(placeId ? [] : [env.DB.prepare(`INSERT INTO place_added (place_id) SELECT ? WHERE EXISTS (SELECT 1 FROM places WHERE id = ? AND trip_id = ?) ON CONFLICT(place_id) DO NOTHING`).bind(id, id, tripId)]),
     ]);
     if (!result.meta.changes) return json({ error: '場所が見つからないか、IDが競合しました' }, placeId ? 404 : 409);
-    return json({ place: { id, ...fields, lat: coordinates?.lat ?? null, lng: coordinates?.lng ?? null } }, placeId ? 200 : 201);
+    const added = await env.DB.prepare('SELECT added_at FROM place_added WHERE place_id = ?').bind(id).first<{ added_at: number }>();
+    return json({ place: { id, ...fields, lat: coordinates?.lat ?? null, lng: coordinates?.lng ?? null, addedAt: added?.added_at ?? null } }, placeId ? 200 : 201);
   }
   return json({ error: 'Not found' }, 404);
 }

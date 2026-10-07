@@ -334,7 +334,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) throw new Error('旅行を選択してください');
     const id = crypto.randomUUID();
-    commit((current) => ({ ...current, placesByTrip: { ...current.placesByTrip, [tripId]: [...(current.placesByTrip[tripId] ?? []), { id, ...input, ...(pin ?? {}) }] } }));
+    commit((current) => ({ ...current, placesByTrip: { ...current.placesByTrip, [tripId]: [...(current.placesByTrip[tripId] ?? []), { id, ...input, ...(pin ?? {}), addedAt: Math.floor(Date.now() / 1000) }] } }));
     enqueue({ method: 'POST', path: `/v1/trips/${tripId}/places`, body: { id, ...input } });
     return id;
   }, [commit, enqueue]);

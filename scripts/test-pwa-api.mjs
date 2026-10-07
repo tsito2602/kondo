@@ -405,10 +405,13 @@ test('places CRUD is shared, validated, scoped and replay-safe', async () => {
   try {
     const base = `/trips/${trip.id}/places`, id = randomUUID();
     assert.equal((await call(base, 'POST', { id, ...place })).status, 201);
+    db.prepare('UPDATE place_added SET added_at = 100 WHERE place_id = ?').run(id);
     assert.equal((await call(base, 'POST', { id, ...place })).status, 201);
     const items = (await (await call(base, 'GET', undefined, 'editor')).json()).places;
     assert.equal(items.length, 1); assert.equal(items[0].openingHours, place.openingHours);
+    assert.equal(items[0].addedAt, 100, 'a replayed add keeps its first added time');
     assert.equal((await call(`${base}/${id}`, 'PATCH', { ...place, reservationStatus: 'confirmed' }, 'editor')).status, 200);
+    assert.equal(db.prepare('SELECT added_at FROM place_added WHERE place_id = ?').get(id).added_at, 100, 'an edit is not an add');
     assert.equal((await call(base, 'POST', { ...place, reservationStatus: 'invalid' })).status, 400);
     assert.equal((await call(base, 'POST', { ...place, location: 'javascript:alert(1)' })).status, 400);
     assert.equal((await call(base, 'POST', { ...place, title: ' ' })).status, 400);

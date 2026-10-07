@@ -38,6 +38,11 @@ test('a place linked to a non-hotel booking is scheduled at the booking time, or
   const both = placeVisits([place('lunch', { itineraryItemId: 'plan' })], items, [booking('b', { time: '08:00', placeId: 'lunch' })]);
   assert.equal(both.get('lunch').item.id, 'plan');
 });
+test('places not on the schedule are numbered in the order they were added, older ones first', () => {
+  const places = [place('zz-new', { addedAt: 200 }), place('aa-newer', { addedAt: 300 }), place('mm-old'), place('bb-old'), place('lunch', { itineraryItemId: 'plan', addedAt: 400 })];
+  const items = [{ id: 'plan', day: '2026-11-22', time: '12:00', kind: '', title: '', note: '' }];
+  assert.deepEqual(Object.fromEntries(placeNumbers(places, items)), { lunch: 1, 'bb-old': 2, 'mm-old': 3, 'zz-new': 4, 'aa-newer': 5 });
+});
 
 test('the しおり walks to a booking from its linked place', () => {
   const stephan = place('stephan', { location: pin('Stephansdom', 48.20849, 16.37314), itineraryItemId: 'visit' });

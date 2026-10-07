@@ -132,8 +132,10 @@ export type Place = {
   lat?: number | null;
   lng?: number | null;
   updatedAt?: number;
+  /** When it was added (seconds); absent on places from before 2026-10-07. */
+  addedAt?: number | null;
 };
-export type PlaceInput = Omit<Place, 'id' | 'updatedAt' | 'lat' | 'lng'>;
+export type PlaceInput = Omit<Place, 'id' | 'updatedAt' | 'lat' | 'lng' | 'addedAt'>;
 
 /** placeId links the note to a numbered place (and through it, a day's plan). Both optional for older rows. */
 export type TravelNote = { id: string; title?: string; body: string; content?: import('./notes').NoteContent | null; pinned?: boolean; placeId?: string | null; updatedBy?: string | null; updatedAt: number };

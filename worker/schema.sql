@@ -198,6 +198,12 @@ CREATE TABLE IF NOT EXISTS place_coordinates (
   lat REAL NOT NULL CHECK(lat BETWEEN -90 AND 90),
   lng REAL NOT NULL CHECK(lng BETWEEN -180 AND 180)
 );
+-- When a place was added: candidates are numbered in this order. Older places
+-- have no row and keep their earlier (id) order ahead of newer ones.
+CREATE TABLE IF NOT EXISTS place_added (
+  place_id TEXT PRIMARY KEY REFERENCES places(id) ON DELETE CASCADE,
+  added_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
 -- A link that gave no position, and when it was last tried; list requests skip it for a day.
 CREATE TABLE IF NOT EXISTS place_coordinate_misses (
   place_id TEXT PRIMARY KEY REFERENCES places(id) ON DELETE CASCADE,
