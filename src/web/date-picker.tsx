@@ -1,15 +1,15 @@
 import { TimeField } from "./time-field";
-import { useId, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import { CalendarDays, Check, ChevronLeft, ChevronRight } from "lucide-react";
-import { RangeHighlight } from "./calendar/range-highlight";
 import { Modal } from "./ui";
 import { dismissModal } from "./motion";
 import { localDate, validDate } from "@/utils/dates";
 import {
   calendarDate,
-  displayDate,
   monthDays,
+  rangeRows,
   selectRangeDate,
+  shortDate,
   type DateRange,
 } from "./calendar/date-range";
 
@@ -33,9 +33,13 @@ type PickerProps = {
   startLabel?: string;
   endLabel?: string;
   allowedDates?: string[];
+  /** What sits between the two ends: 「5日間」 (a trip) or 「3泊」 (a stay). */
+  span?: "days" | "nights";
+  /** The trip's own days, marked with a small dot (and 出発 on the first). */
+  trip?: { startsOn: string; endsOn: string };
 };
 
-/** The same month calendar and start/end selection rules as the production app. */
+/** The trigger: the field's label over 「10/19（月）」 (— 「10/23（金）」). */
 export function DatePicker(props: PickerProps) {
   const [open, setOpen] = useState(false);
   const labelId = useId();
@@ -54,8 +58,8 @@ export function DatePicker(props: PickerProps) {
       >
         <CalendarDays size={20} aria-hidden="true" />
         <span className="date-trigger-value">
-          {props.range && <small>{props.startLabel ?? "出発日"}</small>}
-          <span>{displayDate(props.value)}</span>
+          {props.range && <small>{props.startLabel ?? "出発"}</small>}
+          <span>{shortDate(props.value)}</span>
           {props.showTime && props.startTime && (
             <span className="date-trigger-time">{props.startTime}</span>
           )}
@@ -64,8 +68,8 @@ export function DatePicker(props: PickerProps) {
           <>
             <span aria-hidden="true">—</span>
             <span className="date-trigger-value">
-              <small>{props.endLabel ?? "帰着日"}</small>
-              <span>{displayDate(props.endValue ?? "")}</span>
+              <small>{props.endLabel ?? "帰着"}</small>
+              <span>{shortDate(props.endValue ?? "")}</span>
               {props.showTime && props.endTime && (
                 <span className="date-trigger-time">{props.endTime}</span>
               )}
@@ -78,6 +82,18 @@ export function DatePicker(props: PickerProps) {
   );
 }
 
+const WEEK = ["日", "月", "火", "水", "木", "金", "土"];
+const SPRING = "cubic-bezier(.34,1.56,.64,1)";
+const reduced = () =>
+  typeof matchMedia === "function" &&
+  matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * kondo's one 日付の粒 (kondo-datepanel.html, Tsubasa 2026-10-07): the floating
+ * panel with the two ends as pills, a big month with ‹ › that slides, an ink
+ * circle that pops on the picked day, a band that stretches like jelly, and
+ * today marked by a short line under its number.
+ */
 export function CalendarPanel({
   label,
   value,
@@ -89,9 +105,11 @@ export function CalendarPanel({
   endTime = "",
   min,
   max,
-  startLabel = "出発日",
-  endLabel = "帰着日",
+  startLabel = "出発",
+  endLabel = "帰着",
   allowedDates,
+  span,
+  trip,
   onChange,
   onClose,
 }: PickerProps & { onClose: () => void }) {
@@ -99,30 +117,30 @@ export function CalendarPanel({
     startDate: value,
     endDate: range ? endValue : value,
   });
+  // Which end the next tap sets. Once both are set, the next tap starts over.
   const [phase, setPhase] = useState<"start" | "end">(
     range && value && !endValue ? "end" : "start",
   );
-  const [anchorDate, setAnchorDate] = useState(value);
   const [timePhase, setTimePhase] = useState<"start" | "end">("start");
   const [times, setTimes] = useState({ startTime, endTime });
-  const initial = value || endValue || min || localDate();
+  const today = localDate();
+  const initial = value || endValue || min || today;
   const [month, setMonth] = useState(initial.slice(0, 7));
-  const [hover, setHover] = useState("");
   const grid = useRef<HTMLDivElement>(null);
+  const motion = useRef<{ slide?: number; pop?: string; band?: boolean }>({});
   const year = Number(month.slice(0, 4));
   const monthIndex = Number(month.slice(5)) - 1;
-  const days = monthDays(year, monthIndex);
+  // Only the weeks the month takes (no empty sixth row under it).
+  const all = monthDays(year, monthIndex);
+  const weeks = Math.ceil(
+    (all.filter(Boolean).length + all.indexOf(all.find(Boolean) ?? null)) / 7,
+  );
+  const days = all.slice(0, weeks * 7);
   const allowed = (date: string) =>
     validDate(date) &&
     (!min || date >= min) &&
     (!max || date <= max) &&
     (!allowedDates || allowedDates.includes(date));
-  const years = Array.from(
-    { length: 201 },
-    (_, index) => new Date().getFullYear() - 100 + index,
-  );
-  if (!years.includes(year)) years.push(year);
-  years.sort((a, b) => a - b);
   const validTime = (time: string) =>
     !time || /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
   const valid =
@@ -132,33 +150,112 @@ export function CalendarPanel({
       (allowed(draft.startDate) &&
         (!range ||
           (allowed(draft.endDate) && draft.endDate >= draft.startDate))));
-  const changeMonth = (next: string) => {
-    setMonth(next);
-    setHover("");
+  const changeMonth = (step: number) => {
+    motion.current.slide = step;
+    setMonth(calendarDate(year, monthIndex + step, 1).slice(0, 7));
   };
   const choose = (date: string) => {
     if (!allowed(date)) return;
     const next = range
       ? selectRangeDate(draft, phase, date)
       : { startDate: date, endDate: date };
-    if (!range || !next.endDate) setAnchorDate(next.startDate);
+    motion.current.pop = date;
+    motion.current.band = Boolean(range && next.endDate);
     setDraft(next);
+    setPhase(range && !next.endDate ? "end" : "start");
     setTimePhase(range && next.endDate ? "end" : "start");
-    setPhase(next.endDate ? "start" : "end");
-    setHover("");
   };
-  const preview =
-    range && phase === "end" && !draft.endDate && draft.startDate && hover
-      ? selectRangeDate(draft, "end", hover)
-      : draft;
+  useLayoutEffect(() => {
+    const { slide, pop, band } = motion.current;
+    motion.current = {};
+    const node = grid.current;
+    if (!node || reduced() || typeof node.animate !== "function") return;
+    if (slide)
+      node.animate(
+        [
+          { transform: `translateX(${slide * 40}%)`, opacity: 0 },
+          { transform: "none", opacity: 1 },
+        ],
+        { duration: 380, easing: SPRING },
+      );
+    if (pop)
+      node
+        .querySelector(`[data-date="${pop}"] .dp-n`)
+        ?.animate(
+          [
+            { transform: "scale(.3)" },
+            { transform: "scale(1.18)", offset: 0.55 },
+            { transform: "scale(.95)", offset: 0.8 },
+            { transform: "none" },
+          ],
+          { duration: 460, easing: "ease-out" },
+        );
+    if (band)
+      node.querySelectorAll(".dp-band").forEach((el, index) =>
+        el.animate(
+          [
+            { transform: "scaleX(.1)" },
+            { transform: "scaleX(1.04)", offset: 0.7 },
+            { transform: "scaleX(1)" },
+          ],
+          {
+            duration: 520,
+            delay: index * 70,
+            easing: "cubic-bezier(.3,.9,.4,1)",
+            fill: "backwards",
+          },
+        ),
+      );
+  });
   const confirm = () =>
     dismissModal(() => {
       onChange(draft.startDate, draft.endDate, times.startTime, times.endTime);
       onClose();
     });
+  const count =
+    range && draft.startDate && draft.endDate
+      ? Math.round(
+          (Date.parse(draft.endDate) - Date.parse(draft.startDate)) / 864e5,
+        )
+      : null;
+  const between =
+    count === null || !span
+      ? ""
+      : span === "nights"
+        ? `${count}泊`
+        : `${count + 1}日間`;
+  const end = (which: "start" | "end") => {
+    const date = which === "start" ? draft.startDate : draft.endDate;
+    const time = which === "start" ? times.startTime : times.endTime;
+    return (
+      <button
+        type="button"
+        className="dp-end"
+        aria-pressed={range ? phase === which : true}
+        data-empty={!date || undefined}
+        onClick={() => {
+          setPhase(which);
+          setTimePhase(which);
+        }}
+      >
+        <small>
+          {which === "start"
+            ? range || showTime
+              ? startLabel
+              : "日付"
+            : endLabel}
+        </small>
+        <b>
+          {date ? shortDate(date) : "選んで"}
+          {showTime && time ? ` ${time}` : ""}
+        </b>
+      </button>
+    );
+  };
   return (
     <Modal
       title={label}
+      addPanel
       onClose={onClose}
       dockActions={{
         primary: (
@@ -169,181 +266,121 @@ export function CalendarPanel({
         ),
       }}
     >
-      <div className="calendar-panel">
-        <div className="calendar-summary">
-          <button
-            type="button"
-            aria-pressed={(showTime ? timePhase : phase) === "start"}
-            onClick={() => {
-              setPhase("start");
-              setTimePhase("start");
-            }}
-          >
-            <small>{range || showTime ? startLabel : "日付"}</small>
-            <strong>
-              {displayDate(draft.startDate)}
-              {showTime && times.startTime ? ` ${times.startTime}` : ""}
-            </strong>
-          </button>
+      <div className="dp">
+        <div className="dp-ends">
+          {end("start")}
           {range && (
-            <button
-              type="button"
-              aria-pressed={(showTime ? timePhase : phase) === "end"}
-              onClick={() => {
-                setPhase("end");
-                setTimePhase("end");
-              }}
-            >
-              <small>{endLabel}</small>
-              <strong>
-                {displayDate(draft.endDate)}
-                {showTime && times.endTime ? ` ${times.endTime}` : ""}
-              </strong>
-            </button>
+            <>
+              <span className="dp-between">{between}</span>
+              {end("end")}
+            </>
           )}
         </div>
-        <div className="calendar-month">
+        <div className="dp-month">
+          <b aria-live="polite">
+            {year}
+            <span>年</span>
+            {monthIndex + 1}
+            <span>月</span>
+          </b>
           <button
             type="button"
-            className="icon-button"
+            className="dp-round"
             aria-label="前の月"
             disabled={month === "0001-01"}
-            onClick={() =>
-              changeMonth(calendarDate(year, monthIndex - 1, 1).slice(0, 7))
-            }
+            onClick={() => changeMonth(-1)}
           >
-            <ChevronLeft />
+            <ChevronLeft size={20} />
           </button>
-          <select
-            aria-label="年を選択"
-            value={year}
-            onChange={(event) =>
-              changeMonth(
-                `${event.target.value.padStart(4, "0")}-${month.slice(5)}`,
-              )
-            }
-          >
-            {years.map((option) => (
-              <option key={option} value={option}>
-                {option}年
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="月を選択"
-            value={monthIndex + 1}
-            onChange={(event) =>
-              changeMonth(
-                `${month.slice(0, 4)}-${event.target.value.padStart(2, "0")}`,
-              )
-            }
-          >
-            {Array.from({ length: 12 }, (_, index) => (
-              <option key={index} value={index + 1}>
-                {index + 1}月
-              </option>
-            ))}
-          </select>
           <button
             type="button"
-            className="icon-button"
+            className="dp-round"
             aria-label="次の月"
             disabled={month === "9999-12"}
-            onClick={() =>
-              changeMonth(calendarDate(year, monthIndex + 1, 1).slice(0, 7))
-            }
+            onClick={() => changeMonth(1)}
           >
-            <ChevronRight />
+            <ChevronRight size={20} />
           </button>
         </div>
-        <div
-          className="calendar-grid"
-          ref={grid}
-          aria-label={`${year}年${monthIndex + 1}月`}
-        >
-          <RangeHighlight
-            days={days}
-            range={
-              range ? preview : { startDate: draft.startDate, endDate: "" }
-            }
-            markers={draft}
-            anchorDate={anchorDate}
-            previewDate={hover}
-          />
-          {["日", "月", "火", "水", "木", "金", "土"].map((day) => (
-            <span className="calendar-weekday" key={day}>
-              {day}
-            </span>
+        <div className="dp-week" aria-hidden="true">
+          {WEEK.map((day) => (
+            <span key={day}>{day}</span>
           ))}
-          {days.map((date, index) =>
-            date ? (
-              <button
-                type="button"
-                key={date}
-                data-date={date}
-                aria-label={displayDate(date)}
-                aria-pressed={
-                  date === draft.startDate || date === draft.endDate
-                }
-                aria-current={date === localDate() ? "date" : undefined}
-                disabled={!allowed(date)}
-                data-in-range={Boolean(
-                  preview.startDate &&
-                  preview.endDate &&
-                  date >= preview.startDate &&
-                  date <= preview.endDate,
-                )}
-                onPointerEnter={(event) => {
-                  if (event.pointerType === "mouse") setHover(date);
-                }}
-                onPointerLeave={() => setHover("")}
-                data-preview={date === hover}
-                onClick={() => choose(date)}
-                onKeyDown={(event) => {
-                  const offset = (
-                    {
-                      ArrowLeft: -1,
-                      ArrowRight: 1,
-                      ArrowUp: -7,
-                      ArrowDown: 7,
-                    } as Record<string, number>
-                  )[event.key];
-                  if (!offset) return;
-                  event.preventDefault();
-                  const next = calendarDate(
-                    year,
-                    monthIndex,
-                    Number(date.slice(8)) + offset,
-                  );
-                  if (!allowed(next)) return;
-                  if (next.slice(0, 7) !== month) changeMonth(next.slice(0, 7));
-                  requestAnimationFrame(() =>
-                    grid.current
-                      ?.querySelector<HTMLButtonElement>(
-                        `[data-date="${next}"]`,
-                      )
-                      ?.focus(),
-                  );
-                }}
-              >
-                <span>{Number(date.slice(8))}</span>
-              </button>
-            ) : (
-              <span key={`blank-${index}`} />
-            ),
-          )}
         </div>
-        <p className="muted small" aria-live="polite">
-          {range
-            ? phase === "end" && draft.startDate
-              ? `${endLabel}を選択。同じ日も選べます。`
-              : draft.endDate
-                ? "この期間でよければ「決定」を押してください。"
-                : `${startLabel}を選択してください。`
-            : "日付を選択してください。"}
-        </p>
+        <div className="dp-clip">
+          <div
+            className="dp-grid"
+            ref={grid}
+            role="group"
+            aria-label={`${year}年${monthIndex + 1}月`}
+          >
+            {range &&
+              rangeRows(days, draft).map((row, index) =>
+                row && row.last > row.first ? (
+                  <span
+                    key={index}
+                    className="dp-band"
+                    style={{
+                      top: `calc(${index} * var(--dp-row))`,
+                      left: `calc(${((row.first + 0.5) * 100) / 7}% - 20px)`,
+                      width: `calc(${((row.last - row.first) * 100) / 7}% + 40px)`,
+                    }}
+                  />
+                ) : null,
+              )}
+            {days.map((date, index) => {
+              if (!date) return <span key={`blank-${index}`} />;
+              const picked = date === draft.startDate || date === draft.endDate;
+              const inTrip =
+                trip && date >= trip.startsOn && date <= trip.endsOn;
+              return (
+                <button
+                  type="button"
+                  key={date}
+                  className="dp-day"
+                  data-date={date}
+                  aria-label={shortDate(date)}
+                  aria-pressed={picked}
+                  aria-current={date === today ? "date" : undefined}
+                  data-trip={inTrip || undefined}
+                  disabled={!allowed(date)}
+                  onClick={() => choose(date)}
+                  onKeyDown={(event) => {
+                    const offset = (
+                      {
+                        ArrowLeft: -1,
+                        ArrowRight: 1,
+                        ArrowUp: -7,
+                        ArrowDown: 7,
+                      } as Record<string, number>
+                    )[event.key];
+                    if (!offset) return;
+                    event.preventDefault();
+                    const next = calendarDate(
+                      year,
+                      monthIndex,
+                      Number(date.slice(8)) + offset,
+                    );
+                    if (!allowed(next)) return;
+                    if (next.slice(0, 7) !== month) setMonth(next.slice(0, 7));
+                    requestAnimationFrame(() =>
+                      grid.current
+                        ?.querySelector<HTMLButtonElement>(
+                          `[data-date="${next}"]`,
+                        )
+                        ?.focus(),
+                    );
+                  }}
+                >
+                  <span className="dp-n">{Number(date.slice(8))}</span>
+                  {trip && date === trip.startsOn && <small>出発</small>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
         {showTime && (
-          <div className="calendar-time">
+          <div className="dp-time">
             <label>
               <span>
                 {range
@@ -360,45 +397,8 @@ export function CalendarPanel({
                 }
               />
             </label>
-            {(timePhase === "start" ? times.startTime : times.endTime) && (
-              <button
-                type="button"
-                aria-label="時刻をクリア"
-                onClick={() =>
-                  setTimes((current) => ({
-                    ...current,
-                    [timePhase === "start" ? "startTime" : "endTime"]: "",
-                  }))
-                }
-              >
-                ×
-              </button>
-            )}
           </div>
         )}
-        <div className="calendar-actions">
-          <button
-            type="button"
-            className="subtle"
-            onClick={() => {
-              setDraft({ startDate: "", endDate: "" });
-              setPhase("start");
-              setTimePhase("start");
-              setTimes({ startTime: "", endTime: "" });
-              setHover("");
-            }}
-          >
-            クリア
-          </button>
-          <button
-            type="button"
-            className="primary calendar-confirm"
-            disabled={!valid}
-            onClick={confirm}
-          >
-            決定
-          </button>
-        </div>
       </div>
     </Modal>
   );

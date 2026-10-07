@@ -50,8 +50,12 @@ export function rangeRows(days: (string | null)[], range: DateRange) {
   });
 }
 
-export function displayDate(value: string): string {
+/** 「10/19（月）」, with the year in front when it isn't this year's. */
+export function shortDate(value: string, now = new Date()): string {
   if (!value) return "未設定";
   const [year, month, day] = value.split("-").map(Number);
-  return `${year}年${month}月${day}日`;
+  const week = "日月火水木金土"[
+    new Date(Date.UTC(year, month - 1, day)).getUTCDay()
+  ];
+  return `${year === now.getFullYear() ? "" : `${year}/`}${month}/${day}（${week}）`;
 }

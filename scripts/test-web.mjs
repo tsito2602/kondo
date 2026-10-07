@@ -191,18 +191,10 @@ const fill = async (label, value) => {
     await click(input);
     const selection = typeof value === "string" ? { start: value } : value;
     const chooseDate = async (date) => {
-      const yearSelect = document.querySelector(
-        'dialog:last-of-type [aria-label="年を選択"]',
-      );
-      await act(async () => {
-        yearSelect.value = String(Number(date.slice(0, 4)));
-        yearSelect.dispatchEvent(
-          new dom.window.Event("change", { bubbles: true }),
-        );
-      });
       const first = document.querySelector("dialog:last-of-type [data-date]");
-      const difference =
-        Number(date.slice(5, 7)) - Number(first.dataset.date.slice(5, 7));
+      const months = (value) =>
+        Number(value.slice(0, 4)) * 12 + Number(value.slice(5, 7));
+      const difference = months(date) - months(first.dataset.date);
       for (let index = 0; index < Math.abs(difference); index++)
         await click(
           document.querySelector(
@@ -214,9 +206,7 @@ const fill = async (label, value) => {
       );
     };
     if (selection.start) {
-      await click(
-        document.querySelector("dialog:last-of-type .calendar-summary button"),
-      );
+      await click(document.querySelector("dialog:last-of-type .dp-end"));
       await chooseDate(selection.start);
     }
     if (selection.end) await chooseDate(selection.end);

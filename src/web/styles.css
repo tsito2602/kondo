@@ -10,6 +10,7 @@
 @import "./styles/dock.css";
 @import "./styles/chrome.css";
 @import "./styles/timeline-picker.css";
+@import "./styles/date-panel.css";
 @import "./styles/kinds.css";
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 @theme inline {
@@ -3016,174 +3017,6 @@ input::-webkit-date-and-time-value {
   font-size: 11px;
   color: var(--muted);
 }
-.calendar-panel {
-  width: min(100%, 440px);
-  margin: 0 auto;
-}
-.calendar-summary {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.calendar-summary button {
-  flex: 1;
-  min-width: 0;
-  padding: 12px;
-  border-radius: 12px;
-  text-align: left;
-  background: var(--soft);
-  border: 1px solid transparent;
-}
-.calendar-summary button[aria-pressed="true"] {
-  border-color: var(--brand);
-}
-.calendar-summary small {
-  display: block;
-  color: var(--muted);
-  font-size: 11px;
-  margin-bottom: 4px;
-}
-.calendar-summary strong {
-  font-size: 13px;
-  font-weight: 600;
-}
-.calendar-month {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.calendar-month select {
-  min-height: 44px;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--paper);
-  color: var(--ink);
-  font-size: 16px;
-  font-weight: 600;
-  appearance: auto;
-}
-.calendar-grid {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  grid-template-rows: 32px repeat(6, 46px);
-}
-.calendar-weekday {
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-  font-size: 12px;
-}
-.calendar-grid button {
-  height: 46px;
-  padding: 5px 0;
-  display: grid;
-  place-items: center;
-  position: relative;
-  z-index: 1;
-  border-radius: var(--radius-control);
-  background: transparent;
-}
-.calendar-grid button span {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  font-size: 14px;
-}
-.calendar-grid button[aria-pressed="true"] span,
-.calendar-grid button[data-preview="true"] span {
-  color: var(--dock-on-accent);
-  font-weight: 700;
-}
-.calendar-grid button[aria-current="date"]:not([aria-pressed="true"]) span {
-  box-shadow: inset 0 0 0 1px var(--brand);
-}
-.calendar-grid button:disabled {
-  opacity: 0.25;
-}
-.calendar-grid button:focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: -2px;
-  border-radius: var(--radius-control);
-}
-.calendar-highlights {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.calendar-range-band,
-.calendar-marker {
-  position: absolute;
-  height: 36px;
-  border-radius: 18px;
-  transition:
-    left 250ms cubic-bezier(0.22, 1, 0.36, 1),
-    top 250ms cubic-bezier(0.22, 1, 0.36, 1),
-    width 250ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 150ms ease;
-}
-.calendar-range-band {
-  background: color-mix(in srgb, var(--brand) 15%, transparent);
-}
-.calendar-marker {
-  width: 36px;
-  background: var(--brand);
-}
-.calendar-marker.preview {
-  background: var(--muted);
-}
-.calendar-time {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-  padding: 12px;
-  border-radius: 16px;
-  background: var(--soft);
-}
-.calendar-time label {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-}
-.calendar-time input {
-  width: 120px;
-  padding: 8px;
-  border-radius: 10px;
-  background: var(--paper);
-  font-size: 16px;
-}
-.calendar-time button {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-}
-@media (prefers-reduced-motion: reduce) {
-  .calendar-range-band,
-  .calendar-marker {
-    transition: none;
-  }
-}
-.calendar-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 12px;
-}
-.calendar-actions button {
-  min-height: 44px;
-  padding: 10px 18px;
-}
 @media (max-width: 759px) {
   .home-settings {
     display: none;
@@ -3193,9 +3026,6 @@ input::-webkit-date-and-time-value {
   }
   .itinerary-cover-caption {
     padding: 24px;
-  }
-  .calendar-confirm {
-    display: none;
   }
   .date-trigger {
     gap: 8px;
@@ -3413,9 +3243,7 @@ input::-webkit-date-and-time-value {
 .modal .field select,
 .modal .field textarea,
 .modal .member-row select,
-.modal .date-trigger,
-.modal .calendar-month select,
-.modal .calendar-time input {
+.modal .date-trigger {
   background: var(--field-tint);
 }
 .modal select option {
@@ -3489,7 +3317,6 @@ input::-webkit-date-and-time-value {
 .timeline-entry:not(.transport-entry) > div,
 .note-checklist,
 .task-row,
-.calendar-time,
 .toast,
 .detail-grid,
 .cover-upload {
@@ -3502,9 +3329,6 @@ input::-webkit-date-and-time-value {
 .field textarea,
 .member-row select,
 .date-trigger,
-.calendar-summary button,
-.calendar-month select,
-.calendar-time input,
 .notice,
 .document-row,
 .day-empty,
@@ -3548,7 +3372,6 @@ input::-webkit-date-and-time-value {
   padding-inline: 10px;
 }
 .modal .detail-grid,
-.modal .calendar-summary button,
 .modal .cover-upload,
 .modal .check-list,
 .modal .settings-card,

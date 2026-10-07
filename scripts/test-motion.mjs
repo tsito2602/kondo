@@ -1147,37 +1147,14 @@ test("calendar floats above its editor, commits ranges only on confirmation and 
       panel,
       "keyboard-safe dock follows the foreground panel",
     );
-    const yearSelect = panel.querySelector('[aria-label="年を選択"]');
-    assert.equal(yearSelect.tagName, "SELECT", "year uses the OS selection UI");
-    const monthSelect = panel.querySelector('[aria-label="月を選択"]');
-    assert.equal(monthSelect.tagName, "SELECT");
-    await act(async () => {
-      monthSelect.value = "3";
-      monthSelect.dispatchEvent(
-        new dom.window.Event("change", { bubbles: true }),
-      );
-    });
+    assert.equal(
+      panel.querySelector('[aria-label="年を選択"]'),
+      null,
+      "no year/month selects: the big month and ‹ › only",
+    );
+    await click(panel.querySelector('[aria-label="次の月"]'));
     assert.ok(panel.querySelector('[data-date="2028-03-31"]'));
-    await act(async () => {
-      monthSelect.value = "2";
-      monthSelect.dispatchEvent(
-        new dom.window.Event("change", { bubbles: true }),
-      );
-    });
-
-    await act(async () => {
-      yearSelect.value = "2027";
-      yearSelect.dispatchEvent(
-        new dom.window.Event("change", { bubbles: true }),
-      );
-    });
-    assert.equal(panel.querySelector('[data-date="2027-02-29"]'), null);
-    await act(async () => {
-      yearSelect.value = "2028";
-      yearSelect.dispatchEvent(
-        new dom.window.Event("change", { bubbles: true }),
-      );
-    });
+    await click(panel.querySelector('[aria-label="前の月"]'));
     assert.equal(
       panel.querySelector('[data-date="2028-02-04"]').disabled,
       true,
@@ -1208,11 +1185,11 @@ test("calendar floats above its editor, commits ranges only on confirmation and 
         input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
       });
     assert.match(
-      panel.querySelector(".calendar-time label").textContent,
-      /帰着日の時刻/,
+      panel.querySelector(".dp-time label").textContent,
+      /帰着の時刻/,
     );
     await setTime("09:30");
-    await click(panel.querySelector(".calendar-summary button"));
+    await click(panel.querySelector(".dp-end"));
     await setTime("13:00");
     await click(host.querySelector('[data-slot="r"] button'));
     await closeWait();
@@ -1244,14 +1221,13 @@ test("calendar floats above its editor, commits ranges only on confirmation and 
     const sameDay = [...document.querySelectorAll("dialog")].at(-1);
     await click(sameDay.querySelector('[data-date="2028-02-20"]'));
     await click(sameDay.querySelector('[data-date="2028-02-20"]'));
-    assert.ok(
-      [...sameDay.querySelectorAll(".calendar-range-band")].every(
-        (band) => band.style.width === "0%",
-      ),
+    assert.equal(
+      sameDay.querySelectorAll(".dp-band").length,
+      0,
       "same-day selection has only a round marker, no square range background",
     );
     assert.equal(
-      sameDay.querySelectorAll('.calendar-marker[style*="opacity: 1"]').length,
+      sameDay.querySelectorAll('.dp-day[aria-pressed="true"]').length,
       1,
     );
     await click(host.querySelector('[data-slot="r"] button'));

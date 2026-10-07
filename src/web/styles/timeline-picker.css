@@ -357,7 +357,7 @@
   text-align: center;
 }
 :root .bk-moment .time-field[aria-invalid="true"],
-:root .calendar-time .time-field[aria-invalid="true"] {
+:root .dp-time .time-field[aria-invalid="true"] {
   color: var(--p-danger);
 }
 

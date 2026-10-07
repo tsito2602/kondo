@@ -198,6 +198,7 @@ export function TripEditor({
         <DatePicker
           label="旅行期間"
           range
+          span="days"
           required
           value={draft.startsOn}
           endValue={draft.endsOn}
@@ -762,6 +763,10 @@ export function BookingForm({
             startLabel={dateLabels.start}
             endLabel={dateLabels.end}
             range={rangeBooking}
+            span={
+              kind === "hotel" ? "nights" : kind === "car" ? "days" : undefined
+            }
+            trip={travel.selectedTrip ?? undefined}
             required
             showTime
             value={draft.day}
