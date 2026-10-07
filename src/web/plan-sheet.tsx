@@ -284,7 +284,7 @@ function PlanView({
       <div className="ps-row is-when">
         <div className="ps-when">
           <b>
-            {tap(item.time || "未定", "開始の時刻を直す")}
+            {tap(item.time || "--:--", "開始の時刻を直す")}
             {details.endTime && (
               <>
                 <em>–</em>
@@ -1079,7 +1079,7 @@ function BookingView({
                   label={`${endpoint === "start" ? "チェックイン" : "チェックアウト"}の時刻を直す`}
                   onOpen={() => setPicking(true)}
                 >
-                  {stayTime || "未定"}
+                  {stayTime || "--:--"}
                 </TimeTap>
               ) : (
                 stayTime || "未定"

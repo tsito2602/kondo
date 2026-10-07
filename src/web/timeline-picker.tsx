@@ -864,7 +864,8 @@ export function TimeChip({
         onClick={() => setOpen(true)}
       >
         {!bare && <small>{label}</small>}
-        <b>{time || "未定"}</b>
+        {/* An empty time reads as a time slot (Tsubasa 2026-10-07). */}
+        <b>{time || "--:--"}</b>
       </button>
       {open && (
         <TimelinePicker

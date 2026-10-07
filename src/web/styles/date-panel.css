@@ -245,6 +245,4 @@
 .time-chip[data-empty] b {
   font-weight: 500;
   color: var(--p-mute);
-  font-family: inherit;
-  font-size: 15px;
 }
