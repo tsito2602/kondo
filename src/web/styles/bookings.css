@@ -468,7 +468,10 @@ button.bk-card {
   inset: 0;
   width: 100%;
   max-width: none;
-  height: 100dvh;
+  /* The layout height the app measures, as the other panels use: iOS gave
+     100dvh short for a frame or two as the page locked, lifting the dock
+     and baring the page under the scrim (Tsubasa 2026-10-07「チラつく」). */
+  height: var(--modal-layout-height, 100dvh);
   max-height: none;
   margin: 0;
   padding: 0;
@@ -536,7 +539,8 @@ button.bk-card {
       0 24px 60px -20px #0005;
   }
   /* Content that would scroll: the full height, as Modal addPanel. */
-  :root:has(.thumb-dock-host) .bk-sheet[data-tall] {
+  :root:has(.thumb-dock-host) .bk-sheet[data-tall],
+  :root:has(.thumb-dock-host) .bk-sheet[data-ai] {
     height: calc(
       100% - 10px - env(safe-area-inset-top) - var(--dock-height) -
         var(--dock-bottom-gap) - 12px - var(--dock-safe-bottom)

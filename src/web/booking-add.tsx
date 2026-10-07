@@ -883,7 +883,13 @@ export function AddBookingSheet({
       inert={Boolean(leaving)}
     >
       <div className="bk-scrim" onClick={() => leave()} />
-      <div className="bk-sheet" ref={body}>
+      {/* Reading and its result take the full-height panel (Tsubasa
+          2026-10-07: 「AIの読み取り画面は全画面パネルがいいね」). */}
+      <div
+        className="bk-sheet"
+        ref={body}
+        data-ai={(!manual && step !== "pick") || undefined}
+      >
         <h3>{title}</h3>
         {manual ? (
           <>

@@ -248,6 +248,10 @@ export function ContextDock({
     isValidElement<{ disabled?: boolean }>(primary) && primary.props.disabled
       ? "ink-dim"
       : "ink";
+  // A lone 編集 icon stays an icon, with the secondary beside it (m).
+  const iconActions =
+    isValidElement(actions) &&
+    Boolean((actions.type as { splitsIslands?: boolean }).splitsIslands);
   // 編集 + 削除 (DetailDockActions) split onto two islands.
   const pair =
     isValidElement<{ onEdit?: unknown; onDelete?: unknown }>(actions) &&
@@ -264,7 +268,10 @@ export function ContextDock({
         </DockGroup>
       )}
       {secondary && (primary || actions) && (
-        <DockGroup slot="k" className="context-secondary">
+        <DockGroup
+          slot={!primary && iconActions && !pair ? "m" : "k"}
+          className="context-secondary"
+        >
           {secondary}
         </DockGroup>
       )}
@@ -295,7 +302,14 @@ export function ContextDock({
         </>
       ) : (
         actions && (
-          <DockGroup slot="r" className="context-actions" wide={wide}>
+          // After a secondary island (ホーム: 招待で参加), the action fills
+          // the rest so every island sits 10 px apart (「均等マージンで」).
+          <DockGroup
+            slot="r"
+            className="context-actions"
+            wide={wide}
+            stretch={Boolean(secondary) && !wide && !iconActions}
+          >
             {actions}
           </DockGroup>
         )

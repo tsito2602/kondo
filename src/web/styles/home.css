@@ -329,11 +329,11 @@
    the three islands keep the dock's 10 px gaps: settings 56, then the rest
    split in half. */
 @media (max-width: 759px) {
-  .cdock-group[data-slot="m"]:has(> .home-join-dock),
-  .cdock-group[data-slot="r"]:has(> .home-create) {
+  /* 招待で参加 (k) takes half; 旅行を作成 stretches over the other half. */
+  .cdock-group[data-slot="k"]:has(> .home-join-dock) {
     width: calc((100% - 32px - var(--dock-height) - 20px) / 2);
   }
-  .cdock-group[data-slot="m"] > button.home-join-dock,
+  .cdock-group[data-slot="k"] > button.home-join-dock,
   .cdock-group[data-slot="r"] > button.home-create:not([aria-label]) {
     width: 100%;
     padding: 0 8px;
