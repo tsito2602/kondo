@@ -1,16 +1,21 @@
 import { poofAway } from "./remove-motion";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { BookOpen } from "lucide-react";
+import { BookOpen, Trash2 } from "lucide-react";
 import {
   findFlightConnections,
   flightConnectionCandidates,
   formatConnectionDuration,
 } from "@/data/flight-connections";
-import { mapUrl, referenceUrl } from "@/data/places";
+import { mapUrl, referenceUrl, registeredGoogleMapsUrl } from "@/data/places";
 import { useTravel } from "@/data/travel-provider";
 import type { BookingDocument } from "@/data/types";
-import { BookingCard, dayLabel, useClockNow } from "./booking-card";
+import {
+  BookingCard,
+  dayLabel,
+  linkPlaceName,
+  useClockNow,
+} from "./booking-card";
 import { ArrowIcon, ClipIcon, CopyIcon, PinIcon } from "./booking-icons";
 import { japanTimes } from "./booking-schedule";
 import { spring } from "./cartoon";
@@ -104,12 +109,34 @@ export function BookingDetail({
   );
   const japan = japanTimes(booking);
   const route = ["flight", "train"].includes(booking.kind);
-  const placeText = (() => {
-    const value = booking.location || booking.detail;
-    if (!value) return "";
-    return referenceUrl(value) ? booking.title : value;
-  })();
-  const map = mapUrl(booking.location || booking.detail);
+  // 場所 is the location (or the linked place), never 予約内容: a room type
+  // or a car model is not somewhere to search on a map.
+  const location = (booking.location ?? "").trim();
+  const linkedPlace = booking.placeId
+    ? travel.places.find((place) => place.id === booking.placeId)
+    : undefined;
+  const placeText = location
+    ? referenceUrl(location)
+      ? registeredGoogleMapsUrl(location)
+        ? (linkedPlace?.title ?? linkPlaceName(location)) || booking.title
+        : linkPlaceName(location)
+      : location
+    : (linkedPlace?.title ?? "");
+  const map = location
+    ? mapUrl(location)
+    : linkedPlace
+      ? mapUrl(linkedPlace.location, linkedPlace.title)
+      : null;
+  const mapIsSite = Boolean(map && !registeredGoogleMapsUrl(map));
+  // 予約内容 for every kind (a flight or a train's carrier heads its card too).
+  const detail = (booking.detail ?? "").trim();
+  const detailLink = referenceUrl(detail);
+  const detailLabel =
+    booking.kind === "flight"
+      ? "航空会社"
+      : booking.kind === "train"
+        ? "鉄道会社"
+        : "予約内容";
   const upload = (files: FileList | File[]) =>
     void run(async () => {
       for (const file of Array.from(files)) {
@@ -159,7 +186,12 @@ export function BookingDetail({
       [{ transform: "scale(.9)" }, { transform: "none" }],
       "squish",
     );
-  const seatLabel = booking.kind === "hotel" ? "部屋" : "メモ";
+  const removeDocument = (file: BookingDocument) =>
+    confirm(`書類「${file.filename}」を削除しますか？`) &&
+    void run(async () => {
+      travel.deleteBookingDocument(id, file.id);
+      notify("書類を削除しました");
+    });
   const showInItinerary = () => {
     const trip = travel.selectedTrip?.id;
     dismissModal(() => {
@@ -242,10 +274,32 @@ export function BookingDetail({
                 </span>
               </div>
             )}
+            {detail && (
+              <div>
+                <span>
+                  <small>{detailLabel}</small>
+                  <b className="bk-kv-note">
+                    {detailLink ? linkPlaceName(detailLink) : detail}
+                  </b>
+                </span>
+                {detailLink && (
+                  <a href={detailLink} target="_blank" rel="noreferrer">
+                    {registeredGoogleMapsUrl(detailLink) ? (
+                      <>
+                        <PinIcon size={16} />
+                        地図
+                      </>
+                    ) : (
+                      "サイト"
+                    )}
+                  </a>
+                )}
+              </div>
+            )}
             {booking.note && (
               <div>
                 <span>
-                  <small>{seatLabel}</small>
+                  <small>メモ</small>
                   <b className="bk-kv-note">{booking.note}</b>
                 </span>
               </div>
@@ -265,13 +319,27 @@ export function BookingDetail({
                     <b>{file.filename}</b>
                   </span>
                 </span>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => open(file)}
-                >
-                  開く
-                </button>
+                <span className="bk-kv-acts">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => open(file)}
+                  >
+                    開く
+                  </button>
+                  {travel.canEdit && (
+                    <button
+                      type="button"
+                      className="bk-kv-del"
+                      disabled={busy}
+                      aria-label={`${file.filename}を削除`}
+                      title="書類を削除"
+                      onClick={() => removeDocument(file)}
+                    >
+                      <Trash2 size={16} aria-hidden="true" />
+                    </button>
+                  )}
+                </span>
               </div>
             ))}
             {!route && placeText && (
@@ -282,8 +350,14 @@ export function BookingDetail({
                 </span>
                 {map && (
                   <a href={map} target="_blank" rel="noreferrer">
-                    <PinIcon size={16} />
-                    地図
+                    {mapIsSite ? (
+                      "サイト"
+                    ) : (
+                      <>
+                        <PinIcon size={16} />
+                        地図
+                      </>
+                    )}
                   </a>
                 )}
               </div>

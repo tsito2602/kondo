@@ -342,7 +342,7 @@ function PlanView({
                 rel="noreferrer"
               >
                 <Glyph name="ext" />
-                地図で開く
+                {openLabel(mapLink)}
               </a>
             )}
           </section>
@@ -923,6 +923,10 @@ function StayEditForm({
   );
 }
 
+/** A map link opens the map; any other site says it opens a site. */
+const openLabel = (link: string) =>
+  registeredGoogleMapsUrl(link) ? "地図で開く" : "サイトを開く";
+
 function BookingView({
   booking,
   endpoint,
@@ -937,8 +941,12 @@ function BookingView({
   const travel = useTravel();
   const [picking, setPicking] = useState(false);
   const place = bookingPlaceName(booking);
+  // 予約内容 is never searched on a map; only a map link kept there opens.
   const link = mapUrl(
-    booking.location || (booking.kind === "hotel" ? booking.detail : ""),
+    booking.location ||
+      (booking.kind === "hotel"
+        ? (registeredGoogleMapsUrl(booking.detail) ?? "")
+        : ""),
     place,
   );
   const coords =
@@ -969,7 +977,7 @@ function BookingView({
       {link && (
         <a className="ps-act" href={link} target="_blank" rel="noreferrer">
           <Glyph name="ext" />
-          地図で開く
+          {openLabel(link)}
         </a>
       )}
     </section>

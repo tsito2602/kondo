@@ -401,6 +401,15 @@ button.bk-card {
   text-decoration: none;
   cursor: pointer;
 }
+.bk-kv-acts {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+.bk-kv .bk-kv-del {
+  padding: 8px 10px;
+  color: var(--p-danger);
+}
 .bk-kv-pick select {
   position: absolute;
   inset: 0;

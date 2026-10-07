@@ -3,6 +3,7 @@ import { findAirportByCode } from "@/data/airports";
 import { bookingDuration } from "@/data/booking-duration";
 import { placeNameFromLink } from "@/data/geo";
 import { durationLabel } from "@/data/itinerary";
+import { referenceUrl, registeredGoogleMapsUrl } from "@/data/places";
 import type { Booking, BookingKind } from "@/data/types";
 import { bookingIcons } from "./booking-icons";
 import { kindOfBooking } from "./kind-colors";
@@ -23,6 +24,15 @@ const dayCount = (from: string, to: string) =>
       new Date(`${from}T12:00:00`).getTime()) /
       864e5,
   );
+
+/** The words for a link given as a place: a Google Maps link's place name
+    (or nothing), any other site's host name. */
+export function linkPlaceName(link: string) {
+  const href = referenceUrl(link);
+  if (!href) return "";
+  if (registeredGoogleMapsUrl(href)) return placeNameFromLink(href) ?? "";
+  return new URL(href).hostname.replace(/^www\./, "");
+}
 
 /** The device's wall clock as "YYYY-MM-DDTHH:MM", comparable with booking times. */
 export const clockNow = (date = new Date()) =>
@@ -214,7 +224,7 @@ export function BookingBody({
         </span>
         <Stop
           row={3}
-          big={arrivalOnly ? "" : booking.endTime || "--:--"}
+          big={arrivalOnly ? "" : booking.endTime}
           small={
             arrivalOnly
               ? ""
@@ -223,9 +233,9 @@ export function BookingBody({
           place={to.primary}
           note={to.secondary}
         />
-        {arrivalOnly && (
+        {arrivalOnly && booking.endTime && (
           <div className="bk-at">
-            <b>{booking.endTime || "--:--"}</b>
+            <b>{booking.endTime}</b>
             <small>
               {arrivalLabel(booking, kind === "car" ? "返却" : "着")}
             </small>
@@ -265,12 +275,11 @@ export function BookingBody({
       </div>
     );
   }
-  // Where it happens comes from the place field (予約内容 is gone from these
-  // kinds, Tsubasa 2026-10-06); not repeated when it is the title itself.
+  // Where it happens comes from the place field (予約内容 stays off the card,
+  // Tsubasa 2026-10-06; the detail panel shows it); not repeated when it is
+  // the title itself.
   const location = (booking.location ?? "").trim();
-  const place = /^https?:/i.test(location)
-    ? (placeNameFromLink(location) ?? "")
-    : location;
+  const place = /^https?:/i.test(location) ? linkPlaceName(location) : location;
   const where = place === booking.title ? "" : place;
   return (
     <div className="bk-uni">

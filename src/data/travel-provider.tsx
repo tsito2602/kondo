@@ -85,12 +85,28 @@ function assertTripEditable(cache: TravelCache, tripId: string | null) {
   if (cache.trips.find((trip) => trip.id === tripId)?.role === 'viewer') throw new Error('この旅行は閲覧のみです');
 }
 
+/** What the Worker's bookingFields accepts, so a backfilled place link is never a request it refuses. */
+function patchableBooking(booking: Booking) {
+  const clock = /^([01]\d|2[0-3]):[0-5]\d$|^$/;
+  const within = (value: string | undefined, max: number) => (value ?? '').trim().length <= max;
+  const minutes = booking.durationMinutes;
+  return Boolean(booking.title?.trim()) && within(booking.title, 160) && within(booking.detail, booking.kind === 'hotel' ? 2000 : 500)
+    && within(booking.origin, 160) && within(booking.destination, 160) && within(booking.originCode, 8) && within(booking.destinationCode, 8)
+    && within(booking.confirmationCode, 120) && within(booking.note, 4000)
+    && /^\d{4}-\d{2}-\d{2}$/.test(booking.day ?? '') && (!booking.endDay || /^\d{4}-\d{2}-\d{2}$/.test(booking.endDay))
+    && (booking.kind === 'flight' || !booking.endDay || booking.endDay >= booking.day)
+    && clock.test(booking.time ?? '') && clock.test(booking.endTime ?? '')
+    && (minutes == null || (Number.isInteger(minutes) && minutes >= 1 && minutes <= 10080));
+}
+
 export function TravelProvider({ children }: PropsWithChildren) {
   const { request, requestRaw, isDemo, user } = useAuth();
   const [cache, setCache] = useState<TravelCache>(emptyTravelCache);
   const [ready, setReady] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The server's own bookings and places have arrived once (not just the device's copy).
+  const [synced, setSynced] = useState(false);
   const cacheRef = useRef(cache);
   const syncingRef = useRef<Promise<void> | null>(null);
 
@@ -136,11 +152,15 @@ export function TravelProvider({ children }: PropsWithChildren) {
                 permissionNotice = '担当メンバーが退出したため、担当を未指定にして保存しました';
                 continue;
               }
-              if (!mutation.path.endsWith('/connection') || ![400, 403, 404, 409].includes(Number(status))) throw cause;
-              // Discard only a permanently rejected link, then reload the server's
-              // choices. Network/auth failures keep their queued mutation for retry.
-              const message = cause instanceof Error ? cause.message : '便を選び直してください';
-              globalThis.alert?.(`乗り継ぎを保存できませんでした\n${message}`);
+              // A backfilled place link the server rejects is dropped quietly: it
+              // must never hold up the queue (the booking just stays unlinked).
+              if (!(mutation.backfill && [400, 404].includes(Number(status)))) {
+                if (!mutation.path.endsWith('/connection') || ![400, 403, 404, 409].includes(Number(status))) throw cause;
+                // Discard only a permanently rejected link, then reload the server's
+                // choices. Network/auth failures keep their queued mutation for retry.
+                const message = cause instanceof Error ? cause.message : '便を選び直してください';
+                globalThis.alert?.(`乗り継ぎを保存できませんでした\n${message}`);
+              }
             }
             commit((current) => ({ ...current, pending: current.pending.filter((item) => item.id !== mutation.id) }));
           }
@@ -187,6 +207,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
             };
           });
         } while (cacheRef.current.pending.length);
+        setSynced(true);
         setError(permissionNotice);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : '同期できませんでした');
@@ -201,6 +222,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let active = true;
+    setSynced(false);
     void loadTravelCache(isDemo ? 'demo' : user?.id).then((value) => {
       let stale = false;
       try { stale = isDemo && localStorage.getItem('kondo.demo-revision') !== DEMO_REVISION; } catch { /* storage blocked */ }
@@ -384,6 +406,30 @@ export function TravelProvider({ children }: PropsWithChildren) {
     }));
     enqueue({ method: 'PATCH', path: `/v1/trips/${tripId}/bookings/${id}`, body: input });
   }, [commit, enqueue]);
+
+  // Bookings saved before venues were linked (or by older clients) have no
+  // booking_places row; the create flow's matcher links each one, once per
+  // session, through the same PATCH an edit sends. Only unlinked venue
+  // bookings are looked at, and a linked one is never looked at again.
+  const backfilledRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (isDemo || !synced) return;
+    const current = cacheRef.current;
+    for (const trip of current.trips) {
+      const places = current.placesByTrip[trip.id] ?? [];
+      if (trip.role === 'viewer' || !places.length) continue;
+      for (const booking of current.bookingsByTrip[trip.id] ?? []) {
+        if (booking.placeId || ['flight', 'train', 'car'].includes(booking.kind) || backfilledRef.current.has(booking.id) || !patchableBooking(booking)) continue;
+        const place = matchBookingPlace(booking, places);
+        if (!place) continue;
+        backfilledRef.current.add(booking.id);
+        commit((latest) => ({ ...latest, bookingsByTrip: { ...latest.bookingsByTrip, [trip.id]: (latest.bookingsByTrip[trip.id] ?? []).map((entry) => entry.id === booking.id ? { ...entry, placeId: place.id } : entry) } }));
+        // The stored 場所 is left out, so it stays exactly as it is.
+        const { kind, title, detail, origin, originCode, destination, destinationCode, day, time, endDay, endTime, durationMinutes, confirmationCode, note } = booking;
+        enqueue({ method: 'PATCH', path: `/v1/trips/${trip.id}/bookings/${booking.id}`, body: { kind, title, detail, origin, originCode, destination, destinationCode, day, time, endDay, endTime, durationMinutes, confirmationCode, note, placeId: place.id }, backfill: true });
+      }
+    }
+  }, [cache.trips, cache.bookingsByTrip, cache.placesByTrip, synced, isDemo, commit, enqueue]);
 
   const setFlightConnection = useCallback((id: string, mode: NonNullable<Booking['connectionMode']>, nextFlightId?: string | null) => {
     const tripId = cacheRef.current.selectedTripId;

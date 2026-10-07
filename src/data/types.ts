@@ -138,6 +138,8 @@ export type PendingMutation = {
   method: 'POST' | 'PATCH' | 'DELETE';
   path: string;
   body?: Record<string, unknown>;
+  /** Sent by the app itself (an old booking's place link), not by an edit: dropped if rejected. */
+  backfill?: true;
 };
 
 export type TravelCache = {
