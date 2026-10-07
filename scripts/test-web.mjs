@@ -1461,7 +1461,7 @@ test("legacy account cache and pending changes survive React migration; real for
 
     await click(dockTab("持ち物"));
     assert.equal(document.querySelector(".page-top h2").textContent, "持ち物");
-    const addPacking = async (name, kind, category) => {
+    const addPacking = async (name, kind, category, who) => {
       await click(
         document.querySelector('.persistent-add[aria-label="持ち物を追加"]'),
       );
@@ -1482,6 +1482,7 @@ test("legacy account cache and pending changes survive React migration; real for
         "その他 is the default category",
       );
       if (category) await click(byText(".prep-cats [role=radio]", category));
+      if (who) await click(byText(".prep-whos [role=radio]", who));
       await submitSheet("追加する");
       return db.prepare("SELECT id FROM packing_items WHERE name = ?").get(name)
         .id;
@@ -1509,7 +1510,12 @@ test("legacy account cache and pending changes survive React migration; real for
       "みんな各自 keeps each member's own tick",
     );
     assert.equal(filters(), null, "no filter row while every item is その他");
-    const medicine = await addPacking("常備薬", "1つでいい", "薬");
+    const medicine = await addPacking(
+      "常備薬",
+      "1人が持つ",
+      "薬",
+      "まだ決めない",
+    );
     assert.equal(
       db
         .prepare("SELECT category FROM packing_items WHERE id = ?")
@@ -1532,15 +1538,14 @@ test("legacy account cache and pending changes survive React migration; real for
       [...document.querySelectorAll(".prep-kind-heading b")].map(
         (b) => b.textContent,
       ),
-      ["1つでいい"],
+      ["1人が持つ"],
       "kinds with nothing left are hidden",
     );
     await click(byText(".prep-filters button", "すべて"));
     assert.ok(kindRow(charger));
-    assert.match(kindRow(medicine).textContent, /まだ誰も持っていない/);
-    // Nobody holds it yet: anyone ticks it, and taking it keeps the tick.
-    await click(kindRow(medicine).querySelector('[role="checkbox"]'));
-    await tick(30);
+    // Nobody carries it yet: no box until someone takes it (Tsubasa 2026-10-07).
+    assert.match(kindRow(medicine).textContent, /まだ決めていない/);
+    assert.equal(kindRow(medicine).querySelector('[role="checkbox"]'), null);
     await click(byText(`[data-item="${medicine}"] button`, "自分が持つ"));
     await tick(30);
     assert.equal(
@@ -1551,22 +1556,21 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.match(kindRow(medicine).textContent, /あなたが持つ/);
     assert.ok(kindRow(medicine).querySelector('[role="checkbox"]'));
-    assert.equal(
-      db.prepare("SELECT packed FROM packing_items WHERE id = ?").get(medicine)
-        .packed,
-      1,
-      "自分が持つ keeps the tick",
-    );
-    const diary = await addPacking("日記", "自分だけ");
+    // 自分だけ is gone; the adder carries a 1人が持つ item unless they pick.
+    assert.equal(byText('[role="radio"] b', "自分だけ"), undefined);
+    const diary = await addPacking("日記", "1人が持つ");
     assert.deepEqual(
-      {
-        ...db
-          .prepare("SELECT kind, owner_id FROM packing_kinds WHERE item_id = ?")
-          .get(diary),
-      },
-      { kind: "mine", owner_id: "owner" },
+      [
+        db
+          .prepare("SELECT kind FROM packing_kinds WHERE item_id = ?")
+          .get(diary).kind,
+        db
+          .prepare("SELECT assignee FROM packing_details WHERE item_id = ?")
+          .get(diary).assignee,
+      ],
+      ["one", "member:owner"],
     );
-    assert.match(kindRow(diary).textContent, /ほかの人には見えない/);
+    assert.match(kindRow(diary).textContent, /あなたが持つ/);
     assert.doesNotMatch(kindRow(diary).textContent, /×/);
     await click(document.querySelector('[aria-label="日記を編集"]'));
     assert.equal(
@@ -1587,7 +1591,7 @@ test("legacy account cache and pending changes survive React migration; real for
       document.querySelector("dialog h2").textContent,
       "持ち物を編集",
     );
-    await click(byText('[role="radio"] b', "1つでいい").closest("button"));
+    await click(byText('[role="radio"] b', "1人が持つ").closest("button"));
     await submitSheet("保存");
     assert.equal(
       db

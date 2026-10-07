@@ -28,7 +28,7 @@ const people = (...keys: string[]) => keys.map((key) => DEMO_PEOPLE[key]);
 export const demoMembers = people('self', 'misaki');
 
 /** Bump when the sample content changes, so devices drop an older saved sample. */
-export const DEMO_REVISION = '2026-10-07-vienna-4';
+export const DEMO_REVISION = '2026-10-07-vienna-5';
 
 /**
  * Demo mode's data: one five-day trip to Vienna starting 13 days from today
@@ -70,9 +70,9 @@ export function createDemoCache(): TravelCache {
     pack('sample-pack-umbrella', '折りたたみ傘', 'その他', { kind: 'one', shared: true, assignee: misaki }),
     pack('sample-pack-camera', 'カメラ', '電子機器', { kind: 'one', shared: true }),
     pack('sample-pack-coins', '小銭入れ', 'その他', { kind: 'one', shared: true }),
-    pack('sample-pack-dress', 'オペラに着ていく服', '衣類', { kind: 'mine' }),
-    pack('sample-pack-lens', 'コンタクトレンズ', 'その他', { kind: 'mine' }),
-    pack('sample-pack-book', '機内で読む本', 'その他', { kind: 'mine', packed: true }),
+    pack('sample-pack-dress', 'オペラに着ていく服', '衣類', { kind: 'one', shared: true, assignee: misaki }),
+    pack('sample-pack-lens', 'コンタクトレンズ', 'その他', { kind: 'one', shared: true, assignee: self }),
+    pack('sample-pack-book', '機内で読む本', 'その他', { kind: 'one', shared: true, assignee: self, packed: true }),
   ];
   // The next trip and past ones, so the list shows the next countdown, a trip
   // without a photo, and the shelf of past trips (the passport's entry stamps).

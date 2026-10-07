@@ -482,7 +482,8 @@ dialog.modal:has(.prep-sheet):not([data-panel]) .modal-header h2 {
 .prep-whos button.prep-who-none {
   padding: 5px 14px;
 }
-.prep-whos button[aria-pressed="true"] {
+.prep-whos button[aria-pressed="true"],
+.prep-whos button[aria-checked="true"] {
   background: var(--p-ink);
   color: var(--p-paper);
 }

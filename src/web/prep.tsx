@@ -37,7 +37,7 @@ import {
   presentCategories,
 } from "./packing-categories";
 import { CheckIcon, LockIcon } from "./prep-pictures";
-import { AddButton, DockFunction, ErrorText, Modal } from "./ui";
+import { AddButton, ErrorText, Modal } from "./ui";
 
 /* ---------- motion, as kondo-prep3.html plays it ---------- */
 
@@ -759,15 +759,19 @@ function TaskSheet({
 
 /* ---------- 持ち物 ---------- */
 
-const kinds: Record<PackingKind, [string, string]> = {
-  each: ["みんな各自", "全員のリストに出る。チェックは自分の分だけ"],
-  one: [
-    "1つでいい",
-    "誰かが「自分が持つ」で取る。全員のリストに「○○が持つ」と出る",
-  ],
-  mine: ["自分だけ", "あなたのリストにだけ出る。ほかの人には見えない"],
+/**
+ * Two kinds (Tsubasa 2026-10-07): everyone brings their own, or one person
+ * carries it, picked when adding. An old 自分だけ item still reads as yours
+ * and stays hidden from the others until it is saved again.
+ */
+type ShownKind = "each" | "one";
+const kinds: Record<ShownKind, [string, string]> = {
+  each: ["みんな各自", "全員の一覧に出る。チェックは自分の分だけ"],
+  one: ["1人が持つ", "誰が持つかを選ぶ。全員の一覧に「○○が持つ」と出る"],
 };
 const kindOf = (item: PackingItem): PackingKind => item.kind ?? "one";
+const shownKind = (item: PackingItem): ShownKind =>
+  kindOf(item) === "each" ? "each" : "one";
 const categoryOf = (item: PackingItem) =>
   item.category || defaultPackingCategory;
 const ALL = "すべて";
@@ -899,6 +903,12 @@ function Packing() {
     (item.assignee.startsWith("member:") && !memberKeys.has(item.assignee));
   const tickable = (item: PackingItem) =>
     travel.canEdit && (kindOf(item) !== "one" || !heldByOther(item));
+  // 1人が持つ: only its carrier has a box; nobody has one until it is
+  // decided, except an old item already ticked (so it can be unticked).
+  const showsCheck = (item: PackingItem) =>
+    kindOf(item) !== "one" ||
+    item.assignee === me ||
+    (unclaimed(item) && item.packed);
   const toggle = (item: PackingItem) => {
     travel.updatePackingItem(item.id, {
       ...packingInput(item),
@@ -969,7 +979,7 @@ function Packing() {
           {item.assignee !== me && item.packed ? " · 入れた" : ""}
         </>
       ) : (
-        "まだ誰も持っていない"
+        "まだ決めていない"
       );
       if (unclaimed(item) && travel.canEdit && self)
         side = (
@@ -986,10 +996,10 @@ function Packing() {
       sub = (
         <>
           <LockIcon />
-          ほかの人には見えない
+          あなたが持つ · ほかの人には見えない
         </>
       );
-    const showCheck = kind !== "one" || !heldByOther(item);
+    const showCheck = showsCheck(item);
     return (
       <PackRow
         key={item.id}
@@ -1036,11 +1046,11 @@ function Packing() {
           ))}
         </div>
       )}
-      {(["each", "one", "mine"] as const).map((kind) => {
+      {(["each", "one"] as const).map((kind) => {
         // The list's own order (oldest first), so ticking never moves a row.
         const items = travel.packingItems.filter(
           (item) =>
-            kindOf(item) === kind &&
+            shownKind(item) === kind &&
             (shown === ALL || categoryOf(item) === shown),
         );
         if (shown !== ALL && !items.length) return null;
@@ -1082,10 +1092,22 @@ function PackingSheet({
   onClose: () => void;
   onSaved: (id: string) => void;
 }) {
-  const travel = useTravel();
+  const { travel, members, label } = useTravellers();
   const formId = useId();
   const [name, setName] = useState(item?.name ?? "");
-  const [kind, setKind] = useState<PackingKind>(item ? kindOf(item) : "each");
+  const [kind, setKind] = useState<ShownKind>(item ? shownKind(item) : "each");
+  const me = memberAssignee(self ?? "");
+  // Who carries a 1人が持つ item: a member, nobody yet (""), or KEEP for an
+  // old carrier who is not a member (free text or someone who left).
+  const before = item ? packingInput(item) : null;
+  const holder = before?.kind === "mine" ? me : (before?.assignee ?? "");
+  const current = members.find((m) => memberAssignee(m.id) === holder);
+  const kept = holder && !current ? holder : "";
+  const [who, setWho] = useState(
+    item ? (current?.id ?? (kept ? KEEP : "")) : (self ?? ""),
+  );
+  const assignee =
+    kind !== "one" ? "" : who === KEEP ? kept : who ? memberAssignee(who) : "";
   const [quantity, setQuantity] = useState(item?.quantity ?? 1);
   // Stored as is until the user picks; an old free-text category gets its own chip.
   const [category, setCategory] = useState(
@@ -1112,11 +1134,11 @@ function PackingSheet({
     }
     saved.current = true;
     try {
-      if (item) {
-        const before = packingInput(item);
-        const changed = before.kind !== kind;
-        // A new kind starts fresh: nobody holds a 1つでいい item yet, and a
-        // みんな各自 item keeps each member's own tick.
+      if (item && before) {
+        // The tick stays while the same person carries it; a new carrier
+        // starts unpacked, and みんな各自 keeps each member's own tick.
+        const sameCarrier =
+          kind === "one" && before.kind !== "each" && assignee === holder;
         travel.updatePackingItem(item.id, {
           ...before,
           name: value,
@@ -1124,12 +1146,15 @@ function PackingSheet({
           quantity,
           kind,
           shared: kind === "one",
-          assignee: changed ? "" : before.assignee,
-          packed: !changed
-            ? before.packed
-            : kind === "each"
-              ? Boolean(self && item.packedBy?.includes(self))
-              : false,
+          assignee,
+          packed:
+            kind === "each"
+              ? before.kind === "each"
+                ? before.packed
+                : Boolean(self && item.packedBy?.includes(self))
+              : sameCarrier
+                ? before.packed
+                : false,
         });
         dismissModal(() => {
           onClose();
@@ -1142,7 +1167,7 @@ function PackingSheet({
         category,
         quantity,
         packed: false,
-        assignee: "",
+        assignee,
         shared: kind === "one",
         kind,
       });
@@ -1154,23 +1179,6 @@ function PackingSheet({
       saved.current = false;
       setError(cause instanceof Error ? cause.message : "保存できませんでした");
     }
-  };
-  // Whoever took a 1つでいい item can put it back for someone else to take.
-  const holding =
-    item &&
-    kindOf(item) === "one" &&
-    item.assignee === memberAssignee(self ?? "");
-  const letGo = () => {
-    if (!item) return;
-    travel.updatePackingItem(item.id, {
-      ...packingInput(item),
-      assignee: "",
-      packed: false,
-    });
-    dismissModal(() => {
-      onClose();
-      onSaved(item.id);
-    });
   };
   const remove = () => {
     if (!item || !confirm(`「${item.name}」を削除しますか？`)) return;
@@ -1192,16 +1200,6 @@ function PackingSheet({
       onClose={onClose}
       onDelete={item ? remove : undefined}
       deleteLabel="持ち物を削除"
-      extra={
-        holding ? (
-          <DockFunction
-            label="持つのをやめる"
-            short="持たない"
-            icon={null}
-            onClick={letGo}
-          />
-        ) : undefined
-      }
     >
       <form id={formId} onSubmit={save} noValidate>
         <input
@@ -1271,7 +1269,7 @@ function PackingSheet({
           </button>
         </div>
         <div className="prep-kinds" role="radiogroup" aria-label="持ち物の種類">
-          {(Object.keys(kinds) as PackingKind[]).map((value) => (
+          {(Object.keys(kinds) as ShownKind[]).map((value) => (
             <button
               type="button"
               role="radio"
@@ -1292,6 +1290,68 @@ function PackingSheet({
             </button>
           ))}
         </div>
+        {kind === "one" && (
+          <>
+            <span className="prep-label" id={`${formId}-who`}>
+              誰が持つ
+            </span>
+            <div
+              className="prep-whos"
+              role="radiogroup"
+              aria-labelledby={`${formId}-who`}
+            >
+              {members.map((member) => (
+                <button
+                  type="button"
+                  role="radio"
+                  key={member.id}
+                  aria-checked={who === member.id}
+                  onClick={(event) => {
+                    setWho(member.id);
+                    void boing(event.currentTarget, "scale(.9)");
+                  }}
+                >
+                  <AssigneeAvatar
+                    value={memberAssignee(member.id)}
+                    members={travel.members}
+                  />
+                  {label(member)}
+                </button>
+              ))}
+              {kept && (
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={who === KEEP}
+                  onClick={(event) => {
+                    setWho(KEEP);
+                    void boing(event.currentTarget, "scale(.9)");
+                  }}
+                >
+                  <AssigneeAvatar value={kept} members={travel.members} />
+                  {kept.startsWith("member:") ? "元メンバー" : kept}
+                </button>
+              )}
+              <button
+                type="button"
+                role="radio"
+                className="prep-who-none"
+                aria-checked={who === ""}
+                onClick={(event) => {
+                  setWho("");
+                  void boing(event.currentTarget, "scale(.9)");
+                }}
+              >
+                まだ決めない
+              </button>
+            </div>
+          </>
+        )}
+        {before?.kind === "mine" && (
+          <p className="prep-who-note">
+            保存すると、ほかの人の一覧にも出るようになります
+          </p>
+        )}
       </form>
     </PrepSheet>
   );
