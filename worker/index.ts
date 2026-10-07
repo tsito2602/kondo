@@ -225,49 +225,112 @@ function placeFields(body: Record<string, unknown>) {
   if (/^[a-z][a-z0-9+.-]*:/i.test(location) && !/^https?:\/\//i.test(location)) return null;
   return { title, note, openingHours, location, reservationStatus, ...(referenceLinks === undefined ? {} : { referenceLinks }), ...(itineraryItemId === undefined ? {} : { itineraryItemId }) };
 }
-/** Coordinates from a pasted Google Maps link; a short share link is followed one redirect. */
+/**
+ * A Google Maps link → where it really points and its pin. Short share links
+ * are followed (a few hops, Google Maps hosts only). An iPhone share link
+ * (「?g_st=ic」) lands on 「?q=name, address&ftid=…」 with no coordinates; then
+ * the Maps page itself is read for its pin, and as a last resort the
+ * address is looked up on OpenStreetMap (Tsubasa 2026-10-07: 全部位置なし).
+ */
+const PAGE_PIN = [
+  /[?&;]markers=(-?\d{1,3}\.\d+)(?:%2C|,)(-?\d{1,3}\.\d+)/,
+  /[?&;]center=(-?\d{1,3}\.\d+)(?:%2C|,)(-?\d{1,3}\.\d+)/,
+  /!3d(-?\d{1,3}\.\d+)!4d(-?\d{1,3}\.\d+)/,
+  /\[null,null,(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)\]/,
+];
+function pinInPage(html: string): Coordinates | null {
+  for (const pattern of PAGE_PIN) {
+    const match = html.match(pattern);
+    if (!match) continue;
+    const point = { lat: Number(match[1]), lng: Number(match[2]) };
+    if (Math.abs(point.lat) <= 90 && Math.abs(point.lng) <= 180 && (point.lat || point.lng)) return point;
+  }
+  return null;
+}
+const BROWSER = { 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', 'accept-language': 'ja,en;q=0.8' };
+async function followMapLink(link: string): Promise<string> {
+  let target = link;
+  for (let hop = 0; hop < 4 && !mapCoordinates(target); hop++) {
+    const response = await fetch(target, { redirect: 'manual', headers: BROWSER, signal: AbortSignal.timeout(4000) });
+    const next = response.headers.get('location');
+    await response.body?.cancel();
+    if (!next) break;
+    const href = new URL(next, target).href;
+    if (!registeredGoogleMapsUrl(href)) break;
+    target = href;
+  }
+  return target;
+}
+async function geocode(query: string): Promise<Coordinates | null> {
+  const url = new URL('https://nominatim.openstreetmap.org/search');
+  url.searchParams.set('q', query);
+  url.searchParams.set('format', 'jsonv2');
+  url.searchParams.set('limit', '1');
+  const response = await fetch(url.href, { headers: { 'user-agent': 'kondo/2.0 (https://kondo.tsito-apps.workers.dev)', 'accept-language': 'ja,en' }, signal: AbortSignal.timeout(4000) });
+  if (!response.ok) return null;
+  const [first] = (await response.json()) as { lat?: string; lon?: string }[];
+  const point = { lat: Number(first?.lat), lng: Number(first?.lon) };
+  return Number.isFinite(point.lat) && Number.isFinite(point.lng) && (point.lat || point.lng) ? point : null;
+}
+async function locateMapLink(link: string): Promise<{ target: string; pin: Coordinates | null }> {
+  let target = link;
+  try {
+    if (isShortMapsLink(link)) target = await followMapLink(link);
+  } catch { /* keep the link */ }
+  let pin = mapCoordinates(target);
+  if (pin) return { target, pin };
+  try {
+    const response = await fetch(target, { headers: BROWSER, signal: AbortSignal.timeout(5000) });
+    if (response.ok) pin = pinInPage((await response.text()).slice(0, 2_000_000));
+    else await response.body?.cancel();
+  } catch { /* try the address */ }
+  if (pin) return { target, pin };
+  const url = new URL(target);
+  const query = url.searchParams.get('q') ?? url.searchParams.get('query') ?? decodeURIComponent(url.pathname.match(/\/place\/([^/@]+)/)?.[1] ?? '').replace(/\+/g, ' ');
+  try {
+    if (query.trim()) pin = await geocode(query.trim());
+  } catch { /* no pin */ }
+  return { target, pin };
+}
+/** Coordinates from a pasted Google Maps link (see locateMapLink). */
 async function placeCoordinates(location: string): Promise<Coordinates | null> {
   const direct = mapCoordinates(location);
-  if (direct || !isShortMapsLink(location)) return direct;
-  try {
-    const response = await fetch(new URL(location.trim()).href, { redirect: 'manual', signal: AbortSignal.timeout(4000) });
-    const target = response.headers.get('location');
-    return target ? mapCoordinates(new URL(target, location.trim()).href) : null;
-  } catch {
-    return null;
-  }
+  if (direct) return direct;
+  const link = registeredGoogleMapsUrl(location.trim());
+  return link ? (await locateMapLink(link)).pin : null;
 }
-/** A pasted Google Maps link → the place's name and pin (a short share link is followed one redirect). */
+/** A pasted Google Maps link → the place's name and pin. */
 async function resolveMapLink(text: string) {
   const link = registeredGoogleMapsUrl(text.trim());
   if (!link) return json({ error: 'Googleマップのリンクを入力してください' }, 400);
-  let target = link;
-  if (isShortMapsLink(link)) {
-    try {
-      const response = await fetch(link, { redirect: 'manual', signal: AbortSignal.timeout(4000) });
-      const location = response.headers.get('location');
-      if (location) target = new URL(location, link).href;
-    } catch { /* keep the short link */ }
-  }
-  const pin = mapCoordinates(target);
+  const { target, pin } = await locateMapLink(link);
   return json({ link, name: placeNameFromLink(target), lat: pin?.lat ?? null, lng: pin?.lng ?? null });
 }
 /**
- * Places saved before coordinates were stored (older short share links) have no
- * place_coordinates row. Each list request resolves up to 3 of them in parallel
- * and stores the pin; a link that fails is simply tried again on a later request.
- * Never fails the list.
+ * Places saved without a pin (short share links, iPhone links, older rows)
+ * are resolved a few at a time while the list is read: one after another
+ * (OpenStreetMap asks for one request a second) and within a few seconds,
+ * so the list never waits long. A link that gave nothing is skipped for a
+ * day. Never fails the list.
  */
 async function fillMissingCoordinates(env: Env, tripId: string, rows: Record<string, unknown>[]) {
+  const misses = new Set(((await env.DB.prepare(`SELECT m.place_id FROM place_coordinate_misses m JOIN places p ON p.id = m.place_id
+    WHERE p.trip_id = ? AND m.location = p.location AND m.tried_at > unixepoch() - 86400`).bind(tripId).all()).results).map((row) => row.place_id));
   const missing = rows
-    .filter((row) => row.lat == null && typeof row.location === 'string' && (isShortMapsLink(row.location) || mapCoordinates(row.location)))
+    .filter((row) => row.lat == null && typeof row.location === 'string' && registeredGoogleMapsUrl(row.location) && !misses.has(row.id))
     .sort(() => Math.random() - 0.5)
     .slice(0, 3);
-  await Promise.all(missing.map(async (row) => {
+  const deadline = Date.now() + 6000;
+  for (const row of missing) {
+    if (Date.now() > deadline) break;
     try {
       const location = row.location as string;
       const coordinates = await placeCoordinates(location);
-      if (!coordinates) return;
+      if (!coordinates) {
+        await env.DB.prepare(`INSERT INTO place_coordinate_misses (place_id, location) SELECT ?, ? WHERE EXISTS (SELECT 1 FROM places WHERE id = ? AND trip_id = ?)
+          ON CONFLICT(place_id) DO UPDATE SET location = excluded.location, tried_at = unixepoch()`).bind(row.id, location, row.id, tripId).run();
+        continue;
+      }
       // Only while the place still has this link; a newer save keeps its own pin.
       await env.DB.prepare(`INSERT INTO place_coordinates (place_id, lat, lng)
         SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM places WHERE id = ? AND trip_id = ? AND location = ?)
@@ -275,7 +338,7 @@ async function fillMissingCoordinates(env: Env, tripId: string, rows: Record<str
       row.lat = coordinates.lat;
       row.lng = coordinates.lng;
     } catch { /* leave it without a pin; the next request tries again */ }
-  }));
+  }
 }
 async function placesRoute(request: Request, env: Env, user: User, tripId: string, placeId?: string) {
   const forbidden = await requireMember(env, tripId, user.id);

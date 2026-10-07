@@ -198,6 +198,12 @@ CREATE TABLE IF NOT EXISTS place_coordinates (
   lat REAL NOT NULL CHECK(lat BETWEEN -90 AND 90),
   lng REAL NOT NULL CHECK(lng BETWEEN -180 AND 180)
 );
+-- A link that gave no position, and when it was last tried; list requests skip it for a day.
+CREATE TABLE IF NOT EXISTS place_coordinate_misses (
+  place_id TEXT PRIMARY KEY REFERENCES places(id) ON DELETE CASCADE,
+  location TEXT NOT NULL,
+  tried_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
 
 -- Add read-only membership without rebuilding the existing member table.
 CREATE TABLE IF NOT EXISTS trip_member_permissions (

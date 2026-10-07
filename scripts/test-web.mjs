@@ -619,6 +619,13 @@ test("legacy account cache and pending changes survive React migration; real for
   };
   globalThis.fetch = async (url, init) => {
     const request = new Request(url, init);
+    // The Worker looks up pins on Google Maps and OpenStreetMap; offline here.
+    if (
+      /(^|\.)(google\.com|goo\.gl|openstreetmap\.org)$/.test(
+        new URL(request.url).hostname,
+      )
+    )
+      return new Response("", { status: 404 });
     // Flight saves are optimistic. Exercise a server response slower than the
     // form helper's 30ms wait so database assertions cannot rely on that delay.
     if (

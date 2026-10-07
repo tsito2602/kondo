@@ -13,9 +13,25 @@ const worker = createRequire(import.meta.url)(join(dir, 'worker.cjs')).default;
 after(() => rm(dir, { recursive: true, force: true }));
 // Short Google Maps links are followed once by the Worker; never reach the network in tests.
 const shortLinkRequests = [];
+// An iPhone share link lands on ?q=…&ftid=… (no coordinates): the Maps page's
+// static map gives the pin, or else OpenStreetMap finds the address.
+const pageRequests = [];
 globalThis.fetch = async (input, init) => {
   const url = new URL(input instanceof Request ? input.url : input);
+  if (url.hostname === 'maps.google.com') {
+    pageRequests.push(url.href);
+    const html = url.searchParams.get('q')?.startsWith('Porsche') ? '<meta content="https://maps.google.com/maps/api/staticmap?center=48.8341%2C9.1522&amp;zoom=15&amp;markers=48.83411%2C9.15224&amp;size=256x256" itemprop="image">' : '<html></html>';
+    return new Response(html, { status: 200 });
+  }
+  if (url.hostname === 'nominatim.openstreetmap.org') {
+    pageRequests.push(url.href);
+    return Response.json(url.searchParams.get('q')?.startsWith('Weihnachtsmarkt') ? [{ lat: '48.7758', lon: '9.1829' }] : []);
+  }
   if (url.hostname !== 'maps.app.goo.gl') throw new Error(`unexpected fetch ${url}`);
+  if (url.pathname === '/iphone' || url.pathname === '/market') {
+    const q = url.pathname === '/iphone' ? 'Porsche Museum, Porscheplatz 1, 70435 Stuttgart' : 'Weihnachtsmarkt, Schillerplatz, Stuttgart';
+    return new Response(null, { status: 302, headers: { location: `https://maps.google.com/?q=${encodeURIComponent(q)}&ftid=0x1:0x2&entry=gps&g_st=ic` } });
+  }
   shortLinkRequests.push({ url: url.href, redirect: init?.redirect });
   const location = url.pathname === '/stephansdom' ? 'https://www.google.com/maps/place/Stephansdom/@48.2,16.37,17z/data=!3m1!4b1!4m6!3m5!8m2!3d48.20849!4d16.37314' : 'https://www.google.com/maps?q=Vienna';
   return new Response(null, { status: 302, headers: { location } });
@@ -254,6 +270,21 @@ test('place coordinates come from Google Maps links, follow one short-link redir
     assert.equal((await call(`${base}/${id}`, 'PATCH', { ...place, location: long })).status, 200);
     assert.equal((await call(`${base}/${id}`, 'DELETE')).status, 204);
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM place_coordinates').get().n, 0, 'coordinates go with the place');
+    // iPhone share links: the page's pin, else the address on OpenStreetMap.
+    const iphone = randomUUID(), market = randomUUID(), nowhere = randomUUID();
+    await call(base, 'POST', { id: iphone, ...place, location: 'https://maps.app.goo.gl/iphone?g_st=ic' });
+    await call(base, 'POST', { id: market, ...place, location: 'https://maps.app.goo.gl/market?g_st=ic' });
+    const pins = Object.fromEntries((await (await call(base)).json()).places.map((entry) => [entry.id, [entry.lat, entry.lng]]));
+    assert.deepEqual(pins[iphone], [48.83411, 9.15224]);
+    assert.deepEqual(pins[market], [48.7758, 9.1829]);
+    const resolved = await (await call(`/maps/resolve?url=${encodeURIComponent('https://maps.app.goo.gl/iphone?g_st=ic')}`)).json();
+    assert.deepEqual([resolved.name, resolved.lat], ['Porsche Museum', 48.83411]);
+    // A link that gives nothing is not asked again on the next list read.
+    db.prepare('INSERT INTO places (id, trip_id, title, location, updated_by) VALUES (?,?,?,?,?)').run(nowhere, trip.id, 'どこか', 'https://maps.app.goo.gl/somewhere', 'owner');
+    await call(base);
+    const asked = shortLinkRequests.length;
+    await call(base);
+    assert.equal(shortLinkRequests.length, asked, 'a miss is skipped for a day');
   } finally { db.close(); }
 });
 test('place itinerary links survive title edits and old clients, but clear after plan deletion', async () => {
