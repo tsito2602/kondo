@@ -75,6 +75,25 @@ function equip(host: HTMLElement) {
 export function installHaptics() {
   if (typeof document === "undefined") return;
   if (ios) {
+    // The label's own (real) tap already presses a submit button that holds
+    // it, and the hand-off presses it again: one form would be sent twice
+    // (Tsubasa 2026-10-07: 1回の追加で2件). Let only the first through.
+    const sent = new WeakMap<EventTarget, number>();
+    document.addEventListener(
+      "submit",
+      (event) => {
+        const form = event.target;
+        if (!form) return;
+        const last = sent.get(form);
+        if (last !== undefined && event.timeStamp - last < 700) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          return;
+        }
+        sent.set(form, event.timeStamp);
+      },
+      true,
+    );
     let queued = false;
     const scan = () => {
       queued = false;

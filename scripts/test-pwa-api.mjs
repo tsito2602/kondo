@@ -30,12 +30,15 @@ globalThis.fetch = async (input, init) => {
     pageRequests.push(url.href);
     const desktop = !/iPhone/.test(new Headers(init?.headers).get('user-agent') ?? '');
     const name = decodeURIComponent(url.pathname);
-    if (name.includes('シュロスプラッツ') && desktop) return new Response('<script>window.APP_INITIALIZATION_STATE=[[[1200.5,9.1793,48.7784],[0,0,0]]]</script>', { status: 200 });
+    // The full page opens on the reader's own city (here Tokyo), never the place.
+    if (desktop) return new Response('<script>window.APP_INITIALIZATION_STATE=[[[414656.3,140.1389056,35.7138432],[0,0,0]]];x=[[null,null,[null,null,35.507,139.511]]]</script>', { status: 200 });
     return new Response('<html><script>mapslite = {}</script></html>', { status: 200 });
   }
   if (url.hostname === 'nominatim.openstreetmap.org') {
     pageRequests.push(url.href);
     const q = url.searchParams.get('q') ?? '';
+    if (q === 'Schloßpl., 70173 Stuttgart') return Response.json([{ lat: '48.7784', lon: '9.1793' }]);
+    if (q === 'Café Central, Herrengasse 14, 1010 Wien') return Response.json([{ lat: '48.2105', lon: '16.3654' }]);
     if (q === 'Königstraße 1, 70173 Stuttgart') return Response.json([{ lat: '48.7830', lon: '9.1810' }]);
     return Response.json(q.startsWith('Weihnachtsmarkt') ? [{ lat: '48.7758', lon: '9.1829' }] : q.startsWith('Café Sacher') ? [{ lat: '48.2039', lon: '16.3695' }] : []);
   }
@@ -327,11 +330,11 @@ test('place coordinates come from Google Maps links, follow one short-link redir
     const resolved = await (await call(`/maps/resolve?url=${encodeURIComponent('https://maps.app.goo.gl/iphone?g_st=ic')}`)).json();
     assert.deepEqual([resolved.name, resolved.lat], ['Porsche Museum', 48.83411]);
     const android = await (await call(`/maps/resolve?url=${encodeURIComponent('https://maps.app.goo.gl/android?g_st=ac')}`)).json();
-    assert.deepEqual([android.name, android.lat, android.lng], ['Café Central', 48.2105, 16.3654], 'the page camera gives the pin');
+    assert.deepEqual([android.name, android.lat, android.lng], ['Café Central', 48.2105, 16.3654], 'the page title is looked up, not the opening camera');
     const titled = await (await call(`/maps/resolve?url=${encodeURIComponent('https://maps.app.goo.gl/android2?g_st=ac')}`)).json();
     assert.deepEqual([titled.name, titled.lat], ['Café Sacher', 48.2039], 'else the page title is looked up');
     const lite = await (await call(`/maps/resolve?url=${encodeURIComponent('https://maps.app.goo.gl/schlossplatz?g_st=ac')}`)).json();
-    assert.deepEqual([lite.lat, lite.lng], [48.7784, 9.1793], 'the place page is read as a desktop browser, not Maps lite');
+    assert.deepEqual([lite.lat, lite.lng], [48.7784, 9.1793], 'the opening camera (the reader city) is not the pin; the address is');
     const street = await (await call(`/maps/resolve?url=${encodeURIComponent('https://maps.app.goo.gl/koenig?g_st=ac')}`)).json();
     assert.deepEqual([street.lat, street.lng], [48.783, 9.181], 'the address is looked up without its Japanese name');
     // A link that gives nothing is not asked again on the next list read.

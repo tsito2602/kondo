@@ -232,19 +232,18 @@ function placeFields(body: Record<string, unknown>) {
  * the Maps page itself is read for its pin, and as a last resort the
  * address is looked up on OpenStreetMap (Tsubasa 2026-10-07: 全部位置なし).
  */
-const PAGE_PIN: [RegExp, 'latLng' | 'lngLat'][] = [
-  [/[?&;]markers=(-?\d{1,3}\.\d+)(?:%2C|,)(-?\d{1,3}\.\d+)/, 'latLng'],
-  [/[?&;]center=(-?\d{1,3}\.\d+)(?:%2C|,)(-?\d{1,3}\.\d+)/, 'latLng'],
-  [/!3d(-?\d{1,3}\.\d+)!4d(-?\d{1,3}\.\d+)/, 'latLng'],
-  [/\[null,null,(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)\]/, 'latLng'],
-  // The page's opening camera, which a place page centres on the place: [[[zoom, lng, lat]
-  [/APP_INITIALIZATION_STATE=\[\[\[-?[\d.]+,(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)\]/, 'lngLat'],
+const PAGE_PIN: RegExp[] = [
+  /[?&;]markers=(-?\d{1,3}\.\d+)(?:%2C|,)(-?\d{1,3}\.\d+)/,
+  /[?&;]center=(-?\d{1,3}\.\d+)(?:%2C|,)(-?\d{1,3}\.\d+)/,
+  /!3d(-?\d{1,3}\.\d+)!4d(-?\d{1,3}\.\d+)/,
+  // Not the page's opening camera or its 「[null,null,lat,lng]」 bounds: those
+  // are where the reader is (the Worker's own city), not the place.
 ];
 function pinInPage(html: string): Coordinates | null {
-  for (const [pattern, order] of PAGE_PIN) {
+  for (const pattern of PAGE_PIN) {
     const match = html.match(pattern);
     if (!match) continue;
-    const [lat, lng] = order === 'latLng' ? [match[1], match[2]] : [match[2], match[1]];
+    const [lat, lng] = [match[1], match[2]];
     const point = { lat: Number(lat), lng: Number(lng) };
     if (Math.abs(point.lat) <= 90 && Math.abs(point.lng) <= 180 && (point.lat || point.lng)) return point;
   }

@@ -81,14 +81,18 @@ function useSubmit(
 ) {
   const [error, setError] = useState("");
   const { busy, run } = useAction();
+  // Saved and closing: a late second submit must not save again.
+  const saved = useRef(false);
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    if (saved.current) return;
     const dialog = (event.currentTarget as HTMLFormElement).closest("dialog");
     const message = validate();
     setError(message);
     if (!message)
       void run(async () => {
         await save();
+        saved.current = true;
         dismissModal(close, dialog);
       });
   };
