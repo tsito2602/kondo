@@ -735,6 +735,7 @@ export function PlanSheet({
             onEdit={() => setEditing(true)}
             deleteLabel="予定を削除"
             onDelete={() =>
+              confirm(`「${item.title}」を削除しますか？`) &&
               dismissModal(() => {
                 onClose();
                 onDelete(item);

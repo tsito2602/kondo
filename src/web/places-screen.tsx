@@ -1095,6 +1095,7 @@ function PlacesList({
   ) => (
     <button
       key={mark.key}
+      data-mark={mark.key}
       className={`places-row${selected === mark.key ? " is-selected" : ""}`}
       aria-pressed={mark.point ? selected === mark.key : undefined}
       onClick={() => onSelect(mark)}

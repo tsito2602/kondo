@@ -1,3 +1,4 @@
+import { poofAway } from "./remove-motion";
 import { PlaceStatusLabel } from "./place-status";
 import { DocumentPreview } from "./document-preview";
 import { LinkedNotes } from "./linked-notes";
@@ -146,9 +147,16 @@ export function PlaceDetail({
     />
   ) : undefined;
   const remove = () =>
+    confirm(`「${place?.title ?? "この場所"}」を削除しますか？`) &&
     dismissModal(() => {
-      travel.removeLater("place", id, "場所を消しました");
       onClose();
+      void poofAway(
+        travel.removeLater,
+        "place",
+        id,
+        "場所を消しました",
+        `[data-mark="place:${id}"]`,
+      );
     });
   return (
     <>

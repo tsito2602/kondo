@@ -318,10 +318,15 @@ export function NoteEditor({
     );
   };
   const remove = () => {
-    deleting.current = true;
-    flush();
     const note = latest.current;
     const saved = exists.current;
+    if (
+      saved &&
+      !confirm(`「${note.title?.trim() || "このメモ"}」を削除しますか？`)
+    )
+      return;
+    deleting.current = true;
+    flush();
     dismissModal(() => {
       onClose();
       if (saved) onDelete(note);

@@ -1488,7 +1488,7 @@ test("legacy account cache and pending changes survive React migration; real for
       ![...document.querySelectorAll(".memo-tile")].some((tile) =>
         tile.textContent.includes("削除するメモ"),
       ),
-      "a deleted note leaves the list at once, with no confirm",
+      "after the confirm, a deleted note leaves the list at once",
     );
     await click(
       document.querySelector('.cdock-group[data-slot="toast"] button'),

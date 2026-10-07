@@ -1,3 +1,4 @@
+import { poofAway } from "./remove-motion";
 import { DatePicker } from "./date-picker";
 import {
   createContext,
@@ -608,10 +609,16 @@ function TaskSheet({
     }
   };
   const remove = () => {
-    if (!task) return;
+    if (!task || !confirm(`「${task.title}」を削除しますか？`)) return;
     dismissModal(() => {
-      travel.removeLater("task", task.id, "やることを消しました");
       onClose();
+      void poofAway(
+        travel.removeLater,
+        "task",
+        task.id,
+        "やることを消しました",
+        `[data-task="${task.id}"]`,
+      );
     });
   };
   return (
@@ -1051,10 +1058,16 @@ function PackingSheet({
     });
   };
   const remove = () => {
-    if (!item) return;
+    if (!item || !confirm(`「${item.name}」を削除しますか？`)) return;
     dismissModal(() => {
-      travel.removeLater("packing", item.id, "持ち物を消しました");
       onClose();
+      void poofAway(
+        travel.removeLater,
+        "packing",
+        item.id,
+        "持ち物を消しました",
+        `[data-item="${item.id}"]`,
+      );
     });
   };
   return (

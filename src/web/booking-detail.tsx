@@ -1,3 +1,4 @@
+import { poofAway } from "./remove-motion";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { BookOpen } from "lucide-react";
@@ -141,9 +142,16 @@ export function BookingDetail({
       setPreview({ url, file });
     });
   const remove = () =>
+    confirm(`「${booking?.title ?? "この予約"}」を削除しますか？`) &&
     dismissModal(() => {
-      travel.removeLater("booking", id, "予約を消しました");
       onClose();
+      void poofAway(
+        travel.removeLater,
+        "booking",
+        id,
+        "予約を消しました",
+        `[data-booking="${id}"]`,
+      );
     });
   const press = (element: Element) =>
     spring(

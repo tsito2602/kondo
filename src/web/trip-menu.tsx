@@ -1,3 +1,4 @@
+import { poofAway } from "./remove-motion";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import {
@@ -174,9 +175,23 @@ export function TripMenuButton({ tripId }: { tripId: string }) {
                   disabled={busy}
                   className="danger"
                   onClick={() => {
+                    if (
+                      !confirm(
+                        `「${trip.name}」と旅行内のすべてのデータを削除しますか？`,
+                      )
+                    )
+                      return;
                     // Gone from the list at once; 「元に戻す」 in the dock for a while.
-                    travel.removeLater("trip", trip.id, "旅行を消しました");
                     navigate("/");
+                    // Back on the trip list, its card poofs away.
+                    void poofAway(
+                      travel.removeLater,
+                      "trip",
+                      trip.id,
+                      "旅行を消しました",
+                      `.home-trip[data-trip-surface="${trip.id}"]`,
+                      520,
+                    );
                   }}
                 >
                   <span>旅行を削除</span>
