@@ -37,6 +37,10 @@ type PickerProps = {
   span?: "days" | "nights";
   /** The trip's own days, marked with a small dot (and 出発 on the first). */
   trip?: { startsOn: string; endsOn: string };
+  /** Which end the first tap sets (a stay's チェックアウト row opens on it). */
+  phase?: "start" | "end";
+  /** A one-day pick that may be left empty, e.g. 「期限なし」. */
+  none?: string;
 };
 
 /** The trigger: the field's label over 「10/19（月）」 (— 「10/23（金）」). */
@@ -59,7 +63,9 @@ export function DatePicker(props: PickerProps) {
         <CalendarDays size={20} aria-hidden="true" />
         <span className="date-trigger-value">
           {props.range && <small>{props.startLabel ?? "出発"}</small>}
-          <span>{shortDate(props.value)}</span>
+          <span>
+            {props.none && !props.value ? props.none : shortDate(props.value)}
+          </span>
           {props.showTime && props.startTime && (
             <span className="date-trigger-time">{props.startTime}</span>
           )}
@@ -105,11 +111,13 @@ export function CalendarPanel({
   endTime = "",
   min,
   max,
-  startLabel = "出発",
+  startLabel = range ? "出発" : "日付",
   endLabel = "帰着",
   allowedDates,
   span,
   trip,
+  none,
+  phase: firstPhase,
   onChange,
   onClose,
 }: PickerProps & { onClose: () => void }) {
@@ -119,12 +127,16 @@ export function CalendarPanel({
   });
   // Which end the next tap sets. Once both are set, the next tap starts over.
   const [phase, setPhase] = useState<"start" | "end">(
-    range && value && !endValue ? "end" : "start",
+    firstPhase ?? (range && value && !endValue ? "end" : "start"),
   );
   const [timePhase, setTimePhase] = useState<"start" | "end">("start");
   const [times, setTimes] = useState({ startTime, endTime });
   const today = localDate();
-  const initial = value || endValue || min || today;
+  const initial =
+    value ||
+    endValue ||
+    min ||
+    (trip && trip.startsOn > today ? trip.startsOn : today);
   const [month, setMonth] = useState(initial.slice(0, 7));
   const grid = useRef<HTMLDivElement>(null);
   const motion = useRef<{ slide?: number; pop?: string; band?: boolean }>({});
@@ -238,15 +250,9 @@ export function CalendarPanel({
           setTimePhase(which);
         }}
       >
-        <small>
-          {which === "start"
-            ? range || showTime
-              ? startLabel
-              : "日付"
-            : endLabel}
-        </small>
+        <small>{which === "start" ? startLabel : endLabel}</small>
         <b>
-          {date ? shortDate(date) : "選んで"}
+          {date ? shortDate(date) : (none ?? "選んで")}
           {showTime && time ? ` ${time}` : ""}
         </b>
       </button>
@@ -379,6 +385,16 @@ export function CalendarPanel({
             })}
           </div>
         </div>
+        {none && (
+          <button
+            type="button"
+            className="dp-none"
+            aria-pressed={!draft.startDate}
+            onClick={() => setDraft({ startDate: "", endDate: "" })}
+          >
+            {none}
+          </button>
+        )}
         {showTime && (
           <div className="dp-time">
             <label>

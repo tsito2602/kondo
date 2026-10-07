@@ -958,3 +958,28 @@ button.bk-card {
     scroll-padding-bottom: calc(24px + var(--panel-keyboard-inset, 0px));
   }
 }
+/* 手入力の日付: a chip that opens the one calendar (date-picker.tsx). */
+:root .bk-date {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 13px 14px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--p-soft);
+  color: var(--p-ink);
+  font: inherit;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.bk-date[data-empty] {
+  color: var(--p-mute);
+}
+/* A date and its time need the row's width: the two ends stack. */
+.bk-two:has(.bk-moment) {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}

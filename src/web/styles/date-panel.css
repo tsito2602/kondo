@@ -222,3 +222,21 @@
   font-size: 16px;
   text-align: center;
 }
+
+:root .dp-none {
+  justify-self: start;
+  min-height: 0;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 99px;
+  background: var(--p-soft);
+  color: var(--p-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.dp-none[aria-pressed="true"] {
+  background: var(--p-ink);
+  color: var(--p-paper);
+}

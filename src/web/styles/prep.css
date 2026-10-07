@@ -451,126 +451,7 @@ dialog.modal:has(.prep-sheet):not([data-panel]) .modal-header h2 {
   font-weight: 900;
 }
 /* .cal */
-.prep-cal {
-  margin-top: 6px;
-  padding: 8px 8px 6px;
-  border-radius: 20px;
-  background: var(--p-soft);
-}
-.prep-cal-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 4px 4px;
-}
-.prep-cal-head b {
-  font-size: 15px;
-  font-weight: 900;
-}
-.prep-cal-head button {
-  width: 36px;
-  height: 36px;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: var(--p-ink);
-  font: inherit;
-  font-size: 20px;
-  cursor: pointer;
-}
-.prep-cal-head button:disabled {
-  color: var(--p-pale);
-  opacity: 1;
-  cursor: default;
-}
-.prep-cal-week,
-.prep-cal-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-}
-.prep-cal-week span {
-  padding: 2px 0 4px;
-  color: var(--p-mute);
-  font-size: 11px;
-  font-weight: 700;
-  text-align: center;
-}
-.prep-cal-grid button {
-  position: relative;
-  height: 40px;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 12px;
-  background: none;
-  color: var(--p-ink);
-  font-family: var(--f-num);
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.7;
-  cursor: pointer;
-}
-.prep-cal-grid button:disabled {
-  color: var(--p-pale);
-  opacity: 1;
-  cursor: default;
-}
-.prep-cal-grid button.is-today {
-  box-shadow: inset 0 0 0 2px var(--p-ink);
-}
 /* The trip's days, as one band: departure to return. */
-.prep-cal-grid button.is-trip {
-  border-radius: 0;
-  background: color-mix(in srgb, var(--p-mid) 22%, transparent);
-}
-.prep-cal-grid button.is-trip.is-first {
-  border-radius: 12px 0 0 12px;
-}
-.prep-cal-grid button.is-trip.is-last {
-  border-radius: 0 12px 12px 0;
-}
-.prep-cal-grid button.is-trip.is-first.is-last {
-  border-radius: 12px;
-}
-.prep-cal-grid button small {
-  position: absolute;
-  right: 0;
-  bottom: 1px;
-  left: 0;
-  color: var(--p-mute);
-  font-family: var(--f-body);
-  font-size: 8.5px;
-  font-weight: 900;
-  line-height: 1.7;
-}
-.prep-cal-grid button[aria-pressed="true"] {
-  border-radius: 12px;
-  background: var(--p-ink);
-  color: var(--p-paper);
-}
-.prep-cal-grid button[aria-pressed="true"] small {
-  color: var(--p-pale);
-}
-.prep-cal-none {
-  display: block;
-  min-height: 0;
-  margin: 4px auto 0;
-  padding: 6px 12px;
-  border: 0;
-  border-radius: 99px;
-  background: none;
-  color: var(--p-mute);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.prep-cal-none[aria-pressed="true"] {
-  background: var(--p-ink);
-  color: var(--p-paper);
-}
 /* .whos */
 .prep-whos {
   display: flex;
@@ -671,7 +552,6 @@ dialog.modal:has(.prep-sheet):not([data-panel]) .modal-header h2 {
   width: 20px;
   height: 20px;
 }
-
 
 /* Room under the panel's heading (やることを編集, 持ち物を編集). */
 .prep-sheet {

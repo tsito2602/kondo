@@ -1,3 +1,4 @@
+import { DatePicker } from "./date-picker";
 import {
   createContext,
   useCallback,
@@ -539,101 +540,6 @@ function Tasks() {
   );
 }
 
-function MonthCalendar({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (day: string) => void;
-}) {
-  const { selectedTrip } = useTravel();
-  const today = localDate();
-  const [month, setMonth] = useState((value || today).slice(0, 7));
-  const year = +month.slice(0, 4);
-  const index = +month.slice(5) - 1;
-  const first = new Date(year, index, 1).getDay();
-  const count = new Date(year, index + 1, 0).getDate();
-  const shift = (step: number) => {
-    const date = new Date(year, index + step, 1);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-  };
-  const prev = shift(-1);
-  const start = selectedTrip?.startsOn ?? "";
-  const end = selectedTrip?.endsOn ?? "";
-  return (
-    <div className="prep-cal">
-      <div className="prep-cal-head">
-        <button
-          type="button"
-          aria-label="前の月"
-          disabled={prev < today.slice(0, 7)}
-          onClick={() => setMonth(prev)}
-        >
-          ‹
-        </button>
-        <b aria-live="polite">
-          {year}年{index + 1}月
-        </b>
-        <button
-          type="button"
-          aria-label="次の月"
-          onClick={() => setMonth(shift(1))}
-        >
-          ›
-        </button>
-      </div>
-      <div className="prep-cal-week" aria-hidden="true">
-        {[..."日月火水木金土"].map((day) => (
-          <span key={day}>{day}</span>
-        ))}
-      </div>
-      <div className="prep-cal-grid">
-        {Array.from({ length: first }, (_, cell) => (
-          <span key={`blank-${cell}`} />
-        ))}
-        {Array.from({ length: count }, (_, offset) => {
-          const day = `${month}-${String(offset + 1).padStart(2, "0")}`;
-          const trip = start && day >= start && day <= end;
-          const note = day === start ? "出発" : day === today ? "今日" : "";
-          return (
-            <button
-              type="button"
-              key={day}
-              data-day={day}
-              className={[
-                day === today ? "is-today" : "",
-                trip ? "is-trip" : "",
-                day === start ? "is-first" : "",
-                day === end ? "is-last" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              disabled={day < today}
-              aria-pressed={value === day}
-              aria-label={`${+day.slice(5, 7)}月${offset + 1}日（${weekday(day)}）${note ? ` ${note}` : ""}${trip && !note ? " 旅行中" : ""}`}
-              onClick={(event) => {
-                onChange(day);
-                void boing(event.currentTarget, "scale(.9)");
-              }}
-            >
-              {offset + 1}
-              {note && <small aria-hidden="true">{note}</small>}
-            </button>
-          );
-        })}
-      </div>
-      <button
-        type="button"
-        className="prep-cal-none"
-        aria-pressed={!value}
-        onClick={() => onChange("")}
-      >
-        期限なし
-      </button>
-    </div>
-  );
-}
-
 function TaskSheet({
   task,
   defaultWho,
@@ -730,10 +636,15 @@ function TaskSheet({
           }}
         />
         <ErrorText message={error} />
-        <span className="prep-label">
-          期限 · {due ? `${monthDay(due)}（${weekday(due)}）` : "期限なし"}
-        </span>
-        <MonthCalendar value={due} onChange={setDue} />
+        <DatePicker
+          label="期限"
+          startLabel="期限"
+          value={due}
+          min={localDate()}
+          none="期限なし"
+          trip={travel.selectedTrip ?? undefined}
+          onChange={(day) => setDue(day)}
+        />
         <span className="prep-label" id={`${formId}-who`}>
           誰がやる
         </span>

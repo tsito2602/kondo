@@ -151,7 +151,9 @@ const click = async (node) => {
 const field = (label) =>
   [...document.querySelectorAll("dialog .field, dialog .bk-fld")]
     .find((node) => node.querySelector("span, small")?.textContent === label)
-    ?.querySelector("input,select,textarea,.date-trigger,[data-time-trigger]");
+    ?.querySelector(
+      ".bk-date,input,select,textarea,.date-trigger,[data-time-trigger]",
+    );
 // A plan's times: the button opens the timeline picker, whose big 開始/終了
 // readout is typed into (digits, then Enter) and saved with 「保存する」.
 const pickTime = async (trigger, values) => {
@@ -187,7 +189,7 @@ const fill = async (label, value) => {
   assert.ok(input, `field ${label} exists`);
   if (input.matches("[data-time-trigger]"))
     return pickTime(input, { 開始: value });
-  if (input.matches(".date-trigger")) {
+  if (input.matches(".date-trigger, .bk-date")) {
     await click(input);
     const selection = typeof value === "string" ? { start: value } : value;
     const chooseDate = async (date) => {
@@ -790,9 +792,23 @@ test("legacy account cache and pending changes survive React migration; real for
       "https://links.h6.hilton.com/f/a/" +
       "long-link-".repeat(30) +
       "?reservation=private";
-    const md = (day) => `${Number(day.slice(5, 7))}/${Number(day.slice(8))}`;
-    await fill("チェックイン", `${md(trip.startsOn)} 15:00〜`);
-    await fill("チェックアウト", "11/25 〜11:00");
+    const typeTime = async (label, value) =>
+      act(async () => {
+        const input = document.querySelector(`dialog [aria-label="${label}"]`);
+        Object.getOwnPropertyDescriptor(
+          dom.window.HTMLInputElement.prototype,
+          "value",
+        ).set.call(input, value);
+        input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+      });
+    // The dates: one calendar for the stay (チェックイン, then チェックアウト).
+    await fill("チェックイン", {
+      start: trip.startsOn,
+      end: `${trip.startsOn.slice(0, 4)}-11-25`,
+    });
+    assert.match(field("チェックアウト").textContent, /^11\/25（/);
+    await typeTime("チェックインの時刻", "15:00");
+    await typeTime("チェックアウトの時刻", "11:00");
     await fill("場所", hotelUrl);
     // The ＋ panel's dock: the ‹ circle on the left island (it closes the
     // keyboard first while typing), 「追加する」 in ink.
@@ -1139,28 +1155,32 @@ test("legacy account cache and pending changes survive React migration; real for
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const before = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
-    if (document.querySelector(`[data-day="${before}"]`))
+    await click(document.querySelector("dialog .date-trigger"));
+    const duePanel = () => [...document.querySelectorAll("dialog")].at(-1);
+    if (duePanel().querySelector(`[data-date="${before}"]`))
       assert.equal(
-        document.querySelector(`[data-day="${before}"]`).disabled,
+        duePanel().querySelector(`[data-date="${before}"]`).disabled,
         true,
         "past days cannot be a deadline",
       );
+    while (!duePanel().querySelector(`[data-date="${due}"]`))
+      await click(duePanel().querySelector('[aria-label="次の月"]'));
+    await click(duePanel().querySelector(`[data-date="${due}"]`));
     assert.equal(
-      document.querySelector('.prep-cal [aria-label="前の月"]').disabled,
-      true,
-    );
-    while (!document.querySelector(`[data-day="${due}"]`))
-      await click(document.querySelector('.prep-cal [aria-label="次の月"]'));
-    await click(document.querySelector(`[data-day="${due}"]`));
-    assert.equal(
-      document
-        .querySelector(`[data-day="${due}"]`)
+      duePanel()
+        .querySelector(`[data-date="${due}"]`)
         .getAttribute("aria-pressed"),
       "true",
     );
+    await click(byText(".context-actions button", "決定"));
+    await tick(30);
+    assert.equal(
+      document.querySelector("dialog .date-trigger").dataset.dateValue,
+      due,
+    );
     assert.match(
-      document.querySelector(".prep-label").textContent,
-      new RegExp(`期限 · ${+due.slice(5, 7)}/${+due.slice(8)}（`),
+      document.querySelector("dialog .date-trigger").textContent,
+      new RegExp(`${+due.slice(5, 7)}/${+due.slice(8)}（`),
     );
     await submitSheet("追加する");
     assert.equal(document.querySelector("dialog"), null);
@@ -1203,10 +1223,15 @@ test("legacy account cache and pending changes survive React migration; real for
       document.querySelector("dialog h2").textContent,
       "やることを編集",
     );
-    await click(document.querySelector(".prep-cal-none"));
-    assert.equal(
-      document.querySelector(".prep-label").textContent,
-      "期限 · 期限なし",
+    await click(document.querySelector("dialog .date-trigger"));
+    await click(
+      [...document.querySelectorAll("dialog")].at(-1).querySelector(".dp-none"),
+    );
+    await click(byText(".context-actions button", "決定"));
+    await tick(30);
+    assert.match(
+      document.querySelector("dialog .date-trigger").textContent,
+      /期限なし/,
     );
     await submitSheet("保存");
     const editedTask = db
@@ -1635,10 +1660,15 @@ test("legacy account cache and pending changes survive React migration; real for
     assert.equal(field("便名").placeholder, "EK 319");
     await fill("出発の空港", "成田（NRT）");
     await fill("到着の空港", "kix");
-    await fill(
-      "出発",
-      `${Number(trip.startsOn.slice(5, 7))}/${Number(trip.startsOn.slice(8))} 09:30`,
-    );
+    await fill("出発", { start: trip.startsOn });
+    await act(async () => {
+      const input = document.querySelector('dialog [aria-label="出発の時刻"]');
+      Object.getOwnPropertyDescriptor(
+        dom.window.HTMLInputElement.prototype,
+        "value",
+      ).set.call(input, "09:30");
+      input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    });
     await fill("予約番号", "JM6EQC");
     await click(byText(".thumb-dock-host .cdock-group button", "追加する"));
     await waitFor(
