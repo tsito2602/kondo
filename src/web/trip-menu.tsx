@@ -173,18 +173,11 @@ export function TripMenuButton({ tripId }: { tripId: string }) {
                   data-menu-item
                   disabled={busy}
                   className="danger"
-                  onClick={() =>
-                    void run(async () => {
-                      if (
-                        confirm(
-                          `「${trip.name}」と旅行内のすべてのデータを削除しますか？この操作は取り消せません。`,
-                        )
-                      ) {
-                        await travel.deleteTrip(trip.id);
-                        navigate("/");
-                      }
-                    })
-                  }
+                  onClick={() => {
+                    // Gone from the list at once; 「元に戻す」 in the dock for a while.
+                    travel.removeLater("trip", trip.id, "旅行を消しました");
+                    navigate("/");
+                  }}
                 >
                   <span>旅行を削除</span>
                   <Trash2 size={23} />

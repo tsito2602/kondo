@@ -44,7 +44,7 @@ type TravelContextValue = {
   deleteNote: (id: string) => void;
   createPlace: (input: PlaceInput) => string;
   updatePlace: (id: string, input: PlaceInput) => void;
-  deletePlace: (id: string) => void;
+  deletePlace: (id: string, tripId?: string) => void;
   deleteTrip: (id: string) => Promise<void>;
   saveTripOffline: (onProgress: (done: number, total: number) => void) => Promise<number>;
   pendingCount: number;
@@ -58,19 +58,26 @@ type TravelContextValue = {
   createBooking: (input: BookingInput) => string;
   updateBooking: (id: string, input: BookingInput) => void;
   setFlightConnection: (id: string, mode: NonNullable<Booking['connectionMode']>, nextFlightId?: string | null) => void;
-  deleteBooking: (id: string) => void;
+  deleteBooking: (id: string, tripId?: string) => void;
   uploadBookingDocument: (bookingId: string, input: BookingDocumentInput) => Promise<BookingDocument>;
   deleteBookingDocument: (bookingId: string, documentId: string) => void;
   downloadBookingDocument: (bookingId: string, documentId: string) => Promise<ArrayBuffer>;
   createPackingItem: (input: PackingInput) => string;
   updatePackingItem: (id: string, input: PackingInput) => void;
-  deletePackingItem: (id: string) => void;
+  deletePackingItem: (id: string, tripId?: string) => void;
   createTask: (input: TaskInput) => string;
   updateTask: (id: string, input: TaskInput) => void;
-  deleteTask: (id: string) => void;
+  deleteTask: (id: string, tripId?: string) => void;
   createInvite: () => Promise<string>;
   acceptInvite: (token: string) => Promise<string>;
+  /** Deletes after a few seconds: the thing leaves every list at once and the
+      dock offers 「元に戻す」 until then (Tsubasa 2026-10-07: undo for every delete). */
+  removeLater: (kind: RemovalKind, id: string, message: string) => void;
+  removal: { message: string } | null;
+  undoRemoval: () => void;
 };
+export type RemovalKind = 'booking' | 'task' | 'packing' | 'place' | 'trip';
+export const REMOVAL_UNDO_MS = 5000;
 
 const TravelContext = createContext<TravelContextValue | null>(null);
 
@@ -308,8 +315,8 @@ export function TravelProvider({ children }: PropsWithChildren) {
     commit((current) => ({ ...current, placesByTrip: { ...current.placesByTrip, [tripId]: (current.placesByTrip[tripId] ?? []).map((place) => place.id === id ? { ...place, ...input, ...(input.location !== place.location ? { lat: null, lng: null } : {}) } : place) } }));
     enqueue({ method: 'PATCH', path: `/v1/trips/${tripId}/places/${id}`, body: input });
   }, [commit, enqueue]);
-  const deletePlace = useCallback((id: string) => {
-    const tripId = cacheRef.current.selectedTripId;
+  const deletePlace = useCallback((id: string, inTrip?: string) => {
+    const tripId = inTrip ?? cacheRef.current.selectedTripId;
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) return;
     commit((current) => ({
@@ -483,8 +490,8 @@ export function TravelProvider({ children }: PropsWithChildren) {
     return documents.length;
   }, [isDemo, requestRaw, sync, user?.id]);
 
-  const deleteBooking = useCallback((id: string) => {
-    const tripId = cacheRef.current.selectedTripId;
+  const deleteBooking = useCallback((id: string, inTrip?: string) => {
+    const tripId = inTrip ?? cacheRef.current.selectedTripId;
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) return;
     commit((current) => ({
@@ -527,8 +534,8 @@ export function TravelProvider({ children }: PropsWithChildren) {
     enqueue({ method: 'PATCH', path: `/v1/trips/${tripId}/packing/${id}`, body: input });
   }, [commit, enqueue, user?.id]);
 
-  const deletePackingItem = useCallback((id: string) => {
-    const tripId = cacheRef.current.selectedTripId;
+  const deletePackingItem = useCallback((id: string, inTrip?: string) => {
+    const tripId = inTrip ?? cacheRef.current.selectedTripId;
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) return;
     commit((current) => ({
@@ -569,8 +576,8 @@ export function TravelProvider({ children }: PropsWithChildren) {
     enqueue({ method: 'PATCH', path: `/v1/trips/${tripId}/tasks/${id}`, body: input });
   }, [commit, enqueue]);
 
-  const deleteTask = useCallback((id: string) => {
-    const tripId = cacheRef.current.selectedTripId;
+  const deleteTask = useCallback((id: string, inTrip?: string) => {
+    const tripId = inTrip ?? cacheRef.current.selectedTripId;
     assertTripEditable(cacheRef.current, tripId);
     if (!tripId) return;
     commit((current) => ({
@@ -597,15 +604,56 @@ export function TravelProvider({ children }: PropsWithChildren) {
     return result.tripId;
   }, [request, selectTrip, sync]);
 
-  const selectedTrip = cache.trips.find((trip) => trip.id === cache.selectedTripId) ?? null;
+  const [removal, setRemoval] = useState<{ kind: RemovalKind; id: string; tripId: string | null; message: string } | null>(null);
+  const removalRef = useRef(removal);
+  const removalTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const commitRemoval = useCallback(() => {
+    clearTimeout(removalTimer.current);
+    const pending = removalRef.current;
+    removalRef.current = null;
+    setRemoval(null);
+    if (!pending) return;
+    const { kind, id, tripId } = pending;
+    try {
+      if (kind === 'trip') void deleteTrip(id).catch((cause) => setError(cause instanceof Error ? cause.message : '削除できませんでした'));
+      else if (tripId) ({ booking: deleteBooking, task: deleteTask, packing: deletePackingItem, place: deletePlace })[kind](id, tripId);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '削除できませんでした');
+    }
+  }, [deleteBooking, deletePackingItem, deletePlace, deleteTask, deleteTrip]);
+  const commitRef = useRef(commitRemoval);
+  commitRef.current = commitRemoval;
+  useEffect(() => {
+    const commitNow = () => commitRef.current();
+    globalThis.window?.addEventListener('pagehide', commitNow);
+    return () => { globalThis.window?.removeEventListener('pagehide', commitNow); commitNow(); };
+  }, []);
+  const removeLater = useCallback((kind: RemovalKind, id: string, message: string) => {
+    commitRef.current();
+    const tripId = cacheRef.current.selectedTripId;
+    if (kind !== 'trip') assertTripEditable(cacheRef.current, tripId);
+    const next = { kind, id, tripId, message };
+    removalRef.current = next;
+    setRemoval(next);
+    removalTimer.current = setTimeout(() => commitRef.current(), REMOVAL_UNDO_MS);
+  }, []);
+  const undoRemoval = useCallback(() => {
+    clearTimeout(removalTimer.current);
+    removalRef.current = null;
+    setRemoval(null);
+  }, []);
+  const gone = (kind: RemovalKind) => <T extends { id: string }>(entry: T) => !(removal?.kind === kind && removal.id === entry.id);
+  const removalShown = useMemo(() => removal && { message: removal.message }, [removal]);
+  const trips = useMemo(() => cache.trips.filter((trip) => !(removal?.kind === 'trip' && removal.id === trip.id)), [cache.trips, removal]);
+  const selectedTrip = trips.find((trip) => trip.id === cache.selectedTripId) ?? null;
   const items = [...(selectedTrip ? cache.itemsByTrip[selectedTrip.id] ?? [] : [])]
     .sort((a, b) => `${a.day} ${a.time} ${a.id}`.localeCompare(`${b.day} ${b.time} ${b.id}`));
-  const bookings = [...(selectedTrip ? cache.bookingsByTrip[selectedTrip.id] ?? [] : [])]
+  const bookings = (selectedTrip ? cache.bookingsByTrip[selectedTrip.id] ?? [] : []).filter(gone('booking'))
     .sort((a, b) => `${a.day} ${a.time} ${a.id}`.localeCompare(`${b.day} ${b.time} ${b.id}`));
   // Packing keeps the order things were added in (the server lists by rowid),
   // so ticking never moves a row (kondo-prep3).
-  const packingItems = [...(selectedTrip ? cache.packingByTrip[selectedTrip.id] ?? [] : [])];
-  const tasks = [...(selectedTrip ? cache.tasksByTrip[selectedTrip.id] ?? [] : [])]
+  const packingItems = (selectedTrip ? cache.packingByTrip[selectedTrip.id] ?? [] : []).filter(gone('packing'));
+  const tasks = (selectedTrip ? cache.tasksByTrip[selectedTrip.id] ?? [] : []).filter(gone('task'))
     .sort((a, b) => `${a.done ? 1 : 0} ${a.dueOn || '9999-12-31'} ${a.title} ${a.id}`.localeCompare(`${b.done ? 1 : 0} ${b.dueOn || '9999-12-31'} ${b.title} ${b.id}`));
   const membersOf = useCallback((tripId: string): TripMember[] => {
     const stored = cache.membersByTrip?.[tripId];
@@ -620,14 +668,14 @@ export function TravelProvider({ children }: PropsWithChildren) {
     canEdit: Boolean(selectedTrip && selectedTrip.role !== 'viewer'),
     syncing,
     error,
-    trips: cache.trips,
+    trips,
     selectedTrip,
     items,
     bookings,
     documentsByBooking: cache.documentsByBooking,
     packingItems,
     tasks,
-    places: selectedTrip ? cache.placesByTrip[selectedTrip.id] ?? [] : [],
+    places: (selectedTrip ? cache.placesByTrip[selectedTrip.id] ?? [] : []).filter(gone('place')),
     notes: selectedTrip ? cache.notesByTrip?.[selectedTrip.id] ?? [] : [],
     saveNote, deleteNote,
     createPlace, updatePlace, deletePlace, deleteTrip, saveTripOffline,
@@ -654,7 +702,10 @@ export function TravelProvider({ children }: PropsWithChildren) {
     deleteTask,
     createInvite,
     acceptInvite,
-  }), [saveNote, deleteNote, cache.notesByTrip, members, membersOf, saveTripOffline, createPlace, updatePlace, deletePlace, deleteTrip, cache.placesByTrip, acceptInvite, bookings, cache.documentsByBooking, cache.pending.length, cache.trips, createBooking, createInvite, createItem, createPackingItem, createTask, createTrip, deleteBooking, deleteBookingDocument, deleteItem, deletePackingItem, deleteTask, downloadBookingDocument, error, items, packingItems, ready, selectTrip, selectedTrip, setFlightConnection, sync, syncing, tasks, updateBooking, updateItem, updatePackingItem, updateTask, updateTrip, uploadBookingDocument]);
+    removeLater,
+    removal: removalShown,
+    undoRemoval,
+  }), [removeLater, removalShown, undoRemoval, trips, removal, saveNote, deleteNote, cache.notesByTrip, members, membersOf, saveTripOffline, createPlace, updatePlace, deletePlace, deleteTrip, cache.placesByTrip, acceptInvite, bookings, cache.documentsByBooking, cache.pending.length, createBooking, createInvite, createItem, createPackingItem, createTask, createTrip, deleteBooking, deleteBookingDocument, deleteItem, deletePackingItem, deleteTask, downloadBookingDocument, error, items, packingItems, ready, selectTrip, selectedTrip, setFlightConnection, sync, syncing, tasks, updateBooking, updateItem, updatePackingItem, updateTask, updateTrip, uploadBookingDocument]);
 
   return <TravelContext.Provider value={value}>{children}</TravelContext.Provider>;
 }

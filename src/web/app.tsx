@@ -53,7 +53,12 @@ import { TripMenuButton, tripSpan } from "./trip-menu";
 import { DockBackIcon } from "./cartoon-dock";
 import { installPressFeedback } from "./press-feedback";
 import { keyboardInset, revealModalField } from "./viewport";
-import { ThumbDock, ThumbDockProvider, ContextDock } from "./thumb-dock";
+import {
+  ContextDock,
+  DockToast,
+  ThumbDock,
+  ThumbDockProvider,
+} from "./thumb-dock";
 import {
   BookingsScreen,
   ItineraryScreen,
@@ -304,6 +309,14 @@ function TravelApp() {
           }
         />
       </Routes>
+      {travel.removal && (
+        <ThumbDock mode="toast">
+          <DockToast
+            message={travel.removal.message}
+            onUndo={travel.undoRemoval}
+          />
+        </ThumbDock>
+      )}
       {settingsOpen && <SettingsScreen />}
       {membersTripId && travel.selectedTrip?.id === membersTripId && (
         <MembersScreen

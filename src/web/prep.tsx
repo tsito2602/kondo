@@ -608,9 +608,11 @@ function TaskSheet({
     }
   };
   const remove = () => {
-    if (!task || !confirm(`「${task.title}」を削除しますか？`)) return;
-    travel.deleteTask(task.id);
-    dismissModal(onClose);
+    if (!task) return;
+    dismissModal(() => {
+      travel.removeLater("task", task.id, "やることを消しました");
+      onClose();
+    });
   };
   return (
     <PrepSheet
@@ -1049,9 +1051,11 @@ function PackingSheet({
     });
   };
   const remove = () => {
-    if (!item || !confirm(`「${item.name}」を削除しますか？`)) return;
-    travel.deletePackingItem(item.id);
-    dismissModal(onClose);
+    if (!item) return;
+    dismissModal(() => {
+      travel.removeLater("packing", item.id, "持ち物を消しました");
+      onClose();
+    });
   };
   return (
     <PrepSheet

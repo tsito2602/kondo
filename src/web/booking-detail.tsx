@@ -141,12 +141,9 @@ export function BookingDetail({
       setPreview({ url, file });
     });
   const remove = () =>
-    void run(() => {
-      if (confirm("この予約を削除しますか？"))
-        dismissModal(() => {
-          travel.deleteBooking(id);
-          onClose();
-        });
+    dismissModal(() => {
+      travel.removeLater("booking", id, "予約を消しました");
+      onClose();
     });
   const press = (element: Element) =>
     spring(

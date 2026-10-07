@@ -981,16 +981,6 @@ test("legacy account cache and pending changes survive React migration; real for
         .getAttribute("aria-label"),
       "しおりを見る",
     );
-    globalThis.confirm = () => false;
-    await click(
-      document.querySelector('.context-actions [aria-label="場所を削除"]'),
-    );
-    assert.equal(
-      db.prepare("SELECT COUNT(*) AS n FROM places").get().n,
-      1,
-      "cancelled deletion preserves the place",
-    );
-    globalThis.confirm = () => true;
     await click(document.querySelector('.context-actions [aria-label="編集"]'));
     assert.ok(document.querySelector('.context-actions button[type="submit"]'));
     assert.equal(
@@ -1240,20 +1230,36 @@ test("legacy account cache and pending changes survive React migration; real for
       taskDelete,
       "delete sits to the right of save in the task editor",
     );
-    globalThis.confirm = () => false;
+    // No confirm: it leaves the list at once and the dock offers 元に戻す.
     await click(taskDelete);
+    await tick(30);
+    assert.equal(document.querySelector("dialog"), null);
+    assert.equal(document.querySelector(`[data-task="${savedTask.id}"]`), null);
+    const toast = () =>
+      document.querySelector('.cdock-group[data-slot="toast"]');
+    assert.match(toast().textContent, /やることを消しました/);
+    await click(toast().querySelector("button"));
+    assert.ok(
+      document.querySelector(`[data-task="${savedTask.id}"]`),
+      "元に戻す brings it back",
+    );
     assert.equal(
       db.prepare("SELECT COUNT(*) AS n FROM travel_tasks").get().n,
       1,
     );
-    globalThis.confirm = () => true;
-    await click(taskDelete);
-    await tick(30);
-    assert.equal(
-      db.prepare("SELECT COUNT(*) AS n FROM travel_tasks").get().n,
-      0,
+    await click(document.querySelector('[aria-label="チケットを予約を編集"]'));
+    await click(
+      document.querySelector('.context-actions [aria-label="やることを削除"]'),
     );
-    assert.equal(document.querySelector("dialog"), null);
+    await tick(30);
+    // Leaving the page settles the deletion instead of waiting for the timer.
+    await act(async () =>
+      window.dispatchEvent(new dom.window.Event("pagehide")),
+    );
+    await waitFor(
+      () => db.prepare("SELECT COUNT(*) AS n FROM travel_tasks").get().n === 0,
+      "the undo window ends in a real delete",
+    );
 
     await click(dockTab("持ち物"));
     assert.equal(document.querySelector(".page-top h2").textContent, "持ち物");

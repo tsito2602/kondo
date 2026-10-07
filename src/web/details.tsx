@@ -146,13 +146,9 @@ export function PlaceDetail({
     />
   ) : undefined;
   const remove = () =>
-    void run(() => {
-      if (confirm("この場所を削除しますか？")) {
-        dismissModal(() => {
-          travel.deletePlace(id);
-          onClose();
-        });
-      }
+    dismissModal(() => {
+      travel.removeLater("place", id, "場所を消しました");
+      onClose();
     });
   return (
     <>

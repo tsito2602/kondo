@@ -28,7 +28,7 @@ const people = (...keys: string[]) => keys.map((key) => DEMO_PEOPLE[key]);
 export const demoMembers = people('self', 'misaki');
 
 /** Bump when the sample content changes, so devices drop an older saved sample. */
-export const DEMO_REVISION = '2026-10-06-vienna-3';
+export const DEMO_REVISION = '2026-10-07-vienna-4';
 
 /**
  * Demo mode's data: one five-day trip to Vienna starting 13 days from today
