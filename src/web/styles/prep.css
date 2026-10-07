@@ -644,8 +644,3 @@ dialog.modal:has(.prep-sheet):not([data-panel]) .modal-header h2 {
   width: 20px;
   height: 20px;
 }
-
-/* Room under the panel's heading (やることを編集, 持ち物を編集). */
-.prep-sheet {
-  padding-top: 14px;
-}

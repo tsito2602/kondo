@@ -1680,8 +1680,9 @@ dialog[data-panel="add"],
   line-height: 1.3;
   text-align: left;
 }
+/* Room under every floating panel's heading (Tsubasa 2026-10-07). */
 :root dialog.modal[data-panel="add"] .modal-body {
-  padding: 0 18px 18px;
+  padding: 14px 18px 18px;
 }
 /* A card's detail in the same panel (予約・場所; 予定 above) leads with the
    card itself: the panel's name stays for screen readers only. */
@@ -1689,6 +1690,11 @@ dialog[data-panel="add"],
   dialog.modal[data-panel="add"]:is(:has(.bk-detail), :has(.detail-stack))
   .modal-header {
   padding-top: 18px;
+}
+:root
+  dialog.modal[data-panel="add"]:is(:has(.bk-detail), :has(.detail-stack))
+  .modal-body {
+  padding-top: 0;
 }
 :root
   dialog.modal[data-panel="add"]:is(:has(.bk-detail), :has(.detail-stack))
@@ -1712,6 +1718,9 @@ dialog[data-panel="add"],
   font-size: 11.5px;
   font-weight: 400;
   color: var(--it-mute);
+}
+:root .plan-add > .field:first-child > span:not(.it-sr) {
+  margin-top: 0;
 }
 .it-chips {
   display: flex;
