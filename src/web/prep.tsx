@@ -28,6 +28,14 @@ import { anim, RM, spring } from "./cartoon";
 import { useJellyScroll } from "./jelly-scroll";
 import { dismissModal } from "./motion";
 import { PageTop } from "./page-top";
+import {
+  CategoryIcon,
+  categoryColorKey,
+  defaultPackingCategory,
+  isListedCategory,
+  packingCategories,
+  presentCategories,
+} from "./packing-categories";
 import { CheckIcon, LockIcon } from "./prep-pictures";
 import { AddButton, DockFunction, ErrorText, Modal } from "./ui";
 
@@ -227,6 +235,10 @@ type Ring = {
   tasks: TravelTask[];
 };
 const UNASSIGNED = "unassigned";
+/** Tasks still on a member who has left the trip. */
+const FORMER = "former";
+/** The who-picker's value for "leave it on the departed member". */
+const KEEP = "keep";
 
 function DueText({ task, today }: { task: TravelTask; today: string }) {
   if (!task.dueOn) return <>期限なし</>;
@@ -279,7 +291,7 @@ function ActivityRing({
             strokeDashoffset={circumference * (1 - fraction)}
           />
         </svg>
-        {ring.key === UNASSIGNED ? (
+        {ring.key === UNASSIGNED || ring.key === FORMER ? (
           <span className="assignee-avatar" aria-hidden="true">
             ?
           </span>
@@ -409,14 +421,23 @@ function Tasks() {
       (task) => task.assignee === memberAssignee(member.id),
     ),
   }));
-  // Tasks from older versions may have nobody (or a departed member) on them.
+  // A task may have nobody on it, or a member who has since left the trip.
   const loose = travel.tasks.filter((task) => !memberKeys.has(task.assignee));
-  if (loose.length)
+  const former = loose.filter((task) => task.assignee.startsWith("member:"));
+  const nobody = loose.filter((task) => !task.assignee.startsWith("member:"));
+  if (former.length)
+    rings.push({
+      key: FORMER,
+      label: "元メンバー",
+      assignee: "",
+      tasks: former,
+    });
+  if (nobody.length)
     rings.push({
       key: UNASSIGNED,
       label: "担当なし",
       assignee: "",
-      tasks: loose,
+      tasks: nobody,
     });
   const [chosen, setChosen] = useState(self ?? "");
   const ring =
@@ -489,17 +510,11 @@ function Tasks() {
           {ring && (
             <>
               <div className="prep-heading prep-task-heading">
-                <b>
-                  {mine
-                    ? "あなたのやること"
-                    : ring.key === UNASSIGNED
-                      ? "担当なしのやること"
-                      : `${ring.label}のやること`}
-                </b>
+                <b>{mine ? "あなたのやること" : `${ring.label}のやること`}</b>
                 <span>
                   {mine
                     ? "押すとリングが閉じていく"
-                    : ring.key === UNASSIGNED
+                    : ring.key === UNASSIGNED || ring.key === FORMER
                       ? "誰でもチェックできる"
                       : "見るだけ（チェックは本人）"}
                 </span>
@@ -531,8 +546,8 @@ function Tasks() {
           task={sheet.task}
           defaultWho={self ?? ""}
           onClose={() => setSheet(null)}
-          onSaved={(ids, who) => {
-            if (who !== "all" && who) setChosen(who);
+          onSaved={(ids, key) => {
+            if (key) setChosen(key);
             setFresh(ids);
           }}
         />
@@ -550,18 +565,29 @@ function TaskSheet({
   task?: TravelTask;
   defaultWho: string;
   onClose: () => void;
-  onSaved: (ids: string[], who: string) => void;
+  /** The ring to show afterwards (empty: stay). */
+  onSaved: (ids: string[], ring: string) => void;
 }) {
   const { travel, members, label } = useTravellers();
   const formId = useId();
   const [title, setTitle] = useState(task?.title ?? "");
   const [due, setDue] = useState(task?.dueOn ?? "");
-  const initialWho = task
-    ? task.assignee.startsWith("member:")
-      ? task.assignee.slice(7)
-      : ""
-    : defaultWho;
+  // KEEP: the task stays on someone outside the list (a member who left).
+  const current =
+    task && members.find((m) => memberAssignee(m.id) === task.assignee);
+  const kept = task?.assignee && !current ? task.assignee : "";
+  const initialWho = task ? (current?.id ?? (kept ? KEEP : "")) : defaultWho;
   const [who, setWho] = useState(initialWho);
+  const assigneeFor = (value: string) =>
+    value === KEEP ? kept : value ? memberAssignee(value) : "";
+  const ringFor = (value: string) =>
+    value === "all"
+      ? ""
+      : value === KEEP
+        ? kept.startsWith("member:")
+          ? FORMER
+          : UNASSIGNED
+        : value || UNASSIGNED;
   const [error, setError] = useState("");
   const name = useRef<HTMLInputElement>(null);
   const save = (event: FormEvent) => {
@@ -582,12 +608,12 @@ function TaskSheet({
         travel.updateTask(task.id, {
           title: value,
           dueOn: due,
-          assignee: who ? memberAssignee(who) : task.assignee,
+          assignee: assigneeFor(who),
           done: task.done,
         });
         dismissModal(() => {
           onClose();
-          onSaved([task.id], who);
+          onSaved([task.id], ringFor(who));
         });
         return;
       }
@@ -596,13 +622,13 @@ function TaskSheet({
         travel.createTask({
           title: value,
           dueOn: due,
-          assignee: person ? memberAssignee(person) : "",
+          assignee: assigneeFor(person),
           done: false,
         }),
       );
       dismissModal(() => {
         onClose();
-        onSaved(ids, who);
+        onSaved(ids, ringFor(who));
       });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "保存できませんでした");
@@ -677,6 +703,30 @@ function TaskSheet({
               {label(member)}
             </button>
           ))}
+          {kept && (
+            <button
+              type="button"
+              aria-pressed={who === KEEP}
+              onClick={(event) => {
+                setWho(KEEP);
+                void boing(event.currentTarget, "scale(.9)");
+              }}
+            >
+              <AssigneeAvatar value={kept} members={travel.members} />
+              {kept.startsWith("member:") ? "元メンバー" : kept}
+            </button>
+          )}
+          <button
+            type="button"
+            className="prep-who-none"
+            aria-pressed={who === ""}
+            onClick={(event) => {
+              setWho("");
+              void boing(event.currentTarget, "scale(.9)");
+            }}
+          >
+            担当なし
+          </button>
           {!task && members.length > 1 && (
             <button
               type="button"
@@ -712,6 +762,9 @@ const kinds: Record<PackingKind, [string, string]> = {
   mine: ["自分だけ", "あなたのリストにだけ出る。ほかの人には見えない"],
 };
 const kindOf = (item: PackingItem): PackingKind => item.kind ?? "one";
+const categoryOf = (item: PackingItem) =>
+  item.category || defaultPackingCategory;
+const ALL = "すべて";
 
 const packingInput = (item: PackingItem) => ({
   name: item.name,
@@ -773,7 +826,12 @@ function PackRow({
         }}
       >
         <span>
-          <b>{item.name}</b>
+          <b>
+            {item.name}
+            {item.quantity > 1 && (
+              <span className="prep-qty"> ×{item.quantity}</span>
+            )}
+          </b>
           {sub && <small className="prep-item-sub">{sub}</small>}
         </span>
         {side}
@@ -805,6 +863,8 @@ function Packing() {
   const bubble = useBubble();
   const [sheet, setSheet] = useState<{ item?: PackingItem } | null>(null);
   const [fresh, setFresh] = useState("");
+  // The category filter lasts for this visit only.
+  const [filter, setFilter] = useState(ALL);
   const page = useRef<HTMLDivElement>(null);
   const me = memberAssignee(self ?? "");
   useSinkIn(page);
@@ -819,12 +879,20 @@ function Packing() {
   const others = members.filter((member) => member.id !== self);
   const row$ = (id: string) =>
     page.current?.querySelector(`[data-item="${id}"]`);
-  // Only the one who took a 1つでいい item ticks it; an old free-text carrier is anyone's.
+  // A 1つでいい item is held only by a current member; one nobody holds (or
+  // whose carrier left the trip) is open to everyone, as is an old free-text carrier.
+  const memberKeys = new Set(
+    members.map((member) => memberAssignee(member.id)),
+  );
+  const heldByOther = (item: PackingItem) =>
+    Boolean(item.assignee) &&
+    item.assignee !== me &&
+    memberKeys.has(item.assignee ?? "");
+  const unclaimed = (item: PackingItem) =>
+    !item.assignee ||
+    (item.assignee.startsWith("member:") && !memberKeys.has(item.assignee));
   const tickable = (item: PackingItem) =>
-    travel.canEdit &&
-    (kindOf(item) !== "one" ||
-      item.assignee === me ||
-      Boolean(item.assignee && !item.assignee.startsWith("member:")));
+    travel.canEdit && (kindOf(item) !== "one" || !heldByOther(item));
   const toggle = (item: PackingItem) => {
     travel.updatePackingItem(item.id, {
       ...packingInput(item),
@@ -840,7 +908,6 @@ function Packing() {
       ...packingInput(item),
       assignee: me,
       shared: true,
-      packed: false,
     });
     requestAnimationFrame(() => {
       const row = row$(item.id);
@@ -886,16 +953,19 @@ function Packing() {
         </span>
       );
     else if (kind === "one") {
-      sub = item.assignee ? (
+      sub = !unclaimed(item) ? (
         <>
-          <AssigneeAvatar value={item.assignee} members={travel.members} />
+          <AssigneeAvatar
+            value={item.assignee ?? ""}
+            members={travel.members}
+          />
           {carrier(item)}が持つ
           {item.assignee !== me && item.packed ? " · 入れた" : ""}
         </>
       ) : (
         "まだ誰も持っていない"
       );
-      if (!item.assignee && travel.canEdit && self)
+      if (unclaimed(item) && travel.canEdit && self)
         side = (
           <button
             type="button"
@@ -913,7 +983,7 @@ function Packing() {
           ほかの人には見えない
         </>
       );
-    const showCheck = kind !== "one" || canTick;
+    const showCheck = kind !== "one" || !heldByOther(item);
     return (
       <PackRow
         key={item.id}
@@ -928,6 +998,9 @@ function Packing() {
       />
     );
   };
+  const categories = presentCategories(travel.packingItems.map(categoryOf));
+  const shown =
+    categories.length > 1 && categories.includes(filter) ? filter : ALL;
   return (
     <div className="page prep-page" ref={page}>
       <PrepHeader
@@ -935,11 +1008,36 @@ function Packing() {
         addLabel="持ち物を追加"
         onAdd={travel.canEdit ? () => setSheet({}) : undefined}
       />
+      {categories.length > 1 && (
+        <div
+          className="prep-filters"
+          role="group"
+          aria-label="カテゴリで絞り込む"
+        >
+          {[ALL, ...categories].map((category) => (
+            <button
+              type="button"
+              key={category}
+              data-kind={
+                category === ALL ? undefined : categoryColorKey(category)
+              }
+              aria-pressed={shown === category}
+              onClick={() => setFilter(category)}
+            >
+              {category !== ALL && <CategoryIcon category={category} />}
+              {category}
+            </button>
+          ))}
+        </div>
+      )}
       {(["each", "one", "mine"] as const).map((kind) => {
         // The list's own order (oldest first), so ticking never moves a row.
         const items = travel.packingItems.filter(
-          (item) => kindOf(item) === kind,
+          (item) =>
+            kindOf(item) === kind &&
+            (shown === ALL || categoryOf(item) === shown),
         );
+        if (shown !== ALL && !items.length) return null;
         return (
           <section key={kind} aria-label={kinds[kind][0]}>
             <div className="prep-heading prep-kind-heading">
@@ -982,6 +1080,13 @@ function PackingSheet({
   const formId = useId();
   const [name, setName] = useState(item?.name ?? "");
   const [kind, setKind] = useState<PackingKind>(item ? kindOf(item) : "each");
+  const [quantity, setQuantity] = useState(item?.quantity ?? 1);
+  // Stored as is until the user picks; an old free-text category gets its own chip.
+  const [category, setCategory] = useState(
+    item?.category || defaultPackingCategory,
+  );
+  const legacy =
+    item?.category && !isListedCategory(item.category) ? item.category : "";
   const [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null);
   const save = (event: FormEvent) => {
@@ -1006,6 +1111,8 @@ function PackingSheet({
         travel.updatePackingItem(item.id, {
           ...before,
           name: value,
+          category,
+          quantity,
           kind,
           shared: kind === "one",
           assignee: changed ? "" : before.assignee,
@@ -1023,8 +1130,8 @@ function PackingSheet({
       }
       const id = travel.createPackingItem({
         name: value,
-        category: "その他",
-        quantity: 1,
+        category,
+        quantity,
         packed: false,
         assignee: "",
         shared: kind === "one",
@@ -1100,6 +1207,59 @@ function PackingSheet({
           }}
         />
         <ErrorText message={error} />
+        <span className="prep-label" id={`${formId}-cat`}>
+          カテゴリ
+        </span>
+        <div
+          className="prep-cats"
+          role="radiogroup"
+          aria-labelledby={`${formId}-cat`}
+        >
+          {[
+            ...packingCategories.map(([value]) => value),
+            ...(legacy ? [legacy] : []),
+          ].map((value) => (
+            <button
+              type="button"
+              role="radio"
+              key={value}
+              data-kind={categoryColorKey(value)}
+              className={value === legacy ? "is-legacy" : undefined}
+              aria-checked={category === value}
+              onClick={(event) => {
+                setCategory(value);
+                void spring(
+                  event.currentTarget,
+                  [{ transform: "scale(.96)" }, { transform: "none" }],
+                  "squish",
+                );
+              }}
+            >
+              <CategoryIcon category={value} />
+              {value}
+            </button>
+          ))}
+        </div>
+        <div className="prep-qty-field" role="group" aria-label="個数">
+          <span className="prep-label">個数</span>
+          <button
+            type="button"
+            aria-label="個数を減らす"
+            disabled={quantity <= 1}
+            onClick={() => setQuantity((n) => Math.max(1, n - 1))}
+          >
+            −
+          </button>
+          <output aria-live="polite">{quantity}</output>
+          <button
+            type="button"
+            aria-label="個数を増やす"
+            disabled={quantity >= 99}
+            onClick={() => setQuantity((n) => Math.min(99, n + 1))}
+          >
+            ＋
+          </button>
+        </div>
         <div className="prep-kinds" role="radiogroup" aria-label="持ち物の種類">
           {(Object.keys(kinds) as PackingKind[]).map((value) => (
             <button

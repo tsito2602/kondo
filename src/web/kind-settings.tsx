@@ -10,18 +10,28 @@ import {
   useKindColors,
   type KindKey,
 } from "./kind-colors";
+import { packingCategories } from "./packing-categories";
 import { Modal, SaveButton, useToast } from "./ui";
+
+/** A kind's icon: a plan glyph, or a 持ち物 category's lucide icon. */
+function KindIcon({ kind, className }: { kind: KindKey; className?: string }) {
+  const entry = KINDS.find((item) => item.key === kind)!;
+  if (entry.glyph) return <Glyph name={entry.glyph} className={className} />;
+  const Icon = packingCategories.find(([, , key]) => key === kind)![1];
+  return <Icon className={className} aria-hidden="true" />;
+}
 
 const dark = () => document.documentElement.dataset.theme === "dark";
 
-/** 設定 › カテゴリの色: one row per kind, its glyph in its colour (uchiwake's 費目). */
+/** 設定 › カテゴリの色: one row per kind, its glyph in its colour (uchiwake's 費目).
+ * 持ち物のカテゴリ follow as a second section. */
 export function KindColorRows() {
   const colors = useKindColors();
   const [editing, setEditing] = useState<KindKey | null>(null);
-  return (
-    <>
-      <div className="settings-group">
-        {KINDS.map((kind) => (
+  const group = (packing: boolean) => (
+    <div className="settings-group">
+      {KINDS.filter((kind) => (kind.group === "packing") === packing).map(
+        (kind) => (
           <button
             key={kind.key}
             type="button"
@@ -36,7 +46,7 @@ export function KindColorRows() {
               setEditing(kind.key);
             }}
           >
-            <Glyph name={kind.glyph} className="settings-row-icon is-kind" />
+            <KindIcon kind={kind.key} className="settings-row-icon is-kind" />
             <span>
               <b>{kind.label}</b>
             </span>
@@ -54,8 +64,15 @@ export function KindColorRows() {
               </svg>
             </span>
           </button>
-        ))}
-      </div>
+        ),
+      )}
+    </div>
+  );
+  return (
+    <>
+      {group(false)}
+      <h3 className="settings-label">持ち物のカテゴリの色</h3>
+      {group(true)}
       {editing && (
         <KindColorPanel
           kind={editing}
@@ -94,7 +111,7 @@ function KindColorPanel({
           className="kind-panel-head"
           style={{ "--kind": displayColor(value) } as CSSProperties}
         >
-          <Glyph name={entry.glyph} />
+          <KindIcon kind={kind} />
           {entry.label}
         </div>
         <fieldset className="color-picker">

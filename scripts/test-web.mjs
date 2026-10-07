@@ -1335,6 +1335,19 @@ test("legacy account cache and pending changes survive React migration; real for
       document.querySelector(`[data-task="${savedTask.id}"] small`).textContent,
       "期限なし",
     );
+    // A task can be put back on nobody (production's 未指定).
+    await click(document.querySelector('[aria-label="チケットを予約を編集"]'));
+    await click(byText("dialog .prep-whos button", "担当なし"));
+    await submitSheet("保存");
+    assert.equal(
+      db.prepare("SELECT assignee FROM travel_tasks").get().assignee,
+      "",
+    );
+    assert.equal(
+      document.querySelector(`[data-ring="unassigned"] b`).textContent,
+      "担当なし",
+    );
+    assert.ok(document.querySelector(`[data-task="${savedTask.id}"]`));
     await click(document.querySelector('[aria-label="チケットを予約を編集"]'));
     const taskDelete = document.querySelector(
       '.context-actions [aria-label="やることを削除"]',
@@ -1376,7 +1389,7 @@ test("legacy account cache and pending changes survive React migration; real for
 
     await click(dockTab("持ち物"));
     assert.equal(document.querySelector(".page-top h2").textContent, "持ち物");
-    const addPacking = async (name, kind) => {
+    const addPacking = async (name, kind, category) => {
       await click(
         document.querySelector('.persistent-add[aria-label="持ち物を追加"]'),
       );
@@ -1391,11 +1404,18 @@ test("legacy account cache and pending changes survive React migration; real for
         name,
       );
       await click(byText('[role="radio"] b', kind).closest("button"));
+      assert.equal(
+        document.querySelector('.prep-cats [aria-checked="true"]').textContent,
+        "その他",
+        "その他 is the default category",
+      );
+      if (category) await click(byText(".prep-cats [role=radio]", category));
       await submitSheet("追加する");
       return db.prepare("SELECT id FROM packing_items WHERE name = ?").get(name)
         .id;
     };
     const kindRow = (id) => document.querySelector(`[data-item="${id}"]`);
+    const filters = () => document.querySelector(".prep-filters");
     const charger = await addPacking("充電器", "みんな各自");
     assert.equal(
       db
@@ -1416,9 +1436,39 @@ test("legacy account cache and pending changes survive React migration; real for
       ["owner"],
       "みんな各自 keeps each member's own tick",
     );
-    const medicine = await addPacking("常備薬", "1つでいい");
+    assert.equal(filters(), null, "no filter row while every item is その他");
+    const medicine = await addPacking("常備薬", "1つでいい", "薬");
+    assert.equal(
+      db
+        .prepare("SELECT category FROM packing_items WHERE id = ?")
+        .get(medicine).category,
+      "薬",
+    );
+    assert.deepEqual(
+      [...filters().querySelectorAll("button")].map((b) => b.textContent),
+      ["すべて", "薬", "その他"],
+    );
+    assert.equal(
+      filters().querySelector('[data-kind="pack-medicine"] svg') !== null,
+      true,
+      "the category icon carries its colour key",
+    );
+    await click(byText(".prep-filters button", "薬"));
+    assert.ok(kindRow(medicine));
+    assert.equal(kindRow(charger), null, "filtering hides other categories");
+    assert.deepEqual(
+      [...document.querySelectorAll(".prep-kind-heading b")].map(
+        (b) => b.textContent,
+      ),
+      ["1つでいい"],
+      "kinds with nothing left are hidden",
+    );
+    await click(byText(".prep-filters button", "すべて"));
+    assert.ok(kindRow(charger));
     assert.match(kindRow(medicine).textContent, /まだ誰も持っていない/);
-    assert.equal(kindRow(medicine).querySelector('[role="checkbox"]'), null);
+    // Nobody holds it yet: anyone ticks it, and taking it keeps the tick.
+    await click(kindRow(medicine).querySelector('[role="checkbox"]'));
+    await tick(30);
     await click(byText(`[data-item="${medicine}"] button`, "自分が持つ"));
     await tick(30);
     assert.equal(
@@ -1429,6 +1479,12 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.match(kindRow(medicine).textContent, /あなたが持つ/);
     assert.ok(kindRow(medicine).querySelector('[role="checkbox"]'));
+    assert.equal(
+      db.prepare("SELECT packed FROM packing_items WHERE id = ?").get(medicine)
+        .packed,
+      1,
+      "自分が持つ keeps the tick",
+    );
     const diary = await addPacking("日記", "自分だけ");
     assert.deepEqual(
       {
@@ -1439,6 +1495,21 @@ test("legacy account cache and pending changes survive React migration; real for
       { kind: "mine", owner_id: "owner" },
     );
     assert.match(kindRow(diary).textContent, /ほかの人には見えない/);
+    assert.doesNotMatch(kindRow(diary).textContent, /×/);
+    await click(document.querySelector('[aria-label="日記を編集"]'));
+    assert.equal(
+      document.querySelector("dialog .prep-qty-field output").textContent,
+      "1",
+    );
+    await click(document.querySelector('dialog [aria-label="個数を増やす"]'));
+    await click(document.querySelector('dialog [aria-label="個数を増やす"]'));
+    await submitSheet("保存");
+    assert.equal(
+      db.prepare("SELECT quantity FROM packing_items WHERE id = ?").get(diary)
+        .quantity,
+      3,
+    );
+    assert.match(kindRow(diary).textContent, /日記 ×3/);
     await click(document.querySelector('[aria-label="充電器を編集"]'));
     assert.equal(
       document.querySelector("dialog h2").textContent,
@@ -1655,6 +1726,18 @@ test("legacy account cache and pending changes survive React migration; real for
       "the version moved to the app row",
     );
     assert.ok(foot.querySelector("button[aria-label='kondo'] svg"));
+    assert.ok(
+      byText("dialog .settings-label", "持ち物のカテゴリの色"),
+      "持ち物 categories have their own colour section",
+    );
+    assert.deepEqual(
+      [
+        ...document.querySelectorAll(
+          'dialog .settings-row[data-kind^="pack-"] b',
+        ),
+      ].map((b) => b.textContent),
+      ["書類・お金", "衣類", "洗面・コスメ", "薬", "電子機器", "その他"],
+    );
     assert.match(
       document.querySelector("dialog .passport-stamps").textContent,
       /これまでの旅 \d+回/,
