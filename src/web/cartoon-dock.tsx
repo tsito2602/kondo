@@ -39,8 +39,9 @@ export function DockGroup({
   /** "ink": the island under this group turns ink (a lone save button);
       "ink-dim": that ink at the mocks' disabled .4 (読み取る before a file). */
   tone?: "ink" | "ink-dim";
-  /** Several actions with a primary one: the primary is an ink pill. */
-  mixed?: boolean;
+  /** Several actions with a primary one: the primary is an ink pill
+      (last, or "first" when it leads, as 保存 before 削除). */
+  mixed?: boolean | "first";
   /** Spread over the tab row's span (context tools such as a note's). */
   wide?: boolean;
   className?: string;
@@ -51,7 +52,7 @@ export function DockGroup({
       className={`cdock-group${className ? ` ${className}` : ""}`}
       data-slot={slot}
       data-tone={tone}
-      data-mixed={mixed || undefined}
+      data-mixed={mixed === "first" ? "first" : mixed || undefined}
       data-wide={wide || undefined}
     >
       {children}

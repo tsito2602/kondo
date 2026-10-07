@@ -198,7 +198,19 @@
 .cdock-group[data-mixed] {
   padding-right: 8px;
 }
-.cdock-group[data-mixed] > :last-child {
+.cdock-group[data-mixed="first"] {
+  padding-right: 0;
+  padding-left: 8px;
+}
+.cdock-group[data-mixed="first"] > :first-child {
+  height: 46px;
+  margin-right: 4px;
+  padding: 0 18px;
+  border-radius: 24px;
+  background: var(--p-ink);
+  color: var(--p-paper);
+}
+.cdock-group[data-mixed]:not([data-mixed="first"]) > :last-child {
   height: 46px;
   margin-left: 4px;
   padding: 0 18px;

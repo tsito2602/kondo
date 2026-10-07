@@ -27,7 +27,7 @@ import { useJellyScroll } from "./jelly-scroll";
 import { dismissModal } from "./motion";
 import { PageTop } from "./page-top";
 import { CheckIcon, LockIcon, Picture, pictureFor } from "./prep-pictures";
-import { AddButton, ErrorText, Modal } from "./ui";
+import { AddButton, DockFunction, ErrorText, Modal } from "./ui";
 
 /* ---------- motion, as kondo-prep3.html plays it ---------- */
 
@@ -168,9 +168,10 @@ function PrepSheet({
   onDelete,
   deleteLabel,
   add = false,
+  extra,
   children,
 }: {
-  /** Opened by the ＋: the shared floating add panel, ‹ cancels. */
+  /** Opened by the ＋ (rises from the bottom); otherwise grows from the row. */
   add?: boolean;
   title: string;
   primary: string;
@@ -178,16 +179,19 @@ function PrepSheet({
   onClose: () => void;
   onDelete?: () => void;
   deleteLabel?: string;
+  /** A separate function on its own dock island (持つのをやめる). */
+  extra?: ReactNode;
   children: ReactNode;
 }) {
+  // A floating panel like every other; dock: ‹ · [extra] · [保存 削除]
+  // (Tsubasa 2026-10-07: 保存は左、削除は右、別機能は別の島).
   return (
     <Modal
       title={title}
       onClose={onClose}
-      plain={!add}
-      addPanel={add}
+      addPanel
       dockActions={{
-        backLabel: add ? undefined : "やめる",
+        primaryFirst: true,
         primary: (
           <button type="submit" className="prep-primary" form={formId}>
             <CheckIcon />
@@ -204,6 +208,7 @@ function PrepSheet({
             <Trash2 size={20} />
           </button>
         ) : undefined,
+        secondary: onDelete ? extra : undefined,
       }}
     >
       <div className="prep-sheet">{children}</div>
@@ -372,7 +377,7 @@ function TaskRow({
         <button
           type="button"
           className="prep-sr"
-          aria-label={`${task.title}を直す`}
+          aria-label={`${task.title}を編集`}
           onClick={onEdit}
         />
       )}
@@ -703,7 +708,7 @@ function TaskSheet({
   };
   return (
     <PrepSheet
-      title={task ? "やることを直す" : "やることを追加"}
+      title={task ? "やることを編集" : "やることを追加"}
       add={!task}
       primary={task ? "保存" : "追加する"}
       formId={formId}
@@ -943,7 +948,7 @@ function Packing() {
           type="button"
           className="prep-item-name"
           disabled={!edit}
-          aria-label={edit ? `${item.name}を直す` : undefined}
+          aria-label={edit ? `${item.name}を編集` : undefined}
           onClick={edit}
         >
           <b>{item.name}</b>
@@ -1108,13 +1113,23 @@ function PackingSheet({
   };
   return (
     <PrepSheet
-      title={item ? "持ち物を直す" : "持ち物を追加"}
+      title={item ? "持ち物を編集" : "持ち物を追加"}
       add={!item}
       primary={item ? "保存" : "追加する"}
       formId={formId}
       onClose={onClose}
       onDelete={item ? remove : undefined}
       deleteLabel="持ち物を削除"
+      extra={
+        holding ? (
+          <DockFunction
+            label="持つのをやめる"
+            short="持たない"
+            icon={null}
+            onClick={letGo}
+          />
+        ) : undefined
+      }
     >
       <form id={formId} onSubmit={save} noValidate>
         <input
@@ -1130,20 +1145,6 @@ function PackingSheet({
           }}
         />
         <ErrorText message={error} />
-        {holding && (
-          <div className="prep-holding">
-            <AssigneeAvatar value={item.assignee!} members={travel.members} />
-            <span>あなたが持つ</span>
-            <button
-              type="button"
-              className="prep-take"
-              data-haptic
-              onClick={letGo}
-            >
-              持つのをやめる
-            </button>
-          </div>
-        )}
         <div className="prep-kinds" role="radiogroup" aria-label="持ち物の種類">
           {(Object.keys(kinds) as PackingKind[]).map((value) => (
             <button

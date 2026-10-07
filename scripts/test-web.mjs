@@ -1084,18 +1084,9 @@ test("legacy account cache and pending changes survive React migration; real for
       const save = dock.querySelector('.context-actions button[type="submit"]');
       assert.equal(save?.textContent, primary);
       assert.equal(save.form, document.querySelector("dialog form"));
-      if (primary === "追加する") {
-        // Adding: the ＋ button's floating panel, ‹ on the left cancels.
-        assert.equal(
-          document.querySelector("dialog[open]").dataset.panel,
-          "add",
-        );
-        assert.ok(dock.querySelector('.context-back [aria-label="戻る"]'));
-      } else
-        assert.equal(
-          dock.querySelector(".context-back .context-back-label")?.textContent,
-          "やめる",
-        );
+      // Adding or editing: a floating panel, ‹ on the left goes back.
+      assert.equal(document.querySelector("dialog[open]").dataset.panel, "add");
+      assert.ok(dock.querySelector('.context-back [aria-label="戻る"]'));
       await act(async () =>
         save.form.dispatchEvent(
           new dom.window.Event("submit", { bubbles: true, cancelable: true }),
@@ -1213,10 +1204,10 @@ test("legacy account cache and pending changes survive React migration; real for
         .classList.contains("is-closed"),
       "the ring closes when every task is done",
     );
-    await click(document.querySelector('[aria-label="チケットを予約を直す"]'));
+    await click(document.querySelector('[aria-label="チケットを予約を編集"]'));
     assert.equal(
       document.querySelector("dialog h2").textContent,
-      "やることを直す",
+      "やることを編集",
     );
     await click(document.querySelector(".prep-cal-none"));
     assert.equal(
@@ -1232,7 +1223,7 @@ test("legacy account cache and pending changes survive React migration; real for
       document.querySelector(`[data-task="${savedTask.id}"] small`).textContent,
       "期限なし",
     );
-    await click(document.querySelector('[aria-label="チケットを予約を直す"]'));
+    await click(document.querySelector('[aria-label="チケットを予約を編集"]'));
     const taskDelete = document.querySelector(
       '.context-actions [aria-label="やることを削除"]',
     );
@@ -1320,10 +1311,10 @@ test("legacy account cache and pending changes survive React migration; real for
       { kind: "mine", owner_id: "owner" },
     );
     assert.match(kindRow(diary).textContent, /ほかの人には見えない/);
-    await click(document.querySelector('[aria-label="充電器を直す"]'));
+    await click(document.querySelector('[aria-label="充電器を編集"]'));
     assert.equal(
       document.querySelector("dialog h2").textContent,
-      "持ち物を直す",
+      "持ち物を編集",
     );
     await click(byText('[role="radio"] b', "1つでいい").closest("button"));
     await submitSheet("保存");
@@ -2520,8 +2511,9 @@ test("home trip cards: destination lines, countdown and companion icons", async 
     "2日目",
   );
   const later = (today) =>
-    render(h(UpcomingTripCard, { ...props, trip, today, nearest: false }))
-      .querySelector(".home-trip-countdown")?.textContent;
+    render(
+      h(UpcomingTripCard, { ...props, trip, today, nearest: false }),
+    ).querySelector(".home-trip-countdown")?.textContent;
   assert.equal(later("2026-10-06"), "あと13日");
   assert.equal(later("2026-09-03"), "あと1ヶ月半", "later trips count roughly");
   assert.equal(later("2026-08-19"), "あと2ヶ月");

@@ -225,8 +225,11 @@ export function ContextDock({
   actions,
   secondary,
   wide,
+  primaryFirst,
 }: {
   back?: ReactNode;
+  /** The primary leads the actions (保存 left of 削除, Tsubasa 2026-10-07). */
+  primaryFirst?: boolean;
   primary?: ReactNode;
   actions?: ReactNode;
   /** Its own island left of the actions; only beside actions. */
@@ -251,11 +254,12 @@ export function ContextDock({
           slot="r"
           className="context-actions"
           tone={primary && !actions ? "ink" : undefined}
-          mixed={Boolean(primary && actions)}
+          mixed={primary && actions ? (primaryFirst ? "first" : true) : false}
           wide={wide}
         >
+          {primaryFirst && primary}
           {actions}
-          {primary}
+          {!primaryFirst && primary}
         </DockGroup>
       )}
     </>

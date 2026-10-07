@@ -337,6 +337,8 @@ export function Modal({
     back?: ReactNode;
     /** Many tools in a row where the tabs sit (a note's editor). */
     wide?: boolean;
+    /** The primary leads the actions (保存 then 削除). */
+    primaryFirst?: boolean;
   };
   /** kondo-prep3's sheets: always rise from the bottom edge, and the page
       stays put under the scrim (no card stretch, no receding). */
@@ -633,6 +635,7 @@ export function Modal({
               actions={dockActions?.actions}
               secondary={saveAction ? undefined : dockActions?.secondary}
               wide={dockActions?.wide}
+              primaryFirst={dockActions?.primaryFirst}
             />
           ) : (
             <ContextDock
