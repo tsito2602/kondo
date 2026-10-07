@@ -324,6 +324,30 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 元に戻す fills up like a gauge until the deletion is real. */
+.cdock-group[data-slot="toast"] > button.cdock-undo-gauge {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: color-mix(in srgb, var(--p-ink) 38%, transparent);
+}
+.cdock-undo-gauge::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--p-ink);
+  transform-origin: left center;
+  animation: cdock-undo-fill var(--undo-ms, 5000ms) linear both;
+}
+@keyframes cdock-undo-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
 .cdock-group[data-slot="toast"] > button {
   flex: none;
   height: auto;

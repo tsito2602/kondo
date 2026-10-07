@@ -318,6 +318,8 @@ export function NotesScreen() {
             }
             message="消しました"
             onUndo={undo}
+            duration={NOTE_UNDO_MS}
+            restartKey={removed.id}
           />
         </ThumbDock>
       )}

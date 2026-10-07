@@ -44,7 +44,11 @@ import {
 } from "lucide-react";
 import { Card } from "./obsidian/card";
 import { GoogleSignIn, useAuth } from "@/auth/auth-provider";
-import { TravelProvider, useTravel } from "@/data/travel-provider";
+import {
+  REMOVAL_UNDO_MS,
+  TravelProvider,
+  useTravel,
+} from "@/data/travel-provider";
 import type { Trip, TripMember } from "@/data/types";
 import { localDate } from "@/utils/dates";
 import { TripEditor } from "./editors";
@@ -314,6 +318,8 @@ function TravelApp() {
           <DockToast
             message={travel.removal.message}
             onUndo={travel.undoRemoval}
+            duration={REMOVAL_UNDO_MS}
+            restartKey={travel.removal.key}
           />
         </ThumbDock>
       )}

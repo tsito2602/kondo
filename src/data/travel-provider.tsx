@@ -73,7 +73,7 @@ type TravelContextValue = {
   /** Deletes after a few seconds: the thing leaves every list at once and the
       dock offers 「元に戻す」 until then (Tsubasa 2026-10-07: undo for every delete). */
   removeLater: (kind: RemovalKind, id: string, message: string) => void;
-  removal: { message: string } | null;
+  removal: { message: string; key: string } | null;
   undoRemoval: () => void;
 };
 export type RemovalKind = 'booking' | 'task' | 'packing' | 'place' | 'trip';
@@ -643,7 +643,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
     setRemoval(null);
   }, []);
   const gone = (kind: RemovalKind) => <T extends { id: string }>(entry: T) => !(removal?.kind === kind && removal.id === entry.id);
-  const removalShown = useMemo(() => removal && { message: removal.message }, [removal]);
+  const removalShown = useMemo(() => removal && { message: removal.message, key: `${removal.kind}:${removal.id}` }, [removal]);
   const trips = useMemo(() => cache.trips.filter((trip) => !(removal?.kind === 'trip' && removal.id === trip.id)), [cache.trips, removal]);
   const selectedTrip = trips.find((trip) => trip.id === cache.selectedTripId) ?? null;
   const items = [...(selectedTrip ? cache.itemsByTrip[selectedTrip.id] ?? [] : [])]

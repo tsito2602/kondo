@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type PropsWithChildren,
   type ReactNode,
 } from "react";
@@ -296,11 +297,17 @@ export function DockToast({
   onUndo,
   undoLabel = "元に戻す",
   back,
+  duration,
+  restartKey,
 }: {
   message: ReactNode;
   onUndo: () => void;
   undoLabel?: string;
   back?: ReactNode;
+  /** How long until it is really deleted: the button fills up over it. */
+  duration?: number;
+  /** A new deletion starts the gauge over. */
+  restartKey?: string;
 }) {
   return (
     <>
@@ -311,8 +318,18 @@ export function DockToast({
       )}
       <DockGroup slot="toast" className={back ? "cdock-toast-r" : undefined}>
         <span role="status">{message}</span>
-        <button type="button" onClick={onUndo}>
-          {undoLabel}
+        <button
+          type="button"
+          key={restartKey}
+          className={duration ? "cdock-undo-gauge" : undefined}
+          style={
+            duration
+              ? ({ "--undo-ms": `${duration}ms` } as CSSProperties)
+              : undefined
+          }
+          onClick={onUndo}
+        >
+          <span>{undoLabel}</span>
         </button>
       </DockGroup>
     </>

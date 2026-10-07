@@ -7,13 +7,22 @@ import { DockToast, ThumbDock } from "./thumb-dock";
 export function PlanUndoDock({
   message,
   onUndo,
+  duration,
+  restartKey,
 }: {
   message: string;
   onUndo: () => void;
+  duration?: number;
+  restartKey?: string;
 }) {
   return (
     <ThumbDock mode="toast">
-      <DockToast message={message} onUndo={onUndo} />
+      <DockToast
+        message={message}
+        onUndo={onUndo}
+        duration={duration}
+        restartKey={restartKey}
+      />
     </ThumbDock>
   );
 }

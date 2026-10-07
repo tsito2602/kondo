@@ -324,7 +324,14 @@ export function ItineraryScreen() {
           onClose={() => setOpen(null)}
         />
       )}
-      {removed && <PlanUndoDock message="予定を消しました" onUndo={undo} />}
+      {removed && (
+        <PlanUndoDock
+          message="予定を消しました"
+          onUndo={undo}
+          duration={UNDO_MS}
+          restartKey={removed.id}
+        />
+      )}
     </div>
   );
 }
