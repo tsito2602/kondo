@@ -785,7 +785,7 @@ export function AddBookingSheet({
   );
   /** The lone ink action on the right island; dimmed like the mock's .4. */
   const ink = (label: ReactNode, onClick: () => void, disabled = false) => (
-    <DockGroup slot="r" tone={disabled ? "ink-dim" : "ink"}>
+    <DockGroup slot="r" tone={disabled ? "ink-dim" : "ink"} stretch>
       <button type="button" disabled={disabled} onClick={onClick}>
         {label}
       </button>

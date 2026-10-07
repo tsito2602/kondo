@@ -1,4 +1,5 @@
 import {
+  cloneElement,
   createContext,
   isValidElement,
   useContext,
@@ -217,26 +218,26 @@ export function ThumbActions() {
 }
 
 /** The current screen's controls on the cartoon dock's islands: the back
-    circle on the left island, the context actions on the right one. A lone
-    primary (保存, 追加する) turns its island ink; next to other actions it is
-    an ink pill on a plain island. A separate function (しおりで見る, 詳細を開く)
-    gets its own island between them (Tsubasa 2026-10-06: 「別機能は別の島に」). */
+    circle on the left island, the context actions on the right one.
+    - The primary (保存, 追加する) is an ink island stretched over all the room
+      its neighbours leave (Tsubasa 2026-10-07: 目一杯横幅広げて).
+    - A separate function (しおりで見る, 持たない) gets its own island right
+      after the back (2026-10-06: 「別機能は別の島に」).
+    - 編集 and 削除 side by side sit on islands of their own (2026-10-07:
+      「編集ボタンと削除ボタンが並んでいる場合、別の島に」). */
 export function ContextDock({
   back,
   primary,
   actions,
   secondary,
   wide,
-  split,
 }: {
   back?: ReactNode;
-  /** 保存 on its own ink island filling the room up to the actions (削除),
-      the secondary right after the back (Tsubasa 2026-10-07:
-      「保存と削除は別の島にして、保存ボタンを残りの領域いっぱい伸ばして」). */
+  /** Kept for callers; the primary always stretches now. */
   split?: boolean;
   primary?: ReactNode;
   actions?: ReactNode;
-  /** Its own island left of the actions; only beside actions. */
+  /** Its own island right after the back. */
   secondary?: ReactNode;
   /** Lay the actions out like the tab row (left 90 px to the right edge). */
   wide?: boolean;
@@ -247,27 +248,14 @@ export function ContextDock({
     isValidElement<{ disabled?: boolean }>(primary) && primary.props.disabled
       ? "ink-dim"
       : "ink";
-  if (split && primary && actions)
-    return (
-      <>
-        {back && (
-          <DockGroup slot="l" className="context-back">
-            {back}
-          </DockGroup>
-        )}
-        {secondary && (
-          <DockGroup slot="k" className="context-secondary">
-            {secondary}
-          </DockGroup>
-        )}
-        <DockGroup slot="m" className="context-primary" tone={ink} stretch>
-          {primary}
-        </DockGroup>
-        <DockGroup slot="r" className="context-actions">
-          {actions}
-        </DockGroup>
-      </>
-    );
+  // 編集 + 削除 (DetailDockActions) split onto two islands.
+  const pair =
+    isValidElement<{ onEdit?: unknown; onDelete?: unknown }>(actions) &&
+    (actions.type as { splitsIslands?: boolean }).splitsIslands &&
+    actions.props.onEdit &&
+    actions.props.onDelete
+      ? actions
+      : null;
   return (
     <>
       {back && (
@@ -276,21 +264,41 @@ export function ContextDock({
         </DockGroup>
       )}
       {secondary && (primary || actions) && (
-        <DockGroup slot="m" className="context-secondary">
+        <DockGroup slot="k" className="context-secondary">
           {secondary}
         </DockGroup>
       )}
-      {(primary || actions) && (
-        <DockGroup
-          slot="r"
-          className="context-actions"
-          tone={primary && !actions ? ink : undefined}
-          mixed={Boolean(primary && actions)}
-          wide={wide}
-        >
-          {actions}
-          {primary}
-        </DockGroup>
+      {primary ? (
+        <>
+          <DockGroup
+            slot={actions ? "m" : "r"}
+            className="context-primary"
+            tone={ink}
+            stretch
+          >
+            {primary}
+          </DockGroup>
+          {actions && (
+            <DockGroup slot="r" className="context-actions">
+              {actions}
+            </DockGroup>
+          )}
+        </>
+      ) : pair ? (
+        <>
+          <DockGroup slot="m" className="context-actions">
+            {cloneElement(pair, { onDelete: undefined })}
+          </DockGroup>
+          <DockGroup slot="r" className="context-actions">
+            {cloneElement(pair, { onEdit: undefined })}
+          </DockGroup>
+        </>
+      ) : (
+        actions && (
+          <DockGroup slot="r" className="context-actions" wide={wide}>
+            {actions}
+          </DockGroup>
+        )
       )}
     </>
   );

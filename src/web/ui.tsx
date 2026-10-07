@@ -269,6 +269,8 @@ export function DetailDockActions({
   );
 }
 
+// ContextDock puts 編集 and 削除 on islands of their own.
+DetailDockActions.splitsIslands = true;
 /** A dock control for a separate function: an icon and a short word, the
     whole name for screen readers. On a narrow phone, where three islands
     would not fit with the word, only the icon shows (dock.css). */
