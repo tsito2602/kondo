@@ -188,7 +188,7 @@ export function TripEditor({
         <Field label="行き先">
           <Input
             maxLength={160}
-            placeholder="いくつかあるなら「、」で区切る"
+            placeholder="行き先を「、」で区切って入力"
             value={draft.destination}
             onChange={(event) =>
               setDraft({ ...draft, destination: event.target.value })
@@ -1015,7 +1015,7 @@ export function PlaceEditor({
               <Field label="名前">
                 <Input
                   maxLength={120}
-                  placeholder="あれば"
+                  placeholder="名前を入力"
                   value={link.label}
                   onChange={(event) =>
                     setDraft({

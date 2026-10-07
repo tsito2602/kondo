@@ -38,7 +38,7 @@ export function AirportField({
           autoComplete="off"
           maxLength={160}
           value={value}
-          placeholder="空港名・都市名・3文字コード"
+          placeholder="空港名・都市名・3文字コードを入力"
           aria-autocomplete="list"
           aria-expanded={expanded}
           aria-controls={expanded ? `${id}-options` : undefined}

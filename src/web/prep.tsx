@@ -634,7 +634,7 @@ function TaskSheet({
           ref={name}
           className="prep-input"
           aria-label="やること"
-          placeholder="やること"
+          placeholder="やることを入力"
           maxLength={160}
           value={title}
           onChange={(event) => {
@@ -1091,7 +1091,7 @@ function PackingSheet({
           ref={input}
           className="prep-input"
           aria-label="持ち物"
-          placeholder="持ち物の名前"
+          placeholder="持ち物を入力"
           maxLength={120}
           value={name}
           onChange={(event) => {

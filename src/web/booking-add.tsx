@@ -35,7 +35,7 @@ import { reduceMotion } from "./motion";
 import { DockGroup } from "./cartoon-dock";
 import { watchPanelFit } from "./panel-fit";
 import { ThumbDock } from "./thumb-dock";
-import { FormBackButton, useToast } from "./ui";
+import { enterHint, FormBackButton, useToast } from "./ui";
 import { menuDepth } from "./menu-depth";
 import { MomentRows } from "./moment-rows";
 
@@ -223,7 +223,7 @@ const EMPTY_FORM: ManualForm = {
   code: "",
   files: [],
 };
-const PLACE: FieldSpec = ["place", "場所", "住所かマップのリンク"];
+const PLACE: FieldSpec = ["place", "場所", "住所かマップのリンクを入力"];
 function manualFields(kind: BookingKind): (FieldSpec[] | [FieldSpec])[] {
   if (kind === "flight")
     return [
@@ -568,7 +568,7 @@ export function AddBookingSheet({
       <small>{label}</small>
       <input
         value={form[key]}
-        placeholder={placeholder}
+        placeholder={placeholder || enterHint(label)}
         list={
           key === "place" && form.kind !== "hotel" && travel.places.length
             ? "booking-add-places"
@@ -833,7 +833,7 @@ export function AddBookingSheet({
                     field(row[0])
                   ),
                 )}
-                {field(["code", "予約番号", "あれば"])}
+                {field(["code", "予約番号", ""])}
                 {form.kind !== "hotel" && travel.places.length > 0 && (
                   <datalist id="booking-add-places">
                     {travel.places.map((place) => (

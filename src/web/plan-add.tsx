@@ -125,6 +125,7 @@ export function PlanAddSheet({
             className="it-inp"
             maxLength={160}
             value={title}
+            placeholder="予定を入力"
             autoComplete="off"
             onChange={(event) => setTitle(event.target.value)}
           />
@@ -148,7 +149,9 @@ export function PlanAddSheet({
               maxLength={160}
               value={place}
               placeholder={
-                category === "transport" ? "行き先" : "場所かマップのリンク"
+                category === "transport"
+                  ? "行き先を入力"
+                  : "場所かマップのリンクを入力"
               }
               aria-label="場所の名前、または Google マップのリンク"
               autoComplete="off"

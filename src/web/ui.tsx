@@ -1,5 +1,8 @@
 import {
+  Children,
+  cloneElement,
   createContext,
+  isValidElement,
   type PropsWithChildren,
   type ReactNode,
   useCallback,
@@ -653,6 +656,11 @@ export function Modal({
     document.body,
   );
 }
+/** A field's placeholder when it has nothing better to say: 「便名を入力」. */
+export const enterHint = (label: string) =>
+  `${label.replace(/（[^）]*）/g, "").trim()}を入力`;
+
+/** Every text box says 「<its label>を入力」 (Tsubasa 2026-10-07). */
 export function Field({
   label,
   children,
@@ -660,7 +668,15 @@ export function Field({
   return (
     <label className="field">
       <span>{label}</span>
-      {children}
+      {Children.map(children, (child) =>
+        isValidElement<{ placeholder?: string; type?: string }>(child) &&
+        child.props.placeholder === undefined &&
+        !["file", "checkbox", "radio", "hidden"].includes(
+          child.props.type ?? "",
+        )
+          ? cloneElement(child, { placeholder: enterHint(label) })
+          : child,
+      )}
     </label>
   );
 }

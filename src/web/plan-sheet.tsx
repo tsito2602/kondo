@@ -542,6 +542,7 @@ function PlanEditForm({
       <label className="field">
         <span>タイトル</span>
         <input
+          placeholder="タイトルを入力"
           className="ps-inp"
           required
           maxLength={160}
@@ -613,6 +614,7 @@ function PlanEditForm({
           <label className="field">
             <span>出発地</span>
             <input
+              placeholder="出発地を入力"
               className="ps-inp"
               maxLength={160}
               value={transport.origin}
@@ -624,6 +626,7 @@ function PlanEditForm({
           <label className="field">
             <span>目的地</span>
             <input
+              placeholder="目的地を入力"
               className="ps-inp"
               maxLength={160}
               value={transport.destination}
@@ -635,6 +638,7 @@ function PlanEditForm({
           <label className="field">
             <span>所要時間（分）</span>
             <input
+              placeholder="所要時間を入力"
               className="ps-inp"
               type="number"
               min={1}
@@ -658,7 +662,7 @@ function PlanEditForm({
             className="ps-inp"
             maxLength={160}
             value={location}
-            placeholder="場所かマップのリンク"
+            placeholder="場所かマップのリンクを入力"
             autoComplete="off"
             onChange={(event) => setLocation(event.target.value)}
           />
@@ -674,6 +678,7 @@ function PlanEditForm({
       <label className="field">
         <span>メモ</span>
         <textarea
+          placeholder="メモを入力"
           className="ps-inp"
           rows={2}
           maxLength={4000}
