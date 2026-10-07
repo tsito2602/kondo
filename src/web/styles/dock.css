@@ -75,6 +75,10 @@
   height: 120px;
   transform-origin: 50% 100%;
   pointer-events: none;
+  /* Its own layer: on iOS a spring on a chip in the panel (誰が持つ) made
+     WebKit drop the shadowed islands for up to a second, flashing every
+     frame (Tsubasa 2026-10-07「ちらつく」). */
+  will-change: transform;
 }
 /* The islands are one contour (dock-morph.ts), so parting and joining
    islands share one outline and one shadow. */
