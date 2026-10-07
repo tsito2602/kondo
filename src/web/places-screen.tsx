@@ -65,7 +65,7 @@ type Mark = {
 type View = { cx: number; cy: number; k: number };
 
 const MAP_HEIGHT = 420;
-const JELLY_ITEMS = ".places-map, .places-honest, .places-list h3, .places-row";
+const JELLY_ITEMS = ".places-map, .places-list h3, .places-row";
 const PAD = 52;
 // Day tones for 全日程: pale, ink, dark, repeating for longer trips.
 const TONES = ["var(--pl-t2)", "var(--pl-ink)", "var(--pl-t4)"];
@@ -229,10 +229,6 @@ export function PlacesScreen() {
         selected={selected}
         onSelect={select}
       />
-      <p className="places-honest">
-        距離と時間は直線距離からの目安です（直線 × 1.3
-        を時速4.8kmで歩いた場合）。道案内はGoogleマップで。
-      </p>
       <PlacesList
         model={model}
         day={activeDay}

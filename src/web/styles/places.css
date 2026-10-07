@@ -327,13 +327,6 @@
   pointer-events: auto;
   transform: none;
 }
-.places-honest {
-  margin: 8px 4px 0;
-  font-size: 11px;
-  line-height: 1.7;
-  color: var(--pl-mute);
-}
-
 /* ===== list ===== */
 .places-list {
   margin-top: 14px;
