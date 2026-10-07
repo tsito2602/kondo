@@ -223,57 +223,47 @@ const EMPTY_FORM: ManualForm = {
   code: "",
   files: [],
 };
-const PLACE: FieldSpec = ["place", "場所", "住所か Google マップのリンク"];
+const PLACE: FieldSpec = ["place", "場所", "住所かマップのリンク"];
 function manualFields(kind: BookingKind): (FieldSpec[] | [FieldSpec])[] {
   if (kind === "flight")
     return [
       // The carrier above the flight it runs, as in the edit form.
-      [["carrier", "航空会社", "エミレーツ航空"]],
-      [["title", "便名", "EK 319"]],
+      [["carrier", "航空会社", ""]],
+      [["title", "便名", ""]],
       [
-        ["from", "出発の空港", "成田（NRT）"],
-        ["to", "到着の空港", "ドバイ（DXB）"],
+        ["from", "出発の空港", ""],
+        ["to", "到着の空港", ""],
       ],
       [
-        ["start", "出発", "10/19 22:20"],
-        ["end", "到着", "10/20 05:30"],
+        ["start", "出発", ""],
+        ["end", "到着", ""],
       ],
     ];
   if (kind === "train")
     return [
-      [["carrier", "鉄道会社", "オーストリア連邦鉄道"]],
-      [["title", "列車", "Railjet 542"]],
+      [["carrier", "鉄道会社", ""]],
+      [["title", "列車", ""]],
       [
-        ["from", "乗る駅", "ウィーン中央駅"],
-        ["to", "降りる駅", "ザルツブルク中央駅"],
+        ["from", "乗る駅", ""],
+        ["to", "降りる駅", ""],
       ],
       [
-        ["start", "出発", "10/22 08:30"],
-        ["end", "到着", "10/22 10:52"],
+        ["start", "出発", ""],
+        ["end", "到着", ""],
       ],
     ];
   if (kind === "hotel")
     return [
-      [["title", "宿の名前", "ホテル・ザッハー"]],
+      [["title", "宿の名前", ""]],
       [
-        ["start", "チェックイン", "10/20 15:00〜"],
-        ["end", "チェックアウト", "10/23 〜11:00"],
+        ["start", "チェックイン", ""],
+        ["end", "チェックアウト", ""],
       ],
       [PLACE],
     ];
-  return [
-    [
-      [
-        "title",
-        "名前",
-        kind === "restaurant" ? "お店の名前" : "施設・公演の名前",
-      ],
-    ],
-    [["start", "日時", "10/22 14:30"]],
-    [PLACE],
-  ];
+  return [[["title", "名前", ""]], [["start", "日時", ""]], [PLACE]];
 }
-/** "10/19 22:20", "2026/10/19 22:20", "10/20 15:00〜" or "10/23 〜11:00". */
+/** "", "2026/10/19 22:20", "" or "". */
 function parseMoment(text: string, year: number) {
   const value = text.normalize("NFKC");
   const date = value.match(/(?:(\d{4})[/-])?(\d{1,2})[/-](\d{1,2})/);
@@ -284,7 +274,7 @@ function parseMoment(text: string, year: number) {
     time: time ? `${pad(time[1])}:${time[2]}` : "",
   };
 }
-/** "成田（NRT）", "nrt", "成田" or a station's name. */
+/** "", "nrt", "成田" or a station's name. */
 function parseStop(text: string, airport: boolean) {
   const value = text.normalize("NFKC").trim();
   if (!airport) return { name: value, code: "" };

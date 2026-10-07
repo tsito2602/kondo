@@ -125,7 +125,6 @@ export function PlanAddSheet({
             className="it-inp"
             maxLength={160}
             value={title}
-            placeholder="例：ナッシュマルクトで昼ごはん"
             autoComplete="off"
             onChange={(event) => setTitle(event.target.value)}
           />

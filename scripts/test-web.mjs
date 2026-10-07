@@ -1653,7 +1653,7 @@ test("legacy account cache and pending changes survive React migration; real for
         "予約番号",
       ],
     );
-    assert.equal(field("便名").placeholder, "EK 319");
+    assert.equal(field("便名").placeholder, "", "no example in placeholders");
     await fill("出発の空港", "成田（NRT）");
     await fill("到着の空港", "kix");
     await fill("出発", { start: trip.startsOn });

@@ -179,7 +179,6 @@ export function TripEditor({
           <Input
             required
             maxLength={120}
-            placeholder="ヨーロッパ旅行"
             value={draft.name}
             onChange={(event) =>
               setDraft({ ...draft, name: event.target.value })
@@ -189,7 +188,7 @@ export function TripEditor({
         <Field label="行き先">
           <Input
             maxLength={160}
-            placeholder="ウィーン、ミュンヘン"
+            placeholder="いくつかあるなら「、」で区切る"
             value={draft.destination}
             onChange={(event) =>
               setDraft({ ...draft, destination: event.target.value })
@@ -703,7 +702,7 @@ export function BookingForm({
           {field("title", titleLabel, kind !== "flight")}
           {kind === "flight" && (
             <p className="muted form-hint">
-              例：GK211。空欄の場合は出発地・到着地を表示します。
+              空欄なら出発地と到着地を表示します。
             </p>
           )}
           {route && (
@@ -924,7 +923,6 @@ export function PlaceEditor({
         <Field label="場所の名前">
           <Input
             required
-            placeholder="お店やスポットの名前"
             maxLength={160}
             value={draft.title}
             onChange={(event) =>
@@ -972,7 +970,6 @@ export function PlaceEditor({
         <Field label="住所・Google MapsのURL">
           <Input
             maxLength={2000}
-            placeholder="住所または地図のリンクを貼り付け"
             autoCapitalize="none"
             autoCorrect="off"
             value={draft.location}
@@ -984,7 +981,6 @@ export function PlaceEditor({
         <Field label="メモ">
           <Textarea
             rows={3}
-            placeholder="気になること、食べたいものなど"
             value={draft.note}
             maxLength={4000}
             onChange={(event) =>
@@ -999,7 +995,6 @@ export function PlaceEditor({
               <Field label="URL">
                 <Input
                   type="url"
-                  placeholder="https://"
                   autoCapitalize="none"
                   autoCorrect="off"
                   required
@@ -1020,7 +1015,7 @@ export function PlaceEditor({
               <Field label="名前">
                 <Input
                   maxLength={120}
-                  placeholder="公式サイトなど（任意）"
+                  placeholder="あれば"
                   value={link.label}
                   onChange={(event) =>
                     setDraft({
