@@ -608,6 +608,15 @@ test("legacy account cache and pending changes survive React migration; real for
   );
   await saveTravelCache(cache, "owner");
   const failures = [];
+  // Booking documents land in a stand-in for R2.
+  const objects = new Map();
+  const BUCKET = {
+    put: async (key, bytes) => void objects.set(key, bytes),
+    get: async (key) => objects.get(key) ?? null,
+    delete: async (keys) => {
+      for (const key of [keys].flat()) objects.delete(key);
+    },
+  };
   globalThis.fetch = async (url, init) => {
     const request = new Request(url, init);
     // Flight saves are optimistic. Exercise a server response slower than the
@@ -619,7 +628,7 @@ test("legacy account cache and pending changes survive React migration; real for
     ) {
       await new Promise((resolve) => setTimeout(resolve, 80));
     }
-    const response = await worker.fetch(request, { DB, BUCKET: {} });
+    const response = await worker.fetch(request, { DB, BUCKET });
     if (!response.ok)
       failures.push({
         url,
@@ -832,10 +841,12 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(document.querySelector(".bk-card"));
     const detail = document.querySelector("dialog[open]");
     assert.equal(detail.dataset.panel, "add");
+    // A site that is not a map says so, and its host name is the place.
     const hotelLink = [...detail.querySelectorAll(".bk-kv a")].find(
-      (node) => node.textContent === "地図",
+      (node) => node.textContent === "サイト",
     );
     assert.equal(hotelLink.href, hotelUrl);
+    assert.match(detail.textContent, /links\.h6\.hilton\.com/);
     assert.doesNotMatch(
       detail.textContent,
       /long-link-|reservation=private|Google Mapsで開く/,
@@ -856,12 +867,58 @@ test("legacy account cache and pending changes survive React migration; real for
     await click(document.querySelector('.context-actions [aria-label="編集"]'));
     assert.equal(document.querySelectorAll("dialog[open]").length, 2);
     await fill("宿泊施設名", "更新したホテル");
+    // Every kind keeps its 予約内容 (production data has it on hotels too).
+    await fill("予約内容", "ツインルーム");
     await submit();
     assert.equal(
       db.prepare("SELECT title FROM bookings").get().title,
       "更新したホテル",
     );
+    assert.equal(
+      db.prepare("SELECT detail FROM bookings").get().detail,
+      "ツインルーム",
+    );
     assert.match(detail.querySelector(".bk-hd").textContent, /更新したホテル/);
+    const kv = (label) =>
+      [...detail.querySelectorAll(".bk-kv > div")].find(
+        (row) => row.querySelector("small")?.textContent === label,
+      );
+    assert.equal(
+      kv("予約内容")?.querySelector("b").textContent,
+      "ツインルーム",
+    );
+    assert.equal(
+      kv("場所")?.querySelector("b").textContent,
+      "links.h6.hilton.com",
+      "予約内容 never stands in for the place",
+    );
+    // A document attached here can be removed here (after a confirm).
+    const picker = detail.querySelector(".bk-attach input[type=file]");
+    Object.defineProperty(picker, "files", {
+      configurable: true,
+      value: [
+        new File(["%PDF-1.4"], "eチケット.pdf", { type: "application/pdf" }),
+      ],
+    });
+    await act(async () => {
+      picker.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+    });
+    await waitFor(
+      () => detail.querySelector(".bk-kv-del"),
+      "the attached document shows with its delete control",
+    );
+    assert.equal(
+      db.prepare("SELECT COUNT(*) AS n FROM booking_documents").get().n,
+      1,
+    );
+    await click(detail.querySelector(".bk-kv-del"));
+    await waitFor(
+      () =>
+        !detail.querySelector(".bk-kv-del") &&
+        db.prepare("SELECT COUNT(*) AS n FROM booking_documents").get().n === 0,
+      "the document leaves the panel and the server",
+    );
+    assert.equal(objects.size, 0);
     await click(document.querySelector('.context-back [aria-label="戻る"]'));
     await tick(30);
     await click(byText("nav a", "場所"));
@@ -930,6 +987,28 @@ test("legacy account cache and pending changes survive React migration; real for
       },
       "the add panel saves memo, hours and statuses",
     );
+    // A booking saved before venues were linked (no booking_places row) is
+    // linked to its place once the server's data arrives, and only once.
+    const legacyBooking = randomUUID();
+    db.prepare(
+      "INSERT INTO bookings (id, trip_id, kind, title, day, updated_by) VALUES (?,?,?,?,?,?)",
+    ).run(legacyBooking, trip.id, "ticket", "美術館", trip.startsOn, "owner");
+    await act(async () => {
+      document.dispatchEvent(new dom.window.Event("visibilitychange"));
+    });
+    const museumId = db.prepare("SELECT id FROM places").get().id;
+    await waitFor(
+      () =>
+        db
+          .prepare("SELECT place_id FROM booking_places WHERE booking_id = ?")
+          .get(legacyBooking)?.place_id === museumId,
+      "an unlinked old booking is linked to its place",
+    );
+    db.prepare("DELETE FROM bookings WHERE id = ?").run(legacyBooking);
+    await act(async () => {
+      document.dispatchEvent(new dom.window.Event("visibilitychange"));
+    });
+    await tick(30);
     const placeRow = document.querySelector(".places-row");
     assert.equal(placeRow.querySelector(".places-badge").textContent, "1");
     assert.equal(
@@ -2587,6 +2666,11 @@ test("booking cards stack journeys, lead stays with dates and stamp used booking
     endTime: "21:30",
   });
   assert.equal(train.querySelector(".bk-du").textContent, "2時間30分");
+  assert.doesNotMatch(
+    render({ ...booking, kind: "car", endTime: "" }).body.textContent,
+    /--:--/,
+    "a booking with no end time shows no placeholder time",
+  );
   const hotel = {
     ...booking,
     kind: "hotel",

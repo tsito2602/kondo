@@ -252,6 +252,19 @@ function manualFields(kind: BookingKind): (FieldSpec[] | [FieldSpec])[] {
         ["end", "到着", ""],
       ],
     ];
+  // A car runs from 受取場所 to 返却場所, as the edit form has it.
+  if (kind === "car")
+    return [
+      [["title", "レンタカー会社・車名", ""]],
+      [
+        ["from", "受取場所", ""],
+        ["to", "返却場所", ""],
+      ],
+      [
+        ["start", "受取", ""],
+        ["end", "返却", ""],
+      ],
+    ];
   if (kind === "hotel")
     return [
       [["title", "宿の名前", ""]],
@@ -296,10 +309,11 @@ function manualInput(form: ManualForm, year: number): BookingInput | string {
   if (form.endTime) end.time = form.endTime;
   if (!start.day) return "日付を選んでください";
   const route = kind === "flight" || kind === "train";
-  const from = route
+  const stops = route || kind === "car";
+  const from = stops
     ? parseStop(form.from, kind === "flight")
     : { name: "", code: "" };
-  const to = route
+  const to = stops
     ? parseStop(form.to, kind === "flight")
     : { name: "", code: "" };
   const title =
@@ -589,9 +603,9 @@ export function AddBookingSheet({
         title={form.title}
         start={{ label: start[1], date: form.start, time: form.startTime }}
         end={end && { label: end[1], date: form.end, time: form.endTime }}
-        stay={form.kind === "hotel"}
-        span="nights"
-        panelLabel="宿泊の日"
+        stay={form.kind === "hotel" || form.kind === "car"}
+        span={form.kind === "car" ? "days" : "nights"}
+        panelLabel={form.kind === "car" ? "利用期間" : "宿泊の日"}
         trip={travel.selectedTrip ?? undefined}
         onChange={(patch) =>
           setForm((current) => ({

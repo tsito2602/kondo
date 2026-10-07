@@ -1,9 +1,5 @@
 import { formatConnectionDuration } from "@/data/flight-connections";
-import {
-  distanceLabel,
-  placeNameFromLink,
-  WALK_LIMIT_METERS,
-} from "@/data/geo";
+import { distanceLabel, WALK_LIMIT_METERS } from "@/data/geo";
 import {
   durationLabel,
   durationMinutes,
@@ -20,7 +16,7 @@ import {
 } from "@/data/plan-timeline";
 import { referenceUrl } from "@/data/places";
 import type { Booking, ItineraryItem, Place } from "@/data/types";
-import { BookingBody, bookingHeading } from "./booking-card";
+import { BookingBody, bookingHeading, linkPlaceName } from "./booking-card";
 import { categoryGlyph, Glyph, MapPin } from "./itinerary-icons";
 import { kindOfBooking, kindOfCategory } from "./kind-colors";
 
@@ -60,18 +56,15 @@ export function placeLabel(
   const location = itemDetails(item).location.trim();
   if (!location) return null;
   if (referenceUrl(location)) {
-    const name = placeNameFromLink(location);
+    const name = linkPlaceName(location);
     return name ? { name } : null;
   }
   return { name: location };
 }
 export function bookingPlaceName(booking: Booking) {
+  // Only 場所 names the place: 予約内容 (a room type) is never one.
   const text = (booking.location || "").trim();
-  if (!text)
-    return booking.kind === "hotel" && !referenceUrl(booking.detail)
-      ? booking.detail
-      : "";
-  return referenceUrl(text) ? (placeNameFromLink(text) ?? "") : text;
+  return referenceUrl(text) ? linkPlaceName(text) : text;
 }
 
 /** A flight or a train as the 予約 tab's card draws it: departure over

@@ -670,6 +670,8 @@ export function BookingForm({
     </Field>
   );
   const route = ["flight", "train", "car"].includes(kind);
+  // A car runs from 受取場所 to 返却場所; a 場所 it already has stays editable.
+  const showLocation = !route || (kind === "car" && Boolean(initialLocation));
   const rangeBooking = route || kind === "hotel";
   const dateLabels = {
     flight: { label: "フライト日時", start: "出発", end: "到着" },
@@ -717,6 +719,7 @@ export function BookingForm({
               空欄なら出発地と到着地を表示します。
             </p>
           )}
+          {!carrier && field("detail", "予約内容")}
           {route && (
             <div className={kind === "flight" ? "airport-fields" : "form-grid"}>
               {kind === "flight" ? (
@@ -754,7 +757,7 @@ export function BookingForm({
               )}
             </div>
           )}
-          {!route &&
+          {showLocation &&
             field(
               "location",
               "住所・Google MapsのURL",
@@ -763,7 +766,7 @@ export function BookingForm({
                 ? undefined
                 : "booking-places",
             )}
-          {!route && kind !== "hotel" && travel.places.length > 0 && (
+          {showLocation && kind !== "hotel" && travel.places.length > 0 && (
             <datalist id="booking-places">
               {travel.places.map((place) => (
                 <option key={place.id} value={place.title} />
