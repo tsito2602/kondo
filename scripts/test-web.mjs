@@ -254,7 +254,9 @@ const fill = async (label, value) => {
 };
 const submit = async () => {
   const dock = document.querySelector(".thumb-dock-host");
-  const save = dock.querySelector('.context-actions button[type="submit"]');
+  const save = dock.querySelector(
+    ':is(.context-actions, .context-primary) button[type="submit"]',
+  );
   assert.ok(dock.querySelector('.context-back [aria-label="戻る"]'));
   assert.equal(save?.form, document.querySelector("dialog form"));
   await act(async () =>
@@ -1081,7 +1083,9 @@ test("legacy account cache and pending changes survive React migration; real for
       await act(async () => document.activeElement?.blur());
       await tick(30);
       const dock = document.querySelector(".thumb-dock-host");
-      const save = dock.querySelector('.context-actions button[type="submit"]');
+      const save = dock.querySelector(
+        ':is(.context-actions, .context-primary) button[type="submit"]',
+      );
       assert.equal(save?.textContent, primary);
       assert.equal(save.form, document.querySelector("dialog form"));
       // Adding or editing: a floating panel, ‹ on the left goes back.
