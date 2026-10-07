@@ -705,3 +705,29 @@ dialog.modal:has(.prep-sheet):not([data-panel]) .modal-header h2 {
   width: 20px;
   height: 20px;
 }
+
+/* The one holding a 1つでいい item can let it go (持ち物を直す). */
+.prep-holding {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 10px 10px 14px;
+  border-radius: 18px;
+  background: var(--p-soft);
+  font-size: 14px;
+  font-weight: 800;
+}
+.prep-holding > :first-child {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+.prep-holding > span:not(:first-child) {
+  flex: 1;
+}
+.prep-holding .prep-take {
+  background: transparent;
+  color: var(--p-ink);
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}

@@ -1084,6 +1084,23 @@ function PackingSheet({
       setError(cause instanceof Error ? cause.message : "保存できませんでした");
     }
   };
+  // Whoever took a 1つでいい item can put it back for someone else to take.
+  const holding =
+    item &&
+    kindOf(item) === "one" &&
+    item.assignee === memberAssignee(self ?? "");
+  const letGo = () => {
+    if (!item) return;
+    travel.updatePackingItem(item.id, {
+      ...packingInput(item),
+      assignee: "",
+      packed: false,
+    });
+    dismissModal(() => {
+      onClose();
+      onSaved(item.id);
+    });
+  };
   const remove = () => {
     if (!item || !confirm(`「${item.name}」を削除しますか？`)) return;
     travel.deletePackingItem(item.id);
@@ -1113,6 +1130,20 @@ function PackingSheet({
           }}
         />
         <ErrorText message={error} />
+        {holding && (
+          <div className="prep-holding">
+            <AssigneeAvatar value={item.assignee!} members={travel.members} />
+            <span>あなたが持つ</span>
+            <button
+              type="button"
+              className="prep-take"
+              data-haptic
+              onClick={letGo}
+            >
+              持つのをやめる
+            </button>
+          </div>
+        )}
         <div className="prep-kinds" role="radiogroup" aria-label="持ち物の種類">
           {(Object.keys(kinds) as PackingKind[]).map((value) => (
             <button
