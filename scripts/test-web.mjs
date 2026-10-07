@@ -858,29 +858,31 @@ test("legacy account cache and pending changes survive React migration; real for
     await tick(30);
     await click(byText("nav a", "場所"));
     await click(document.querySelector('[aria-label="場所を追加"]'));
-    assert.equal(field("訪問ステータス").closest("details"), null);
-    assert.equal(field("訪問ステータス").value, "want");
-    assert.equal(field("予約状況").value, "not_needed");
+    // 行きたい場所 is its Google Maps link and nothing else: the name comes
+    // from the link (Tsubasa 2026-10-07).
+    assert.equal(field("場所の名前"), undefined);
     assert.notEqual(
       document.activeElement,
-      field("場所の名前"),
+      field("Googleマップのリンク"),
       "opening does not activate the keyboard",
     );
-    await fill("場所の名前", "美術館");
-    await fill("メモ", "見たい展示");
-    await fill("営業時間", "10:00〜18:00");
-    await fill("予約状況", "needed");
-    assert.equal(field("予約状況").closest("details"), null);
-    await click(byText("dialog button", "リンクを追加"));
-    await fill("URL", "https://example.com/museum");
-    await fill("名前", "公式サイト");
-    await click(byText("dialog button", "リンクを追加"));
-    await click(document.querySelectorAll('[aria-label="リンクを削除"]')[1]);
-    assert.equal(
-      field("URL").value,
-      "https://example.com/museum",
-      "removing a new link preserves the existing link",
+    await fill("Googleマップのリンク", "美術館");
+    assert.match(
+      document.querySelector("dialog .place-link-note").textContent,
+      /共有/,
+      "plain text is not a place",
     );
+    await fill(
+      "Googleマップのリンク",
+      "https://www.google.com/maps/place/%E7%BE%8E%E8%A1%93%E9%A4%A8",
+    );
+    await tick(30);
+    assert.match(
+      document.querySelector("dialog .it-plres").textContent,
+      /美術館/,
+      "the link names the place",
+    );
+    assert.equal(field("場所の名前"), undefined);
     await submit();
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM places").get().n, 1);
     const placeRow = document.querySelector(".places-row");
@@ -900,14 +902,34 @@ test("legacy account cache and pending changes survive React migration; real for
       placeMapLink.href.startsWith("https://www.google.com/maps/"),
       true,
     );
-    assert.equal(
-      document.querySelector(
-        'dialog a[href="https://example.com/museum"] small',
-      ).textContent,
-      "example.com",
-    );
     assert.ok(
       document.querySelector('.context-actions [aria-label="場所を削除"]'),
+    );
+    // The rest is set in 場所を編集.
+    await click(document.querySelector('.context-actions [aria-label="編集"]'));
+    assert.equal(field("訪問ステータス").closest("details"), null);
+    assert.equal(field("訪問ステータス").value, "want");
+    assert.equal(field("予約状況").value, "not_needed");
+    await fill("メモ", "見たい展示");
+    await fill("営業時間", "10:00〜18:00");
+    await fill("予約状況", "needed");
+    await click(byText("dialog button", "リンクを追加"));
+    await fill("URL", "https://example.com/museum");
+    await fill("名前", "公式サイト");
+    await click(byText("dialog button", "リンクを追加"));
+    await click(document.querySelectorAll('[aria-label="リンクを削除"]')[1]);
+    assert.equal(
+      field("URL").value,
+      "https://example.com/museum",
+      "removing a new link preserves the existing link",
+    );
+    await submit();
+    await tick(30);
+    assert.equal(
+      document.querySelector(
+        'dialog[open] a[href="https://example.com/museum"] small',
+      ).textContent,
+      "example.com",
     );
     await editAndReturn("場所の名前", "更新した美術館");
     const savedPlace = db
@@ -997,7 +1019,7 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     await click(document.querySelector('.context-actions [aria-label="編集"]'));
     await fill(
-      "住所・Google MapsのURL",
+      "Googleマップのリンク",
       "https://www.google.com/maps/place/Kunsthistorisches+Museum/@48.2037,16.3616,17z/data=!4m6!3m5!8m2!3d48.20379!4d16.36166",
     );
     await submit();

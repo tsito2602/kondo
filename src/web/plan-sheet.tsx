@@ -35,7 +35,7 @@ import {
   findFlightConnections,
   formatConnectionDuration,
 } from "@/data/flight-connections";
-import { mapUrl } from "@/data/places";
+import { mapUrl, registeredGoogleMapsUrl } from "@/data/places";
 import type {
   Booking,
   ItineraryCategory,
@@ -662,7 +662,7 @@ function PlanEditForm({
             className="ps-inp"
             maxLength={160}
             value={location}
-            placeholder="場所かマップのリンクを入力"
+            placeholder="マップのリンクか場所の名前を入力"
             autoComplete="off"
             onChange={(event) => setLocation(event.target.value)}
           />
@@ -673,6 +673,14 @@ function PlanEditForm({
               <small>地図の {resolved.number} として載ります</small>
             </span>
           )}
+          {/* Tsubasa 2026-10-07: a plan may name a place that isn't on the map. */}
+          {location.trim() &&
+            !(initial.ownPlace && place && location === shownLocation) &&
+            !registeredGoogleMapsUrl(location.trim()) && (
+              <small className="it-plnote">
+                名前だけなので地図には載りません
+              </small>
+            )}
         </label>
       )}
       <label className="field">

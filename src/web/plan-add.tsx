@@ -151,7 +151,7 @@ export function PlanAddSheet({
               placeholder={
                 category === "transport"
                   ? "行き先を入力"
-                  : "場所かマップのリンクを入力"
+                  : "マップのリンクか場所の名前を入力"
               }
               aria-label="場所の名前、または Google マップのリンク"
               autoComplete="off"
@@ -166,6 +166,13 @@ export function PlanAddSheet({
             <small>地図の {resolved.number} として載ります</small>
           </p>
         )}
+        {category !== "transport" &&
+          place.trim() &&
+          !registeredGoogleMapsUrl(place.trim()) && (
+            <small className="it-plnote">
+              名前だけなので地図には載りません
+            </small>
+          )}
         <ErrorText message={error} />
       </form>
       {picking && (

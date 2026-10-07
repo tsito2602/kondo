@@ -6,12 +6,15 @@ import {
   TimeRangeButton,
   tripDays,
 } from "./timeline-picker";
-import { coordsFromLink } from "@/data/geo";
+import { coordsFromLink, placeNameFromLink } from "@/data/geo";
+import { useAuth } from "@/auth/auth-provider";
+import { placeNumbers } from "@/data/place-numbers";
+import { Glyph, MapPin } from "./itinerary-icons";
 import { dismissModal } from "./motion";
 import { Button } from "./obsidian/button";
 import { Input } from "./obsidian/input";
 import { Textarea } from "./obsidian/textarea";
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { Trash2, Plus, Paperclip } from "lucide-react";
 import { bookingIcons, spring } from "./booking-card";
 import { kindOfBooking } from "./kind-colors";
@@ -34,6 +37,7 @@ import {
   reservationStatuses,
   referenceUrl,
   mapUrl,
+  registeredGoogleMapsUrl,
 } from "@/data/places";
 import { localDate, validDate } from "@/utils/dates";
 import type {
@@ -879,6 +883,148 @@ export function BookingEditor({
     </Modal>
   );
 }
+/**
+ * 行きたい場所を追加 (Tsubasa 2026-10-07): the place is its Google Maps link and
+ * nothing else. Its name and pin come from the link (a short share link asks the
+ * Worker to follow it); only when the link can't tell, a name field appears.
+ */
+function PlaceLinkAdd({ onClose }: { onClose: () => void }) {
+  const travel = useTravel();
+  const { request, isDemo } = useAuth();
+  const formId = useId();
+  const [text, setText] = useState("");
+  const [typedName, setTypedName] = useState("");
+  const [found, setFound] = useState<{ link: string; name: string | null }>();
+  const [pasteError, setPasteError] = useState("");
+  const link = registeredGoogleMapsUrl(text.trim());
+  useEffect(() => {
+    setFound(undefined);
+    if (!link) return;
+    const named = placeNameFromLink(link);
+    if (named || isDemo) return setFound({ link, name: named });
+    let live = true;
+    request<{ name: string | null }>(
+      `/v1/maps/resolve?url=${encodeURIComponent(link)}`,
+    )
+      .then((result) => live && setFound({ link, name: result.name }))
+      .catch(() => live && setFound({ link, name: null }));
+    return () => {
+      live = false;
+    };
+  }, [link, isDemo, request]);
+  const name = (found?.link === link && found.name) || typedName.trim();
+  const number =
+    link &&
+    placeNumbers(
+      [
+        ...travel.places,
+        {
+          id: "~new-place",
+          title: name,
+          note: "",
+          openingHours: "",
+          location: link,
+          status: "want",
+          reservationStatus: "not_needed",
+        },
+      ],
+      travel.items,
+      travel.bookings,
+    ).get("~new-place");
+  const { error, busy, submit } = useSubmit(
+    () => {
+      travel.createPlace({
+        title: name,
+        note: "",
+        openingHours: "",
+        location: link ?? "",
+        status: "want",
+        reservationStatus: "not_needed",
+        referenceLinks: [],
+      });
+    },
+    () =>
+      !link
+        ? "Googleマップのリンクを入力してください"
+        : !name
+          ? "場所の名前を入力してください"
+          : "",
+    onClose,
+  );
+  const paste = async () => {
+    setPasteError("");
+    try {
+      setText((await navigator.clipboard.readText()).trim());
+    } catch {
+      setPasteError(
+        "貼り付けできませんでした。欄を長押しして貼り付けてください",
+      );
+    }
+  };
+  const looking = Boolean(link) && found?.link !== link;
+  return (
+    <Modal
+      title="行きたい場所を追加"
+      onClose={onClose}
+      addPanel
+      dockActions={{
+        primary: (
+          <button type="submit" form={formId} disabled={busy}>
+            <Glyph name="plus" className="ps-dock-glyph" />
+            追加する
+          </button>
+        ),
+      }}
+    >
+      <form id={formId} className="form place-link-form" onSubmit={submit}>
+        <div className="field">
+          <span>Googleマップのリンク</span>
+          <div className="place-link-box">
+            <Input
+              aria-label="Googleマップのリンク"
+              placeholder="Googleマップのリンクを入力"
+              inputMode="url"
+              autoCapitalize="none"
+              autoCorrect="off"
+              maxLength={2000}
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+            />
+            <button type="button" className="place-paste" onClick={paste}>
+              貼り付け
+            </button>
+          </div>
+          {text.trim() && !link && (
+            <small className="place-link-note">
+              Googleマップの「共有」でコピーしたリンクを入れてください
+            </small>
+          )}
+        </div>
+        {looking && <p className="it-plres">場所を読み込んでいます…</p>}
+        {link && !looking && name && (
+          <p className="it-plres">
+            <MapPin number={number || undefined} />
+            {name}
+            <small>
+              {number ? `地図の ${number} として載ります` : "地図に載ります"}
+            </small>
+          </p>
+        )}
+        {link && !looking && !found?.name && (
+          <Field label="場所の名前">
+            <Input
+              maxLength={160}
+              value={typedName}
+              onChange={(event) => setTypedName(event.target.value)}
+            />
+          </Field>
+        )}
+        <ErrorText message={pasteError || error} />
+      </form>
+    </Modal>
+  );
+}
+
 export function PlaceEditor({
   place,
   onClose,
@@ -886,6 +1032,11 @@ export function PlaceEditor({
   place?: Place;
   onClose: () => void;
 }) {
+  if (!place) return <PlaceLinkAdd onClose={onClose} />;
+  return <PlaceForm place={place} onClose={onClose} />;
+}
+
+function PlaceForm({ place, onClose }: { place: Place; onClose: () => void }) {
   const travel = useTravel();
   const [draft, setDraft] = useState({
     title: place?.title ?? "",
@@ -905,8 +1056,10 @@ export function PlaceEditor({
     () =>
       !draft.title.trim()
         ? "場所の名前を入力してください"
-        : draft.location && !mapUrl(draft.location)
-          ? "正しい住所・URLを入力してください"
+        : draft.location !== place.location &&
+            draft.location.trim() &&
+            !registeredGoogleMapsUrl(draft.location)
+          ? "Googleマップのリンクを入力してください"
           : draft.referenceLinks.some((link) => !referenceUrl(link.url))
             ? "参照リンクはhttps://またはhttp://から入力してください"
             : "",
@@ -967,9 +1120,10 @@ export function PlaceEditor({
             </select>
           </Field>
         </div>
-        <Field label="住所・Google MapsのURL">
+        <Field label="Googleマップのリンク">
           <Input
             maxLength={2000}
+            inputMode="url"
             autoCapitalize="none"
             autoCorrect="off"
             value={draft.location}

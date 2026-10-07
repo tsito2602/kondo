@@ -45,7 +45,8 @@ export function placeNameFromLink(text?: string | null): string | null {
   if (place) return decode(place[1]).trim() || null;
   for (const key of ['query', 'q']) {
     const value = url.searchParams.get(key)?.trim();
-    if (value && !pair(value)) return value;
+    // 「Café Central, Herrengasse 14, 1010 Wien」: the name is the first part.
+    if (value && !pair(value)) return value.split(/[,、]/)[0].trim() || value;
   }
   return null;
 }

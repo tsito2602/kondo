@@ -1833,3 +1833,37 @@ dialog[data-panel="add"],
   margin: 0;
   padding: 0;
 }
+
+/* 行きたい場所を追加: the Google Maps link and nothing else (editors.tsx PlaceLinkAdd). */
+.place-link-box {
+  display: flex;
+  gap: 8px;
+}
+.place-link-box input {
+  flex: 1;
+  min-width: 0;
+}
+:root .place-paste {
+  flex: none;
+  min-height: 0;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--it-ink);
+  color: var(--it-paper);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.place-link-note {
+  font-size: 12px;
+  color: var(--it-mute);
+}
+/* A plan's place typed as a name only: it stays off the map. */
+.it-plnote {
+  display: block;
+  margin: 6px 2px 0;
+  font-size: 12px;
+  color: var(--it-mute);
+}

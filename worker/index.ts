@@ -3,7 +3,8 @@ import { Hono } from 'hono';
 import { validDate } from '../src/utils/dates';
 import { itineraryCategories, transportModes, itineraryDetailsError } from '../src/data/itinerary';
 import type { ItineraryDetails } from '../src/data/types';
-import { isShortMapsLink, mapCoordinates, mapUrl, referenceUrl, type Coordinates } from '../src/data/places';
+import { isShortMapsLink, mapCoordinates, mapUrl, referenceUrl, registeredGoogleMapsUrl, type Coordinates } from '../src/data/places';
+import { placeNameFromLink } from '../src/data/geo';
 import { validNoteContent, notePlainText, NOTE_TITLE_LIMIT, NOTE_BODY_LIMIT } from '../src/data/notes';
 
 import { createRemoteJWKSet, jwtVerify } from 'jose';
@@ -236,6 +237,21 @@ async function placeCoordinates(location: string): Promise<Coordinates | null> {
   } catch {
     return null;
   }
+}
+/** A pasted Google Maps link → the place's name and pin (a short share link is followed one redirect). */
+async function resolveMapLink(text: string) {
+  const link = registeredGoogleMapsUrl(text.trim());
+  if (!link) return json({ error: 'Googleマップのリンクを入力してください' }, 400);
+  let target = link;
+  if (isShortMapsLink(link)) {
+    try {
+      const response = await fetch(link, { redirect: 'manual', signal: AbortSignal.timeout(4000) });
+      const location = response.headers.get('location');
+      if (location) target = new URL(location, link).href;
+    } catch { /* keep the short link */ }
+  }
+  const pin = mapCoordinates(target);
+  return json({ link, name: placeNameFromLink(target), lat: pin?.lat ?? null, lng: pin?.lng ?? null });
 }
 async function placesRoute(request: Request, env: Env, user: User, tripId: string, placeId?: string) {
   const forbidden = await requireMember(env, tripId, user.id);
@@ -1087,6 +1103,7 @@ app.delete('/v1/trips/:tripId/invites', (c) => revokeInvites(c.env, c.get('user'
 app.post('/v1/invites/:token/accept', (c) => acceptInvite(c.env, c.get('user'), c.req.param('token')));
 app.all('/v1/trips/:tripId/members', (c) => membersRoute(c.req.raw, c.env, c.get('user'), c.req.param('tripId')));
 app.all('/v1/trips/:tripId/members/:id', (c) => membersRoute(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('id')));
+app.get('/v1/maps/resolve', (c) => resolveMapLink(c.req.query('url') ?? ''));
 app.all('/v1/trips/:tripId/places', (c) => placesRoute(c.req.raw, c.env, c.get('user'), c.req.param('tripId')));
 app.all('/v1/trips/:tripId/places/:id', (c) => placesRoute(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('id')));
 app.all('/v1/trips/:tripId/notes', (c) => notesRoute(c.req.raw, c.env, c.get('user'), c.req.param('tripId')));
