@@ -275,11 +275,7 @@ export function ItemEditor({
         ? (travel.updateItem(item.id, input), item.id)
         : travel.createItem(input);
       if (place)
-        travel.updatePlace(place.id, {
-          ...place,
-          itineraryItemId: id,
-          status: place.status === "want" ? "planned" : place.status,
-        });
+        travel.updatePlace(place.id, { ...place, itineraryItemId: id });
     },
     () =>
       !draft.title.trim()
@@ -898,7 +894,7 @@ export function BookingEditor({
 /**
  * 行きたい場所 add and edit share one form: the name, an address or any link
  * (a Google Maps link puts it on the map; a plain address stays a candidate
- * without a pin), statuses, memo, reference links and opening hours.
+ * without a pin), 予約, memo, reference links and opening hours.
  * Adding opens in the ＋ panel; a Google Maps link fills the name when it
  * names the place (a short share link asks the Worker to follow it).
  */
@@ -917,7 +913,6 @@ export function PlaceEditor({
     note: place?.note ?? "",
     openingHours: place?.openingHours ?? "",
     location: place?.location ?? "",
-    status: place?.status ?? "want",
     reservationStatus: place?.reservationStatus ?? "not_needed",
     referenceLinks: place?.referenceLinks ?? [],
     itineraryItemId: place?.itineraryItemId,

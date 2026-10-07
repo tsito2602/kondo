@@ -109,7 +109,6 @@ export type TravelTask = {
   updatedAt?: number;
 };
 
-export type PlaceStatus = 'want' | 'planned' | 'visited' | 'skipped';
 export type ReservationStatus = 'not_needed' | 'unavailable' | 'needed' | 'requested' | 'confirmed';
 export type PlaceReferenceLink = { label: string; url: string };
 export type Place = {
@@ -121,7 +120,6 @@ export type Place = {
   location: string;
   referenceLinks?: PlaceReferenceLink[];
   itineraryItemId?: string | null;
-  status: PlaceStatus;
   /** Read from the Google Maps link by the Worker; absent on older rows and offline edits. */
   lat?: number | null;
   lng?: number | null;

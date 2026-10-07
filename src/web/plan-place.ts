@@ -28,7 +28,6 @@ export function previewPlace(
     openingHours: "",
     reservationStatus: "not_needed",
     location: link,
-    status: "planned",
     itineraryItemId: "~new-item",
   };
   const itemId = probe.itineraryItemId ?? "~new-item";
@@ -78,7 +77,6 @@ export function savePlanPlace(
         location: link,
         referenceLinks: [],
         itineraryItemId: item.id,
-        status: "planned",
       });
     return { location: link, ownPlace: Boolean(!linked || ownPlace) };
   }

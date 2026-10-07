@@ -220,11 +220,10 @@ function placeFields(body: Record<string, unknown>) {
   }
   const itineraryItemId = body.itineraryItemId == null ? body.itineraryItemId : idField(body.itineraryItemId);
   if (body.itineraryItemId != null && !itineraryItemId) return null;
-  const status = textField(body.status, 20);
   const reservationStatus = textField(body.reservationStatus, 20);
-  if (!title || note === null || openingHours === null || location === null || !['want','planned','visited','skipped'].includes(status ?? '') || !['not_needed','unavailable','needed','requested','confirmed'].includes(reservationStatus ?? '')) return null;
+  if (!title || note === null || openingHours === null || location === null || !['not_needed','unavailable','needed','requested','confirmed'].includes(reservationStatus ?? '')) return null;
   if (/^[a-z][a-z0-9+.-]*:/i.test(location) && !/^https?:\/\//i.test(location)) return null;
-  return { title, note, openingHours, location, status, reservationStatus, ...(referenceLinks === undefined ? {} : { referenceLinks }), ...(itineraryItemId === undefined ? {} : { itineraryItemId }) };
+  return { title, note, openingHours, location, reservationStatus, ...(referenceLinks === undefined ? {} : { referenceLinks }), ...(itineraryItemId === undefined ? {} : { itineraryItemId }) };
 }
 /** Coordinates from a pasted Google Maps link; a short share link is followed one redirect. */
 async function placeCoordinates(location: string): Promise<Coordinates | null> {
@@ -282,7 +281,7 @@ async function placesRoute(request: Request, env: Env, user: User, tripId: strin
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
   if (!placeId && request.method === 'GET') {
-    const rows = await env.DB.prepare(`SELECT p.id, p.title, p.note, p.opening_hours AS openingHours, COALESCE(d.reservation_status, p.reservation_status) AS reservationStatus, p.location, p.status, p.updated_at AS updatedAt, COALESCE(d.reference_links, '[]') AS referenceLinks, l.item_id AS itineraryItemId, c.lat, c.lng FROM places p LEFT JOIN place_itinerary_links l ON l.place_id = p.id LEFT JOIN place_details d ON d.place_id = p.id LEFT JOIN place_coordinates c ON c.place_id = p.id WHERE p.trip_id = ? ORDER BY p.updated_at DESC, p.id`).bind(tripId).all();
+    const rows = await env.DB.prepare(`SELECT p.id, p.title, p.note, p.opening_hours AS openingHours, COALESCE(d.reservation_status, p.reservation_status) AS reservationStatus, p.location, p.updated_at AS updatedAt, COALESCE(d.reference_links, '[]') AS referenceLinks, l.item_id AS itineraryItemId, c.lat, c.lng FROM places p LEFT JOIN place_itinerary_links l ON l.place_id = p.id LEFT JOIN place_details d ON d.place_id = p.id LEFT JOIN place_coordinates c ON c.place_id = p.id WHERE p.trip_id = ? ORDER BY p.updated_at DESC, p.id`).bind(tripId).all();
     await fillMissingCoordinates(env, tripId, rows.results);
     return json({ places: rows.results.map((row) => ({ ...row, referenceLinks: JSON.parse(row.referenceLinks as string) })) });
   }
@@ -294,7 +293,7 @@ async function placesRoute(request: Request, env: Env, user: User, tripId: strin
     const body = await request.json().catch(() => null);
     const fields = isObject(body) ? placeFields(body) : null;
     if (!fields) return json({ error: '場所の名前と入力内容を確認してください' }, 400);
-    const { title, note, openingHours, reservationStatus, location, status, referenceLinks } = fields;
+    const { title, note, openingHours, reservationStatus, location, referenceLinks } = fields;
     if (fields.itineraryItemId) {
       const item = await env.DB.prepare('SELECT trip_id FROM itinerary_items WHERE id = ?').bind(fields.itineraryItemId).first<{ trip_id: string }>();
       if (item && item.trip_id !== tripId) return json({ error: 'この旅行の予定を選択してください' }, 400);
@@ -304,8 +303,8 @@ async function placesRoute(request: Request, env: Env, user: User, tripId: strin
     const legacyReservationStatus = reservationStatus === 'unavailable' ? 'not_needed' : reservationStatus;
     const id = placeId ?? idField(isObject(body) ? body.id : undefined) ?? crypto.randomUUID();
     const statement = placeId
-      ? await env.DB.prepare('UPDATE places SET title=?, note=?, opening_hours=?, reservation_status=?, location=?, status=?, updated_by=?, updated_at=unixepoch() WHERE id=? AND trip_id=?').bind(title, note, openingHours, legacyReservationStatus, location, status, user.id, id, tripId)
-      : await env.DB.prepare(`INSERT INTO places (id, trip_id, title, note, opening_hours, reservation_status, location, status, updated_by) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title, note=excluded.note, opening_hours=excluded.opening_hours, reservation_status=excluded.reservation_status, location=excluded.location, status=excluded.status, updated_by=excluded.updated_by, updated_at=unixepoch() WHERE places.trip_id=excluded.trip_id`).bind(id, tripId, title, note, openingHours, legacyReservationStatus, location, status, user.id);
+      ? await env.DB.prepare('UPDATE places SET title=?, note=?, opening_hours=?, reservation_status=?, location=?, updated_by=?, updated_at=unixepoch() WHERE id=? AND trip_id=?').bind(title, note, openingHours, legacyReservationStatus, location, user.id, id, tripId)
+      : await env.DB.prepare(`INSERT INTO places (id, trip_id, title, note, opening_hours, reservation_status, location, updated_by) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title, note=excluded.note, opening_hours=excluded.opening_hours, reservation_status=excluded.reservation_status, location=excluded.location, updated_by=excluded.updated_by, updated_at=unixepoch() WHERE places.trip_id=excluded.trip_id`).bind(id, tripId, title, note, openingHours, legacyReservationStatus, location, user.id);
     const itemLink = env.DB.prepare(`INSERT INTO place_itinerary_links (place_id, item_id)
       SELECT ?, ? WHERE EXISTS (SELECT 1 FROM places WHERE id = ? AND trip_id = ?)
       ON CONFLICT(place_id) DO UPDATE SET item_id = CASE WHEN ? THEN excluded.item_id ELSE place_itinerary_links.item_id END

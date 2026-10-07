@@ -15,7 +15,7 @@ new Function('module', 'exports', outputFiles[0].text)(mod, mod.exports);
 const { placeNumbers, placeVisits, matchBookingPlace, linkBookingPlace, buildTimeline, createDemoCache } = mod.exports;
 
 const pin = (name, lat, lng) => `https://www.google.com/maps/place/${encodeURIComponent(name)}/@${lat},${lng},17z/data=!4m6!3m5!8m2!3d${lat}!4d${lng}`;
-const place = (id, extra = {}) => ({ id, title: id, note: '', openingHours: '', reservationStatus: 'not_needed', location: '', status: 'want', itineraryItemId: null, ...extra });
+const place = (id, extra = {}) => ({ id, title: id, note: '', openingHours: '', reservationStatus: 'not_needed', location: '', itineraryItemId: null, ...extra });
 const booking = (id, extra = {}) => ({ id, kind: 'ticket', title: id, detail: '', location: '', origin: '', originCode: '', destination: '', destinationCode: '', day: '2026-11-22', time: '', endDay: '2026-11-22', endTime: '', confirmationCode: '', note: '', ...extra });
 
 test('a place linked to a non-hotel booking is scheduled at the booking time, ordered with plans', () => {

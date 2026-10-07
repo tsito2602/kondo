@@ -974,7 +974,7 @@ test("legacy account cache and pending changes survive React migration; real for
       {
         ...db
           .prepare(
-            "SELECT title, note, opening_hours, reservation_status, status FROM places",
+            "SELECT title, note, opening_hours, reservation_status FROM places",
           )
           .get(),
       },
@@ -983,7 +983,6 @@ test("legacy account cache and pending changes survive React migration; real for
         note: "見たい展示",
         opening_hours: "10:00〜18:00",
         reservation_status: "needed",
-        status: "want",
       },
       "the add panel saves memo, hours and statuses",
     );

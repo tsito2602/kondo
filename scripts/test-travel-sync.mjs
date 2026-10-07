@@ -237,10 +237,10 @@ test('sample mode stores edits separately and never sends them to the API', asyn
 test('places survive offline edits, queue exactly once, and remain separate from bookings', async () => {
   const f = await fixture({ isDemo: true });
   try {
-    const input = { title: 'Museum', note: 'Gallery', openingHours: '10–18', reservationStatus: 'unavailable', referenceLinks: [{ label: '公式サイト', url: 'https://museum.example/' }, { label: '', url: 'https://museum.example/exhibitions' }], location: 'https://maps.app.goo.gl/example', status: 'want' };
+    const input = { title: 'Museum', note: 'Gallery', openingHours: '10–18', reservationStatus: 'unavailable', referenceLinks: [{ label: '公式サイト', url: 'https://museum.example/' }, { label: '', url: 'https://museum.example/exhibitions' }], location: 'https://maps.app.goo.gl/example' };
     const id = f.api.createPlace(input);
-    f.api.updatePlace(id, { ...input, status: 'visited' });
-    assert.equal(f.render().places[0].status, 'visited');
+    f.api.updatePlace(id, { ...input, title: 'Museum 2' });
+    assert.equal(f.render().places[0].title, 'Museum 2');
     assert.equal(f.render().places[0].reservationStatus, 'unavailable');
     assert.deepEqual(f.render().places[0].referenceLinks, input.referenceLinks);
     assert.deepEqual(f.writes.at(-1).placesByTrip.trip[0].referenceLinks, input.referenceLinks);

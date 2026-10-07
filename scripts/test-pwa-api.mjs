@@ -256,7 +256,7 @@ test('place coordinates come from Google Maps links, follow one short-link redir
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM place_coordinates').get().n, 0, 'coordinates go with the place');
   } finally { db.close(); }
 });
-test('place itinerary links survive status/title edits and old clients, but clear after plan deletion', async () => {
+test('place itinerary links survive title edits and old clients, but clear after plan deletion', async () => {
   const { db, call, trip } = await fixture();
   try {
     const base = `/trips/${trip.id}/places`, id = randomUUID(), itemId = randomUUID();
@@ -264,8 +264,10 @@ test('place itinerary links survive status/title edits and old clients, but clea
     const read = async () => (await (await call(base)).json()).places.find((entry) => entry.id === id);
     assert.equal((await call(base, 'POST', { id, ...place })).status, 201);
     assert.equal((await call(`/trips/${trip.id}/items`, 'POST', plan)).status, 201);
+    // An old client still sends 訪問ステータス; it is ignored.
     for (const status of ['want', 'planned', 'visited', 'skipped']) {
       assert.equal((await call(`${base}/${id}`, 'PATCH', { ...place, title: '改名', status, itineraryItemId: itemId })).status, 200);
+      assert.equal((await read()).status, undefined);
       assert.equal((await read()).itineraryItemId, itemId);
     }
     assert.equal((await call(`${base}/${id}`, 'PATCH', place)).status, 200);
@@ -310,8 +312,8 @@ test('places CRUD is shared, validated, scoped and replay-safe', async () => {
     assert.equal((await call(base, 'POST', { id, ...place })).status, 201);
     const items = (await (await call(base, 'GET', undefined, 'editor')).json()).places;
     assert.equal(items.length, 1); assert.equal(items[0].openingHours, place.openingHours);
-    assert.equal((await call(`${base}/${id}`, 'PATCH', { ...place, status: 'visited', reservationStatus: 'confirmed' }, 'editor')).status, 200);
-    assert.equal((await call(base, 'POST', { ...place, status: 'invalid' })).status, 400);
+    assert.equal((await call(`${base}/${id}`, 'PATCH', { ...place, reservationStatus: 'confirmed' }, 'editor')).status, 200);
+    assert.equal((await call(base, 'POST', { ...place, reservationStatus: 'invalid' })).status, 400);
     assert.equal((await call(base, 'POST', { ...place, location: 'javascript:alert(1)' })).status, 400);
     assert.equal((await call(base, 'POST', { ...place, title: ' ' })).status, 400);
     assert.equal((await call(base, 'GET', undefined, 'outsider')).status, 403);

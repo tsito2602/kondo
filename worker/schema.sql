@@ -161,11 +161,12 @@ CREATE TABLE IF NOT EXISTS places (
   opening_hours TEXT NOT NULL DEFAULT '',
   reservation_status TEXT NOT NULL DEFAULT 'not_needed' CHECK(reservation_status IN ('not_needed','needed','requested','confirmed')),
   location TEXT NOT NULL DEFAULT '',
-  status TEXT NOT NULL DEFAULT 'want' CHECK(status IN ('want','planned','visited','skipped')),
   updated_by TEXT NOT NULL REFERENCES users(id),
   updated_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
-CREATE INDEX IF NOT EXISTS places_trip ON places(trip_id, status, updated_at);
+-- 訪問ステータス (places.status) is no longer read or written (2026-10-07); an older
+-- database keeps the column and its places_trip index until they are dropped by hand.
+CREATE INDEX IF NOT EXISTS places_trip_updated ON places(trip_id, updated_at);
 
 CREATE TABLE IF NOT EXISTS place_itinerary_links (
   place_id TEXT PRIMARY KEY REFERENCES places(id) ON DELETE CASCADE,

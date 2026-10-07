@@ -53,7 +53,6 @@ export function newBookingPlace(booking: BookingVenue, link: string): PlaceInput
     location: link,
     referenceLinks: [],
     itineraryItemId: null,
-    status: 'planned',
   };
 }
 
