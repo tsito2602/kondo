@@ -16,7 +16,15 @@ function buildVersion() {
     // A shallow deploy checkout would count too few commits.
     if (git("rev-parse", "--is-shallow-repository") === "true")
       git("fetch", "--unshallow", "--quiet");
-    return `${major}.${minor}.${git("rev-list", "--count", "HEAD")}`;
+    // Counted from the 2.0.0 release commit (the redesign's first production
+    // release, 2026-10-07), so that release itself reads 2.0.0.
+    const release = git(
+      "log",
+      "-1",
+      "--format=%H",
+      "--grep=^Release 2\\.0\\.0$",
+    );
+    return `${major}.${minor}.${git("rev-list", "--count", release ? `${release}..HEAD` : "HEAD")}`;
   } catch {
     return `${major}.${minor}.0`;
   }
