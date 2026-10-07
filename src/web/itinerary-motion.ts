@@ -103,10 +103,12 @@ export async function poof(element: HTMLElement | null | undefined) {
     .animate(
       [
         { transform: "none" },
-        { transform: "scale(.94,1.08)", offset: 0.3 },
-        { transform: "scale(1.2,.08)" },
+        // Pressed down, then stretched up, then squashed flat (cartoon).
+        { transform: "scale(1.04,.9)", offset: 0.22 },
+        { transform: "scale(.94,1.1)", offset: 0.48 },
+        { transform: "scale(1.22,.06)" },
       ],
-      { duration: 240, easing: "cubic-bezier(.5,0,.8,.4)", fill: "forwards" },
+      { duration: 460, easing: "cubic-bezier(.45,0,.7,.4)", fill: "forwards" },
     )
     .finished.catch(() => undefined);
   const box = element.getBoundingClientRect();

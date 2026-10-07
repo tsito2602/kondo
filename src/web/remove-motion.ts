@@ -33,5 +33,27 @@ export async function poofAway(
     },
   );
   await Promise.all(nodes.map((node) => poof(node)));
+  // The gap closes up on a spring before the list lets it go.
+  await Promise.all(nodes.map(collapse));
   removeLater(kind, id, message);
+}
+
+function collapse(node: HTMLElement) {
+  if (!node.animate || node.closest(".home-trips-grid, .memo-grid"))
+    return Promise.resolve();
+  const style = getComputedStyle(node);
+  node.style.overflow = "hidden";
+  return node
+    .animate(
+      [
+        {
+          height: `${node.offsetHeight}px`,
+          marginTop: style.marginTop,
+          marginBottom: style.marginBottom,
+        },
+        { height: "0px", marginTop: "0px", marginBottom: "0px" },
+      ],
+      { duration: 300, easing: "cubic-bezier(.3,0,.2,1)", fill: "forwards" },
+    )
+    .finished.catch(() => undefined);
 }

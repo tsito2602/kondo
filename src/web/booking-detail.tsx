@@ -143,16 +143,16 @@ export function BookingDetail({
     });
   const remove = () =>
     confirm(`「${booking?.title ?? "この予約"}」を削除しますか？`) &&
-    dismissModal(() => {
-      onClose();
-      void poofAway(
-        travel.removeLater,
-        "booking",
-        id,
-        "予約を消しました",
-        `[data-booking="${id}"], [data-entry-key^="booking-${id}-"] .it-card`,
-      );
-    });
+    // The panel goes at once (no flight back into the card), so the card
+    // itself is what squashes and bursts.
+    (onClose(),
+    void poofAway(
+      travel.removeLater,
+      "booking",
+      id,
+      "予約を消しました",
+      `[data-booking="${id}"], [data-entry-key^="booking-${id}-"] .it-card`,
+    ));
   const press = (element: Element) =>
     spring(
       element,

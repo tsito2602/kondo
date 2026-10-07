@@ -86,8 +86,13 @@ export async function poof(element: HTMLElement | null | undefined) {
   const box = element.getBoundingClientRect();
   await element
     .animate(
-      [{ transform: "none" }, { transform: "scale(1.04,.2)", opacity: 0.8 }],
-      { duration: 200, easing: "cubic-bezier(.5,0,.9,.5)", fill: "forwards" },
+      [
+        { transform: "none" },
+        { transform: "scale(1.05,.9)", offset: 0.22 },
+        { transform: "scale(.94,1.1)", offset: 0.48 },
+        { transform: "scale(1.2,.08)", opacity: 0.8 },
+      ],
+      { duration: 460, easing: "cubic-bezier(.45,0,.7,.4)", fill: "forwards" },
     )
     .finished.catch(() => undefined);
   const cx = box.left + box.width / 2;

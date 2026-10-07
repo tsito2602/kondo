@@ -610,16 +610,14 @@ function TaskSheet({
   };
   const remove = () => {
     if (!task || !confirm(`「${task.title}」を削除しますか？`)) return;
-    dismissModal(() => {
-      onClose();
-      void poofAway(
-        travel.removeLater,
-        "task",
-        task.id,
-        "やることを消しました",
-        `[data-task="${task.id}"]`,
-      );
-    });
+    onClose();
+    void poofAway(
+      travel.removeLater,
+      "task",
+      task.id,
+      "やることを消しました",
+      `[data-task="${task.id}"]`,
+    );
   };
   return (
     <PrepSheet
@@ -1059,16 +1057,14 @@ function PackingSheet({
   };
   const remove = () => {
     if (!item || !confirm(`「${item.name}」を削除しますか？`)) return;
-    dismissModal(() => {
-      onClose();
-      void poofAway(
-        travel.removeLater,
-        "packing",
-        item.id,
-        "持ち物を消しました",
-        `[data-item="${item.id}"]`,
-      );
-    });
+    onClose();
+    void poofAway(
+      travel.removeLater,
+      "packing",
+      item.id,
+      "持ち物を消しました",
+      `[data-item="${item.id}"]`,
+    );
   };
   return (
     <PrepSheet

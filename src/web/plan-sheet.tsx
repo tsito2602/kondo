@@ -736,10 +736,7 @@ export function PlanSheet({
             deleteLabel="予定を削除"
             onDelete={() =>
               confirm(`「${item.title}」を削除しますか？`) &&
-              dismissModal(() => {
-                onClose();
-                onDelete(item);
-              })
+              (onClose(), onDelete(item))
             }
           />
         ) : undefined,

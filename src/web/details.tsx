@@ -148,16 +148,14 @@ export function PlaceDetail({
   ) : undefined;
   const remove = () =>
     confirm(`「${place?.title ?? "この場所"}」を削除しますか？`) &&
-    dismissModal(() => {
-      onClose();
-      void poofAway(
-        travel.removeLater,
-        "place",
-        id,
-        "場所を消しました",
-        `[data-mark="place:${id}"]`,
-      );
-    });
+    (onClose(),
+    void poofAway(
+      travel.removeLater,
+      "place",
+      id,
+      "場所を消しました",
+      `[data-mark="place:${id}"]`,
+    ));
   return (
     <>
       <Modal

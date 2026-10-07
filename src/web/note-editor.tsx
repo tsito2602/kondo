@@ -327,10 +327,10 @@ export function NoteEditor({
       return;
     deleting.current = true;
     flush();
-    dismissModal(() => {
-      onClose();
-      if (saved) onDelete(note);
-    });
+    // A saved note's tile is what squashes and bursts, so the editor goes at once.
+    if (!saved) return dismissModal(onClose);
+    onClose();
+    onDelete(note);
   };
 
   // The mock offers the trip's planned places: a day and a place.
