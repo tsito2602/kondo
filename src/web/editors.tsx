@@ -1,7 +1,7 @@
 import { DatePicker } from "./date-picker";
+import { MomentRows } from "./moment-rows";
 import {
   shiftDay,
-  TimeChip,
   TimelinePicker,
   TimeRangeButton,
   tripDays,
@@ -759,49 +759,42 @@ export function BookingForm({
               ))}
             </datalist>
           )}
-          <DatePicker
-            label={dateLabels.label}
-            startLabel={dateLabels.start}
-            endLabel={dateLabels.end}
-            range={rangeBooking}
-            span={
-              kind === "hotel" ? "nights" : kind === "car" ? "days" : undefined
-            }
-            trip={travel.selectedTrip ?? undefined}
-            required
-            value={draft.day}
-            endValue={draft.endDay}
-            onChange={(day, endDay) => setDraft({ ...draft, day, endDay })}
-          />
-          <div className="field time-chips">
-            <span>時刻</span>
-            <div>
-              <TimeChip
-                label={dateLabels.start}
-                title={draft.title}
-                day={draft.day}
-                time={draft.time}
-                onChange={(time) =>
-                  setDraft((current) => ({
-                    ...current,
-                    time,
-                    endTime: rangeBooking ? current.endTime : time,
-                  }))
-                }
-              />
-              {rangeBooking && (
-                <TimeChip
-                  label={dateLabels.end}
-                  title={draft.title}
-                  day={draft.endDay || draft.day}
-                  time={draft.endTime}
-                  onChange={(endTime) =>
-                    setDraft((current) => ({ ...current, endTime }))
+          <MomentRows
+            title={draft.title}
+            start={{
+              label: dateLabels.start,
+              date: draft.day,
+              time: draft.time,
+            }}
+            end={
+              rangeBooking
+                ? {
+                    label: dateLabels.end,
+                    date: draft.endDay,
+                    time: draft.endTime,
                   }
-                />
-              )}
-            </div>
-          </div>
+                : undefined
+            }
+            stay={kind === "hotel" || kind === "car"}
+            span={kind === "hotel" ? "nights" : "days"}
+            panelLabel={dateLabels.label}
+            trip={travel.selectedTrip ?? undefined}
+            onChange={(patch) =>
+              setDraft((current) => ({
+                ...current,
+                ...(patch.date !== undefined && {
+                  day: patch.date,
+                  endDay: rangeBooking ? current.endDay : patch.date,
+                }),
+                ...(patch.time !== undefined && {
+                  time: patch.time,
+                  endTime: rangeBooking ? current.endTime : patch.time,
+                }),
+                ...(patch.endDate !== undefined && { endDay: patch.endDate }),
+                ...(patch.endTime !== undefined && { endTime: patch.endTime }),
+              }))
+            }
+          />
           {["flight", "train"].includes(kind) && (
             <Field label="所要時間（分・空欄なら自動計算）">
               <Input

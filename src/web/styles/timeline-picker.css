@@ -342,7 +342,7 @@
   color: var(--p-mid);
 }
 
-/* 予約を手で入力: the date chip and the time chip side by side. */
+/* A ticket's 日時 (moment-rows.tsx): the date chip and the time chip side by side. */
 .bk-moment > span {
   display: flex;
   gap: 6px;
@@ -428,4 +428,14 @@
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   pointer-events: none;
+}
+
+/* In the booking editor the rows read like its other fields (.field). */
+.form > .bk-moment {
+  margin-top: 0;
+}
+.form > .bk-moment > small {
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-weight: 550;
 }

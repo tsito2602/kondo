@@ -37,9 +37,7 @@ import { watchPanelFit } from "./panel-fit";
 import { ThumbDock } from "./thumb-dock";
 import { FormBackButton, useToast } from "./ui";
 import { menuDepth } from "./menu-depth";
-import { TimeChip } from "./timeline-picker";
-import { CalendarPanel } from "./date-picker";
-import { shortDate } from "./calendar/date-range";
+import { MomentRows } from "./moment-rows";
 
 type Travel = ReturnType<typeof useTravel>;
 type Row = {
@@ -356,7 +354,6 @@ export function AddBookingSheet({
   const notify = useToast();
   const [manual, setManual] = useState(false);
   const [form, setForm] = useState<ManualForm>(EMPTY_FORM);
-  const [dateOpen, setDateOpen] = useState<"start" | "end" | null>(null);
   const [leaving, setLeaving] = useState<null | (() => void)>(null);
   /** Slide the sheet away, then close (and run what follows a save). */
   const leave = (after?: () => void) => {
@@ -576,86 +573,48 @@ export function AddBookingSheet({
       created.filter((entry) => entry.file),
     );
   };
-  const field = ([key, label, placeholder]: FieldSpec) =>
-    key === "start" || key === "end" ? (
-      moment(key, label, placeholder)
-    ) : (
-      <label className="bk-fld" key={key}>
-        <small>{label}</small>
-        <input
-          value={form[key]}
-          placeholder={placeholder}
-          list={
-            key === "place" && form.kind !== "hotel" && travel.places.length
-              ? "booking-add-places"
-              : undefined
-          }
-          onChange={(event) =>
-            setForm((current) => ({ ...current, [key]: event.target.value }))
-          }
-        />
-      </label>
-    );
-  /** 日付の粒 (the one calendar) and 時刻の粒 (that day's timeline). */
-  const moment = (key: "start" | "end", label: string, placeholder: string) => {
-    const timeKey = key === "start" ? "startTime" : "endTime";
-    const [date] = placeholder.split(" ");
+  const field = ([key, label, placeholder]: FieldSpec) => (
+    <label className="bk-fld" key={key}>
+      <small>{label}</small>
+      <input
+        value={form[key]}
+        placeholder={placeholder}
+        list={
+          key === "place" && form.kind !== "hotel" && travel.places.length
+            ? "booking-add-places"
+            : undefined
+        }
+        onChange={(event) =>
+          setForm((current) => ({ ...current, [key]: event.target.value }))
+        }
+      />
+    </label>
+  );
+  // 日付の粒 + 時刻の粒 per end, the same rows as the booking editor.
+  const moments = (row: FieldSpec[]) => {
+    const [start, end] = row;
     return (
-      <div className="bk-fld bk-moment" key={key}>
-        <small>{label}</small>
-        <span>
-          <button
-            type="button"
-            className="bk-date"
-            aria-label={`${label}の日付`}
-            aria-haspopup="dialog"
-            data-date-value={form[key]}
-            data-empty={!form[key] || undefined}
-            onClick={() => setDateOpen(key)}
-          >
-            {form[key] ? shortDate(form[key]) : date}
-          </button>
-          <TimeChip
-            bare
-            label={label}
-            title={form.title}
-            day={form[key] || form.start}
-            time={form[timeKey]}
-            onChange={(value) =>
-              setForm((current) => ({ ...current, [timeKey]: value }))
-            }
-          />
-        </span>
-      </div>
+      <MomentRows
+        key="moments"
+        title={form.title}
+        start={{ label: start[1], date: form.start, time: form.startTime }}
+        end={end && { label: end[1], date: form.end, time: form.endTime }}
+        stay={form.kind === "hotel"}
+        span="nights"
+        panelLabel="宿泊の日"
+        trip={travel.selectedTrip ?? undefined}
+        onChange={(patch) =>
+          setForm((current) => ({
+            ...current,
+            ...(patch.date !== undefined && { start: patch.date }),
+            ...(patch.time !== undefined && { startTime: patch.time }),
+            ...(patch.endDate !== undefined && { end: patch.endDate }),
+            ...(patch.endTime !== undefined && { endTime: patch.endTime }),
+          }))
+        }
+      />
     );
   };
-  // A stay is one range (「3泊」); a flight's or train's two ends are picked one by one.
-  const stay = form.kind === "hotel";
-  const dateLabel = (key: "start" | "end") =>
-    form.kind
-      ? (manualFields(form.kind)
-          .flat()
-          .find(([field]) => field === key)?.[1] ?? "日付")
-      : "日付";
-  const datePanel = dateOpen && (
-    <CalendarPanel
-      label={stay ? "宿泊の日" : `${dateLabel(dateOpen)}の日`}
-      range={stay}
-      span={stay ? "nights" : undefined}
-      startLabel={stay ? "チェックイン" : dateLabel(dateOpen)}
-      endLabel="チェックアウト"
-      phase={dateOpen}
-      value={stay ? form.start : form[dateOpen]}
-      endValue={stay ? form.end : undefined}
-      trip={travel.selectedTrip ?? undefined}
-      onChange={(start, end) =>
-        setForm((current) =>
-          stay ? { ...current, start, end } : { ...current, [dateOpen]: start },
-        )
-      }
-      onClose={() => setDateOpen(null)}
-    />
-  );
   const saveManual = () => {
     if (!form.kind) return notify("先にカテゴリを選んでください");
     const year = Number(
@@ -874,7 +833,9 @@ export function AddBookingSheet({
             {form.kind && (
               <>
                 {manualFields(form.kind).map((row, index) =>
-                  row.length === 2 ? (
+                  row[0][0] === "start" ? (
+                    moments(row)
+                  ) : row.length === 2 ? (
                     <div className="bk-two" key={index}>
                       {row.map(field)}
                     </div>
@@ -1108,7 +1069,6 @@ export function AddBookingSheet({
           </>
         )}
       </ThumbDock>
-      {datePanel}
     </dialog>,
     document.body,
   );

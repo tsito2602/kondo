@@ -978,8 +978,3 @@ button.bk-card {
 .bk-date[data-empty] {
   color: var(--p-mute);
 }
-/* A date and its time need the row's width: the two ends stack. */
-.bk-two:has(.bk-moment) {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0;
-}

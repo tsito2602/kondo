@@ -216,11 +216,7 @@
   color: var(--p-paper);
 }
 
-/* 時刻の粒 next to the 日付の粒 (timeline-picker.tsx TimeChip). */
-.time-chips > div {
-  display: flex;
-  gap: 8px;
-}
+/* 時刻の粒 next to the 日付の粒 (timeline-picker.tsx TimeChip, moment-rows.tsx). */
 :root .time-chip {
   min-height: 0;
   display: grid;
@@ -247,11 +243,8 @@
   font-variant-numeric: tabular-nums;
 }
 .time-chip[data-empty] b {
+  font-weight: 500;
   color: var(--p-mute);
   font-family: inherit;
   font-size: 15px;
-}
-.time-chips .time-chip {
-  flex: 1;
-  min-width: 0;
 }
