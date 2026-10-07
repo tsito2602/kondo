@@ -6,10 +6,14 @@ export const SOFT_ORBIT_STRENGTH = 0.7;
 const TAU = Math.PI * 2;
 const PADDING = 30;
 const RADIUS = 30;
-const PALETTE = [[244,78,158],[193,79,221],[139,86,245],[85,103,249],
-  [45,153,244],[36,190,230],[46,196,177],[100,198,127],
-  [174,201,92],[234,190,80],[252,147,83],[252,105,117]];
-const LAYERS = [[22,11,.28],[10,4.5,.42],[1.6,.6,.63]];
+// Holographic CMY (Tsubasa 2026-10-07: マゼンタ、シアン、黄色を使った虹色):
+// magenta, violet, cyan, aqua, yellow, peach, pink, back to magenta.
+const PALETTE = [[255,64,200],[214,96,255],[150,120,255],[70,170,255],
+  [40,220,255],[90,240,225],[190,245,150],[255,235,90],
+  [255,205,110],[255,160,170],[255,110,205],[255,80,220]];
+// Less halo than uchiwake's [[22,11,.28],[10,4.5,.42],[1.6,.6,.63]]
+// (「ホワホワを少し押さえて」): a narrower, fainter bloom and a crisper line.
+const LAYERS = [[12,6,.16],[6,2.5,.4],[2,.5,.85]];
 const wrap = (value:number) => ((value % 1) + 1) % 1;
 type Point = [number,number];
 

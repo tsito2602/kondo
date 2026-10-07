@@ -5,7 +5,6 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { BorderBeam } from "border-beam";
 import { startSoftOrbit } from "./soft-orbit";
 
 // What marks an operation that runs AI, as in uchiwake (Tsubasa 2026-10-07:
@@ -82,7 +81,7 @@ function SoftOrbitGlow() {
 }
 
 /**
- * uchiwake's reading glow (Soft Orbit + a colourful BorderBeam) on the rim of
+ * uchiwake's reading glow (Soft Orbit, in kondo's CMY holo) on the rim of
  * `panel` while `active`; it outlives the reading by a beat, fading as the
  * result lands. It sits beside the panel, not in it, so it stays on the rim
  * while the panel's content scrolls.
@@ -132,17 +131,6 @@ export function AiGlow({
       aria-hidden="true"
     >
       <SoftOrbitGlow />
-      <div className="ai-border-beam">
-        <BorderBeam
-          size="md"
-          theme="light"
-          colorVariant="colorful"
-          borderRadius={30}
-          style={{ position: "absolute", inset: 0 }}
-        >
-          <div style={{ height: "100%", borderRadius: 30 }} />
-        </BorderBeam>
-      </div>
     </div>
   );
 }
