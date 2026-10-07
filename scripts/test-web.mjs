@@ -1632,7 +1632,15 @@ test("legacy account cache and pending changes survive React migration; real for
       [...document.querySelectorAll("dialog .bk-fld small")].map(
         (node) => node.textContent,
       ),
-      ["便名", "出発の空港", "到着の空港", "出発", "到着", "予約番号"],
+      [
+        "航空会社",
+        "便名",
+        "出発の空港",
+        "到着の空港",
+        "出発",
+        "到着",
+        "予約番号",
+      ],
     );
     assert.equal(field("便名").placeholder, "EK 319");
     await fill("出発の空港", "成田（NRT）");

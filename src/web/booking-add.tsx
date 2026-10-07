@@ -200,6 +200,7 @@ type ManualForm = {
   startTime: string;
   endTime: string;
   place: string;
+  carrier: string;
   code: string;
   files: File[];
 };
@@ -218,6 +219,7 @@ const EMPTY_FORM: ManualForm = {
   startTime: "",
   endTime: "",
   place: "",
+  carrier: "",
   code: "",
   files: [],
 };
@@ -225,6 +227,8 @@ const PLACE: FieldSpec = ["place", "場所", "住所か Google マップのリ�
 function manualFields(kind: BookingKind): (FieldSpec[] | [FieldSpec])[] {
   if (kind === "flight")
     return [
+      // The carrier above the flight it runs, as in the edit form.
+      [["carrier", "航空会社", "エミレーツ航空"]],
       [["title", "便名", "EK 319"]],
       [
         ["from", "出発の空港", "成田（NRT）"],
@@ -237,6 +241,7 @@ function manualFields(kind: BookingKind): (FieldSpec[] | [FieldSpec])[] {
     ];
   if (kind === "train")
     return [
+      [["carrier", "鉄道会社", "オーストリア連邦鉄道"]],
       [["title", "列車", "Railjet 542"]],
       [
         ["from", "乗る駅", "ウィーン中央駅"],
@@ -317,7 +322,11 @@ function manualInput(form: ManualForm, year: number): BookingInput | string {
   return {
     kind,
     title: title.slice(0, 160),
-    detail: place && !mapUrl(place) ? place : "",
+    detail: route
+      ? form.carrier.trim().slice(0, 160)
+      : place && !mapUrl(place)
+        ? place
+        : "",
     location: place && mapUrl(place) ? place : "",
     origin: from.name,
     originCode: kind === "flight" ? from.code : "",
@@ -402,6 +411,31 @@ export function AddBookingSheet({
   const [editing, setEditing] = useState<string | null>(null);
   const run = useRef<AbortController | null>(null);
   const body = useRef<HTMLDivElement>(null);
+  // With the keyboard up the sheet sits in what is left of the screen
+  // (bookings.css); bring the field being typed into view inside it.
+  useEffect(() => {
+    const sheet = body.current;
+    if (!sheet) return;
+    let timer = 0;
+    const reveal = (event: FocusEvent) => {
+      const field = event.target;
+      if (!(field instanceof HTMLInputElement)) return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        const box = sheet.getBoundingClientRect();
+        const row = (field.closest(".bk-fld") ?? field).getBoundingClientRect();
+        if (row.bottom > box.bottom - 16)
+          sheet.scrollTop += row.bottom - box.bottom + 16;
+        else if (row.top < box.top + 16)
+          sheet.scrollTop -= box.top + 16 - row.top;
+      }, 320);
+    };
+    sheet.addEventListener("focusin", reveal);
+    return () => {
+      window.clearTimeout(timer);
+      sheet.removeEventListener("focusin", reveal);
+    };
+  }, []);
   const bookings = useRef(travel.bookings);
   bookings.current = travel.bookings;
   useEffect(() => () => run.current?.abort(), []);
