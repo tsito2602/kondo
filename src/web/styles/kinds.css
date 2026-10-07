@@ -231,3 +231,10 @@
   width: 21px;
   height: 21px;
 }
+/* An odd count leaves one empty cell: it still gets its lines. */
+.kind-grid:has(> .settings-row:last-child:nth-child(odd))::after {
+  content: "";
+  box-shadow:
+    -1px 0 0 var(--p-line),
+    0 -1px 0 var(--p-line);
+}
