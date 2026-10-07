@@ -800,14 +800,16 @@ const packingSelect = `
       JOIN trip_members tm ON tm.trip_id = p.trip_id AND tm.user_id = m.user_id WHERE m.item_id = p.id) AS marks
   FROM packing_items p LEFT JOIN packing_details d ON d.item_id = p.id LEFT JOIN packing_kinds k ON k.item_id = p.id`;
 // 自分だけ items stay on the server for their owner only, never for the rest of the trip.
-const packingVisible = `(COALESCE(k.kind, 'one') <> 'mine' OR k.owner_id = ?)`;
+// One whose owner's account is gone (owner_id NULL) goes to the trip's owner so it can be deleted.
+const packingVisible = `(COALESCE(k.kind, 'one') <> 'mine' OR k.owner_id = ?
+  OR (k.owner_id IS NULL AND EXISTS (SELECT 1 FROM trip_members o WHERE o.trip_id = p.trip_id AND o.user_id = ? AND o.role = 'owner')))`;
 
 async function listPacking(env: Env, user: User, tripId: string) {
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
   const result = await env.DB.prepare(`${packingSelect}
     WHERE p.trip_id = ? AND ${packingVisible} ORDER BY p.rowid
-  `).bind(tripId, user.id).all<PackingRow>();
+  `).bind(tripId, user.id, user.id).all<PackingRow>();
   return json({ items: result.results.map((item) => packingView(item, user.id)) });
 }
 
@@ -820,8 +822,8 @@ async function validatePackingAssignee(env: Env, tripId: string, assignee: strin
 }
 
 async function writePackingItem(request: Request, env: Env, user: User, tripId: string, itemId?: string) {
-  const forbidden = await requireMember(env, tripId, user.id);
-  if (forbidden) return forbidden;
+  const role = await memberRole(env, tripId, user.id);
+  if (!role) return json({ error: 'この旅行を編集する権限がありません' }, 403);
   const body = await request.json().catch(() => null);
   const fields = isObject(body) ? packingFields(body) : null;
   if (!fields) return json({ error: '正しい持ち物情報を入力してください' }, 400);
@@ -830,14 +832,18 @@ async function writePackingItem(request: Request, env: Env, user: User, tripId: 
     FROM packing_items p LEFT JOIN packing_details d ON d.item_id = p.id LEFT JOIN packing_kinds k ON k.item_id = p.id WHERE p.id = ?`)
     .bind(id).first<{ packed: number; assignee: string; kind: PackingKind; ownerId: string | null }>();
   // Someone else's private item does not exist for this user.
-  if (existing?.kind === 'mine' && existing.ownerId !== user.id) return json({ error: '持ち物が見つからないか、IDが競合しました' }, itemId ? 404 : 409);
+  // An owner-less one (its owner's account was deleted) belongs to the trip's owner.
+  if (existing?.kind === 'mine' && existing.ownerId !== user.id && !(existing.ownerId === null && role === 'owner')) return json({ error: '持ち物が見つからないか、IDが競合しました' }, itemId ? 404 : 409);
   const invalidAssignee = await validatePackingAssignee(env, tripId, fields.assignee, id);
   if (invalidAssignee) return invalidAssignee;
   const kind = fields.kind ?? existing?.kind ?? 'one';
   const carrier = fields.assignee ?? existing?.assignee ?? '';
   // 1つでいい: only the member who took it ticks it. A stale or foreign tick is
   // ignored rather than rejected so an offline queue is never blocked by it.
-  const packed = kind === 'one' && existing && carrier.startsWith('member:') && carrier !== `member:${user.id}`
+  // A carrier who has left the trip holds nothing: anyone ticks it then.
+  const held = kind === 'one' && existing && carrier.startsWith('member:') && carrier !== `member:${user.id}`
+    && Boolean(await memberRole(env, tripId, carrier.slice(7)));
+  const packed = held
     ? Boolean(existing.packed)
     : fields.packed;
   const statement = itemId
@@ -879,11 +885,12 @@ const createPackingItem = (request: Request, env: Env, user: User, tripId: strin
 const updatePackingItem = (request: Request, env: Env, user: User, tripId: string, itemId: string) => writePackingItem(request, env, user, tripId, itemId);
 
 async function deletePackingItem(env: Env, user: User, tripId: string, itemId: string) {
-  const forbidden = await requireMember(env, tripId, user.id);
-  if (forbidden) return forbidden;
+  const role = await memberRole(env, tripId, user.id);
+  if (!role) return json({ error: 'この旅行を編集する権限がありません' }, 403);
   const result = await env.DB.prepare(`DELETE FROM packing_items WHERE id = ? AND trip_id = ?
-    AND NOT EXISTS (SELECT 1 FROM packing_kinds k WHERE k.item_id = packing_items.id AND k.kind = 'mine' AND k.owner_id IS NOT ?)`)
-    .bind(itemId, tripId, user.id).run();
+    AND NOT EXISTS (SELECT 1 FROM packing_kinds k WHERE k.item_id = packing_items.id AND k.kind = 'mine' AND k.owner_id IS NOT ?
+      AND NOT (k.owner_id IS NULL AND ? = 'owner'))`)
+    .bind(itemId, tripId, user.id, role).run();
   return result.meta.changes ? new Response(null, { status: 204 }) : json({ error: '持ち物が見つかりません' }, 404);
 }
 

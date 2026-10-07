@@ -478,7 +478,8 @@ dialog.modal:has(.prep-sheet):not([data-panel]) .modal-header h2 {
   width: 30px;
   height: 30px;
 }
-.prep-whos button.prep-who-all {
+.prep-whos button.prep-who-all,
+.prep-whos button.prep-who-none {
   padding: 5px 14px;
 }
 .prep-whos button[aria-pressed="true"] {
@@ -490,6 +491,45 @@ dialog.modal:has(.prep-sheet):not([data-panel]) .modal-header h2 {
   margin: 2px 4px 0;
   color: var(--p-mute);
   font-size: 12px;
+}
+/* 個数: a − n ＋ stepper. */
+.prep-qty-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.prep-qty-field .prep-label {
+  flex: 1;
+  margin: 0 2px;
+}
+.prep-qty-field button {
+  width: 36px;
+  height: 36px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--p-soft);
+  color: var(--p-ink);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.prep-qty-field button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.prep-qty-field output {
+  min-width: 2ch;
+  font-size: 16px;
+  font-weight: 900;
+  text-align: center;
+}
+.prep-qty {
+  color: var(--p-mute);
+  font-weight: 700;
 }
 /* .kinds */
 .prep-kinds {

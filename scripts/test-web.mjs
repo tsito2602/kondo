@@ -1244,6 +1244,19 @@ test("legacy account cache and pending changes survive React migration; real for
       document.querySelector(`[data-task="${savedTask.id}"] small`).textContent,
       "期限なし",
     );
+    // A task can be put back on nobody (production's 未指定).
+    await click(document.querySelector('[aria-label="チケットを予約を編集"]'));
+    await click(byText("dialog .prep-whos button", "担当なし"));
+    await submitSheet("保存");
+    assert.equal(
+      db.prepare("SELECT assignee FROM travel_tasks").get().assignee,
+      "",
+    );
+    assert.equal(
+      document.querySelector(`[data-ring="unassigned"] b`).textContent,
+      "担当なし",
+    );
+    assert.ok(document.querySelector(`[data-task="${savedTask.id}"]`));
     await click(document.querySelector('[aria-label="チケットを予約を編集"]'));
     const taskDelete = document.querySelector(
       '.context-actions [aria-label="やることを削除"]',
@@ -1327,7 +1340,9 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     const medicine = await addPacking("常備薬", "1つでいい");
     assert.match(kindRow(medicine).textContent, /まだ誰も持っていない/);
-    assert.equal(kindRow(medicine).querySelector('[role="checkbox"]'), null);
+    // Nobody holds it yet: anyone ticks it, and taking it keeps the tick.
+    await click(kindRow(medicine).querySelector('[role="checkbox"]'));
+    await tick(30);
     await click(byText(`[data-item="${medicine}"] button`, "自分が持つ"));
     await tick(30);
     assert.equal(
@@ -1338,6 +1353,12 @@ test("legacy account cache and pending changes survive React migration; real for
     );
     assert.match(kindRow(medicine).textContent, /あなたが持つ/);
     assert.ok(kindRow(medicine).querySelector('[role="checkbox"]'));
+    assert.equal(
+      db.prepare("SELECT packed FROM packing_items WHERE id = ?").get(medicine)
+        .packed,
+      1,
+      "自分が持つ keeps the tick",
+    );
     const diary = await addPacking("日記", "自分だけ");
     assert.deepEqual(
       {
@@ -1348,6 +1369,21 @@ test("legacy account cache and pending changes survive React migration; real for
       { kind: "mine", owner_id: "owner" },
     );
     assert.match(kindRow(diary).textContent, /ほかの人には見えない/);
+    assert.doesNotMatch(kindRow(diary).textContent, /×/);
+    await click(document.querySelector('[aria-label="日記を編集"]'));
+    assert.equal(
+      document.querySelector("dialog .prep-qty-field output").textContent,
+      "1",
+    );
+    await click(document.querySelector('dialog [aria-label="個数を増やす"]'));
+    await click(document.querySelector('dialog [aria-label="個数を増やす"]'));
+    await submitSheet("保存");
+    assert.equal(
+      db.prepare("SELECT quantity FROM packing_items WHERE id = ?").get(diary)
+        .quantity,
+      3,
+    );
+    assert.match(kindRow(diary).textContent, /日記 ×3/);
     await click(document.querySelector('[aria-label="充電器を編集"]'));
     assert.equal(
       document.querySelector("dialog h2").textContent,

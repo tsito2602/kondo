@@ -171,6 +171,21 @@ test('packing kinds: legacy rows read as 1つでいい, みんな各自 ticks pe
     assert.equal((await call(`${base}/${mine.id}`, 'PATCH', { ...mine, kind: 'each' }, 'editor')).status, 200);
     assert.equal((await find(mine.id, 'owner')).kind, 'each');
     assert.equal((await call(`${base}/${mine.id}`, 'PATCH', { ...mine, kind: 'secret' }, 'editor')).status, 400);
+    // A 自分だけ item whose owner's account is gone goes to the trip's owner, who can delete it.
+    const orphan = { ...mine, id: randomUUID(), name: '持ち主のいない物' };
+    assert.equal((await call(base, 'POST', orphan, 'editor')).status, 201);
+    db.prepare('UPDATE packing_kinds SET owner_id = NULL WHERE item_id = ?').run(orphan.id);
+    assert.equal((await find(orphan.id, 'owner')).name, orphan.name);
+    assert.equal(await find(orphan.id, 'editor'), undefined);
+    assert.equal((await call(`${base}/${orphan.id}`, 'DELETE', undefined, 'editor')).status, 404);
+    assert.equal((await call(`${base}/${orphan.id}`, 'DELETE', undefined, 'owner')).status, 204);
+    // A 1つでいい item whose carrier left the trip is anyone's to tick or take.
+    db.prepare("DELETE FROM trip_members WHERE trip_id = ? AND user_id = 'editor'").run(trip.id);
+    assert.equal((await call(`${base}/${legacy.id}`, 'PATCH', { ...legacy, packed: false })).status, 200);
+    assert.equal((await find(legacy.id)).packed, false);
+    assert.equal((await call(`${base}/${legacy.id}`, 'PATCH', { ...legacy, packed: true, assignee: 'member:owner' })).status, 200);
+    assert.equal((await find(legacy.id)).packed, true, 'claiming keeps the tick');
+    db.prepare("INSERT INTO trip_members (trip_id,user_id,role) VALUES (?, 'editor', 'editor')").run(trip.id);
     db.exec(await readFile('worker/schema.sql', 'utf8'));
     assert.equal((await find(each.id)).kind, 'each', 'kinds survive schema reruns');
     assert.equal((await call(`${base}/${each.id}`, 'DELETE')).status, 204);
