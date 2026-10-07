@@ -1163,14 +1163,11 @@ export function AddBookingSheet({
         disabled={Boolean(leaving)}
       >
         {step === "run" && !manual ? (
-          <>
-            {cancel}
-            <DockGroup slot="r">
-              <button type="button" onClick={stop}>
-                取り込みを中止
-              </button>
-            </DockGroup>
-          </>
+          // Reading: ‹ alone, one step back to the files (Tsubasa 2026-10-07:
+          // 「取り込みを中止と戻るボタンが同居してるのはおかしい」).
+          <DockGroup slot="l" className="context-back">
+            <FormBackButton onBack={stop} />
+          </DockGroup>
         ) : (
           <>
             {cancel}
