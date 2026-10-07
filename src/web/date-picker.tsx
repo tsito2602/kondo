@@ -26,7 +26,7 @@ type PickerProps = {
   allowedDates?: string[];
   /** What sits between the two ends: 「5日間」 (a trip) or 「3泊」 (a stay). */
   span?: "days" | "nights";
-  /** The trip's own days, marked with a small dot (and 出発 on the first). */
+  /** The trip's own days, marked with a small dot. */
   trip?: { startsOn: string; endsOn: string };
   /** Which end the first tap sets (a stay's チェックアウト row opens on it). */
   phase?: "start" | "end";
@@ -346,7 +346,6 @@ export function CalendarPanel({
                   }}
                 >
                   <span className="dp-n">{Number(date.slice(8))}</span>
-                  {trip && date === trip.startsOn && <small>出発</small>}
                 </button>
               );
             })}

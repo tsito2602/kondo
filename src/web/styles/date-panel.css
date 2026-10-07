@@ -194,18 +194,9 @@
   border-radius: 50%;
   background: var(--p-mute);
 }
-/* 出発 takes the dot's place; a picked day's circle covers it. */
-.dp-day:is(:has(small), [aria-pressed="true"])::after {
+/* A picked day's circle covers its dot. */
+.dp-day[aria-pressed="true"]::after {
   display: none;
-}
-.dp-day small {
-  position: absolute;
-  inset: auto 0 -4px;
-  z-index: 2;
-  color: var(--p-mute);
-  font-family: var(--f-body);
-  font-size: 8.5px;
-  font-weight: 900;
 }
 :root .dp-none {
   justify-self: start;
