@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { Coins, Sparkles } from "lucide-react";
 import { useAuth } from "@/auth/auth-provider";
 import {
   demoImportRows,
@@ -32,11 +33,12 @@ import { useLayer } from "./booking-detail";
 import { bookingIcons, CheckIcon, ClipIcon } from "./booking-icons";
 import { BookingEditor, bookingKinds, type BookingInput } from "./editors";
 import { anim, RM } from "./cartoon";
-import { reduceMotion } from "./motion";
+import { dismissModal, reduceMotion } from "./motion";
 import { DockGroup } from "./cartoon-dock";
 import { watchPanelFit } from "./panel-fit";
 import { ThumbDock } from "./thumb-dock";
-import { enterHint, FormBackButton, useToast } from "./ui";
+import { enterHint, FormBackButton, Modal, useToast } from "./ui";
+import { AiGlow, StudioActionLabel } from "./studio";
 import { menuDepth } from "./menu-depth";
 import { MomentRows } from "./moment-rows";
 
@@ -69,6 +71,86 @@ const fileSize = (file: File) =>
   file.size >= 1024 * 1024
     ? `${(file.size / 1024 / 1024).toFixed(1)}MB`
     : `${Math.max(1, Math.round(file.size / 1024))}KB`;
+
+/**
+ * The check before AI reads (uchiwake's 取り込みの確認): a child panel over
+ * the import, whose rainbow button is the one that runs AI.
+ */
+function ReadConfirm({
+  demo,
+  tripName,
+  files,
+  onClose,
+  onStart,
+}: {
+  demo: boolean;
+  tripName: string;
+  files: File[];
+  onClose: () => void;
+  onStart: () => void;
+}) {
+  const started = useRef(false);
+  return (
+    <Modal
+      title="読み取りの確認"
+      onClose={onClose}
+      addPanel
+      dockActions={{
+        primary: (
+          <button
+            type="button"
+            className="studio-action"
+            onClick={() => {
+              if (started.current) return;
+              started.current = true;
+              dismissModal(() => {
+                onClose();
+                onStart();
+              });
+            }}
+          >
+            <StudioActionLabel
+              label={demo ? "デモで読み取る" : "AIで読み取る"}
+            />
+          </button>
+        ),
+      }}
+    >
+      <div className="bk-confirm">
+        <div className="bk-confirm-cost">
+          {demo ? <Sparkles size={22} /> : <Coins size={22} />}
+          <div>
+            <strong>{demo ? "デモは無料です" : "AIで読み取ります"}</strong>
+            <p>
+              {demo
+                ? "AIは動かさず、例の読み取りをお見せします。"
+                : "読み取りにはAI利用料がかかります。"}
+            </p>
+          </div>
+        </div>
+        <dl className="bk-confirm-summary">
+          <div>
+            <dt>旅行</dt>
+            <dd>{tripName}</dd>
+          </div>
+          <div>
+            <dt>書類</dt>
+            <dd>{files.length}ファイル</dd>
+          </div>
+        </dl>
+        <ul className="bk-confirm-files">
+          {files.map((file, index) => (
+            <li key={`${file.name}-${index}`}>
+              <span className="bk-th">{fileBadge(file)}</span>
+              <span>{file.name}</span>
+              <small>{fileSize(file)}</small>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </Modal>
+  );
+}
 
 /** Attach the chosen files to saved bookings. New bookings reach the server first. */
 export async function attachDocuments(
@@ -414,6 +496,7 @@ export function AddBookingSheet({
   const [rows, setRows] = useState<Row[]>([]);
   const [seconds, setSeconds] = useState(0);
   const [editing, setEditing] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const run = useRef<AbortController | null>(null);
   const body = useRef<HTMLDivElement>(null);
   const bookings = useRef(travel.bookings);
@@ -474,7 +557,8 @@ export function AddBookingSheet({
     setStep("run");
     try {
       if (isDemo) {
-        // Demo: simulate the stream with sample rows on the sample trip's days.
+        // Demo: simulate the stream with sample rows on the sample trip's days,
+        // slow enough to watch the reading glow (Tsubasa 2026-10-07).
         const sample = demoImportRows(
           travel.selectedTrip?.startsOn ?? travel.bookings[0]?.day ?? "",
         );
@@ -486,10 +570,10 @@ export function AddBookingSheet({
               reject(new DOMException("Aborted", "AbortError"));
             });
           });
-        await wait(1800);
+        await wait(2400);
         for (const row of sample) {
           accept({ ...row, source: row.source % files.length });
-          await wait(900);
+          await wait(1100);
         }
         await wait(900);
       } else {
@@ -1029,6 +1113,7 @@ export function AddBookingSheet({
           </>
         )}
       </div>
+      <AiGlow active={step === "run" && !manual} panel={body} />
       {editingRow && (
         <BookingEditor
           booking={editingRow.input ?? importedBookingInput(editingRow.row)}
@@ -1042,6 +1127,15 @@ export function AddBookingSheet({
               ),
             )
           }
+        />
+      )}
+      {confirming && (
+        <ReadConfirm
+          demo={isDemo}
+          tripName={travel.selectedTrip?.name ?? ""}
+          files={files}
+          onClose={() => setConfirming(false)}
+          onStart={() => void read()}
         />
       )}
       <ThumbDock
@@ -1076,7 +1170,7 @@ export function AddBookingSheet({
                     save,
                     !adding || needs.length > 0,
                   )
-                : ink("読み取る", () => void read(), !files.length)}
+                : ink("読み取る", () => setConfirming(true), !files.length)}
           </>
         )}
       </ThumbDock>

@@ -12,6 +12,7 @@
 @import "./styles/timeline-picker.css";
 @import "./styles/date-panel.css";
 @import "./styles/kinds.css";
+@import "./styles/studio.css";
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 @theme inline {
   --color-brand: var(--brand);

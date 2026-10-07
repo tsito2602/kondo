@@ -1,0 +1,244 @@
+/* AI operations, as in uchiwake (studio-action.css, statement-import.css):
+   a rainbow-rimmed button, and a rainbow rim on the panel while AI reads.
+   The wash, its SVGs, masks and animations are uchiwake's source unchanged;
+   only the selectors and the dock geometry are kondo's. */
+.studio-action {
+  --studio-strength: 0.7;
+  --probtn-core: 50%;
+  --probtn-core-blur: 150%;
+  --probtn-blur: 6px;
+  --probtn-hue-dur: 4000ms;
+  --probtn-drift-dur: 5000ms;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+/* On the ink island: the button is the island, the wash creeps in from its rim. */
+.cdock-group > button.studio-action {
+  width: 100%;
+  padding: 0 20px;
+  gap: 8px;
+  border-radius: calc(var(--dock-height) / 2);
+  color: var(--p-paper);
+}
+.cdock-group > button.studio-action:disabled::before {
+  --studio-strength: 0.2;
+}
+.studio-action::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image:
+    url("data:image/svg+xml;utf8,<svg viewBox='0 0 67 42' xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='none'><rect x='0' y='0' height='100%' width='100%' fill='url(%23grad)' opacity='0.88'/><defs><radialGradient id='grad' gradientUnits='userSpaceOnUse' cx='0' cy='0' r='10' gradientTransform='matrix(0.34726 -1.3118e-7 8.6482e-7 0.89585 33.5 21)'><stop stop-color='rgba(0,110,245,1)' offset='0'/><stop stop-color='rgba(0,110,245,0)' offset='1'/></radialGradient></defs></svg>"),
+    url("data:image/svg+xml;utf8,<svg viewBox='0 0 67 42' xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='none'><rect x='0' y='0' height='100%' width='100%' fill='url(%23grad)' opacity='0.5'/><defs><radialGradient id='grad' gradientUnits='userSpaceOnUse' cx='0' cy='0' r='10' gradientTransform='matrix(-1.3 0.25 -1.2633 -2.7471 33.5 21)'><stop stop-color='rgba(0,110,245,1)' offset='0'/><stop stop-color='rgba(0,110,245,0)' offset='1'/></radialGradient></defs></svg>"),
+    url("data:image/svg+xml;utf8,<svg viewBox='0 0 67 42' xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='none'><rect x='0' y='0' height='100%' width='100%' fill='url(%23grad)' opacity='0.4'/><defs><radialGradient id='grad' gradientUnits='userSpaceOnUse' cx='0' cy='0' r='10' gradientTransform='matrix(1.05 -0.8 0.46018 3.6184 33.5 21)'><stop stop-color='rgba(204,0,167,1)' offset='0'/><stop stop-color='rgba(170,0,204,0)' offset='0.71709'/></radialGradient></defs></svg>"),
+    url("data:image/svg+xml;utf8,<svg viewBox='0 0 67 42' xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='none'><rect x='0' y='0' height='100%' width='100%' fill='url(%23grad)'/><defs><radialGradient id='grad' gradientUnits='userSpaceOnUse' cx='0' cy='0' r='10' gradientTransform='matrix(-0.51067 -3.3275e-16 -4.3352e-14 -1.1396 33.5 21)'><stop stop-color='rgba(204,0,167,1)' offset='0'/><stop stop-color='rgba(170,0,204,0)' offset='1'/></radialGradient></defs></svg>"),
+    url("data:image/svg+xml;utf8,<svg viewBox='0 0 67 42' xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='none'><rect x='0' y='0' height='100%' width='100%' fill='url(%23grad)'/><defs><radialGradient id='grad' gradientUnits='userSpaceOnUse' cx='0' cy='0' r='10' gradientTransform='matrix(-0.45 -0.75 1.9052 -0.7091 33.5 21)'><stop stop-color='rgba(255,173,85,1)' offset='0'/><stop stop-color='rgba(255,173,85,0)' offset='1'/></radialGradient></defs></svg>"),
+    url("data:image/svg+xml;utf8,<svg viewBox='0 0 67 42' xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='none'><rect x='0' y='0' height='100%' width='100%' fill='url(%23grad)'/><defs><radialGradient id='grad' gradientUnits='userSpaceOnUse' cx='0' cy='0' r='10' gradientTransform='matrix(1.25 -0.35 -0.4013 3.5959 33.5 21)'><stop stop-color='rgba(0,204,68,1)' offset='0'/><stop stop-color='rgba(0,196,102,0.75)' offset='0.25'/><stop stop-color='rgba(0,187,136,0.5)' offset='0.5'/><stop stop-color='rgba(0,170,204,0)' offset='1'/></radialGradient></defs></svg>"),
+    url("data:image/svg+xml;utf8,<svg viewBox='0 0 67 42' xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='none'><rect x='0' y='0' height='100%' width='100%' fill='url(%23grad)'/><defs><radialGradient id='grad' gradientUnits='userSpaceOnUse' cx='0' cy='0' r='10' gradientTransform='matrix(-0.87391 0.73043 -4.1482 -1.9503 33.5 21)'><stop stop-color='rgba(0,170,204,1)' offset='0'/><stop stop-color='rgba(0,170,204,0)' offset='1'/></radialGradient></defs></svg>");
+  background-size:
+    180% 180%,
+    180% 180%,
+    180% 180%,
+    180% 180%,
+    180% 180%,
+    180% 180%,
+    180% 180%;
+  background-repeat: no-repeat;
+  /* Rim-only wash: the mask clears the centre so the label sits on
+     clean white and the colour reads as a glow creeping in from the
+     edges. The ellipse is deliberately smaller than the pill (46%)
+     so full opacity is reached INSIDE the border — sizing it past
+     the edge would clip the opaque end of the ramp and leave the
+     whole wash near-invisible. */
+  -webkit-mask-image: radial-gradient(
+    ellipse 46% 46% at 50% 50%,
+    transparent var(--probtn-core),
+    black calc(var(--probtn-core) + var(--probtn-core-blur))
+  );
+  mask-image: radial-gradient(
+    ellipse 46% 46% at 50% 50%,
+    transparent var(--probtn-core),
+    black calc(var(--probtn-core) + var(--probtn-core-blur))
+  );
+  opacity: var(--studio-strength);
+  animation:
+    t-pro-btn-hue var(--probtn-hue-dur) linear infinite,
+    t-pro-btn-drift var(--probtn-drift-dur) ease-in-out infinite;
+}
+
+.studio-action-label {
+  position: relative;
+  z-index: 1;
+}
+.studio-action-icon {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.cdock-group .studio-action-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+.studio-action-sparks {
+  position: absolute;
+  left: 23px;
+  top: 13px;
+  width: 0;
+  height: 0;
+  z-index: 3;
+  pointer-events: none;
+  color: #ffffff;
+}
+.studio-action-sparks i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1.5px;
+  height: 1.5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0;
+}
+.studio-action:is(:hover, :active) .studio-action-sparks i {
+  animation: detail-studio-spark var(--sd) linear var(--sdelay, 0ms) infinite;
+}
+@keyframes detail-studio-spark {
+  0% {
+    opacity: 0;
+    transform: translate(var(--ox, 0), var(--oy, 0)) scale(0.4);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(
+        calc(var(--ox, 0) + var(--sx, 0) * 0.2),
+        calc(var(--oy, 0) + var(--sy, -12px) * 0.2)
+      )
+      scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+        calc(var(--ox, 0) + var(--sx, 0)),
+        calc(var(--oy, 0) + var(--sy, -12px))
+      )
+      scale(0.6);
+  }
+}
+.studio-action-icon .studio-action-sparks {
+  left: 11px;
+  top: 5px;
+  color: var(--p-paper);
+}
+@keyframes t-pro-btn-hue {
+  from {
+    filter: hue-rotate(0deg) saturate(1.3) blur(var(--probtn-blur));
+  }
+  to {
+    filter: hue-rotate(-360deg) saturate(1.3) blur(var(--probtn-blur));
+  }
+}
+/* Blob travel — the same perimeter orbit as the Pro gradient text,
+   minus its static grey-ramp layer: each blob is pinned to the ring
+   of edge stops TL,T,TR,R,BR,B,BL,L and advances two ring stops per
+   keyframe — a full lap around the pill per cycle, so colour hugs
+   and travels the rim while the mask keeps the middle clean. */
+@keyframes t-pro-btn-drift {
+  0%,
+  100% {
+    background-position:
+      100% 0%,
+      0% 50%,
+      100% 50%,
+      0% 100%,
+      0% 0%,
+      50% 0%,
+      50% 100%;
+  }
+  25% {
+    background-position:
+      100% 100%,
+      50% 0%,
+      50% 100%,
+      0% 0%,
+      100% 0%,
+      100% 50%,
+      0% 50%;
+  }
+  50% {
+    background-position:
+      0% 100%,
+      100% 0%,
+      0% 100%,
+      100% 0%,
+      100% 100%,
+      100% 100%,
+      0% 0%;
+  }
+  75% {
+    background-position:
+      0% 0%,
+      100% 100%,
+      0% 0%,
+      100% 100%,
+      50% 100%,
+      0% 100%,
+      100% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-action::before,
+  .studio-action .studio-action-sparks i {
+    animation: none !important;
+  }
+}
+
+/* The reading panel's rim (uchiwake .import-glow): Soft Orbit + BorderBeam. */
+.ai-glow {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  transition: opacity 0.8s ease 0.38s;
+}
+.ai-glow[data-leaving] {
+  opacity: 0;
+}
+.soft-orbit-glow,
+.ai-border-beam {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  clip-path: inset(0 round 30px);
+  pointer-events: none;
+}
+.soft-orbit-glow canvas {
+  position: absolute;
+  left: -30px;
+  top: -30px;
+  width: calc(100% + 60px);
+  height: calc(100% + 60px);
+}
+.ai-border-beam {
+  opacity: 0.7;
+}
+.ai-border-beam * {
+  pointer-events: none;
+}
+@media (min-width: 760px) {
+  .soft-orbit-glow,
+  .ai-border-beam {
+    clip-path: inset(0 round 30px 30px 0 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-glow {
+    transition: none;
+  }
+}

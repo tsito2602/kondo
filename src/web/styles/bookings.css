@@ -987,3 +987,78 @@ button.bk-card {
 .bk-date[data-empty] {
   color: var(--p-mute);
 }
+
+/* 読み取りの確認 (uchiwake's 取り込みの確認): what AI will read, and its cost. */
+.bk-confirm {
+  display: grid;
+  gap: 22px;
+  padding-top: 4px;
+}
+.bk-confirm-cost {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--bk-card);
+}
+.bk-confirm-cost > svg {
+  flex: none;
+  margin-top: 1px;
+}
+.bk-confirm-cost strong {
+  font-size: 15px;
+  font-weight: 900;
+}
+.bk-confirm-cost p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+.bk-confirm-summary {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+}
+.bk-confirm-summary > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+.bk-confirm-summary dt {
+  flex: none;
+  color: var(--muted);
+  font-size: 13px;
+}
+.bk-confirm-summary dd {
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.bk-confirm-files {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 18px 0 0;
+  border-top: 1.5px solid var(--bk-pale);
+  list-style: none;
+}
+.bk-confirm-files li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+.bk-confirm-files li > span:nth-child(2) {
+  overflow-wrap: anywhere;
+}
+.bk-confirm-files small {
+  color: var(--muted);
+  font-size: 11.5px;
+}
