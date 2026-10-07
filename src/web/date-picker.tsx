@@ -1,4 +1,3 @@
-import { TimeField } from "./time-field";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { CalendarDays, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { Modal } from "./ui";
@@ -17,15 +16,7 @@ type PickerProps = {
   label: string;
   value: string;
   endValue?: string;
-  onChange: (
-    start: string,
-    end: string,
-    startTime: string,
-    endTime: string,
-  ) => void;
-  showTime?: boolean;
-  startTime?: string;
-  endTime?: string;
+  onChange: (start: string, end: string) => void;
   range?: boolean;
   required?: boolean;
   min?: string;
@@ -66,9 +57,6 @@ export function DatePicker(props: PickerProps) {
           <span>
             {props.none && !props.value ? props.none : shortDate(props.value)}
           </span>
-          {props.showTime && props.startTime && (
-            <span className="date-trigger-time">{props.startTime}</span>
-          )}
         </span>
         {props.range && (
           <>
@@ -76,9 +64,6 @@ export function DatePicker(props: PickerProps) {
             <span className="date-trigger-value">
               <small>{props.endLabel ?? "帰着"}</small>
               <span>{shortDate(props.endValue ?? "")}</span>
-              {props.showTime && props.endTime && (
-                <span className="date-trigger-time">{props.endTime}</span>
-              )}
             </span>
           </>
         )}
@@ -106,9 +91,6 @@ export function CalendarPanel({
   endValue = "",
   range = false,
   required = false,
-  showTime = false,
-  startTime = "",
-  endTime = "",
   min,
   max,
   startLabel = range ? "出発" : "日付",
@@ -129,8 +111,6 @@ export function CalendarPanel({
   const [phase, setPhase] = useState<"start" | "end">(
     firstPhase ?? (range && value && !endValue ? "end" : "start"),
   );
-  const [timePhase, setTimePhase] = useState<"start" | "end">("start");
-  const [times, setTimes] = useState({ startTime, endTime });
   const today = localDate();
   const initial =
     value ||
@@ -153,15 +133,10 @@ export function CalendarPanel({
     (!min || date >= min) &&
     (!max || date <= max) &&
     (!allowedDates || allowedDates.includes(date));
-  const validTime = (time: string) =>
-    !time || /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
   const valid =
-    validTime(times.startTime) &&
-    validTime(times.endTime) &&
-    ((!required && !draft.startDate && !draft.endDate) ||
-      (allowed(draft.startDate) &&
-        (!range ||
-          (allowed(draft.endDate) && draft.endDate >= draft.startDate))));
+    (!required && !draft.startDate && !draft.endDate) ||
+    (allowed(draft.startDate) &&
+      (!range || (allowed(draft.endDate) && draft.endDate >= draft.startDate)));
   const changeMonth = (step: number) => {
     motion.current.slide = step;
     setMonth(calendarDate(year, monthIndex + step, 1).slice(0, 7));
@@ -175,7 +150,6 @@ export function CalendarPanel({
     motion.current.band = Boolean(range && next.endDate);
     setDraft(next);
     setPhase(range && !next.endDate ? "end" : "start");
-    setTimePhase(range && next.endDate ? "end" : "start");
   };
   useLayoutEffect(() => {
     const { slide, pop, band } = motion.current;
@@ -221,7 +195,7 @@ export function CalendarPanel({
   });
   const confirm = () =>
     dismissModal(() => {
-      onChange(draft.startDate, draft.endDate, times.startTime, times.endTime);
+      onChange(draft.startDate, draft.endDate);
       onClose();
     });
   const count =
@@ -238,23 +212,16 @@ export function CalendarPanel({
         : `${count + 1}日間`;
   const end = (which: "start" | "end") => {
     const date = which === "start" ? draft.startDate : draft.endDate;
-    const time = which === "start" ? times.startTime : times.endTime;
     return (
       <button
         type="button"
         className="dp-end"
         aria-pressed={range ? phase === which : true}
         data-empty={!date || undefined}
-        onClick={() => {
-          setPhase(which);
-          setTimePhase(which);
-        }}
+        onClick={() => setPhase(which)}
       >
         <small>{which === "start" ? startLabel : endLabel}</small>
-        <b>
-          {date ? shortDate(date) : (none ?? "選んで")}
-          {showTime && time ? ` ${time}` : ""}
-        </b>
+        <b>{date ? shortDate(date) : (none ?? "選んで")}</b>
       </button>
     );
   };
@@ -394,26 +361,6 @@ export function CalendarPanel({
           >
             {none}
           </button>
-        )}
-        {showTime && (
-          <div className="dp-time">
-            <label>
-              <span>
-                {range
-                  ? `${timePhase === "start" ? startLabel : endLabel}の時刻`
-                  : "時刻"}
-              </span>
-              <TimeField
-                value={timePhase === "start" ? times.startTime : times.endTime}
-                onChange={(value) =>
-                  setTimes((current) => ({
-                    ...current,
-                    [timePhase === "start" ? "startTime" : "endTime"]: value,
-                  }))
-                }
-              />
-            </label>
-          </div>
         )}
       </div>
     </Modal>

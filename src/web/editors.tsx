@@ -1,6 +1,7 @@
 import { DatePicker } from "./date-picker";
 import {
   shiftDay,
+  TimeChip,
   TimelinePicker,
   TimeRangeButton,
   tripDays,
@@ -768,21 +769,39 @@ export function BookingForm({
             }
             trip={travel.selectedTrip ?? undefined}
             required
-            showTime
             value={draft.day}
             endValue={draft.endDay}
-            startTime={draft.time}
-            endTime={draft.endTime}
-            onChange={(day, endDay, time, endTime) =>
-              setDraft({
-                ...draft,
-                day,
-                endDay,
-                time,
-                endTime: rangeBooking ? endTime : time,
-              })
-            }
+            onChange={(day, endDay) => setDraft({ ...draft, day, endDay })}
           />
+          <div className="field time-chips">
+            <span>時刻</span>
+            <div>
+              <TimeChip
+                label={dateLabels.start}
+                title={draft.title}
+                day={draft.day}
+                time={draft.time}
+                onChange={(time) =>
+                  setDraft((current) => ({
+                    ...current,
+                    time,
+                    endTime: rangeBooking ? current.endTime : time,
+                  }))
+                }
+              />
+              {rangeBooking && (
+                <TimeChip
+                  label={dateLabels.end}
+                  title={draft.title}
+                  day={draft.endDay || draft.day}
+                  time={draft.endTime}
+                  onChange={(endTime) =>
+                    setDraft((current) => ({ ...current, endTime }))
+                  }
+                />
+              )}
+            </div>
+          </div>
           {["flight", "train"].includes(kind) && (
             <Field label="所要時間（分・空欄なら自動計算）">
               <Input

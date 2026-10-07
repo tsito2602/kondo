@@ -1111,13 +1111,9 @@ test("calendar floats above its editor, commits ranges only on confirmation and 
           value: dates[0],
           endValue: dates[1],
           range: true,
-          showTime: true,
-          startTime: dates[2] ?? "",
-          endTime: dates[3] ?? "",
           required: true,
           min: "2028-02-05",
-          onChange: (start, end, startTime, endTime) =>
-            setDates([start, end, startTime, endTime]),
+          onChange: (start, end) => setDates([start, end]),
         }),
       ),
     );
@@ -1175,26 +1171,13 @@ test("calendar floats above its editor, commits ranges only on confirmation and 
       "2028-02-20",
       "changes stay in the child draft",
     );
-    const setTime = async (value) =>
-      act(async () => {
-        const input = panel.querySelector("input[data-time-field]");
-        Object.getOwnPropertyDescriptor(
-          dom.window.HTMLInputElement.prototype,
-          "value",
-        ).set.call(input, value);
-        input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
-      });
-    assert.match(
-      panel.querySelector(".dp-time label").textContent,
-      /帰着の時刻/,
+    assert.equal(
+      panel.querySelector("input[data-time-field]"),
+      null,
+      "the calendar picks days only; times are their own chips",
     );
-    await setTime("09:30");
-    await click(panel.querySelector(".dp-end"));
-    await setTime("13:00");
     await click(host.querySelector('[data-slot="r"] button'));
     await closeWait();
-    assert.match(trigger.textContent, /13:00/);
-    assert.match(trigger.textContent, /09:30/);
     assert.equal(document.querySelectorAll("dialog").length, 1);
     assert.equal(trigger.dataset.dateValue, "2028-02-12");
     assert.equal(

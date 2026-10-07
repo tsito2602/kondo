@@ -212,18 +212,6 @@ const fill = async (label, value) => {
       await chooseDate(selection.start);
     }
     if (selection.end) await chooseDate(selection.end);
-    if (selection.time !== undefined) {
-      const time = document.querySelector(
-        "dialog:last-of-type input[data-time-field]",
-      );
-      await act(async () => {
-        Object.getOwnPropertyDescriptor(
-          dom.window.HTMLInputElement.prototype,
-          "value",
-        ).set.call(time, selection.time);
-        time.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
-      });
-    }
     assert.equal(byText(".context-actions button", "決定").disabled, false);
     await click(byText(".context-actions button", "決定"));
     await tick(30);
@@ -792,23 +780,25 @@ test("legacy account cache and pending changes survive React migration; real for
       "https://links.h6.hilton.com/f/a/" +
       "long-link-".repeat(30) +
       "?reservation=private";
-    const typeTime = async (label, value) =>
-      act(async () => {
-        const input = document.querySelector(`dialog [aria-label="${label}"]`);
-        Object.getOwnPropertyDescriptor(
-          dom.window.HTMLInputElement.prototype,
-          "value",
-        ).set.call(input, value);
-        input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
-      });
     // The dates: one calendar for the stay (チェックイン, then チェックアウト).
     await fill("チェックイン", {
       start: trip.startsOn,
       end: `${trip.startsOn.slice(0, 4)}-11-25`,
     });
     assert.match(field("チェックアウト").textContent, /^11\/25（/);
-    await typeTime("チェックインの時刻", "15:00");
-    await typeTime("チェックアウトの時刻", "11:00");
+    // The times: each chip opens that day's timeline (時刻の粒).
+    await pickTime(
+      document.querySelector(
+        'dialog [data-time-trigger][aria-label^="チェックインの時刻"]',
+      ),
+      { チェックイン: "15:00" },
+    );
+    await pickTime(
+      document.querySelector(
+        'dialog [data-time-trigger][aria-label^="チェックアウトの時刻"]',
+      ),
+      { チェックアウト: "11:00" },
+    );
     await fill("場所", hotelUrl);
     // The ＋ panel's dock: the ‹ circle on the left island (it closes the
     // keyboard first while typing), 「追加する」 in ink.
@@ -1661,14 +1651,12 @@ test("legacy account cache and pending changes survive React migration; real for
     await fill("出発の空港", "成田（NRT）");
     await fill("到着の空港", "kix");
     await fill("出発", { start: trip.startsOn });
-    await act(async () => {
-      const input = document.querySelector('dialog [aria-label="出発の時刻"]');
-      Object.getOwnPropertyDescriptor(
-        dom.window.HTMLInputElement.prototype,
-        "value",
-      ).set.call(input, "09:30");
-      input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
-    });
+    await pickTime(
+      document.querySelector(
+        'dialog [data-time-trigger][aria-label^="出発の時刻"]',
+      ),
+      { 出発: "09:30" },
+    );
     await fill("予約番号", "JM6EQC");
     await click(byText(".thumb-dock-host .cdock-group button", "追加する"));
     await waitFor(

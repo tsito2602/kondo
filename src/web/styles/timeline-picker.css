@@ -342,23 +342,15 @@
   color: var(--p-mid);
 }
 
-/* 予約を手で入力: a date and its numeric time side by side. */
+/* 予約を手で入力: the date chip and the time chip side by side. */
 .bk-moment > span {
   display: flex;
   gap: 6px;
 }
-:root .bk-moment input {
-  min-width: 0;
-}
-:root .bk-moment .time-field {
-  flex: 0 0 4.9em;
-  padding-inline: 8px;
-  font-variant-numeric: tabular-nums;
+:root .bk-moment .time-chip {
+  flex: 0 0 5.6em;
+  padding-block: 0;
   text-align: center;
-}
-:root .bk-moment .time-field[aria-invalid="true"],
-:root .dp-time .time-field[aria-invalid="true"] {
-  color: var(--p-danger);
 }
 
 /* In the plan forms the times take the whole row. */

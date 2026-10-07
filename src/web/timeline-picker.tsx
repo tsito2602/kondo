@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { useTravel } from "@/data/travel-provider";
+import { localDate } from "@/utils/dates";
 import { distanceMeters, type LatLng, walkMinutes } from "@/data/geo";
 import { itemDetails } from "@/data/itinerary";
 import {
@@ -828,3 +829,57 @@ export function PlanTimePicker({
 }
 
 export { addDays as shiftDay };
+
+/**
+ * 時刻の粒: a time chip that opens that day's timeline (the plans around it,
+ * the readout typeable), next to the 日付の粒 that picks the day.
+ */
+export function TimeChip({
+  label,
+  title,
+  day,
+  time,
+  bare = false,
+  onChange,
+}: {
+  /** 出発, 到着, チェックイン… (the readout's name and the chip's). */
+  label: string;
+  /** The time only, when the row's own label already names the end. */
+  bare?: boolean;
+  /** The booking's name over the timeline. */
+  title: string;
+  day: string;
+  time: string;
+  onChange: (time: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        className="time-chip"
+        aria-label={`${label}の時刻：${time || "未定"}`}
+        data-time-trigger=""
+        data-empty={!time || undefined}
+        onClick={() => setOpen(true)}
+      >
+        {!bare && <small>{label}</small>}
+        <b>{time || "未定"}</b>
+      </button>
+      {open && (
+        <TimelinePicker
+          title={title || label}
+          day={day || localDate()}
+          time={time}
+          endTime=""
+          point
+          pointLabel={label}
+          allowClear
+          clearLabel="時刻なし（未定）にする"
+          onSave={(picked) => onChange(picked.time)}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+}

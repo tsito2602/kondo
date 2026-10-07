@@ -37,7 +37,7 @@ import { watchPanelFit } from "./panel-fit";
 import { ThumbDock } from "./thumb-dock";
 import { FormBackButton, useToast } from "./ui";
 import { menuDepth } from "./menu-depth";
-import { TimeField } from "./time-field";
+import { TimeChip } from "./timeline-picker";
 import { CalendarPanel } from "./date-picker";
 import { shortDate } from "./calendar/date-range";
 
@@ -596,11 +596,10 @@ export function AddBookingSheet({
         />
       </label>
     );
-  /** A date (the one calendar) and its time, from a ticket: the time on the
-      numeric keypad. */
+  /** 日付の粒 (the one calendar) and 時刻の粒 (that day's timeline). */
   const moment = (key: "start" | "end", label: string, placeholder: string) => {
     const timeKey = key === "start" ? "startTime" : "endTime";
-    const [date, clock = ""] = placeholder.split(" ");
+    const [date] = placeholder.split(" ");
     return (
       <div className="bk-fld bk-moment" key={key}>
         <small>{label}</small>
@@ -616,10 +615,12 @@ export function AddBookingSheet({
           >
             {form[key] ? shortDate(form[key]) : date}
           </button>
-          <TimeField
-            value={form[timeKey]}
-            placeholder={clock.replace(/[〜]/g, "") || "--:--"}
-            aria-label={`${label}の時刻`}
+          <TimeChip
+            bare
+            label={label}
+            title={form.title}
+            day={form[key] || form.start}
+            time={form[timeKey]}
             onChange={(value) =>
               setForm((current) => ({ ...current, [timeKey]: value }))
             }
