@@ -660,7 +660,12 @@ export function Modal({
 export const enterHint = (label: string) =>
   `${label.replace(/（[^）]*）/g, "").trim()}を入力`;
 
-/** Every text box says 「<its label>を入力」 (Tsubasa 2026-10-07). */
+/**
+ * Every text box says 「<its label>を入力」 (Tsubasa 2026-10-07). None of them
+ * is the person's own contact details: with autofill on, iOS Safari read
+ * 「場所の名前」 as a name, offered 連絡先を自動入力 and swallowed the
+ * Japanese conversion candidates (Tsubasa 2026-10-07「変換できない」).
+ */
 export function Field({
   label,
   children,
@@ -669,12 +674,18 @@ export function Field({
     <label className="field">
       <span>{label}</span>
       {Children.map(children, (child) =>
-        isValidElement<{ placeholder?: string; type?: string }>(child) &&
-        child.props.placeholder === undefined &&
+        isValidElement<{
+          placeholder?: string;
+          type?: string;
+          autoComplete?: string;
+        }>(child) &&
         !["file", "checkbox", "radio", "hidden"].includes(
           child.props.type ?? "",
         )
-          ? cloneElement(child, { placeholder: enterHint(label) })
+          ? cloneElement(child, {
+              placeholder: child.props.placeholder ?? enterHint(label),
+              autoComplete: child.props.autoComplete ?? "off",
+            })
           : child,
       )}
     </label>
