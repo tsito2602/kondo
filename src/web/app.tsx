@@ -134,7 +134,7 @@ export function App() {
       // Compact panels also retain their pre-keyboard height when scroll space
       // is added underneath their content.
       for (const panel of document.querySelectorAll<HTMLElement>(
-        "dialog[open]:not(.full) .modal-inner",
+        "dialog[open]:not(.full) .modal-inner, dialog[open] > .bk-sheet",
       )) {
         if (!inset) panel.style.removeProperty("--modal-panel-height");
         else if (!panel.style.getPropertyValue("--modal-panel-height"))

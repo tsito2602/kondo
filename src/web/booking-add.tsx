@@ -411,31 +411,6 @@ export function AddBookingSheet({
   const [editing, setEditing] = useState<string | null>(null);
   const run = useRef<AbortController | null>(null);
   const body = useRef<HTMLDivElement>(null);
-  // With the keyboard up the sheet sits in what is left of the screen
-  // (bookings.css); bring the field being typed into view inside it.
-  useEffect(() => {
-    const sheet = body.current;
-    if (!sheet) return;
-    let timer = 0;
-    const reveal = (event: FocusEvent) => {
-      const field = event.target;
-      if (!(field instanceof HTMLInputElement)) return;
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        const box = sheet.getBoundingClientRect();
-        const row = (field.closest(".bk-fld") ?? field).getBoundingClientRect();
-        if (row.bottom > box.bottom - 16)
-          sheet.scrollTop += row.bottom - box.bottom + 16;
-        else if (row.top < box.top + 16)
-          sheet.scrollTop -= box.top + 16 - row.top;
-      }, 320);
-    };
-    sheet.addEventListener("focusin", reveal);
-    return () => {
-      window.clearTimeout(timer);
-      sheet.removeEventListener("focusin", reveal);
-    };
-  }, []);
   const bookings = useRef(travel.bookings);
   bookings.current = travel.bookings;
   useEffect(() => () => run.current?.abort(), []);

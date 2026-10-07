@@ -947,17 +947,14 @@ button.bk-card {
   white-space: nowrap;
 }
 
-/* The keyboard is up: the sheet moves into the part of the screen still
-   visible (the visual viewport) and scrolls inside it, so the field being
-   typed never hides behind the keyboard (Tsubasa 2026-10-07). */
+/* The keyboard is up: as uchiwake's panels, the sheet keeps its size and
+   place; room under the fields lets the one being typed scroll above the
+   keyboard (viewport.ts revealModalField; Tsubasa 2026-10-07). */
 @media (max-width: 759px) {
   :root[data-keyboard-open="true"]:has(.thumb-dock-host) .bk-sheet {
-    top: calc(var(--modal-top, 0px) + max(10px, env(safe-area-inset-top)));
-    bottom: auto;
-    height: auto;
-    max-height: calc(
-      var(--modal-height, 100dvh) - max(10px, env(safe-area-inset-top)) - 10px
-    );
-    overflow-y: auto;
+    height: var(--modal-panel-height, auto);
+    max-height: none;
+    padding-bottom: calc(18px + var(--panel-keyboard-inset, 0px));
+    scroll-padding-bottom: calc(24px + var(--panel-keyboard-inset, 0px));
   }
 }

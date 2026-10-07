@@ -2,7 +2,7 @@
 // before revealing the editor inside the panel's own scroll container.
 export function modalEditor(target: Element | null): HTMLElement | null {
   if (!(target instanceof HTMLElement)) return null;
-  if (!target.closest(".modal-inner") || target.closest("[inert]")) return null;
+  if (!target.closest(".modal-inner, .bk-sheet") || target.closest("[inert]")) return null;
   const dialog = target.closest("dialog[open]:not(.closing)");
   if (
     !dialog ||

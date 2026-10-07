@@ -24,7 +24,7 @@ export function keyboardInset(
 export function revealModalField(focused: Element | null) {
   focused = modalEditor(focused);
   if (!(focused instanceof HTMLElement)) return;
-  const panel = focused.closest<HTMLElement>(".modal-inner");
+  const panel = focused.closest<HTMLElement>(".modal-inner, .bk-sheet");
   const dialog = panel?.closest("dialog[open]:not(.closing)");
   if (!panel || !dialog || panel.closest("[inert]")) return;
 
