@@ -475,3 +475,7 @@ dialog .update-notice-host {
     );
   }
 }
+/* Passkeys sit under the passport as part of the account, 10 px apart. */
+.settings-passkeys {
+  margin-top: 10px;
+}

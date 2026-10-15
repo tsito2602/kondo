@@ -8,6 +8,12 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  browserSupportsWebAuthn,
+  startAuthentication,
+  startRegistration,
+  WebAuthnError,
+} from "@simplewebauthn/browser";
 
 type User = {
   id: string;
@@ -64,6 +70,30 @@ async function api<T>(
     });
   return result;
 }
+type PasskeyOptions = {
+  challengeId: string;
+  // Server-made WebAuthn options, passed through to the browser untouched.
+  options: Parameters<typeof startAuthentication>[0]["optionsJSON"] &
+    Parameters<typeof startRegistration>[0]["optionsJSON"];
+};
+export type PasskeyRow = {
+  id: string;
+  device: string;
+  createdAt: number;
+  lastUsedAt: number | null;
+};
+/** A message for the person, or null when they simply cancelled the sheet. */
+function passkeyError(cause: unknown) {
+  if (cause instanceof WebAuthnError) {
+    if (cause.code === "ERROR_CEREMONY_ABORTED") return null;
+    if (cause.code === "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED")
+      return "この端末のパスキーはもう登録されています";
+  }
+  if (cause instanceof Error && cause.name === "NotAllowedError") return null;
+  return cause instanceof Error && !(cause instanceof WebAuthnError)
+    ? cause.message
+    : "パスキーを使えませんでした";
+}
 function useAuthState() {
   const [isDemo, setIsDemo] = useState(false);
   const [demoName, setDemoName] = useState("あなた");
@@ -71,6 +101,8 @@ function useAuthState() {
   const [loading, setLoading] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // How many passkeys this account has; null until known (offline, demo).
+  const [passkeys, setPasskeys] = useState<number | null>(null);
   const startDemo = useCallback(() => {
     if (DEMO_ENABLED) {
       localStorage.setItem("tabi.demo-active", "1");
@@ -96,11 +128,16 @@ function useAuthState() {
       } catch {
         /* Validate online below. */
       }
-      const result = await api<{ user: User }>("/v1/me", {}, token);
+      const result = await api<{ user: User; passkeys?: number }>(
+        "/v1/me",
+        {},
+        token,
+      );
       if (!active) return;
       writeToken(token);
       saveIdentity(result.user);
       setUser(result.user);
+      setPasskeys(result.passkeys ?? 0);
     })()
       .catch((cause) => {
         if (active && [401, 403].includes(cause?.status)) {
@@ -115,25 +152,71 @@ function useAuthState() {
       active = false;
     };
   }, []);
-  const authenticate = useCallback(async (idToken: string) => {
-    setSigningIn(true);
-    setError(null);
-    try {
-      const result = await api<{ token: string; user: User }>(
-        "/v1/auth/google",
-        { method: "POST", body: JSON.stringify({ idToken }) },
-      );
-      writeToken(result.token);
-      saveIdentity(result.user);
-      setUser(result.user);
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "ログインに失敗しました",
-      );
-    } finally {
-      setSigningIn(false);
-    }
-  }, []);
+  const signIn = useCallback(
+    async (
+      run: () => Promise<{ token: string; user: User }>,
+      passkeyCount: number,
+    ) => {
+      setSigningIn(true);
+      setError(null);
+      try {
+        const result = await run();
+        writeToken(result.token);
+        saveIdentity(result.user);
+        setUser(result.user);
+        setPasskeys(passkeyCount);
+      } catch (cause) {
+        const message = passkeyError(cause);
+        if (message) setError(message);
+      } finally {
+        setSigningIn(false);
+      }
+    },
+    [],
+  );
+  /** Google only lets an account in that has no passkey yet (moving over). */
+  const authenticate = useCallback(
+    (idToken: string) =>
+      signIn(
+        () =>
+          api<{ token: string; user: User }>("/v1/auth/google", {
+            method: "POST",
+            body: JSON.stringify({ idToken }),
+          }),
+        0,
+      ),
+    [signIn],
+  );
+  const passkeySignIn = useCallback(
+    () =>
+      signIn(async () => {
+        const { challengeId, options } = await api<PasskeyOptions>(
+          "/v1/auth/passkey/login/options",
+          { method: "POST" },
+        );
+        const response = await startAuthentication({ optionsJSON: options });
+        return api<{ token: string; user: User }>("/v1/auth/passkey/login", {
+          method: "POST",
+          body: JSON.stringify({ challengeId, response }),
+        });
+      }, 1),
+    [signIn],
+  );
+  const passkeySignUp = useCallback(
+    (name: string) =>
+      signIn(async () => {
+        const { challengeId, options } = await api<PasskeyOptions>(
+          "/v1/auth/passkey/signup/options",
+          { method: "POST", body: JSON.stringify({ name: name.trim() }) },
+        );
+        const response = await startRegistration({ optionsJSON: options });
+        return api<{ token: string; user: User }>("/v1/auth/passkey/signup", {
+          method: "POST",
+          body: JSON.stringify({ challengeId, response }),
+        });
+      }, 1),
+    [signIn],
+  );
   const request = useCallback(
     async <T,>(path: string, init: RequestInit = {}) => {
       if (isDemo) throw new Error("サンプルでは共有機能を利用できません");
@@ -161,6 +244,27 @@ function useAuthState() {
     },
     [isDemo],
   );
+  /** Adds a passkey to the signed-in account; false when the person backed out. */
+  const addPasskey = useCallback(async () => {
+    const { challengeId, options } = await request<PasskeyOptions>(
+      "/v1/passkeys/options",
+      { method: "POST" },
+    );
+    let response;
+    try {
+      response = await startRegistration({ optionsJSON: options });
+    } catch (cause) {
+      const message = passkeyError(cause);
+      if (message) throw new Error(message);
+      return false;
+    }
+    const result = await request<{ passkeys: PasskeyRow[] }>("/v1/passkeys", {
+      method: "POST",
+      body: JSON.stringify({ challengeId, response }),
+    });
+    setPasskeys(result.passkeys.length);
+    return true;
+  }, [request]);
   const signOut = useCallback(async () => {
     const token = readToken();
     if (token)
@@ -188,6 +292,11 @@ function useAuthState() {
   return useMemo(
     () => ({
       configured: Boolean(CLIENT_ID),
+      passkeySupported: browserSupportsWebAuthn(),
+      passkeys: isDemo ? null : passkeys,
+      passkeySignIn,
+      passkeySignUp,
+      addPasskey,
       demoEnabled: DEMO_ENABLED,
       isDemo,
       startDemo,
@@ -216,6 +325,10 @@ function useAuthState() {
       authenticate,
       signOut,
       updateProfile,
+      passkeys,
+      passkeySignIn,
+      passkeySignUp,
+      addPasskey,
     ],
   );
 }
@@ -304,7 +417,6 @@ export function GoogleSignIn() {
   return (
     <div className="google-sign-in" aria-busy={signingIn}>
       <div className="google-sign-in-button" ref={ref} />
-      {signingIn && <p role="status">ログインしています…</p>}
       {error && <p role="alert">{error}</p>}
       {!configured && <p>Googleログインは現在設定されていません。</p>}
     </div>

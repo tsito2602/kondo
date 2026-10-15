@@ -41,9 +41,12 @@ import {
   BookOpen,
   Plus,
   Link2,
+  KeyRound,
+  ChevronLeft,
 } from "lucide-react";
 import { Card } from "./obsidian/card";
 import { GoogleSignIn, useAuth } from "@/auth/auth-provider";
+import { PasskeyNotice } from "./passkey-notice";
 import {
   REMOVAL_UNDO_MS,
   TravelProvider,
@@ -204,7 +207,7 @@ export function App() {
   if (!auth.user) return <Login />;
   return (
     <TravelProvider key={auth.isDemo ? "demo" : auth.user.id}>
-      <ThumbDockProvider>
+      <ThumbDockProvider notice={<PasskeyNotice />}>
         <TravelApp />
       </ThumbDockProvider>
     </TravelProvider>
@@ -221,6 +224,26 @@ function Logo() {
 }
 function Login() {
   const auth = useAuth();
+  const [joining, setJoining] = useState(false);
+  const [name, setName] = useState("");
+  // Google stays only while an account made with it has no passkey yet.
+  const [google, setGoogle] = useState(false);
+  useEffect(() => {
+    let active = true;
+    fetch(
+      `${import.meta.env.VITE_API_URL?.replace(/\/$/, "") ?? ""}/v1/auth/methods`,
+    )
+      .then((response) =>
+        response.ok ? (response.json() as Promise<{ google?: boolean }>) : null,
+      )
+      .then((result) => {
+        if (active) setGoogle(result?.google === true);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
   return (
     <main className="login">
       <div className="login-panel">
@@ -231,11 +254,77 @@ function Login() {
           <h1>こんど、どこ行こうか。</h1>
         </div>
         <div className="login-actions">
-          <GoogleSignIn />
+          {!auth.passkeySupported ? (
+            <p className="error" role="alert">
+              このブラウザーはパスキーに対応していません
+            </p>
+          ) : joining ? (
+            <form
+              className="login-join"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (name.trim()) void auth.passkeySignUp(name);
+              }}
+            >
+              <input
+                className="login-name"
+                value={name}
+                maxLength={100}
+                autoFocus
+                autoComplete="nickname"
+                aria-label="名前"
+                placeholder="名前を入力"
+                onChange={(event) => setName(event.target.value)}
+              />
+              <Button
+                type="submit"
+                className="login-passkey"
+                disabled={auth.signingIn || !name.trim()}
+              >
+                <KeyRound size={18} />
+                パスキーをつくって始める
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="login-demo"
+                onClick={() => setJoining(false)}
+              >
+                <ChevronLeft size={18} />
+                パスキーでログイン
+              </Button>
+            </form>
+          ) : (
+            <>
+              <Button
+                className="login-passkey"
+                disabled={auth.signingIn}
+                onClick={() => void auth.passkeySignIn()}
+              >
+                <KeyRound size={18} />
+                パスキーでログイン
+              </Button>
+              <Button
+                variant="ghost"
+                className="login-join-open"
+                onClick={() => setJoining(true)}
+              >
+                はじめての方
+                <ChevronRight size={18} />
+              </Button>
+            </>
+          )}
+          {auth.signingIn && <p role="status">ログインしています…</p>}
           {auth.error && (
             <p className="error" role="alert">
               {auth.error}
             </p>
+          )}
+          {google && !joining && (
+            <div className="login-google">
+              <small>Googleで登録した方は、一度だけGoogleで</small>
+              <GoogleSignIn />
+            </div>
           )}
           {auth.demoEnabled && (
             <Button
