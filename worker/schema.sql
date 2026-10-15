@@ -311,3 +311,26 @@ CREATE TABLE IF NOT EXISTS booking_places (
   booking_id TEXT PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
   place_id TEXT REFERENCES places(id) ON DELETE SET NULL
 );
+
+-- Passkeys (WebAuthn): the only way to sign in. Accounts made with a passkey
+-- store a placeholder email without '@' that the API never shows.
+CREATE TABLE IF NOT EXISTS passkeys (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  public_key TEXT NOT NULL,
+  counter INTEGER NOT NULL DEFAULT 0,
+  transports TEXT NOT NULL DEFAULT '[]',
+  device TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  last_used_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS passkeys_user ON passkeys(user_id);
+
+-- One-use WebAuthn challenges; user_id/name carry a sign-up or add in progress.
+CREATE TABLE IF NOT EXISTS auth_challenges (
+  id TEXT PRIMARY KEY,
+  challenge TEXT NOT NULL,
+  user_id TEXT,
+  name TEXT,
+  expires_at INTEGER NOT NULL
+);

@@ -10,6 +10,7 @@ import { validNoteContent, notePlainText, NOTE_TITLE_LIMIT, NOTE_BODY_LIMIT } fr
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { connectionBetween, createsFlightConnectionCycle, type FlightConnectionInput } from '../src/data/flight-connections';
 import { startBookingImport, type AIBinding } from './booking-import';
+import { addOptions, addVerify, googleStillNeeded, listPasskeys, loginOptions, loginVerify, removePasskey, signupOptions, signupVerify } from './passkeys';
 
 type Env = {
   DB: D1Database;
@@ -84,9 +85,26 @@ async function currentUser(request: Request, env: Env): Promise<User | null> {
   const authorization = request.headers.get('authorization');
   if (!authorization?.startsWith('Bearer ')) return null;
   const tokenHash = await hashToken(authorization.slice(7));
-  return env.DB.prepare(`SELECT u.id, u.email, u.display_name AS name, p.avatar_url AS avatarUrl FROM sessions s JOIN users u ON u.id = s.user_id LEFT JOIN user_profiles p ON p.user_id = u.id WHERE s.token_hash = ? AND s.expires_at > unixepoch()`)
+  return env.DB.prepare(`SELECT u.id, ${PUBLIC_EMAIL} AS email, u.display_name AS name, p.avatar_url AS avatarUrl FROM sessions s JOIN users u ON u.id = s.user_id LEFT JOIN user_profiles p ON p.user_id = u.id WHERE s.token_hash = ? AND s.expires_at > unixepoch()`)
     .bind(tokenHash)
     .first<User>();
+}
+
+/** Passkey-made accounts have no email; their placeholder never leaves the server. */
+const PUBLIC_EMAIL = `CASE WHEN instr(u.email, '@') > 0 THEN u.email ELSE '' END`;
+
+function findUser(env: Env, id: string) {
+  return env.DB.prepare(`SELECT u.id, ${PUBLIC_EMAIL} AS email, u.display_name AS name, p.avatar_url AS avatarUrl FROM users u LEFT JOIN user_profiles p ON p.user_id = u.id WHERE u.id = ?`)
+    .bind(id)
+    .first<User>();
+}
+
+async function startSession(env: Env, userId: string) {
+  const token = randomToken();
+  await env.DB.prepare(`INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, unixepoch() + 2592000, unixepoch())`)
+    .bind(await hashToken(token), userId)
+    .run();
+  return token;
 }
 
 async function googleLogin(request: Request, env: Env) {
@@ -101,17 +119,17 @@ async function googleLogin(request: Request, env: Env) {
     });
     if (!payload.sub || !payload.email || payload.email_verified !== true) return json({ error: '確認済みGoogleアカウントが必要です' }, 401);
     const user: User = { id: payload.sub, email: String(payload.email).toLowerCase(), name: typeof payload.name === 'string' ? payload.name : null, avatarUrl: typeof payload.picture === 'string' && /^https:\/\//.test(payload.picture) ? payload.picture : null };
+    // Passkeys only: Google just lets an existing account in until it has a passkey.
+    const account = await env.DB.prepare('SELECT EXISTS (SELECT 1 FROM passkeys WHERE user_id = u.id) AS hasPasskey FROM users u WHERE u.id = ?').bind(user.id).first<{ hasPasskey: number }>();
+    if (!account) return json({ error: 'パスキーで始めてください' }, 403);
+    if (account.hasPasskey) return json({ error: 'パスキーでログインしてください' }, 403);
     await env.DB.prepare(`INSERT INTO users (id, email, display_name, updated_at) VALUES (?, ?, ?, unixepoch()) ON CONFLICT(id) DO UPDATE SET email = excluded.email, display_name = COALESCE(users.display_name, excluded.display_name), updated_at = unixepoch()`)
       .bind(user.id, user.email, user.name)
       .run();
     await env.DB.prepare(`INSERT INTO user_profiles (user_id, avatar_url) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET avatar_url = excluded.avatar_url`).bind(user.id, user.avatarUrl).run();
     const saved = await env.DB.prepare('SELECT display_name AS name FROM users WHERE id = ?').bind(user.id).first<{ name: string | null }>();
     user.name = saved?.name ?? user.name;
-    const token = randomToken();
-    await env.DB.prepare(`INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, unixepoch() + 2592000, unixepoch())`)
-      .bind(await hashToken(token), user.id)
-      .run();
-    return json({ token, user });
+    return json({ token: await startSession(env, user.id), user });
   } catch {
     return json({ error: 'Googleログインを確認できませんでした' }, 401);
   }
@@ -1151,7 +1169,7 @@ async function membersRoute(request: Request, env: Env, user: User, tripId: stri
   const forbidden = await requireMember(env, tripId, user.id);
   if (forbidden) return forbidden;
   if (request.method === 'GET' && !memberId) {
-    const members = await env.DB.prepare(`SELECT u.id, u.display_name AS name, u.email, up.avatar_url AS avatarUrl,
+    const members = await env.DB.prepare(`SELECT u.id, u.display_name AS name, ${PUBLIC_EMAIL} AS email, up.avatar_url AS avatarUrl,
       CASE WHEN tm.role = 'owner' THEN 'owner' WHEN mp.read_only = 1 THEN 'viewer' ELSE tm.role END AS role
       FROM trip_members tm JOIN users u ON u.id = tm.user_id LEFT JOIN user_profiles up ON up.user_id = u.id
       LEFT JOIN trip_member_permissions mp ON mp.trip_id = tm.trip_id AND mp.user_id = tm.user_id
@@ -1223,6 +1241,11 @@ app.use('/v1/*', async (c, next) => {
   await next();
 });
 app.post('/v1/auth/google', (c) => googleLogin(c.req.raw, c.env));
+app.get('/v1/auth/methods', async (c) => json({ google: await googleStillNeeded(c.env) }));
+app.post('/v1/auth/passkey/signup/options', (c) => signupOptions(c.req.raw, c.env));
+app.post('/v1/auth/passkey/signup', (c) => signupVerify(c.req.raw, c.env, (id) => startSession(c.env, id)));
+app.post('/v1/auth/passkey/login/options', (c) => loginOptions(c.req.raw, c.env));
+app.post('/v1/auth/passkey/login', (c) => loginVerify(c.req.raw, c.env, (id) => startSession(c.env, id), (id) => findUser(c.env, id)));
 app.use('/v1/*', async (c, next) => {
   const user = await currentUser(c.req.raw, c.env);
   if (!user) return json({ error: 'ログインが必要です' }, 401);
@@ -1233,7 +1256,11 @@ app.use('/v1/*', async (c, next) => {
   }
   await next();
 });
-app.get('/v1/me', (c) => json({ user: c.get('user') }));
+app.get('/v1/me', async (c) => {
+  const user = c.get('user');
+  const row = await c.env.DB.prepare('SELECT count(*) AS n FROM passkeys WHERE user_id = ?').bind(user.id).first<{ n: number }>();
+  return json({ user, passkeys: row?.n ?? 0 });
+});
 app.patch('/v1/me', async (c) => {
   const body = await c.req.json().catch(() => null);
   const name = isObject(body) ? textField(body.name, 100, true) : null;
@@ -1242,6 +1269,10 @@ app.patch('/v1/me', async (c) => {
   await c.env.DB.prepare('UPDATE users SET display_name = ?, updated_at = unixepoch() WHERE id = ?').bind(name, user.id).run();
   return json({ user: { ...user, name } });
 });
+app.get('/v1/passkeys', (c) => listPasskeys(c.env, c.get('user')));
+app.post('/v1/passkeys/options', (c) => addOptions(c.req.raw, c.env, c.get('user')));
+app.post('/v1/passkeys', (c) => addVerify(c.req.raw, c.env, c.get('user')));
+app.delete('/v1/passkeys/:id', (c) => removePasskey(c.env, c.get('user'), c.req.param('id')));
 app.post('/v1/auth/logout', async (c) => {
   const token = c.req.header('authorization')?.slice(7);
   if (token) await c.env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await hashToken(token)).run();

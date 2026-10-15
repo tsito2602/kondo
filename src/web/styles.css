@@ -4203,3 +4203,47 @@ label.haptic-touch > input.haptic-touch {
 .appearance-control > .segment-selection {
   border-radius: var(--radius-field);
 }
+/* Passkey sign-in: one black pill, the new-account form, and Google only while someone still needs it. */
+.login-passkey {
+  width: min(280px, 100%);
+  height: 48px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 15px;
+  font-weight: 700;
+}
+.login-join {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+}
+.login-name {
+  width: min(280px, 100%);
+  height: 48px;
+  padding: 0 20px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 16px;
+  text-align: center;
+  outline: none;
+}
+.login-join-open {
+  font-size: 13px;
+}
+.login-google {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 12px;
+}
+.login-google small {
+  color: var(--muted);
+  font-size: 11px;
+}

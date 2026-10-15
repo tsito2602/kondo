@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { type Location, useLocation, useNavigate } from "react-router";
-import { useAuth } from "@/auth/auth-provider";
+import { type PasskeyRow, useAuth } from "@/auth/auth-provider";
 import { useTravel } from "@/data/travel-provider";
 import type { Trip } from "@/data/types";
 import { localDate } from "@/utils/dates";
@@ -188,9 +188,11 @@ function Passport() {
           </label>
         </span>
         <span className="passport-key">ACCOUNT</span>
-        <span className="passport-email">
-          {auth.user?.email || "サンプルアカウント"}
-        </span>
+        {(auth.isDemo || auth.user?.email) && (
+          <span className="passport-email">
+            {auth.isDemo ? "サンプルアカウント" : auth.user?.email}
+          </span>
+        )}
       </div>
       <div className="passport-stamps">
         <small>これまでの旅 {past.length}回</small>
@@ -303,6 +305,98 @@ function Appearance() {
           {entry.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+const KEY_ICON = (
+  <svg className="settings-row-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <circle
+      cx="8"
+      cy="12"
+      r="4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    />
+    <path
+      d="M12 12h9M18 12v3.5M21 12v2.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+/** The account's passkeys, one row each, and a row to add one for another device. */
+function PasskeyRows() {
+  const auth = useAuth();
+  const notify = useToast();
+  const [rows, setRows] = useState<PasskeyRow[] | null>(null);
+  const { busy, run } = useAction();
+  const { request, passkeys } = auth;
+  useEffect(() => {
+    let active = true;
+    request<{ passkeys: PasskeyRow[] }>("/v1/passkeys")
+      .then((result) => {
+        if (active) setRows(result.passkeys);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [request, passkeys]);
+  if (auth.isDemo || !auth.passkeySupported) return null;
+  return (
+    <div className="settings-group settings-passkeys">
+      {rows?.map((row) => (
+        <div key={row.id} className="settings-row">
+          {KEY_ICON}
+          <span>
+            <b>{row.device ? `${row.device}のパスキー` : "パスキー"}</b>
+            <small>
+              {new Date(row.createdAt * 1000).toLocaleDateString("ja-JP", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+              に登録
+            </small>
+          </span>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="settings-row"
+        disabled={busy}
+        onClick={(event) => {
+          void spring(
+            event.currentTarget,
+            [{ transform: "scale(.97)" }, { transform: "none" }],
+            "squish",
+          );
+          void run(async () => {
+            if (await auth.addPasskey()) notify("パスキーを登録しました");
+          });
+        }}
+      >
+        {KEY_ICON}
+        <span>
+          <b>パスキーを追加</b>
+        </span>
+        <span className="settings-row-end">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 5v14M5 12h14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+            />
+          </svg>
+        </span>
+      </button>
     </div>
   );
 }
@@ -475,6 +569,7 @@ export function SettingsScreen() {
       <div ref={page} className="settings-page settings-v2">
         <h3 className="settings-label">アカウント</h3>
         <Passport />
+        <PasskeyRows />
         <h3 className="settings-label">外観</h3>
         <Appearance />
         <KindColorRows />
