@@ -1077,7 +1077,7 @@ button.bk-card {
   background: var(--bk-card);
   overflow: hidden;
 }
-.bk-doc {
+.bk-desk-doc {
   position: absolute;
   left: 50%;
   top: 52px;
@@ -1093,21 +1093,21 @@ button.bk-card {
   box-shadow: 0 0 0 1.5px var(--bk-pale);
   transform-origin: 50% 80%;
 }
-.bk-doc i {
+.bk-desk-doc i {
   display: block;
   height: 6px;
   border-radius: 3px;
   background: var(--p-line);
 }
-.bk-doc i:nth-child(1) {
+.bk-desk-doc i:nth-child(1) {
   width: 60%;
   height: 9px;
   background: var(--bk-pale);
 }
-.bk-doc i:nth-child(3n) {
+.bk-desk-doc i:nth-child(3n) {
   width: 75%;
 }
-.bk-doc span {
+.bk-desk-doc span {
   position: absolute;
   right: 8px;
   bottom: 8px;

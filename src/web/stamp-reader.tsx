@@ -52,7 +52,7 @@ export function StampReader({
     const desk = stage.current;
     if (!desk) return;
     let alive = true;
-    const docs = [...desk.querySelectorAll<HTMLElement>(".bk-doc")];
+    const docs = [...desk.querySelectorAll<HTMLElement>(".bk-desk-doc")];
     const stamp = desk.querySelector<HTMLElement>(".bk-stamp")!;
     const flying: HTMLElement[] = [];
 
@@ -347,7 +347,7 @@ export function StampReader({
         .map((tag, index) => (
           <div
             key={index}
-            className="bk-doc"
+            className="bk-desk-doc"
             style={{ transform: PLACES[index] }}
           >
             {Array.from({ length: 10 }, (_, line) => (
