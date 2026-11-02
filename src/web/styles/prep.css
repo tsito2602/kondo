@@ -164,30 +164,33 @@
   margin-right: 12px;
 }
 .prep-row-main b {
-  position: relative;
   display: inline;
   font-size: 15px;
   font-weight: 700;
 }
-/* The strike is drawn across when a task is done (.32 s). */
-.prep-row-main b::after {
-  content: "";
+/* The strike is drawn through every wrapped line when a row is done (.32 s),
+   one segment after another (strike.tsx), and taken back in reverse. */
+.prep-row-main > span {
+  position: relative;
+}
+.prep-strike {
   position: absolute;
-  top: 52%;
-  right: -2px;
-  left: -2px;
   height: 2.5px;
+  margin-top: -1.25px;
   border-radius: 99px;
   background: var(--p-mid);
+  pointer-events: none;
   transform: scaleX(0);
   transform-origin: 0 50%;
-  transition: transform 0.32s;
+  transition: transform var(--strike-dur, 0.32s) var(--strike-ease, ease)
+    var(--strike-back, 0s);
 }
 .prep-row.is-done b {
   color: var(--p-mute);
 }
-.prep-row.is-done b::after {
+.prep-row.is-done .prep-strike {
   transform: scaleX(1);
+  transition-delay: var(--strike-delay, 0s);
 }
 .prep-row-main small {
   display: block;

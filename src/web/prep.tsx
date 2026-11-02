@@ -1,5 +1,6 @@
 import { poofAway } from "./remove-motion";
 import { DatePicker } from "./date-picker";
+import { StrikeName } from "./strike";
 import {
   createContext,
   useCallback,
@@ -388,7 +389,7 @@ function TaskRow({
         onClick={onEdit}
       >
         <span>
-          <b>{task.title}</b>
+          <StrikeName>{task.title}</StrikeName>
           <small className="prep-item-sub">{sub}</small>
         </span>
         {side}
@@ -804,12 +805,12 @@ function PackRow({
         onClick={onEdit}
       >
         <span>
-          <b>
+          <StrikeName>
             {item.name}
             {item.quantity > 1 && (
               <span className="prep-qty"> ×{item.quantity}</span>
             )}
-          </b>
+          </StrikeName>
           {sub && <small className="prep-item-sub">{sub}</small>}
         </span>
         {side}
