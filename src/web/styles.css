@@ -2140,17 +2140,6 @@ input::-webkit-date-and-time-value {
   color: var(--muted);
   font-size: 12px;
 }
-.google-sign-in {
-  width: min(280px, 100%);
-}
-.google-sign-in-button {
-  width: 100%;
-  height: 40px;
-  /* Google centers a 280px pill in a 300px iframe; hide its outer 10px/2px gutter. */
-  overflow: hidden;
-  border-radius: 999px;
-  isolation: isolate;
-}
 .document-preview {
   display: flex;
   flex-direction: column;
@@ -4203,7 +4192,7 @@ label.haptic-touch > input.haptic-touch {
 .appearance-control > .segment-selection {
   border-radius: var(--radius-field);
 }
-/* Passkey sign-in: one black pill, the new-account form, and Google only while someone still needs it. */
+/* Passkey sign-in: one black pill and the new-account form. */
 .login-passkey {
   width: min(280px, 100%);
   height: 48px;
@@ -4234,16 +4223,4 @@ label.haptic-touch > input.haptic-touch {
 }
 .login-join-open {
   font-size: 13px;
-}
-.login-google {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  margin-top: 12px;
-}
-.login-google small {
-  color: var(--muted);
-  font-size: 11px;
 }

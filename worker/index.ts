@@ -7,16 +7,14 @@ import { isShortMapsLink, mapCoordinates, mapUrl, referenceUrl, registeredGoogle
 import { placeNameFromLink } from '../src/data/geo';
 import { validNoteContent, notePlainText, NOTE_TITLE_LIMIT, NOTE_BODY_LIMIT } from '../src/data/notes';
 
-import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { connectionBetween, createsFlightConnectionCycle, type FlightConnectionInput } from '../src/data/flight-connections';
 import { startBookingImport, type AIBinding } from './booking-import';
-import { addOptions, addVerify, googleStillNeeded, listPasskeys, loginOptions, loginVerify, removePasskey, signupOptions, signupVerify } from './passkeys';
+import { addOptions, addVerify, listPasskeys, loginOptions, loginVerify, removePasskey, signupOptions, signupVerify } from './passkeys';
 
 type Env = {
   DB: D1Database;
   BUCKET: R2Bucket;
   ASSETS: Fetcher;
-  GOOGLE_CLIENT_IDS: string;
   ALLOWED_ORIGINS?: string;
   /** Workers AI binding and AI Gateway id for reading booking documents. Import is off without either. */
   AI?: AIBinding;
@@ -24,7 +22,6 @@ type Env = {
 };
 
 type User = { id: string; email: string; name: string | null; avatarUrl: string | null };
-const googleJwks = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
 const encoder = new TextEncoder();
 
 function json(value: unknown, status = 200, headers?: HeadersInit) {
@@ -105,35 +102,6 @@ async function startSession(env: Env, userId: string) {
     .bind(await hashToken(token), userId)
     .run();
   return token;
-}
-
-async function googleLogin(request: Request, env: Env) {
-  const body = (await request.json().catch(() => null)) as { idToken?: string } | null;
-  if (!body?.idToken) return json({ error: 'IDトークンが必要です' }, 400);
-  const audiences = env.GOOGLE_CLIENT_IDS.split(',').map((value) => value.trim()).filter(Boolean);
-  if (!audiences.length) return json({ error: 'OAuth設定が完了していません' }, 503);
-  try {
-    const { payload } = await jwtVerify(body.idToken, googleJwks, {
-      issuer: ['https://accounts.google.com', 'accounts.google.com'],
-      audience: audiences,
-    });
-    if (!payload.sub || !payload.email || payload.email_verified !== true) return json({ error: '確認済みGoogleアカウントが必要です' }, 401);
-    const user: User = { id: payload.sub, email: String(payload.email).toLowerCase(), name: typeof payload.name === 'string' ? payload.name : null, avatarUrl: typeof payload.picture === 'string' && /^https:\/\//.test(payload.picture) ? payload.picture : null };
-    // Passkeys only: Google just lets an existing account in until it has a passkey.
-    const account = await env.DB.prepare('SELECT EXISTS (SELECT 1 FROM passkeys WHERE user_id = u.id) AS hasPasskey FROM users u WHERE u.id = ?').bind(user.id).first<{ hasPasskey: number }>();
-    if (!account) return json({ error: 'パスキーで始めてください' }, 403);
-    if (account.hasPasskey) return json({ error: 'パスキーでログインしてください' }, 403);
-    await env.DB.prepare(`INSERT INTO users (id, email, display_name, updated_at) VALUES (?, ?, ?, unixepoch()) ON CONFLICT(id) DO UPDATE SET email = excluded.email, display_name = COALESCE(users.display_name, excluded.display_name), updated_at = unixepoch()`)
-      .bind(user.id, user.email, user.name)
-      .run();
-    await env.DB.prepare(`INSERT INTO user_profiles (user_id, avatar_url) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET avatar_url = CASE WHEN user_profiles.avatar_url LIKE '/v1/avatars/%' THEN user_profiles.avatar_url ELSE excluded.avatar_url END`).bind(user.id, user.avatarUrl).run();
-    user.avatarUrl = (await env.DB.prepare('SELECT avatar_url AS url FROM user_profiles WHERE user_id = ?').bind(user.id).first<{ url: string | null }>())?.url ?? null;
-    const saved = await env.DB.prepare('SELECT display_name AS name FROM users WHERE id = ?').bind(user.id).first<{ name: string | null }>();
-    user.name = saved?.name ?? user.name;
-    return json({ token: await startSession(env, user.id), user });
-  } catch {
-    return json({ error: 'Googleログインを確認できませんでした' }, 401);
-  }
 }
 
 async function listTrips(env: Env, user: User) {
@@ -1241,14 +1209,12 @@ app.use('/v1/*', async (c, next) => {
   if (c.req.method === 'OPTIONS') return c.body(null, 204);
   await next();
 });
-app.post('/v1/auth/google', (c) => googleLogin(c.req.raw, c.env));
 // Icons are public so <img> can load them without a token; the version in the path busts caches.
 app.get('/v1/avatars/:userId/:version', async (c) => {
   const object = await c.env.BUCKET.get(`avatars/${c.req.param('userId')}`);
   if (!object) return json({ error: 'Not found' }, 404);
   return new Response(object.body, { headers: { 'content-type': object.httpMetadata?.contentType ?? 'image/jpeg', 'cache-control': 'public, max-age=31536000, immutable' } });
 });
-app.get('/v1/auth/methods', async (c) => json({ google: await googleStillNeeded(c.env) }));
 app.post('/v1/auth/passkey/signup/options', (c) => signupOptions(c.req.raw, c.env));
 app.post('/v1/auth/passkey/signup', (c) => signupVerify(c.req.raw, c.env, (id) => startSession(c.env, id)));
 app.post('/v1/auth/passkey/login/options', (c) => loginOptions(c.req.raw, c.env));

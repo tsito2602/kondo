@@ -44,11 +44,7 @@ const Registry = createContext<{
 const Actions = createContext<ReactNode[]>([]);
 
 /** One live surface, moved into the active dialog's top layer without remounting. */
-/** `notice`: another pill for the update notice's spot (it waits while an update does). */
-export function ThumbDockProvider({
-  children,
-  notice,
-}: PropsWithChildren<{ notice?: ReactNode }>) {
+export function ThumbDockProvider({ children }: PropsWithChildren) {
   const [entries, setEntries] = useState(new Map<string, Entry>());
   const sequence = useRef(0);
   const [host] = useState(() =>
@@ -201,13 +197,7 @@ export function ThumbDockProvider({
           </SharedDockSurfaceContext.Provider>,
           host,
         )}
-        {createPortal(
-          <>
-            <UpdateNotice />
-            {notice}
-          </>,
-          noticeHost,
-        )}
+        {createPortal(<UpdateNotice />, noticeHost)}
       </Actions.Provider>
     </Registry.Provider>
   );

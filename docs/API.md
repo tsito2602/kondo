@@ -1,11 +1,14 @@
 # tabi API
 
-All `/v1` endpoints except Google login require `Authorization: Bearer <session token>`.
+All `/v1` endpoints except passkey sign-in, sign-up and `/v1/avatars/*` require `Authorization: Bearer <session token>`.
 Dates use `YYYY-MM-DD`; times use local `HH:mm`. A trip owner and every invited editor have the same itinerary editing rights.
 
 ## Authentication
 
-- `POST /v1/auth/google` — exchange `{ "idToken": "..." }` for an app session.
+- `POST /v1/auth/passkey/login/options`, `POST /v1/auth/passkey/login` — sign in with a passkey (`{ challengeId, response }`).
+- `POST /v1/auth/passkey/signup/options` (`{ name }`), `POST /v1/auth/passkey/signup` — create an account with a passkey.
+- `GET /v1/passkeys`, `POST /v1/passkeys/options`, `POST /v1/passkeys`, `DELETE /v1/passkeys/:id` — the account's passkeys.
+- `PUT /v1/me/avatar` (square JPEG/PNG/WebP, ≤ 1 MB), `DELETE /v1/me/avatar` — the account's icon.
 - `GET /v1/me` — return the current user.
 - `POST /v1/auth/logout` — revoke the current session.
 

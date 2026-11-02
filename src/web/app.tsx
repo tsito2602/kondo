@@ -45,8 +45,7 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import { Card } from "./obsidian/card";
-import { GoogleSignIn, useAuth } from "@/auth/auth-provider";
-import { PasskeyNotice } from "./passkey-notice";
+import { useAuth } from "@/auth/auth-provider";
 import {
   REMOVAL_UNDO_MS,
   TravelProvider,
@@ -207,7 +206,7 @@ export function App() {
   if (!auth.user) return <Login />;
   return (
     <TravelProvider key={auth.isDemo ? "demo" : auth.user.id}>
-      <ThumbDockProvider notice={<PasskeyNotice />}>
+      <ThumbDockProvider>
         <TravelApp />
       </ThumbDockProvider>
     </TravelProvider>
@@ -226,24 +225,6 @@ function Login() {
   const auth = useAuth();
   const [joining, setJoining] = useState(false);
   const [name, setName] = useState("");
-  // Google stays only while an account made with it has no passkey yet.
-  const [google, setGoogle] = useState(false);
-  useEffect(() => {
-    let active = true;
-    fetch(
-      `${import.meta.env.VITE_API_URL?.replace(/\/$/, "") ?? ""}/v1/auth/methods`,
-    )
-      .then((response) =>
-        response.ok ? (response.json() as Promise<{ google?: boolean }>) : null,
-      )
-      .then((result) => {
-        if (active) setGoogle(result?.google === true);
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, []);
   return (
     <main className="login">
       <div className="login-panel">
@@ -319,12 +300,6 @@ function Login() {
             <p className="error" role="alert">
               {auth.error}
             </p>
-          )}
-          {google && !joining && (
-            <div className="login-google">
-              <small>Googleで登録した方は、一度だけGoogleで</small>
-              <GoogleSignIn />
-            </div>
           )}
           {auth.demoEnabled && (
             <Button

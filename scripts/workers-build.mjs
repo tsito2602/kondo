@@ -11,7 +11,6 @@ const environments = {
 // then select the copied kondo stores after their contents have been verified.
 const profiles = new Set(['legacy', 'kondo-url', 'kondo']);
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const clientId = /^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/;
 const required = (env, key) => {
   const value = env[key]?.trim();
   if (!value) throw new Error(`${key} is required in Workers Builds settings`);
@@ -43,16 +42,10 @@ export function configuration(target, env, template, checkOnly = false) {
   required(env, 'CLOUDFLARE_API_TOKEN');
   const databaseId = required(env, 'D1_DATABASE_ID');
   if (!uuid.test(databaseId)) throw new Error('D1_DATABASE_ID must be the existing environment database UUID');
-  const webClientId = required(env, 'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID');
-  const audiences = required(env, 'GOOGLE_CLIENT_IDS').split(',').map(value => value.trim());
-  if (!clientId.test(webClientId) || audiences.some(value => !clientId.test(value)) || !audiences.includes(webClientId)) {
-    throw new Error('GOOGLE_CLIENT_IDS must contain the environment Web Client ID and only valid Client IDs');
-  }
   const origin = `https://${expected.worker}.tsito-apps.workers.dev`;
   const publicEnv = {
     EXPO_PUBLIC_API_URL: origin,
     EXPO_PUBLIC_ENABLE_DEMO: target === 'staging' ? 'true' : 'false',
-    EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: webClientId,
   };
   for (const [key, value] of Object.entries(publicEnv)) {
     if (env[key] !== undefined && env[key] !== value) throw new Error(`${key} does not match ${target}`);
@@ -70,9 +63,9 @@ export function configuration(target, env, template, checkOnly = false) {
   config.d1_databases[0].database_name = expected.database;
   config.d1_databases[0].database_id = databaseId;
   config.r2_buckets[0].bucket_name = expected.bucket;
-  config.vars = { ...config.vars, GOOGLE_CLIENT_IDS: audiences.join(','), ALLOWED_ORIGINS: origin };
+  config.vars = { ...config.vars, ALLOWED_ORIGINS: origin };
   if (/__[A-Z0-9_]+__/.test(JSON.stringify(config))) throw new Error('Unresolved Wrangler template placeholder');
-  const childEnv = { ...env, ...publicEnv, GOOGLE_CLIENT_IDS: audiences.join(','), ALLOWED_ORIGINS: origin, CI: 'true', EXPO_NO_DOTENV: '1' };
+  const childEnv = { ...env, ...publicEnv, ALLOWED_ORIGINS: origin, CI: 'true', EXPO_NO_DOTENV: '1' };
   // React tests need development React; Vite build selects production itself.
   delete childEnv.NODE_ENV;
   return { ...expected, target, profile, origin, account, databaseId, commit, config, env: childEnv, checkOnly };

@@ -43,8 +43,6 @@ watch pathsは空変更push、20コミット以上または3,000ファイル以�
 | `NODE_VERSION` | `24` |
 | `SKIP_DEPENDENCY_INSTALL` | `1`（自動依存導入を止め、スクリプトの`npm ci`1回に限定） |
 | `D1_DATABASE_ID` | 対象環境の既存D1のUUID。D1の対象DB → Settingsから確認 |
-| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | 対象環境のWeb OAuth Client ID |
-| `GOOGLE_CLIENT_IDS` | 許可するClient IDのカンマ区切り。必ず上のWeb Client IDを含める |
 
 ビルド実行には`CLOUDFLARE_ACCOUNT_ID`と`CLOUDFLARE_API_TOKEN`も必要。BuildsのAPI token選択で環境に合うトークンを選び、対象アカウントを確認する。明示的に登録する場合、tokenは必ずBuild secretへ保存する。GitHub Secretsの値がCloudflareへ自動移行するとは仮定しない。値をチャット・コミット・ログへ貼らない。
 
@@ -52,14 +50,14 @@ watch pathsは空変更push、20コミット以上または3,000ファイル以�
 
 `EXPO_PUBLIC_API_URL`・`EXPO_PUBLIC_ENABLE_DEMO`・`ALLOWED_ORIGINS`はスクリプトが環境別に固定するので通常は設定不要。残っている設定が矛盾すれば依存導入前に停止する。productionはサンプルOFF。`WORKERS_CI`・`WORKERS_CI_BRANCH`・`WORKERS_CI_COMMIT_SHA`はCloudflareの値を使用し、手動で上書きしない。
 
-本番のGoogle JavaScript生成元は`https://tabi.tsito-apps.workers.dev`。Google Identity Servicesのpopup方式を使う。スコープは`openid`・`email`・`profile`。現在の実装にGoogle Client Secret・Gmail token・セッション署名鍵・R2のS3キーは不要。実行時の既存secretsは削除せず、公開のOAuth IDと許可originは生成Wrangler設定から反映する。
+ログインはパスキーだけで、Google OAuthの設定は不要（`GOOGLE_CLIENT_IDS`・`EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`が残っていても使われない）。セッション署名鍵・R2のS3キーも不要。許可originは生成Wrangler設定から反映する。
 
 ## 1回の実行内容
 
 1. 対象ブランチ・checkout SHA・環境変数・Worker/D1/R2の対応を検証し、既存D1のUUIDと名前をAPIで照合する。権限や設定エラーはインストール前に止める。
 2. 依存不要の`node --test scripts/test-workers-build.mjs` → `npm ci --include=dev --prefer-offline --no-audit --no-fund` → `npm run check`を各1回実行する。checkには型・Reactフォーム/API統合・既存テスト・Web/PWAビルドが含まれる。
 3. 生成設定を用い、既存の`worker/schema.sql`適用 → lockfileのWranglerで配信する。リソースの毎回の一覧探索・作成、別ビルド、配信の自動再試行は行わない。
-4. ホームのHTML、未認証`/v1/me`の401 JSON、`/sw.js`を確認する。これはHTTP疎通確認であり、Googleログインや画面操作の実機検証を代替しない。
+4. ホームのHTML、未認証`/v1/me`の401 JSON、`/sw.js`を確認する。これはHTTP疎通確認であり、パスキーログインや画面操作の実機検証を代替しない。
 
 コマンドには段階ごとのタイムアウト、通信には10秒の上限を設ける。配信後のHTTP確認だけが失敗しても、すでに配信済みの可能性があるため、原因を確認せずBuild全体を再実行しない。DB適用後の配信失敗時も、DDLが自動で戻ったとは扱わない。
 
