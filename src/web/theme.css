@@ -3,9 +3,9 @@
    Both dark forms are kept: the system preference unless 設定 picked light,
    and an explicit data-theme="dark" (the app always sets one of the two). */
 :root {
-  --f-num: "Bricolage Grotesque", "Zen Kaku Gothic New", system-ui, sans-serif;
+  --f-num: "Bricolage Grotesque", "Noto Sans JP Variable", system-ui, sans-serif;
   --f-body:
-    "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", system-ui,
+    "Noto Sans JP Variable", "Noto Sans JP", "Hiragino Sans", system-ui,
     sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
   --p-paper: #ffffff;
