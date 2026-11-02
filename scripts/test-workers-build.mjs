@@ -8,7 +8,6 @@ const base = {
   WORKERS_CI: '1', WORKERS_CI_BRANCH: 'staging', WORKERS_CI_COMMIT_SHA: 'a'.repeat(40),
   SKIP_DEPENDENCY_INSTALL: '1', CLOUDFLARE_ACCOUNT_ID: 'b'.repeat(32),
   CLOUDFLARE_API_TOKEN: 'test-token-not-a-secret', D1_DATABASE_ID: '00000000-0000-0000-0000-000000000001',
-  GOOGLE_CLIENT_IDS: 'test.apps.googleusercontent.com', EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: 'test.apps.googleusercontent.com',
 };
 const settings = (overrides = {}, checkOnly = false) => configuration('staging', { ...base, ...overrides }, templates.staging, checkOnly);
 function harness({ fail, preflightError, verifyError } = {}) {
@@ -21,7 +20,7 @@ function harness({ fail, preflightError, verifyError } = {}) {
   } };
 }
 
-test('environment bindings and OAuth origins remain separated', () => {
+test('environment bindings and origins remain separated', () => {
   for (const [target, branch, name, bucket] of [['staging', 'staging', 'tabi-staging', 'tabi-documents-staging'], ['production', 'main', 'tabi', 'tabi-documents']]) {
     const s = configuration(target, { ...base, WORKERS_CI_BRANCH: branch }, templates[target]);
     assert.equal(s.config.name, name);
@@ -36,7 +35,7 @@ test('environment bindings and OAuth origins remain separated', () => {
 });
 
 test('configuration errors fail before dependency installation', () => {
-  for (const key of ['WORKERS_CI_BRANCH', 'WORKERS_CI_COMMIT_SHA', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'D1_DATABASE_ID', 'GOOGLE_CLIENT_IDS', 'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID']) {
+  for (const key of ['WORKERS_CI_BRANCH', 'WORKERS_CI_COMMIT_SHA', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'D1_DATABASE_ID']) {
     assert.throws(() => settings({ [key]: '' }), new RegExp(key));
   }
   for (const overrides of [
@@ -45,7 +44,6 @@ test('configuration errors fail before dependency installation', () => {
     { WORKERS_CI_COMMIT_SHA: 'bad' }, { CLOUDFLARE_ACCOUNT_ID: 'bad' }, { D1_DATABASE_ID: 'bad' },
     { SKIP_DEPENDENCY_INSTALL: 'false' }, { EXPO_PUBLIC_ENABLE_DEMO: 'false' },
     { EXPO_PUBLIC_API_URL: 'https://tabi.tsito-apps.workers.dev' }, { ALLOWED_ORIGINS: '*' },
-    { GOOGLE_CLIENT_IDS: 'other.apps.googleusercontent.com' }, { GOOGLE_CLIENT_IDS: 'test.apps.googleusercontent.com,invalid' },
   ]) assert.throws(() => settings(overrides));
   assert.throws(() => configuration('other', base, templates.staging));
   assert.throws(() => configuration('staging', base, templates.production));

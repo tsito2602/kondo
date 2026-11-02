@@ -5,7 +5,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import {
@@ -24,7 +23,6 @@ type User = {
 const SESSION_KEY = "tabi.session";
 const USER_KEY = "tabi.offline-user";
 const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, "") ?? "";
-const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const DEMO_ENABLED =
   import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO === "true";
 const readToken = () =>
@@ -174,19 +172,6 @@ function useAuthState() {
     },
     [],
   );
-  /** Google only lets an account in that has no passkey yet (moving over). */
-  const authenticate = useCallback(
-    (idToken: string) =>
-      signIn(
-        () =>
-          api<{ token: string; user: User }>("/v1/auth/google", {
-            method: "POST",
-            body: JSON.stringify({ idToken }),
-          }),
-        0,
-      ),
-    [signIn],
-  );
   const passkeySignIn = useCallback(
     () =>
       signIn(async () => {
@@ -309,7 +294,6 @@ function useAuthState() {
   );
   return useMemo(
     () => ({
-      configured: Boolean(CLIENT_ID),
       passkeySupported: browserSupportsWebAuthn(),
       passkeys: isDemo ? null : passkeys,
       passkeySignIn,
@@ -325,7 +309,6 @@ function useAuthState() {
       error,
       request,
       requestRaw,
-      authenticate,
       signOut,
       updateProfile,
       updateAvatar,
@@ -341,7 +324,6 @@ function useAuthState() {
       error,
       request,
       requestRaw,
-      authenticate,
       signOut,
       updateProfile,
       updateAvatar,
@@ -364,81 +346,4 @@ export function useAuth() {
   const value = useContext(AuthContext);
   if (!value) throw new Error("AuthProvider is required");
   return value;
-}
-
-type GoogleIdentity = {
-  initialize: (options: {
-    client_id: string;
-    callback: (result: { credential: string }) => void;
-  }) => void;
-  renderButton: (
-    element: HTMLElement,
-    options: Record<string, string | number>,
-  ) => void;
-};
-declare global {
-  interface Window {
-    google?: { accounts: { id: GoogleIdentity } };
-  }
-}
-let googleScript: Promise<GoogleIdentity> | undefined;
-function loadGoogle() {
-  if (window.google?.accounts.id)
-    return Promise.resolve(window.google.accounts.id);
-  return (googleScript ??= new Promise<GoogleIdentity>((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.onload = () =>
-      window.google?.accounts.id
-        ? resolve(window.google.accounts.id)
-        : reject(new Error("Googleログインを読み込めませんでした"));
-    script.onerror = () => {
-      googleScript = undefined;
-      script.remove();
-      reject(
-        new Error(
-          "Googleログインを読み込めませんでした。通信を確認して再読み込みしてください",
-        ),
-      );
-    };
-    document.head.appendChild(script);
-  }));
-}
-export function GoogleSignIn() {
-  const { configured, authenticate, signingIn } = useAuth();
-  const ref = useRef<HTMLDivElement>(null);
-  const [error, setError] = useState("");
-  useEffect(() => {
-    if (!configured) return;
-    let active = true;
-    void loadGoogle()
-      .then((google) => {
-        if (!active || !ref.current) return;
-        google.initialize({
-          client_id: CLIENT_ID,
-          callback: ({ credential }) => void authenticate(credential),
-        });
-        google.renderButton(ref.current, {
-          theme: "outline",
-          size: "large",
-          shape: "pill",
-          locale: "ja",
-          width: Math.round(ref.current.getBoundingClientRect().width),
-        });
-      })
-      .catch((cause: Error) => {
-        if (active) setError(cause.message);
-      });
-    return () => {
-      active = false;
-    };
-  }, [configured, authenticate]);
-  return (
-    <div className="google-sign-in" aria-busy={signingIn}>
-      <div className="google-sign-in-button" ref={ref} />
-      {error && <p role="alert">{error}</p>}
-      {!configured && <p>Googleログインは現在設定されていません。</p>}
-    </div>
-  );
 }

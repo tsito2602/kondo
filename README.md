@@ -8,7 +8,7 @@
 - Hono API on Cloudflare Workers
 - 既存Cloudflare D1（旅行・セッション）/ R2（予約書類）
 - アカウント別IndexedDB、未送信操作キュー、Service Worker
-- Google Identity ServicesのGoogleログイン
+- パスキー（WebAuthn）だけのログイン
 
 ## 開発
 
@@ -26,7 +26,7 @@ npx wrangler d1 execute DB --local --config wrangler.dev.jsonc --file worker/sch
 npx wrangler dev --config wrangler.dev.jsonc
 ```
 
-Googleログインには`.env.local`の`VITE_GOOGLE_CLIENT_ID`と`.dev.vars`の`GOOGLE_CLIENT_IDS`に同じWeb Client IDを設定し、Google側のJavaScript生成元へ開発用URLを登録します。サンプルモードではGoogle設定不要です。
+パスキーは`localhost`で動きます（`127.0.0.1`はRP IDにできないため不可）。
 
 ```bash
 npm run check      # 型、API、同期、Reactフォーム連携、PWA、配信設定、ビルド

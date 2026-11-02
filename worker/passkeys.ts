@@ -180,7 +180,7 @@ export async function listPasskeys(env: Env, user: User) {
   return json({ passkeys: rows.results });
 }
 
-/** Signed in, step 1 of adding another passkey (another device, or a Google account moving over). */
+/** Signed in, step 1 of adding another passkey (another device). */
 export async function addOptions(request: Request, env: Env, user: User) {
   const existing = await env.DB.prepare('SELECT id FROM passkeys WHERE user_id = ?').bind(user.id).all<{ id: string }>();
   const { options, error } = await registrationOptions(request, env, { id: user.id, name: user.name || user.email || 'kondo' }, existing.results.map((row) => row.id));
@@ -204,13 +204,4 @@ export async function removePasskey(env: Env, user: User, id: string) {
   if ((count?.n ?? 0) <= 1) return json({ error: '最後のパスキーは削除できません' }, 409);
   await env.DB.prepare('DELETE FROM passkeys WHERE id = ? AND user_id = ?').bind(id, user.id).run();
   return listPasskeys(env, user);
-}
-
-/**
- * Google sign-in only stays while some account still has no passkey, so
- * nobody who signed up with Google is locked out before moving over.
- */
-export async function googleStillNeeded(env: Env) {
-  const row = await env.DB.prepare('SELECT EXISTS (SELECT 1 FROM users u WHERE NOT EXISTS (SELECT 1 FROM passkeys p WHERE p.user_id = u.id)) AS needed').first<{ needed: number }>();
-  return row?.needed === 1;
 }

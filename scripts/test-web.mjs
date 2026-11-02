@@ -92,7 +92,6 @@ async function bundle(contents) {
       "import.meta.env.DEV": "false",
       "import.meta.env.PROD": "false",
       "import.meta.env.VITE_API_URL": '"https://tabi.test"',
-      "import.meta.env.VITE_GOOGLE_CLIENT_ID": '""',
       "import.meta.env.VITE_ENABLE_DEMO": '"false"',
       "import.meta.env.VITE_APP_VERSION": '"2.0.0"',
     },

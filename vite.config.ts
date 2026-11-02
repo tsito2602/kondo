@@ -73,9 +73,6 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.VITE_API_URL": JSON.stringify(
         env.VITE_API_URL ?? env.EXPO_PUBLIC_API_URL ?? "",
       ),
-      "import.meta.env.VITE_GOOGLE_CLIENT_ID": JSON.stringify(
-        env.VITE_GOOGLE_CLIENT_ID ?? env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "",
-      ),
       "import.meta.env.VITE_ENABLE_DEMO": JSON.stringify(
         env.VITE_ENABLE_DEMO ?? env.EXPO_PUBLIC_ENABLE_DEMO ?? "false",
       ),
