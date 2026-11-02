@@ -289,6 +289,24 @@ function useAuthState() {
     },
     [isDemo, request],
   );
+  /** A new square icon (JPEG), or null to go back to the drawn face. */
+  const updateAvatar = useCallback(
+    async (image: Blob | null) => {
+      const result = await request<{ user: User }>(
+        "/v1/me/avatar",
+        image
+          ? {
+              method: "PUT",
+              body: image,
+              headers: { "content-type": image.type },
+            }
+          : { method: "DELETE" },
+      );
+      setUser(result.user);
+      saveIdentity(result.user);
+    },
+    [request],
+  );
   return useMemo(
     () => ({
       configured: Boolean(CLIENT_ID),
@@ -310,6 +328,7 @@ function useAuthState() {
       authenticate,
       signOut,
       updateProfile,
+      updateAvatar,
     }),
     [
       isDemo,
@@ -325,6 +344,7 @@ function useAuthState() {
       authenticate,
       signOut,
       updateProfile,
+      updateAvatar,
       passkeys,
       passkeySignIn,
       passkeySignUp,

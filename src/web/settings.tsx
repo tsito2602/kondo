@@ -9,6 +9,7 @@ import { RM, spring } from "./cartoon";
 import { jellyScroll } from "./jelly-scroll";
 import { Glyph } from "./itinerary-icons";
 import { KindColorRows } from "./kind-settings";
+import { AvatarEditor } from "./avatar-editor";
 import { Modal, useAction, useTheme, useToast } from "./ui";
 
 /** A trip's entry stamp: a latin place becomes a 3-letter code, others keep their first word. */
@@ -140,19 +141,28 @@ function Passport() {
     .map((trip) => ({ trip, label: stampLabel(trip) }))
     .filter((stamp) => stamp.label);
   const photo = auth.user?.avatarUrl;
+  const [editing, setEditing] = useState(false);
   return (
     <div className="passport">
-      <span className="passport-photo">
+      <button
+        type="button"
+        className="passport-photo"
+        aria-label="アイコンを変更"
+        disabled={auth.isDemo}
+        onClick={() => setEditing(true)}
+      >
         {photo ? (
-          <img
-            src={photo}
-            referrerPolicy="no-referrer"
-            alt="Googleアカウントのアイコン"
-          />
+          <img src={photo} referrerPolicy="no-referrer" alt="" />
         ) : (
           <Face />
         )}
-      </span>
+        {!auth.isDemo && (
+          <span className="passport-photo-edit" aria-hidden="true">
+            <Glyph name="edit" />
+          </span>
+        )}
+      </button>
+      {editing && <AvatarEditor onClose={() => setEditing(false)} />}
       <div className="passport-fields">
         <label className="passport-key" htmlFor={nameId}>
           NAME / 表示名
@@ -187,12 +197,6 @@ function Passport() {
             <Glyph name="edit" />
           </label>
         </span>
-        <span className="passport-key">ACCOUNT</span>
-        {(auth.isDemo || auth.user?.email) && (
-          <span className="passport-email">
-            {auth.isDemo ? "サンプルアカウント" : auth.user?.email}
-          </span>
-        )}
       </div>
       <div className="passport-stamps">
         <small>これまでの旅 {past.length}回</small>
