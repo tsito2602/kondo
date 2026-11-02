@@ -161,6 +161,38 @@ const localizedAirports: Airport[] = [
   },
 ];
 
+/** Japanese names for busy airports that the catalog source has no Japanese name for, or an outdated one. */
+const japaneseNames: Record<string, string> = {
+  JFK: "ジョン・F・ケネディ国際空港",
+  OSL: "オスロ・ガーデモエン空港",
+  GRU: "サンパウロ・グアルーリョス国際空港",
+  GIG: "リオデジャネイロ・ガレオン国際空港",
+  JNB: "O・R・タンボ国際空港",
+  NBO: "ジョモ・ケニヤッタ国際空港",
+  SPN: "サイパン国際空港",
+  ORY: "パリ・オルリー空港",
+  BVA: "パリ・ボーヴェ空港",
+  LTN: "ロンドン・ルートン空港",
+  STN: "ロンドン・スタンステッド空港",
+  VKO: "ヴヌーコヴォ国際空港",
+  DME: "ドモジェドヴォ空港",
+  HOU: "ウィリアム・P・ホビー空港",
+  CMB: "バンダラナイケ国際空港",
+  LYS: "リヨン・サン＝テグジュペリ空港",
+  KWI: "クウェート国際空港",
+  PUJ: "プンタ・カナ国際空港",
+  VRN: "ヴェローナ空港",
+  YIA: "ジョグジャカルタ国際空港",
+  RKV: "レイキャビク空港",
+  TFN: "テネリフェ・ノルテ空港",
+  IKA: "エマーム・ホメイニー国際空港",
+  BMA: "ストックホルム・ブロンマ空港",
+  ACE: "ランサローテ空港",
+  RHO: "ロドス国際空港",
+  MDE: "ホセ・マリア・コルドバ国際空港",
+  LAS: "ハリー・リード国際空港",
+};
+
 const localizedByCode = new Map(
   localizedAirports.map((airport) => [airport.code, airport]),
 );
@@ -173,28 +205,50 @@ function countryName(code: string) {
 }
 
 export const airports: Airport[] = (
-  catalog.rows as [string, string, string, string, string, string, number][]
-).map(([code, name, city, country, keywords, timeZone, scheduled]) => {
-  const localized = localizedByCode.get(code);
-  return {
+  catalog.rows as [
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    number,
+    string,
+    string,
+  ][]
+).map(
+  ([
     code,
-    name: localized?.name || name,
-    city: localized?.city || city,
-    aliases: [
-      name,
-      city,
-      ...keywords
-        .split(",")
-        .map((word) => word.trim())
-        .filter(Boolean),
-      ...(localized?.aliases || []),
-    ],
-    timeZone: localized?.timeZone || timeZone,
+    name,
+    city,
     country,
-    countryName: countryName(country),
-    scheduledService: Boolean(scheduled),
-  };
-});
+    keywords,
+    timeZone,
+    scheduled,
+    nameJa,
+    cityJa,
+  ]) => {
+    const localized = localizedByCode.get(code);
+    return {
+      code,
+      name: localized?.name || japaneseNames[code] || nameJa || name,
+      city: localized?.city || cityJa || city,
+      aliases: [
+        name,
+        city,
+        ...keywords
+          .split(",")
+          .map((word) => word.trim())
+          .filter(Boolean),
+        ...(localized?.aliases || []),
+      ],
+      timeZone: localized?.timeZone || timeZone,
+      country,
+      countryName: countryName(country),
+      scheduledService: Boolean(scheduled),
+    };
+  },
+);
 const byCode = new Map(airports.map((airport) => [airport.code, airport]));
 
 function normalize(value: string) {
@@ -202,6 +256,17 @@ function normalize(value: string) {
 }
 export function findAirportByCode(code: string) {
   return byCode.get(normalize(code).toUpperCase());
+}
+const JAPANESE = /[\u3040-\u30ff\u3400-\u9fff]/;
+/**
+ * The airport name to show. A name saved in English (older AI imports, typed text) gives way to the
+ * catalog's Japanese name for the same code; a Japanese name the user chose stays as it is.
+ */
+export function airportName(code: string, saved = "") {
+  const name = saved.trim();
+  if (JAPANESE.test(name)) return name;
+  const airport = code ? findAirportByCode(code) : undefined;
+  return airport && JAPANESE.test(airport.name) ? airport.name : name;
 }
 const index = airports.map((airport) => {
   const names = [airport.name, airport.city, ...airport.aliases].map(normalize);

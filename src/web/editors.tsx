@@ -19,7 +19,7 @@ import { Trash2, Plus, Paperclip } from "lucide-react";
 import { bookingIcons, spring } from "./booking-card";
 import { kindOfBooking } from "./kind-colors";
 import { AirportField } from "./airport-field";
-import { findAirportByCode } from "@/data/airports";
+import { airportName } from "@/data/airports";
 import { findMatchingItineraryItem } from "@/data/booking-match";
 import { linkBookingPlace } from "@/data/booking-place";
 import { planPlace } from "@/data/plan-timeline";
@@ -541,14 +541,12 @@ export function BookingForm({
     detail: booking?.detail ?? "",
     location: initialLocation,
     origin:
-      booking?.origin ||
-      findAirportByCode(booking?.originCode ?? "")?.name ||
+      airportName(booking?.originCode ?? "", booking?.origin) ||
       booking?.originCode ||
       "",
     originCode: booking?.originCode ?? "",
     destination:
-      booking?.destination ||
-      findAirportByCode(booking?.destinationCode ?? "")?.name ||
+      airportName(booking?.destinationCode ?? "", booking?.destination) ||
       booking?.destinationCode ||
       "",
     destinationCode: booking?.destinationCode ?? "",

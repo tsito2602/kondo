@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { findAirportByCode } from "@/data/airports";
+import { airportName, findAirportByCode } from "@/data/airports";
 import { bookingDuration } from "@/data/booking-duration";
 import { placeNameFromLink } from "@/data/geo";
 import { durationLabel } from "@/data/itinerary";
@@ -110,7 +110,7 @@ export function spring(
 
 function placeName(name: string, code: string, flight: boolean) {
   const airport = flight ? findAirportByCode(code) : undefined;
-  const label = name || airport?.name || "";
+  const label = flight ? airportName(code, name) : name;
   const primary = flight
     ? airport?.code || code || label || "未定"
     : label || code || "未定";

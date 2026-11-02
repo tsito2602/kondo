@@ -78,7 +78,7 @@ export function bookingImportRequest(files: ImportFile[], trip: { startsOn: stri
       type: 'input_text',
       text: `旅行の予約確認書類（予約確認メールや画面のスクリーンショット、eチケットのPDF、紙の写真）を読み取り、予約を1件ずつ抽出する。渡された全ファイルを確認し、PDFは全ページを見る。旅行期間は${trip.startsOn}〜${trip.endsOn}。年が書かれていない日付はこの旅行期間に合う年にする。
 各予約について：source_fileは読み取ったファイルの番号（0始まり、渡した順）。kindは flight（航空券・1区間ごと）、hotel（宿泊）、train（鉄道）、car（レンタカー・送迎）、restaurant（飲食店）、ticket（入場券・公演・ツアー）、other から選ぶ。
-titleは便名（例：EK 319）、列車名、宿・店・施設・公演の名前。detailは航空会社名、宿のある地区、会場名やプラン名など短い補足。origin/destinationは空港・駅・受取場所の名前、origin_code/destination_codeは空港のIATAコード（なければ空文字）。
+titleは便名（例：EK 319）、列車名、宿・店・施設・公演の名前。detailは航空会社名、宿のある地区、会場名やプラン名など短い補足。origin/destinationは空港・駅・受取場所の名前を日本語表記で（例：羽田空港、ウィーン国際空港）、origin_code/destination_codeは空港のIATAコード（なければ空文字）。
 day/timeは出発・チェックイン・入場・予約の現地日時（YYYY-MM-DD と HH:MM、24時間）。end_day/end_timeは到着・チェックアウト・返却の現地日時。乗り継ぎ便は区間ごとに別の予約にする。confirmation_codeは予約番号・確認番号。partyは座席番号・部屋タイプ・人数など書かれているもの。
 書かれていない値は空文字にし、推測で作らない。review_reason：日付が読めなければ missing_date、飲食店・入場券で人数が書かれていなければ missing_people、何の予約か判断できなければ unclear、それ以外は none。同じ予約が複数のファイルにあれば1件にまとめる。予約ではない案内や広告は含めない。JSONのみ。`,
     },

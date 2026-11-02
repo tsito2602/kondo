@@ -1,5 +1,6 @@
 import { addDays } from '../utils/dates';
 import { streamLines } from './stream-lines';
+import { airportName } from './airports';
 import type { Booking, BookingKind } from './types';
 
 // What the import reads from one booking confirmation. The Worker validates the
@@ -52,14 +53,16 @@ export function normalizeImportedBooking(raw: unknown, fileCount: number): Impor
   const source = Number(row.source_file ?? row.source);
   const reported = importReviews.includes(row.review_reason as ImportReview) ? (row.review_reason as ImportReview) : importReviews.includes(row.review as ImportReview) ? (row.review as ImportReview) : 'none';
   const title = text(row.title, 160);
+  const originCode = text(row.origin_code ?? row.originCode, 8).toUpperCase();
+  const destinationCode = text(row.destination_code ?? row.destinationCode, 8).toUpperCase();
   const result: ImportedBooking = {
     kind,
     title,
     detail: text(row.detail, 500),
-    origin: text(row.origin, 160),
-    originCode: text(row.origin_code ?? row.originCode, 8).toUpperCase(),
-    destination: text(row.destination, 160),
-    destinationCode: text(row.destination_code ?? row.destinationCode, 8).toUpperCase(),
+    origin: airportName(originCode, text(row.origin, 160)),
+    originCode,
+    destination: airportName(destinationCode, text(row.destination, 160)),
+    destinationCode,
     day: isDay(day) ? day : '',
     time: isTime(time) ? time : '',
     endDay: isDay(endDay) ? endDay : '',

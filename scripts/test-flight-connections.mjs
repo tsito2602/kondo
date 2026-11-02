@@ -17,7 +17,7 @@ const { findFlightConnections, connectionBetween, flightConnectionCandidates, ha
 const worker = require(join(dir, 'worker.cjs')).default;
 const { bookingDuration, bookingDurationLabel } = require(join(dir, 'duration.cjs'));
 after(() => rm(dir, { recursive: true, force: true }));
-const { airports, findAirports, findAirportByCode } = require(join(dir, 'airports.cjs'));
+const { airports, airportName, findAirports, findAirportByCode } = require(join(dir, 'airports.cjs'));
 test('worldwide airport catalog includes every IATA record from its source snapshot', async () => {
   const catalog = JSON.parse(await readFile('src/data/airports-world.json', 'utf8'));
   assert.ok(catalog.count > 9000);
@@ -40,6 +40,14 @@ test('airport search preserves Japanese names and accepts cities, accents and fu
   assert.equal(findAirportByCode('SIN').timeZone, 'Asia/Singapore');
   assert.equal(findAirportByCode('XXX'), undefined);
   assert.deepEqual(findAirports(''), []);
+});
+test('airports show Japanese names, even when a booking saved the English name', () => {
+  assert.equal(findAirportByCode('PEK').name, '北京首都国際空港');
+  assert.equal(findAirportByCode('PEK').city, '北京');
+  assert.equal(findAirports('beijing capital')[0].code, 'PEK');
+  assert.equal(airportName('PEK', 'Beijing Capital International Airport'), '北京首都国際空港');
+  assert.equal(airportName('HND', '羽田'), '羽田');
+  assert.equal(airportName('', 'Somewhere Field'), 'Somewhere Field');
 });
 const flight = (id, extra = {}) => ({ id, kind: 'flight', title: id, origin: '', destination: '', detail: '', confirmationCode: '', note: '', originCode: 'NRT', destinationCode: 'DXB', day: '2026-11-21', time: '22:20', endDay: '2026-11-22', endTime: '05:30', ...extra });
 const first = flight(randomUUID());
