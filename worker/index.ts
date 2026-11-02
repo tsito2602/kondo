@@ -34,7 +34,7 @@ function json(value: unknown, status = 200, headers?: HeadersInit) {
 function cors(request: Request, env: Env) {
   const origin = request.headers.get('origin');
   const allowed = env.ALLOWED_ORIGINS?.split(',').map((value) => value.trim()) ?? [];
-  const headers = new Headers({ 'access-control-allow-headers': 'authorization, content-type, x-filename, x-file-size', 'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS' });
+  const headers = new Headers({ 'access-control-allow-headers': 'authorization, content-type, x-filename, x-file-size', 'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS' });
   if (origin && allowed.includes(origin)) headers.set('access-control-allow-origin', origin);
   return headers;
 }
@@ -126,7 +126,8 @@ async function googleLogin(request: Request, env: Env) {
     await env.DB.prepare(`INSERT INTO users (id, email, display_name, updated_at) VALUES (?, ?, ?, unixepoch()) ON CONFLICT(id) DO UPDATE SET email = excluded.email, display_name = COALESCE(users.display_name, excluded.display_name), updated_at = unixepoch()`)
       .bind(user.id, user.email, user.name)
       .run();
-    await env.DB.prepare(`INSERT INTO user_profiles (user_id, avatar_url) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET avatar_url = excluded.avatar_url`).bind(user.id, user.avatarUrl).run();
+    await env.DB.prepare(`INSERT INTO user_profiles (user_id, avatar_url) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET avatar_url = CASE WHEN user_profiles.avatar_url LIKE '/v1/avatars/%' THEN user_profiles.avatar_url ELSE excluded.avatar_url END`).bind(user.id, user.avatarUrl).run();
+    user.avatarUrl = (await env.DB.prepare('SELECT avatar_url AS url FROM user_profiles WHERE user_id = ?').bind(user.id).first<{ url: string | null }>())?.url ?? null;
     const saved = await env.DB.prepare('SELECT display_name AS name FROM users WHERE id = ?').bind(user.id).first<{ name: string | null }>();
     user.name = saved?.name ?? user.name;
     return json({ token: await startSession(env, user.id), user });
@@ -1241,6 +1242,12 @@ app.use('/v1/*', async (c, next) => {
   await next();
 });
 app.post('/v1/auth/google', (c) => googleLogin(c.req.raw, c.env));
+// Icons are public so <img> can load them without a token; the version in the path busts caches.
+app.get('/v1/avatars/:userId/:version', async (c) => {
+  const object = await c.env.BUCKET.get(`avatars/${c.req.param('userId')}`);
+  if (!object) return json({ error: 'Not found' }, 404);
+  return new Response(object.body, { headers: { 'content-type': object.httpMetadata?.contentType ?? 'image/jpeg', 'cache-control': 'public, max-age=31536000, immutable' } });
+});
 app.get('/v1/auth/methods', async (c) => json({ google: await googleStillNeeded(c.env) }));
 app.post('/v1/auth/passkey/signup/options', (c) => signupOptions(c.req.raw, c.env));
 app.post('/v1/auth/passkey/signup', (c) => signupVerify(c.req.raw, c.env, (id) => startSession(c.env, id)));
@@ -1268,6 +1275,24 @@ app.patch('/v1/me', async (c) => {
   const user = c.get('user');
   await c.env.DB.prepare('UPDATE users SET display_name = ?, updated_at = unixepoch() WHERE id = ?').bind(name, user.id).run();
   return json({ user: { ...user, name } });
+});
+/** The account's own icon: a square image the app already cropped and shrank. */
+app.put('/v1/me/avatar', async (c) => {
+  const user = c.get('user');
+  const type = c.req.header('content-type') ?? '';
+  if (!['image/jpeg', 'image/webp', 'image/png'].includes(type)) return json({ error: '画像を選んでください' }, 415);
+  const bytes = await c.req.arrayBuffer();
+  if (!bytes.byteLength || bytes.byteLength > 1_000_000) return json({ error: '画像が大きすぎます' }, 413);
+  await c.env.BUCKET.put(`avatars/${user.id}`, bytes, { httpMetadata: { contentType: type } });
+  const avatarUrl = `/v1/avatars/${user.id}/${Date.now().toString(36)}`;
+  await c.env.DB.prepare('INSERT INTO user_profiles (user_id, avatar_url) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET avatar_url = excluded.avatar_url').bind(user.id, avatarUrl).run();
+  return json({ user: { ...user, avatarUrl } });
+});
+app.delete('/v1/me/avatar', async (c) => {
+  const user = c.get('user');
+  await c.env.BUCKET.delete(`avatars/${user.id}`);
+  await c.env.DB.prepare('INSERT INTO user_profiles (user_id, avatar_url) VALUES (?, NULL) ON CONFLICT(user_id) DO UPDATE SET avatar_url = NULL').bind(user.id).run();
+  return json({ user: { ...user, avatarUrl: null } });
 });
 app.get('/v1/passkeys', (c) => listPasskeys(c.env, c.get('user')));
 app.post('/v1/passkeys/options', (c) => addOptions(c.req.raw, c.env, c.get('user')));

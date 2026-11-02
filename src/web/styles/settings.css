@@ -479,3 +479,88 @@ dialog .update-notice-host {
 .settings-passkeys {
   margin-top: 10px;
 }
+/* The photo is the button that opens アイコン; a small pen like the name's says so. */
+button.passport-photo {
+  position: relative;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+  cursor: pointer;
+}
+button.passport-photo > img,
+button.passport-photo > svg {
+  border-radius: 50%;
+}
+.passport-photo-edit {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: 0 0 0 2px var(--p-soft);
+}
+.passport-photo-edit svg {
+  width: 13px;
+  height: 13px;
+}
+.avatar-editor {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 8px 0 4px;
+}
+.avatar-crop {
+  position: relative;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--p-soft);
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+.avatar-crop img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  max-width: none;
+  pointer-events: none;
+}
+.avatar-crop img.avatar-current {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: translate(-50%, -50%);
+}
+.avatar-crop[data-empty] {
+  cursor: pointer;
+}
+.avatar-zoom {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(260px, 100%);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.avatar-zoom input {
+  flex: 1;
+  accent-color: var(--ink);
+}
+.avatar-choose {
+  height: 44px;
+  padding: 0 22px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}

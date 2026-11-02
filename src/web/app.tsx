@@ -758,7 +758,6 @@ function MembersScreen({ onClose }: { onClose: () => void }) {
               )}
               <div className="grow">
                 <strong>{member.name || member.email}</strong>
-                <small>{member.email}</small>
               </div>
               {owner && member.role !== "owner" ? (
                 <>
