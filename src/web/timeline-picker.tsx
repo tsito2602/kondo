@@ -130,7 +130,7 @@ function useTrackBlocks(
 ) {
   const travel = useTravel();
   return useMemo(() => {
-    const entries = timelineEntries(travel.items, travel.bookings);
+    const entries = timelineEntries(travel.items, travel.bookings, travel.places);
     return days.flatMap((day, index) =>
       dayTimeline(entries, day).flatMap((entry): Block[] => {
         const start = minutesOf(entry.time);
