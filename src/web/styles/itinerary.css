@@ -1487,7 +1487,7 @@ dialog[data-panel="add"],
   font-weight: 700;
 }
 .ps-kv dd.is-code {
-  font-family: var(--it-mono);
+  font-family: var(--f-body);
   font-weight: 500;
   letter-spacing: 0.06em;
 }
