@@ -13,10 +13,9 @@ dialog[data-panel="add"],
   --it-mute: #77726b;
   --it-line: #e8e6e1;
   --it-num:
-    "Bricolage Grotesque", "Noto Sans JP Variable", ui-rounded, system-ui,
+    "Bricolage Grotesque", "Hiragino Sans", ui-rounded, system-ui,
     -apple-system, sans-serif;
-  --it-mono:
-    "IBM Plex Mono", "Noto Sans JP Variable", ui-monospace, Menlo, monospace;
+  --it-mono: "IBM Plex Mono", "Hiragino Sans", ui-monospace, Menlo, monospace;
   --it-split: linear(
     0,
     0.045,
@@ -605,10 +604,9 @@ dialog[data-panel="add"],
   --it-mute: #77726b;
   --it-line: #e8e6e1;
   --it-num:
-    "Bricolage Grotesque", "Noto Sans JP Variable", ui-rounded, system-ui,
+    "Bricolage Grotesque", "Hiragino Sans", ui-rounded, system-ui,
     -apple-system, sans-serif;
-  --it-mono:
-    "IBM Plex Mono", "Noto Sans JP Variable", ui-monospace, Menlo, monospace;
+  --it-mono: "IBM Plex Mono", "Hiragino Sans", ui-monospace, Menlo, monospace;
   --it-split: linear(
     0,
     0.045,
