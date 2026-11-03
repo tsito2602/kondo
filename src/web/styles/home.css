@@ -319,7 +319,7 @@
   right: 0;
   top: -34px;
   text-align: center;
-  font-family: var(--f-mono);
+  font-family: var(--f-body);
   font-size: 10px;
   color: var(--p-mute);
   opacity: 0;

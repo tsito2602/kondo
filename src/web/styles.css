@@ -3410,6 +3410,7 @@ input::-webkit-date-and-time-value {
   /* Same face as the times on しおり (.it-ev time), only larger. */
   font-family:
     "Bricolage Grotesque",
+    "Noto Sans JP Variable",
     ui-rounded,
     system-ui,
     -apple-system,
