@@ -278,7 +278,7 @@ export function ItemEditor({
     () => {
       const input = {
         ...draft,
-        title: draft.title.trim(),
+        title: (place?.title ?? draft.title).trim(),
         kind: itineraryCategories.find(
           (entry) => entry.value === details.category,
         )!.label,
@@ -294,7 +294,7 @@ export function ItemEditor({
         travel.updatePlace(place.id, { ...place, itineraryItemId: id });
     },
     () =>
-      !draft.title.trim()
+      !(place?.title ?? draft.title).trim()
         ? "タイトルを入力してください"
         : dateError(draft.day, details.endDay) ||
           (details.endDay && !details.endTime
@@ -335,16 +335,19 @@ export function ItemEditor({
             ))}
           </select>
         </Field>
-        <Field label="タイトル">
-          <Input
-            required
-            maxLength={160}
-            value={draft.title}
-            onChange={(event) =>
-              setDraft({ ...draft, title: event.target.value })
-            }
-          />
-        </Field>
+        {/* A place's plan goes by the place's name; 場所を編集 changes both. */}
+        {!place && (
+          <Field label="タイトル">
+            <Input
+              required
+              maxLength={160}
+              value={draft.title}
+              onChange={(event) =>
+                setDraft({ ...draft, title: event.target.value })
+              }
+            />
+          </Field>
+        )}
         <div className="field">
           <span>日時</span>
           <TimeRangeButton
@@ -999,6 +1002,18 @@ export function PlaceEditor({
       const pin = found?.link === link ? found.pin : null;
       if (place) travel.updatePlace(place.id, input, pin);
       else travel.createPlace(input, pin);
+      // Its plan in the しおり goes by the same name (Tsubasa 2026-11-03).
+      const plan =
+        place && travel.items.find((item) => item.id === place.itineraryItemId);
+      if (plan && !itemDetails(plan).ownPlace && plan.title !== input.title)
+        travel.updateItem(plan.id, {
+          day: plan.day,
+          time: plan.time,
+          kind: plan.kind,
+          title: input.title,
+          note: plan.note,
+          details: itemDetails(plan),
+        });
     },
     () =>
       !draft.title.trim()
