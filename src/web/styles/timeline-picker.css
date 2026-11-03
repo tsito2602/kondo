@@ -62,7 +62,7 @@
 .tlp-h span {
   flex: none;
   color: var(--p-mid);
-  font-family: var(--f-mono);
+  font-family: var(--f-body);
   font-size: 12px;
 }
 .tlp-readout {
@@ -78,7 +78,7 @@
 }
 .tlp-readout small {
   color: var(--p-mid);
-  font-family: var(--f-mono);
+  font-family: var(--f-body);
   font-size: 10px;
   letter-spacing: 0.04em;
 }
@@ -134,7 +134,7 @@
   min-height: 18px;
   margin: -4px 0 0;
   color: var(--p-mid);
-  font-family: var(--f-mono);
+  font-family: var(--f-body);
   font-size: 12px;
   text-align: center;
 }
@@ -261,7 +261,7 @@
   left: 70px;
   z-index: 1;
   color: var(--p-mid);
-  font-family: var(--f-mono);
+  font-family: var(--f-body);
   font-size: 10px;
   pointer-events: none;
 }
@@ -302,7 +302,7 @@
 .time-tap-hint {
   margin: 4px 0 0;
   color: var(--p-mid);
-  font-family: var(--f-mono);
+  font-family: var(--f-body);
   font-size: 10.5px;
 }
 
