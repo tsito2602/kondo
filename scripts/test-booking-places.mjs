@@ -5,14 +5,14 @@ import { build } from 'esbuild';
 // Bookings linked to map places: numbering, しおり walks, auto-linking and the demo.
 const { outputFiles } = await build({
   stdin: {
-    contents: `export * from './src/data/place-numbers'; export * from './src/data/booking-place'; export * from './src/data/plan-timeline'; export { createDemoCache } from './src/data/demo';`,
+    contents: `export * from './src/data/place-numbers'; export * from './src/data/booking-place'; export * from './src/data/plan-timeline'; export * from './src/data/booking-match'; export { createDemoCache } from './src/data/demo';`,
     resolveDir: process.cwd(), loader: 'ts',
   },
   bundle: true, write: false, platform: 'node', format: 'cjs', logLevel: 'silent',
 });
 const mod = { exports: {} };
 new Function('module', 'exports', outputFiles[0].text)(mod, mod.exports);
-const { placeNumbers, placeVisits, matchBookingPlace, linkBookingPlace, buildTimeline, createDemoCache } = mod.exports;
+const { placeNumbers, placeVisits, matchBookingPlace, linkBookingPlace, buildTimeline, createDemoCache, planForBooking } = mod.exports;
 
 const pin = (name, lat, lng) => `https://www.google.com/maps/place/${encodeURIComponent(name)}/@${lat},${lng},17z/data=!4m6!3m5!8m2!3d${lat}!4d${lng}`;
 const place = (id, extra = {}) => ({ id, title: id, note: '', openingHours: '', reservationStatus: 'not_needed', location: '', itineraryItemId: null, ...extra });
@@ -94,4 +94,18 @@ test('the demo links its venues: nothing booked sits under 候補', () => {
   }
   const candidates = places.filter((entry) => !visits.has(entry.id)).map((entry) => entry.id).sort();
   assert.deepEqual(candidates, ['sample-place-naschmarkt', 'sample-place-prater']);
+});
+
+test('a venue booking takes over the plan of its place, or a plan that day named like it', () => {
+  const plan = (id, title, day = '2026-11-25') => ({ id, day, time: '10:00', kind: '観光', title, note: '' });
+  const items = [plan('porsche', 'ポルシェ博物館'), plan('market', 'クリスマスマーケット'), plan('other-day', 'メルセデス・ベンツ博物館', '2026-11-26')];
+  const places = [place('museum', { title: 'ポルシェミュージアム', itineraryItemId: 'porsche' })];
+  // Linked to the place: its plan, whatever either is called.
+  assert.equal(planForBooking(booking('t', { title: '入場券', day: '2026-11-25', placeId: 'museum' }), items, places)?.id, 'porsche');
+  // Named like the plan's place, or like the plan, on that day.
+  assert.equal(planForBooking(booking('ポルシェミュージアム 入場券', { day: '2026-11-25' }), items, places)?.id, 'porsche');
+  assert.equal(planForBooking(booking('ポルシェ博物館', { day: '2026-11-25' }), items, places)?.id, 'porsche');
+  assert.equal(planForBooking(booking('メルセデス・ベンツ博物館', { day: '2026-11-25' }), items, places), null);
+  // Flights, trains, hotels and cars keep their own rows.
+  assert.equal(planForBooking(booking('t', { kind: 'hotel', day: '2026-11-25', placeId: 'museum' }), items, places), null);
 });

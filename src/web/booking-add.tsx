@@ -25,7 +25,9 @@ import { useTravel } from "@/data/travel-provider";
 import type { Booking } from "@/data/types";
 import { findAirportByCode, findAirports } from "@/data/airports";
 import { mapUrl, referenceUrl } from "@/data/places";
-import { linkBookingPlace } from "@/data/booking-place";
+import { linkBookingPlace, matchBookingPlace } from "@/data/booking-place";
+import { planForBooking } from "@/data/booking-match";
+import { planPlace } from "@/data/plan-timeline";
 import type { BookingKind } from "@/data/types";
 import { monthDay, spring } from "./booking-card";
 import { kindOfBooking } from "./kind-colors";
@@ -656,6 +658,31 @@ export function AddBookingSheet({
   );
   const duplicates = rows.filter((entry) => entry.duplicate);
   const adding = rows.length - duplicates.length;
+  // A ticket or a table for a plan already in the しおり takes that plan's
+  // place there (Tsubasa 2026-11-03): one row, with the plan's memo kept.
+  const joinPlan = <T extends BookingInput>(
+    input: T,
+    taken: Set<string>,
+  ): T => {
+    const placeId =
+      input.placeId !== undefined
+        ? input.placeId
+        : (matchBookingPlace(input, travel.places)?.id ?? null);
+    const plan = planForBooking(
+      { ...input, placeId },
+      travel.items.filter((item) => !taken.has(item.id)),
+      travel.places,
+    );
+    if (!plan) return input;
+    taken.add(plan.id);
+    travel.deleteItem(plan.id);
+    return {
+      ...input,
+      placeId: placeId ?? planPlace(plan, travel.places)?.id ?? null,
+      time: input.time || plan.time,
+      note: [input.note, plan.note.trim()].filter(Boolean).join("\n"),
+    };
+  };
   const save = () => {
     if (needs.length) {
       const first = body.current?.querySelector(
@@ -669,8 +696,12 @@ export function AddBookingSheet({
       );
       return notify("要確認を先に決めてください");
     }
+    const taken = new Set<string>();
     const created = ready.map((entry) => {
-      const input = entry.input ?? importedBookingInput(entry.row);
+      const input = joinPlan(
+        entry.input ?? importedBookingInput(entry.row),
+        taken,
+      );
       return {
         bookingId: travel.createBooking(input),
         file: files[entry.row.source] ?? files[0],
@@ -741,13 +772,18 @@ export function AddBookingSheet({
       ...input,
       location: form.place.trim(),
     });
-    const id = travel.createBooking({
-      ...input,
-      location: referenceUrl(linked.location)
-        ? linked.location
-        : input.location,
-      placeId: linked.placeId,
-    });
+    const id = travel.createBooking(
+      joinPlan(
+        {
+          ...input,
+          location: referenceUrl(linked.location)
+            ? linked.location
+            : input.location,
+          placeId: linked.placeId,
+        },
+        new Set(),
+      ),
+    );
     const chosen = form.files;
     leave(() => onAdded([id]));
     void attachDocuments(

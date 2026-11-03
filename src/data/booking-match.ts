@@ -1,5 +1,5 @@
 import { ordinaryPlans } from './itinerary';
-import type { Booking, BookingKind, ItineraryItem } from './types';
+import type { Booking, BookingKind, ItineraryItem, Place } from './types';
 
 type BookingMatchInput = Pick<Booking, 'kind' | 'title' | 'detail' | 'origin' | 'originCode' | 'destination' | 'destinationCode' | 'day' | 'time'>;
 
@@ -77,4 +77,33 @@ export function findMatchingItineraryItem(items: ItineraryItem[], booking: Booki
   });
 
   return matches.sort((left, right) => right.score - left.score || left.item.id.localeCompare(right.item.id))[0] ?? null;
+}
+
+/** Kinds that stand where a plan stood: a table or a ticket at one venue. */
+const VENUE_KINDS = new Set<BookingKind>(['restaurant', 'ticket', 'other']);
+
+/**
+ * The plan a new venue booking takes over (Tsubasa 2026-11-03: a ticket for
+ * a place already in the しおり joins that plan). The place's own plan first,
+ * else a plan that day named like the booking (by its title or its place).
+ */
+export function planForBooking(
+  booking: Pick<Booking, 'kind' | 'title' | 'detail' | 'day'> & { placeId?: string | null },
+  items: ItineraryItem[],
+  places: readonly Place[],
+): ItineraryItem | null {
+  if (!VENUE_KINDS.has(booking.kind)) return null;
+  const plans = ordinaryPlans(items);
+  const place = booking.placeId ? places.find((entry) => entry.id === booking.placeId) : undefined;
+  const own = place?.itineraryItemId ? plans.find((item) => item.id === place.itineraryItemId) : undefined;
+  if (own) return own;
+  const text = normalize(`${booking.title} ${booking.detail}`);
+  if (!booking.day || !text) return null;
+  const title = normalize(booking.title);
+  // 「ポルシェミュージアム 入場券」 names the plan 「ポルシェミュージアム」, and the other way round.
+  const named = (value: string) => {
+    const name = normalize(value);
+    return name.length >= 3 && (text.includes(name) || (title.length >= 3 && name.includes(title)));
+  };
+  return plans.find((item) => item.day === booking.day && (named(item.title) || named(places.find((entry) => entry.itineraryItemId === item.id)?.title ?? ''))) ?? null;
 }
