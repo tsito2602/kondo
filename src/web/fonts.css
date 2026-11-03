@@ -1,8 +1,7 @@
 /* The mocks' three faces, self-hosted so the installed app keeps them offline.
    --f-num: Bricolage Grotesque (opsz + wght axes, as the mocks request 12..96).
-   --f-body: Noto Sans JP (wght axis 100..900, so 550/650/800 render true).
+   --f-body: the device's own system font (not bundled; see theme.css).
    --f-mono: IBM Plex Mono 400/500. */
-@import "@fontsource-variable/noto-sans-jp/wght.css";
 @import "@fontsource/ibm-plex-mono/400.css";
 @import "@fontsource/ibm-plex-mono/500.css";
 
