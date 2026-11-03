@@ -235,7 +235,7 @@ function PlanView({
   const category = itemCategory(item);
   const minutes = durationMinutes(item.day, item.time, details);
   const entries = useMemo(
-    () => dayTimeline(timelineEntries(travel.items, travel.bookings, travel.places), item.day),
+    () => dayTimeline(timelineEntries(travel.items, travel.bookings), item.day),
     [travel.items, travel.bookings, item.day],
   );
   const entry = entries.find(
