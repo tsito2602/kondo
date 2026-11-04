@@ -826,3 +826,24 @@ test('agent keys reach /v1/mcp as their member: read-only keys only read, viewer
   assert.equal((await rpc(reader.token, 'notifications/initialized', undefined, null)).status, 202);
   assert.equal((await worker.fetch(new Request('https://example.test/v1/mcp', { headers: { authorization: `Bearer ${reader.token}` } }), call.env)).status, 405);
 });
+
+test('making an AI key or adding a passkey needs a fresh passkey confirmation on this session', async () => {
+  const { db, call } = await fixture();
+  db.prepare("INSERT INTO passkeys (id,user_id,public_key,counter,transports,device,created_at) VALUES ('cred','owner','AA',0,'[]','iPhone',unixepoch())").run();
+  const make = () => call('/agent-keys', 'POST', { name: 'Muse', canWrite: true });
+  const refused = await make();
+  assert.equal(refused.status, 403);
+  assert.equal((await refused.json()).confirm, true);
+  assert.equal((await call('/passkeys/options', 'POST')).status, 403);
+  // An account without a passkey has nothing to confirm with.
+  assert.equal((await call('/agent-keys', 'POST', { name: 'Muse', canWrite: false }, 'editor')).status, 201);
+  const hash = createHash('sha256').update('owner').digest('hex');
+  db.prepare('INSERT INTO session_confirmations (token_hash, confirmed_until) VALUES (?, unixepoch() - 1)').run(hash);
+  assert.equal((await make()).status, 403, 'an old confirmation has run out');
+  db.prepare('UPDATE session_confirmations SET confirmed_until = unixepoch() + 300 WHERE token_hash = ?').run(hash);
+  assert.equal((await make()).status, 201);
+  // The confirmation belongs to that session only, and a bad answer confirms nothing.
+  db.prepare('INSERT INTO sessions (token_hash,user_id,expires_at,created_at) VALUES (?,?,unixepoch()+1000,unixepoch())').run(createHash('sha256').update('owner-2').digest('hex'), 'owner');
+  assert.equal((await call('/agent-keys', 'POST', { name: 'x', canWrite: true }, 'owner-2')).status, 403);
+  assert.equal((await call('/confirm', 'POST', { challengeId: 'nope', response: { id: 'cred' } }, 'owner-2')).status, 401);
+});

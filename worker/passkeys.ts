@@ -17,6 +17,8 @@ type User = { id: string; email: string; name: string | null; avatarUrl: string 
 type Session = (userId: string) => Promise<string>;
 
 const RP_NAME = 'kondo';
+/** Marks a confirm challenge's name, so sign-up, sign-in and adding never accept it. */
+const CONFIRM = '\u0001confirm';
 const CHALLENGE_SECONDS = 300;
 export const passkeyEmail = (userId: string) => `passkey:${userId}`;
 
@@ -123,7 +125,7 @@ export async function signupOptions(request: Request, env: Env) {
 export async function signupVerify(request: Request, env: Env, session: Session) {
   const body = (await request.json().catch(() => null)) as { challengeId?: unknown; response?: unknown } | null;
   const pending = await takeChallenge(env, body?.challengeId);
-  if (!pending?.userId || !pending.name) return json({ error: 'もう一度お試しください' }, 400);
+  if (!pending?.userId || !pending.name || pending.name === CONFIRM) return json({ error: 'もう一度お試しください' }, 400);
   const credential = await verifyRegistration(request, env, pending.challenge, body?.response);
   if (!credential) return json({ error: 'パスキーを確認できませんでした' }, 401);
   await env.DB.batch([
@@ -191,7 +193,7 @@ export async function addOptions(request: Request, env: Env, user: User) {
 export async function addVerify(request: Request, env: Env, user: User) {
   const body = (await request.json().catch(() => null)) as { challengeId?: unknown; response?: unknown } | null;
   const pending = await takeChallenge(env, body?.challengeId);
-  if (!pending || pending.userId !== user.id) return json({ error: 'もう一度お試しください' }, 400);
+  if (!pending || pending.userId !== user.id || pending.name) return json({ error: 'もう一度お試しください' }, 400);
   const credential = await verifyRegistration(request, env, pending.challenge, body?.response);
   if (!credential) return json({ error: 'パスキーを確認できませんでした' }, 401);
   await (await storeCredential(env, user.id, credential, deviceLabel(request.headers.get('user-agent')))).run();
@@ -204,4 +206,49 @@ export async function removePasskey(env: Env, user: User, id: string) {
   if ((count?.n ?? 0) <= 1) return json({ error: '最後のパスキーは削除できません' }, 409);
   await env.DB.prepare('DELETE FROM passkeys WHERE id = ? AND user_id = ?').bind(id, user.id).run();
   return listPasskeys(env, user);
+}
+
+/**
+ * Signed in, step 1 of confirming it is really the account's owner: one of
+ * the account's own passkeys, with Face ID / Touch ID required.
+ */
+export async function confirmOptions(request: Request, env: Env, user: User) {
+  const rp = relyingParty(request, env);
+  if (!rp) return json({ error: 'このページからは確認できません' }, 403);
+  const rows = await env.DB.prepare('SELECT id, transports FROM passkeys WHERE user_id = ?').bind(user.id).all<{ id: string; transports: string }>();
+  if (!rows.results.length) return json({ error: 'パスキーが登録されていません' }, 409);
+  const options = await generateAuthenticationOptions({
+    rpID: rp.rpID,
+    userVerification: 'required',
+    allowCredentials: rows.results.map((row) => ({ id: row.id, transports: JSON.parse(row.transports || '[]') })),
+  });
+  return json({ challengeId: await saveChallenge(env, options.challenge, user.id, CONFIRM), options });
+}
+
+/** Step 2: true when one of this account's passkeys answered with the person verified. */
+export async function confirmVerify(request: Request, env: Env, user: User) {
+  const body = (await request.json().catch(() => null)) as { challengeId?: unknown; response?: AuthenticationResponseJSON } | null;
+  const pending = await takeChallenge(env, body?.challengeId);
+  const rp = relyingParty(request, env);
+  const response = body?.response;
+  if (!pending || pending.userId !== user.id || pending.name !== CONFIRM || !rp || typeof response?.id !== 'string') return false;
+  const saved = await env.DB.prepare('SELECT id, public_key AS publicKey, counter, transports FROM passkeys WHERE id = ? AND user_id = ?')
+    .bind(response.id, user.id)
+    .first<{ id: string; publicKey: string; counter: number; transports: string }>();
+  if (!saved) return false;
+  try {
+    const result = await verifyAuthenticationResponse({
+      response,
+      expectedChallenge: pending.challenge,
+      expectedOrigin: rp.origin,
+      expectedRPID: rp.rpID,
+      credential: { id: saved.id, publicKey: fromBase64Url(saved.publicKey), counter: saved.counter, transports: JSON.parse(saved.transports || '[]') },
+      requireUserVerification: true,
+    });
+    if (!result.verified) return false;
+    await env.DB.prepare('UPDATE passkeys SET counter = ?, last_used_at = unixepoch() WHERE id = ?').bind(result.authenticationInfo.newCounter, saved.id).run();
+    return true;
+  } catch {
+    return false;
+  }
 }

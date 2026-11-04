@@ -10,7 +10,7 @@ import { validNoteContent, notePlainText, NOTE_TITLE_LIMIT, NOTE_BODY_LIMIT } fr
 import { connectionBetween, createsFlightConnectionCycle, type FlightConnectionInput } from '../src/data/flight-connections';
 import { startBookingImport, type AIBinding } from './booking-import';
 import { handleMcp, type ApiCall } from './mcp';
-import { addOptions, addVerify, listPasskeys, loginOptions, loginVerify, removePasskey, signupOptions, signupVerify } from './passkeys';
+import { addOptions, addVerify, confirmOptions, confirmVerify, listPasskeys, loginOptions, loginVerify, removePasskey, signupOptions, signupVerify } from './passkeys';
 
 type Env = {
   DB: D1Database;
@@ -1205,6 +1205,36 @@ async function acceptInvite(env: Env, user: User, token: string) {
 /** Requests the MCP server makes on an agent key's member's behalf; they never come from outside. */
 const internalUsers = new WeakMap<Request, User>();
 
+const CONFIRM_SECONDS = 300;
+
+/** The calling session's token hash, or null for a request without one. */
+async function sessionHash(request: Request) {
+  const authorization = request.headers.get('authorization');
+  return authorization?.startsWith('Bearer ') ? hashToken(authorization.slice(7)) : null;
+}
+
+/**
+ * What a stolen token alone must not do (make an AI key, add a passkey) needs
+ * this session to have confirmed its owner with a passkey within 5 minutes.
+ * An account without any passkey has nothing to confirm with and is let through.
+ */
+async function requireConfirmed(request: Request, env: Env, user: User) {
+  const hash = await sessionHash(request);
+  const row = hash ? await env.DB.prepare('SELECT 1 FROM session_confirmations WHERE token_hash = ? AND confirmed_until > unixepoch()').bind(hash).first() : null;
+  if (row) return null;
+  const passkeys = await env.DB.prepare('SELECT count(*) AS n FROM passkeys WHERE user_id = ?').bind(user.id).first<{ n: number }>();
+  if (!passkeys?.n) return null;
+  return json({ error: 'パスキーで本人確認してください', confirm: true }, 403);
+}
+
+async function confirmSession(request: Request, env: Env, user: User) {
+  const hash = await sessionHash(request);
+  if (!hash || !(await confirmVerify(request, env, user))) return json({ error: 'パスキーを確認できませんでした' }, 401);
+  await env.DB.prepare(`INSERT INTO session_confirmations (token_hash, confirmed_until) VALUES (?, unixepoch() + ?)
+    ON CONFLICT(token_hash) DO UPDATE SET confirmed_until = excluded.confirmed_until`).bind(hash, CONFIRM_SECONDS).run();
+  return json({ confirmedFor: CONFIRM_SECONDS });
+}
+
 const AGENT_KEY_PREFIX = 'kondo_';
 const AGENT_KEY_LIMIT = 10;
 
@@ -1217,6 +1247,8 @@ async function agentKeysRoute(request: Request, env: Env, user: User, url: URL, 
     const body = await request.json().catch(() => null);
     const name = isObject(body) ? textField(body.name, 40, true) : null;
     if (!name || !isObject(body) || typeof body.canWrite !== 'boolean') return json({ error: '名前と書き込みの可否を指定してください' }, 400);
+    const unconfirmed = await requireConfirmed(request, env, user);
+    if (unconfirmed) return unconfirmed;
     const count = await env.DB.prepare('SELECT count(*) AS n FROM agent_keys WHERE user_id = ?').bind(user.id).first<{ n: number }>();
     if ((count?.n ?? 0) >= AGENT_KEY_LIMIT) return json({ error: `AI用のキーは${AGENT_KEY_LIMIT}個までです` }, 409);
     const id = crypto.randomUUID();
@@ -1316,7 +1348,9 @@ app.delete('/v1/me/avatar', async (c) => {
 app.all('/v1/agent-keys', (c) => internalUsers.has(c.req.raw) ? json({ error: 'Not found' }, 404) : agentKeysRoute(c.req.raw, c.env, c.get('user'), new URL(c.req.url)));
 app.all('/v1/agent-keys/:id', (c) => internalUsers.has(c.req.raw) ? json({ error: 'Not found' }, 404) : agentKeysRoute(c.req.raw, c.env, c.get('user'), new URL(c.req.url), c.req.param('id')));
 app.get('/v1/passkeys', (c) => listPasskeys(c.env, c.get('user')));
-app.post('/v1/passkeys/options', (c) => addOptions(c.req.raw, c.env, c.get('user')));
+app.post('/v1/passkeys/options', async (c) => (await requireConfirmed(c.req.raw, c.env, c.get('user'))) ?? addOptions(c.req.raw, c.env, c.get('user')));
+app.post('/v1/confirm/options', (c) => internalUsers.has(c.req.raw) ? json({ error: 'Not found' }, 404) : confirmOptions(c.req.raw, c.env, c.get('user')));
+app.post('/v1/confirm', (c) => internalUsers.has(c.req.raw) ? json({ error: 'Not found' }, 404) : confirmSession(c.req.raw, c.env, c.get('user')));
 app.post('/v1/passkeys', (c) => addVerify(c.req.raw, c.env, c.get('user')));
 app.delete('/v1/passkeys/:id', (c) => removePasskey(c.env, c.get('user'), c.req.param('id')));
 app.post('/v1/auth/logout', async (c) => {
