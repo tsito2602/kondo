@@ -348,3 +348,10 @@ CREATE TABLE IF NOT EXISTS agent_keys (
   last_used_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS agent_keys_user ON agent_keys(user_id);
+
+-- A session that just confirmed its owner with a passkey (Face ID) may, until
+-- confirmed_until, do what a stolen token must not: make an AI key or add a passkey.
+CREATE TABLE IF NOT EXISTS session_confirmations (
+  token_hash TEXT PRIMARY KEY REFERENCES sessions(token_hash) ON DELETE CASCADE,
+  confirmed_until INTEGER NOT NULL
+);

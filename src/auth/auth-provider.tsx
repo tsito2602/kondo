@@ -61,10 +61,14 @@ async function api<T>(
 ): Promise<T> {
   const response = await apiResponse(path, init, token);
   if (response.status === 204) return undefined as T;
-  const result = (await response.json()) as T & { error?: string };
+  const result = (await response.json()) as T & {
+    error?: string;
+    confirm?: boolean;
+  };
   if (!response.ok)
     throw Object.assign(new Error(result.error ?? "通信に失敗しました"), {
       status: response.status,
+      confirm: result.confirm === true,
     });
   return result;
 }
@@ -229,18 +233,73 @@ function useAuthState() {
     },
     [isDemo],
   );
-  /** Adds a passkey to the signed-in account; false when the person backed out. */
-  const addPasskey = useCallback(async () => {
+  /**
+   * Face ID / Touch ID with one of the account's passkeys, so the next few
+   * minutes may make an AI key or add a passkey; false when the person backed out.
+   */
+  const confirmIdentity = useCallback(async () => {
     const { challengeId, options } = await request<PasskeyOptions>(
-      "/v1/passkeys/options",
+      "/v1/confirm/options",
       { method: "POST" },
     );
+    let response;
+    try {
+      response = await startAuthentication({ optionsJSON: options });
+    } catch (cause) {
+      const message = passkeyError(cause);
+      if (message) throw new Error(message);
+      return false;
+    }
+    await request("/v1/confirm", {
+      method: "POST",
+      body: JSON.stringify({ challengeId, response }),
+    });
+    return true;
+  }, [request]);
+  /**
+   * `run`, and when the server first wants the owner confirmed, Face ID then
+   * `run` again; null when the person backed out of Face ID.
+   */
+  const withConfirmation = useCallback(
+    async <T,>(run: () => Promise<T>): Promise<T | null> => {
+      try {
+        return await run();
+      } catch (cause) {
+        if (!(cause instanceof Error && "confirm" in cause && cause.confirm))
+          throw cause;
+      }
+      if (!(await confirmIdentity())) return null;
+      return run();
+    },
+    [confirmIdentity],
+  );
+  /** Adds a passkey to the signed-in account; false when the person backed out. */
+  const addPasskey = useCallback(async () => {
+    let confirmed = false;
+    const started = await withConfirmation(async () => {
+      try {
+        return await request<PasskeyOptions>("/v1/passkeys/options", {
+          method: "POST",
+        });
+      } catch (cause) {
+        confirmed = true;
+        throw cause;
+      }
+    });
+    if (!started) return false;
+    const { challengeId, options } = started;
     let response;
     try {
       response = await startRegistration({ optionsJSON: options });
     } catch (cause) {
       const message = passkeyError(cause);
       if (message) throw new Error(message);
+      // Safari lets one tap open one passkey sheet: after Face ID, the next
+      // tap (within 5 minutes, no Face ID again) makes the passkey.
+      if (confirmed)
+        throw new Error(
+          "確認できました。もう一度「パスキーを追加」を押してください",
+        );
       return false;
     }
     const result = await request<{ passkeys: PasskeyRow[] }>("/v1/passkeys", {
@@ -299,6 +358,7 @@ function useAuthState() {
       passkeySignIn,
       passkeySignUp,
       addPasskey,
+      withConfirmation,
       demoEnabled: DEMO_ENABLED,
       isDemo,
       startDemo,
@@ -331,6 +391,7 @@ function useAuthState() {
       passkeySignIn,
       passkeySignUp,
       addPasskey,
+      withConfirmation,
     ],
   );
 }
