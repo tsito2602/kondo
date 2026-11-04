@@ -13,6 +13,11 @@ Dates use `YYYY-MM-DD`; times use local `HH:mm`. A trip owner and every invited 
 - `POST /v1/auth/logout` — revoke the current session.
 
 
+## AI agents (MCP)
+
+- `GET /v1/agent-keys`, `POST /v1/agent-keys` (`{ name, canWrite }`), `DELETE /v1/agent-keys/:id` — the account's keys for AI agents, made in 設定 > AIからの操作. `POST` returns the key (`kondo_…`) once with the server URL; only its hash is stored.
+- `POST /v1/mcp` with `Authorization: Bearer kondo_…` — a Model Context Protocol server (streamable HTTP, JSON responses, no sessions) for Muse and other MCP clients. The key acts as its member through the routes below, so trip membership and 閲覧のみ apply. Tools: `list_trips`, `get_trip`, and with a writing key `create_trip`, `update_trip`, `save_plan`, `save_booking`, `save_place`, `save_packing_item`, `save_task`, `save_note`. Edits keep omitted fields. Nothing can be deleted through it.
+
 ## Trips
 
 - `GET /v1/trips` — list trips shared with the current user.

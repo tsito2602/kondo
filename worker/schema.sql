@@ -334,3 +334,17 @@ CREATE TABLE IF NOT EXISTS auth_challenges (
   name TEXT,
   expires_at INTEGER NOT NULL
 );
+
+-- Keys for AI agents (Muse and other MCP clients) to reach /v1/mcp on a
+-- member's behalf. Only the hash is kept; the key is shown once when made.
+-- can_write = 0 keys only read. Deleting the row revokes the key.
+CREATE TABLE IF NOT EXISTS agent_keys (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  can_write INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  last_used_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS agent_keys_user ON agent_keys(user_id);

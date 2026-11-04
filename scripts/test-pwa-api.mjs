@@ -75,6 +75,7 @@ async function fixture() {
   const trip = { id: randomUUID(), name: '旅', destination: 'Vienna', startsOn: '2026-11-21', endsOn: '2026-11-28', coverImage: 'data:image/jpeg;base64,/9j/AA==' };
   assert.equal((await call('/trips', 'POST', trip)).status, 201);
   db.prepare("INSERT INTO trip_members (trip_id,user_id,role) VALUES (?, 'editor', 'editor')").run(trip.id);
+  call.env = env;
   return { db, call, trip, removed };
 }
 const place = { title: '美術館', note: '展示', openingHours: '10:00–18:00', reservationStatus: 'needed', location: 'https://maps.app.goo.gl/abc', status: 'want' };
@@ -746,4 +747,82 @@ test('ticket journey times round-trip, survive old clients, reset to automatic, 
     assert.equal((await call(`${base}/${id}`, 'DELETE')).status, 204);
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM booking_durations WHERE booking_id = ?').get(id).n, 0);
   } finally { db.close(); }
+});
+
+test('agent keys reach /v1/mcp as their member: read-only keys only read, viewers stay read-only, revoked keys stop', async () => {
+  const { db, call, trip } = await fixture();
+  const keyOf = async (canWrite, user = 'owner') => {
+    const response = await call('/agent-keys', 'POST', { name: 'Muse', canWrite }, user);
+    assert.equal(response.status, 201);
+    return response.json();
+  };
+  const writer = await keyOf(true);
+  assert.match(writer.token, /^kondo_/);
+  assert.equal(writer.url, 'https://example.test/v1/mcp');
+  assert.equal(db.prepare('SELECT count(*) AS n FROM agent_keys WHERE token_hash = ?').get(writer.token).n, 0, 'only the hash is stored');
+  const rpc = async (token, method, params, id = 1) => {
+    const response = await worker.fetch(new Request('https://example.test/v1/mcp', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id, method, params }) }), call.env);
+    return { status: response.status, body: response.status === 202 ? null : await response.json() };
+  };
+  // An app session token is not an agent key, and an agent key is not an app session.
+  assert.equal((await rpc('owner', 'tools/list')).status, 401);
+  assert.equal((await call('/trips', 'GET', undefined, writer.token)).status, 401);
+  const init = await rpc(writer.token, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } });
+  assert.equal(init.body.result.serverInfo.name, 'kondo');
+  assert.equal(init.body.result.protocolVersion, '2025-06-18');
+  const names = (await rpc(writer.token, 'tools/list')).body.result.tools.map((tool) => tool.name);
+  assert.ok(names.includes('save_plan') && names.includes('get_trip'));
+  assert.ok(!names.some((name) => name.startsWith('delete')));
+  const tool = async (token, name, args) => (await rpc(token, 'tools/call', { name, arguments: args })).body.result;
+  const listed = await tool(writer.token, 'list_trips', {});
+  assert.equal(listed.structuredContent.trips[0].id, trip.id);
+  assert.equal(listed.structuredContent.trips[0].coverImage, undefined);
+  // Add then edit a plan: omitted fields are kept.
+  const added = await tool(writer.token, 'save_plan', { tripId: trip.id, day: '2026-11-22', time: '10:00', title: 'シュテファン大聖堂', category: 'sightseeing', location: 'Stephansplatz' });
+  assert.equal(added.isError, undefined, JSON.stringify(added));
+  const planId = added.structuredContent.id;
+  const edited = await tool(writer.token, 'save_plan', { tripId: trip.id, planId, time: '11:00' });
+  assert.equal(edited.structuredContent.title, 'シュテファン大聖堂');
+  assert.equal(edited.structuredContent.details.location, 'Stephansplatz');
+  assert.equal(edited.structuredContent.kind, '観光');
+  const moved = await tool(writer.token, 'save_plan', { tripId: trip.id, planId, category: 'transport', transport: { mode: 'train', origin: 'Wien Hbf', destination: 'Salzburg' } });
+  assert.equal(moved.structuredContent.details.transport.mode, 'train');
+  // Tasks default to 1人がやる by the key's member; ticking keeps the rest.
+  const task = (await tool(writer.token, 'save_task', { tripId: trip.id, title: 'ESTAを申請' })).structuredContent;
+  assert.equal(task.assignee, 'member:owner');
+  assert.equal((await tool(writer.token, 'save_task', { tripId: trip.id, taskId: task.id, done: true })).structuredContent.title, 'ESTAを申請');
+  const item = (await tool(writer.token, 'save_packing_item', { tripId: trip.id, name: 'パスポート', category: '書類・お金', kind: 'each' })).structuredContent;
+  assert.equal((await tool(writer.token, 'save_packing_item', { tripId: trip.id, itemId: item.id, packed: true })).structuredContent.packed, true);
+  const placeResult = await tool(writer.token, 'save_place', { tripId: trip.id, title: 'カフェ・ザッハー', reservationStatus: 'needed' });
+  assert.equal(placeResult.structuredContent.reservationStatus, 'needed');
+  const booking = (await tool(writer.token, 'save_booking', { tripId: trip.id, kind: 'hotel', title: 'Hotel Sacher', detail: 'Philharmoniker Str. 4', day: '2026-11-21', endDay: '2026-11-24' })).structuredContent;
+  assert.equal((await tool(writer.token, 'save_booking', { tripId: trip.id, bookingId: booking.id, confirmationCode: 'ABC123' })).structuredContent.detail, 'Philharmoniker Str. 4');
+  const note = (await tool(writer.token, 'save_note', { tripId: trip.id, title: '両替', body: '空港より市内' })).structuredContent;
+  assert.equal((await tool(writer.token, 'save_note', { tripId: trip.id, noteId: note.id, pinned: true })).structuredContent.body, '空港より市内');
+  const whole = (await tool(writer.token, 'get_trip', { tripId: trip.id })).structuredContent;
+  assert.equal(whole.you, 'owner');
+  assert.deepEqual([whole.plans.length, whole.tasks.length, whole.packing.length, whole.places.length, whole.bookings.length, whole.notes.length], [1, 1, 1, 1, 1, 1]);
+  assert.deepEqual(whole.members.map((member) => member.id).sort(), ['editor', 'owner']);
+  // The app's rules still hold: bad input is refused with the app's own message.
+  const bad = await tool(writer.token, 'save_plan', { tripId: trip.id, day: 'tomorrow', title: 'x' });
+  assert.equal(bad.isError, true);
+  // A read-only key lists no write tools and is refused if it calls one.
+  const reader = await keyOf(false);
+  assert.ok(!(await rpc(reader.token, 'tools/list')).body.result.tools.some((entry) => entry.name.startsWith('save')));
+  assert.equal((await tool(reader.token, 'save_task', { tripId: trip.id, title: 'x' })).isError, true);
+  // A viewer's writable key still cannot change the trip; an outsider sees nothing.
+  db.prepare("INSERT INTO trip_member_permissions (trip_id,user_id,read_only) VALUES (?, 'editor', 1)").run(trip.id);
+  const viewerKey = await keyOf(true, 'editor');
+  assert.equal((await tool(viewerKey.token, 'save_task', { tripId: trip.id, title: 'x' })).isError, true);
+  const outsider = await keyOf(true, 'outsider');
+  assert.equal((await tool(outsider.token, 'get_trip', { tripId: trip.id })).isError, true);
+  // Keys are listed and revoked per account; agent keys cannot manage keys.
+  assert.equal((await call('/agent-keys', 'GET', undefined, 'editor').then((r) => r.json())).keys.length, 1);
+  assert.equal((await call(`/agent-keys/${writer.key.id}`, 'DELETE', undefined, 'editor')).status, 204);
+  assert.equal((await rpc(writer.token, 'ping')).status, 200, 'another account cannot revoke it');
+  assert.equal((await call(`/agent-keys/${writer.key.id}`, 'DELETE')).status, 204);
+  assert.equal((await rpc(writer.token, 'ping')).status, 401);
+  // Notifications get 202 and no body; GET is not offered.
+  assert.equal((await rpc(reader.token, 'notifications/initialized', undefined, null)).status, 202);
+  assert.equal((await worker.fetch(new Request('https://example.test/v1/mcp', { headers: { authorization: `Bearer ${reader.token}` } }), call.env)).status, 405);
 });
