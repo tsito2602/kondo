@@ -355,3 +355,15 @@ CREATE TABLE IF NOT EXISTS session_confirmations (
   token_hash TEXT PRIMARY KEY REFERENCES sessions(token_hash) ON DELETE CASCADE,
   confirmed_until INTEGER NOT NULL
 );
+
+-- One-use URLs (10 minutes) an AI agent gets from /v1/mcp to PUT a booking
+-- document from its own machine. Only the hash of the URL's token is kept.
+CREATE TABLE IF NOT EXISTS document_uploads (
+  token_hash TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  booking_id TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  filename TEXT NOT NULL,
+  content_type TEXT NOT NULL,
+  expires_at INTEGER NOT NULL
+);

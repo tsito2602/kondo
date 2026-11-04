@@ -847,3 +847,28 @@ test('making an AI key or adding a passkey needs a fresh passkey confirmation on
   assert.equal((await call('/agent-keys', 'POST', { name: 'x', canWrite: true }, 'owner-2')).status, 403);
   assert.equal((await call('/confirm', 'POST', { challengeId: 'nope', response: { id: 'cred' } }, 'owner-2')).status, 401);
 });
+
+test('agents attach booking files inline or through a one-use upload URL, as their member', async () => {
+  const { call, trip } = await fixture();
+  const stored = new Map();
+  call.env.BUCKET.put = async (key, bytes) => stored.set(key, new Uint8Array(bytes));
+  const { token } = await (await call('/agent-keys', 'POST', { name: 'Muse', canWrite: true })).json();
+  const rpc = async (name, args) => (await (await worker.fetch(new Request('https://example.test/v1/mcp', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) }), call.env)).json()).result;
+  const booking = (await rpc('save_booking', { tripId: trip.id, kind: 'flight', title: 'CA 925', day: '2026-11-21' })).structuredContent;
+  const pdf = Buffer.from('%PDF-1.4 e-ticket');
+  const inline = await rpc('attach_booking_document', { tripId: trip.id, bookingId: booking.id, filename: '旅程票.pdf', contentType: 'application/pdf', dataBase64: pdf.toString('base64') });
+  assert.equal(inline.isError, undefined, JSON.stringify(inline));
+  assert.equal(inline.structuredContent.filename, '旅程票.pdf');
+  assert.equal(inline.structuredContent.size, pdf.length);
+  const ticket = (await rpc('upload_booking_document', { tripId: trip.id, bookingId: booking.id, filename: 'receipt.pdf', contentType: 'application/pdf' })).structuredContent;
+  assert.match(ticket.uploadUrl, /^https:\/\/example\.test\/v1\/uploads\//);
+  const put = () => worker.fetch(new Request(ticket.uploadUrl, { method: 'PUT', body: pdf }), call.env);
+  assert.equal((await put()).status, 201);
+  assert.equal((await put()).status, 404, 'the URL works once');
+  const whole = (await rpc('get_trip', { tripId: trip.id })).structuredContent;
+  assert.deepEqual(whole.bookings[0].documents.map((document) => document.filename).sort(), ['receipt.pdf', '旅程票.pdf']);
+  assert.equal(stored.size, 2);
+  // Only an agent key can ask for an upload URL, and a bad type is refused.
+  assert.equal((await call(`/trips/${trip.id}/bookings/${booking.id}/document-uploads`, 'POST', { filename: 'x.pdf', contentType: 'application/pdf' })).status, 404);
+  assert.equal((await rpc('attach_booking_document', { tripId: trip.id, bookingId: booking.id, filename: 'x.exe', contentType: 'application/x-msdownload', dataBase64: 'AA==' })).isError, true);
+});

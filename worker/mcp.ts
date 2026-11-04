@@ -9,12 +9,22 @@
 
 export type ApiCall = (method: string, path: string, body?: unknown) => Promise<{ status: number; data: any }>;
 
+/** A body sent as raw bytes with its own headers (a booking document), not as JSON. */
+export class RawBody {
+  constructor(readonly bytes: Uint8Array<ArrayBuffer>, readonly headers: Record<string, string>) {}
+}
+
+const DOCUMENT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'image/gif'];
+/** Inline base64 is for small files; larger ones go through upload_booking_document's URL. */
+const INLINE_LIMIT = 8 * 1024 * 1024;
+
 const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 
 const INSTRUCTIONS = `kondo is a shared travel planner (旅のしおり). Data is in Japanese; reply to the user in Japanese.
 Start with list_trips, then get_trip to read everything in one trip (plans, bookings, places, packing, tasks, notes, members).
 Dates are YYYY-MM-DD, times HH:MM (24h) or "" for no time. To edit, pass the id and only the fields to change; the rest is kept.
-Assignees are "member:<userId>" with ids from get_trip's members. Nothing can be deleted through this server; ask the user to delete in the app.`;
+Assignees are "member:<userId>" with ids from get_trip's members. Booking files (PDF e-tickets, receipts) can be attached with attach_booking_document or upload_booking_document.
+Nothing can be deleted through this server; ask the user to delete in the app.`;
 
 type Tool = { name: string; description: string; inputSchema: Record<string, unknown>; write: boolean; run: (api: ApiCall, args: Record<string, any>) => Promise<unknown> };
 
@@ -76,8 +86,8 @@ export const tools: Tool[] = [
       const trip = trips.find((row: any) => row.id === id);
       if (!trip) throw new ToolError('旅行が見つかりません');
       const get = (path: string) => ok(api, 'GET', `/trips/${id}/${path}`);
-      const [members, items, bookings, places, packing, tasks, notes, me] = await Promise.all([
-        get('members'), get('items'), get('bookings'), get('places'), get('packing'), get('tasks'), get('notes'), ok(api, 'GET', '/me'),
+      const [members, items, bookings, places, packing, tasks, notes, me, documents] = await Promise.all([
+        get('members'), get('items'), get('bookings'), get('places'), get('packing'), get('tasks'), get('notes'), ok(api, 'GET', '/me'), get('booking-documents'),
       ]);
       const { coverImage, ...summary } = trip;
       return {
@@ -85,7 +95,10 @@ export const tools: Tool[] = [
         you: me.user.id,
         members: members.members.map(({ id, name, role }: any) => ({ id, name, role })),
         plans: items.items,
-        bookings: bookings.bookings,
+        bookings: bookings.bookings.map((booking: any) => ({
+          ...booking,
+          documents: documents.documents.filter((document: any) => document.bookingId === booking.id).map(({ id, filename, contentType, size }: any) => ({ id, filename, contentType, size })),
+        })),
         places: places.places,
         packing: packing.items,
         tasks: tasks.tasks,
@@ -179,6 +192,52 @@ export const tools: Tool[] = [
       const body = { detail: '', origin: '', originCode: '', destination: '', destinationCode: '', time: '', endTime: '', confirmationCode: '', note: '', ...pick(existing ?? {}, [...fields.filter((key) => key !== 'location'), 'durationMinutes']), ...pick(args, fields) };
       const data = existing ? await ok(api, 'PATCH', `/trips/${id}/bookings/${existing.id}`, body) : await ok(api, 'POST', `/trips/${id}/bookings`, body);
       return data.booking;
+    },
+  },
+  {
+    name: 'attach_booking_document',
+    description: 'Attach a file (PDF or image: e-ticket, itinerary receipt, booking confirmation) to a booking, given as base64. Up to 8 MB; for larger files, or when the file is on disk, use upload_booking_document instead.',
+    inputSchema: object({
+      tripId,
+      bookingId: str('Booking id from get_trip'),
+      filename: str('File name shown in the app, e.g. "eticket.pdf"'),
+      contentType: str('File type', { enum: DOCUMENT_TYPES }),
+      dataBase64: str('The file, base64-encoded'),
+    }, ['tripId', 'bookingId', 'filename', 'contentType', 'dataBase64']),
+    write: true,
+    run: async (api, args) => {
+      const id = tripPath(args.tripId);
+      if (typeof args.bookingId !== 'string' || !/^[A-Za-z0-9-]{1,100}$/.test(args.bookingId)) throw new ToolError('bookingId を確認してください');
+      if (typeof args.dataBase64 !== 'string' || args.dataBase64.length > Math.ceil(INLINE_LIMIT / 3) * 4 + 4) throw new ToolError('8MBを超えるファイルは upload_booking_document を使ってください');
+      let bytes: Uint8Array<ArrayBuffer>;
+      try {
+        const raw = atob(args.dataBase64.replace(/^data:[^,]*,/, '').replace(/\s+/g, ''));
+        bytes = Uint8Array.from(raw, (char) => char.charCodeAt(0));
+      } catch {
+        throw new ToolError('dataBase64 を読めませんでした');
+      }
+      const data = await ok(api, 'POST', `/trips/${id}/bookings/${args.bookingId}/documents`, new RawBody(bytes, {
+        'content-type': String(args.contentType),
+        'x-filename': encodeURIComponent(String(args.filename ?? '')),
+        'x-file-size': String(bytes.byteLength),
+      }));
+      return data.document;
+    },
+  },
+  {
+    name: 'upload_booking_document',
+    description: 'Get a one-time URL (valid 10 minutes) to attach a file to a booking by sending the raw bytes with HTTP PUT, e.g. curl -X PUT --data-binary @eticket.pdf "<uploadUrl>". Up to 20 MB, PDF or image. No Authorization header is needed for the PUT.',
+    inputSchema: object({
+      tripId,
+      bookingId: str('Booking id from get_trip'),
+      filename: str('File name shown in the app, e.g. "eticket.pdf"'),
+      contentType: str('File type', { enum: DOCUMENT_TYPES }),
+    }, ['tripId', 'bookingId', 'filename', 'contentType']),
+    write: true,
+    run: async (api, args) => {
+      const id = tripPath(args.tripId);
+      if (typeof args.bookingId !== 'string' || !/^[A-Za-z0-9-]{1,100}$/.test(args.bookingId)) throw new ToolError('bookingId を確認してください');
+      return ok(api, 'POST', `/trips/${id}/bookings/${args.bookingId}/document-uploads`, { filename: args.filename, contentType: args.contentType });
     },
   },
   {
