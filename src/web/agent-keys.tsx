@@ -135,7 +135,7 @@ export function AgentKeyRows() {
 }
 
 function AgentKeyEditor({ onClose }: { onClose: () => void }) {
-  const { request } = useAuth();
+  const { request, withConfirmation } = useAuth();
   const notify = useToast();
   const { busy, run } = useAction();
   const formId = useId();
@@ -148,12 +148,14 @@ function AgentKeyEditor({ onClose }: { onClose: () => void }) {
     setError("");
     void run(async () => {
       try {
-        setMade(
-          await request<{ token: string; url: string }>("/v1/agent-keys", {
+        // A key outlives sign-out, so making one asks for Face ID first.
+        const result = await withConfirmation(() =>
+          request<{ token: string; url: string }>("/v1/agent-keys", {
             method: "POST",
             body: JSON.stringify({ name: name.trim(), canWrite }),
           }),
         );
+        if (result) setMade(result);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : String(cause));
       }
