@@ -9,6 +9,7 @@ import { validNoteContent, notePlainText, NOTE_TITLE_LIMIT, NOTE_BODY_LIMIT } fr
 
 import { connectionBetween, createsFlightConnectionCycle, type FlightConnectionInput } from '../src/data/flight-connections';
 import { startBookingImport, type AIBinding } from './booking-import';
+import { handleMcp, type ApiCall } from './mcp';
 import { addOptions, addVerify, listPasskeys, loginOptions, loginVerify, removePasskey, signupOptions, signupVerify } from './passkeys';
 
 type Env = {
@@ -1201,6 +1202,57 @@ async function acceptInvite(env: Env, user: User, token: string) {
   return json({ tripId: invite.tripId });
 }
 
+/** Requests the MCP server makes on an agent key's member's behalf; they never come from outside. */
+const internalUsers = new WeakMap<Request, User>();
+
+const AGENT_KEY_PREFIX = 'kondo_';
+const AGENT_KEY_LIMIT = 10;
+
+async function agentKeysRoute(request: Request, env: Env, user: User, url: URL, keyId?: string) {
+  if (request.method === 'GET' && !keyId) {
+    const rows = await env.DB.prepare('SELECT id, name, can_write AS canWrite, created_at AS createdAt, last_used_at AS lastUsedAt FROM agent_keys WHERE user_id = ? ORDER BY created_at, id').bind(user.id).all<{ canWrite: number }>();
+    return json({ keys: rows.results.map((row) => ({ ...row, canWrite: row.canWrite === 1 })), url: `${url.origin}/v1/mcp` });
+  }
+  if (request.method === 'POST' && !keyId) {
+    const body = await request.json().catch(() => null);
+    const name = isObject(body) ? textField(body.name, 40, true) : null;
+    if (!name || !isObject(body) || typeof body.canWrite !== 'boolean') return json({ error: '名前と書き込みの可否を指定してください' }, 400);
+    const count = await env.DB.prepare('SELECT count(*) AS n FROM agent_keys WHERE user_id = ?').bind(user.id).first<{ n: number }>();
+    if ((count?.n ?? 0) >= AGENT_KEY_LIMIT) return json({ error: `AI用のキーは${AGENT_KEY_LIMIT}個までです` }, 409);
+    const id = crypto.randomUUID();
+    const token = AGENT_KEY_PREFIX + randomToken();
+    await env.DB.prepare('INSERT INTO agent_keys (id, user_id, name, token_hash, can_write) VALUES (?, ?, ?, ?, ?)').bind(id, user.id, name, await hashToken(token), body.canWrite ? 1 : 0).run();
+    return json({ key: { id, name, canWrite: body.canWrite, createdAt: Math.floor(Date.now() / 1000), lastUsedAt: null }, token, url: `${url.origin}/v1/mcp` }, 201);
+  }
+  if (request.method === 'DELETE' && keyId) {
+    await env.DB.prepare('DELETE FROM agent_keys WHERE id = ? AND user_id = ?').bind(keyId, user.id).run();
+    return new Response(null, { status: 204 });
+  }
+  return json({ error: 'Not found' }, 404);
+}
+
+/** /v1/mcp: an agent key in `Authorization: Bearer kondo_…` stands for its member. */
+async function mcpRoute(request: Request, env: Env, executionCtx: Parameters<typeof app.fetch>[2]) {
+  const authorization = request.headers.get('authorization') ?? '';
+  const token = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+  const key = token.startsWith(AGENT_KEY_PREFIX)
+    ? await env.DB.prepare('SELECT k.id, k.can_write AS canWrite, u.id AS userId FROM agent_keys k JOIN users u ON u.id = k.user_id WHERE k.token_hash = ?').bind(await hashToken(token)).first<{ id: string; canWrite: number; userId: string }>()
+    : null;
+  if (!key) return json({ jsonrpc: '2.0', id: null, error: { code: -32001, message: 'kondoのAI用キーが必要です（設定 > AI用のキー）' } }, 401, { 'www-authenticate': 'Bearer realm="kondo"' });
+  const user = await findUser(env, key.userId);
+  if (!user) return json({ error: 'アカウントが見つかりません' }, 401);
+  await env.DB.prepare('UPDATE agent_keys SET last_used_at = unixepoch() WHERE id = ?').bind(key.id).run();
+  const origin = new URL(request.url).origin;
+  const api: ApiCall = async (method, path, body) => {
+    const inner = new Request(`${origin}/v1${path}`, { method, headers: { 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    internalUsers.set(inner, user);
+    const response = await app.fetch(inner, env, executionCtx);
+    const text = await response.text();
+    return { status: response.status, data: text ? JSON.parse(text) : null };
+  };
+  return handleMcp(request, api, key.canWrite === 1);
+}
+
 const app = new Hono<{ Bindings: Env; Variables: { user: User } }>();
 app.use('/v1/*', async (c, next) => {
   const headers = cors(c.req.raw, c.env);
@@ -1215,12 +1267,13 @@ app.get('/v1/avatars/:userId/:version', async (c) => {
   if (!object) return json({ error: 'Not found' }, 404);
   return new Response(object.body, { headers: { 'content-type': object.httpMetadata?.contentType ?? 'image/jpeg', 'cache-control': 'public, max-age=31536000, immutable' } });
 });
+app.all('/v1/mcp', (c) => mcpRoute(c.req.raw, c.env, (() => { try { return c.executionCtx; } catch { return undefined; } })()));
 app.post('/v1/auth/passkey/signup/options', (c) => signupOptions(c.req.raw, c.env));
 app.post('/v1/auth/passkey/signup', (c) => signupVerify(c.req.raw, c.env, (id) => startSession(c.env, id)));
 app.post('/v1/auth/passkey/login/options', (c) => loginOptions(c.req.raw, c.env));
 app.post('/v1/auth/passkey/login', (c) => loginVerify(c.req.raw, c.env, (id) => startSession(c.env, id), (id) => findUser(c.env, id)));
 app.use('/v1/*', async (c, next) => {
-  const user = await currentUser(c.req.raw, c.env);
+  const user = internalUsers.get(c.req.raw) ?? await currentUser(c.req.raw, c.env);
   if (!user) return json({ error: 'ログインが必要です' }, 401);
   c.set('user', user);
   const scope = c.req.path.match(/^\/v1\/trips\/([^/]+)(?:\/|$)/);
@@ -1260,6 +1313,8 @@ app.delete('/v1/me/avatar', async (c) => {
   await c.env.DB.prepare('INSERT INTO user_profiles (user_id, avatar_url) VALUES (?, NULL) ON CONFLICT(user_id) DO UPDATE SET avatar_url = NULL').bind(user.id).run();
   return json({ user: { ...user, avatarUrl: null } });
 });
+app.all('/v1/agent-keys', (c) => internalUsers.has(c.req.raw) ? json({ error: 'Not found' }, 404) : agentKeysRoute(c.req.raw, c.env, c.get('user'), new URL(c.req.url)));
+app.all('/v1/agent-keys/:id', (c) => internalUsers.has(c.req.raw) ? json({ error: 'Not found' }, 404) : agentKeysRoute(c.req.raw, c.env, c.get('user'), new URL(c.req.url), c.req.param('id')));
 app.get('/v1/passkeys', (c) => listPasskeys(c.env, c.get('user')));
 app.post('/v1/passkeys/options', (c) => addOptions(c.req.raw, c.env, c.get('user')));
 app.post('/v1/passkeys', (c) => addVerify(c.req.raw, c.env, c.get('user')));

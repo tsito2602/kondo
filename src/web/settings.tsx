@@ -10,6 +10,7 @@ import { jellyScroll } from "./jelly-scroll";
 import { Glyph } from "./itinerary-icons";
 import { KindColorRows } from "./kind-settings";
 import { AvatarEditor } from "./avatar-editor";
+import { AgentKeyRows } from "./agent-keys";
 import { Modal, useAction, useTheme, useToast } from "./ui";
 
 /** A trip's entry stamp: a latin place becomes a 3-letter code, others keep their first word. */
@@ -577,6 +578,12 @@ export function SettingsScreen() {
         <h3 className="settings-label">外観</h3>
         <Appearance />
         <KindColorRows />
+        {!auth.isDemo && (
+          <>
+            <h3 className="settings-label">AIからの操作</h3>
+            <AgentKeyRows />
+          </>
+        )}
         <h3 className="settings-label">アプリ</h3>
         <AppRows />
         <div className="settings-group settings-signout">
