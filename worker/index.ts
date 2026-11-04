@@ -9,7 +9,7 @@ import { validNoteContent, notePlainText, NOTE_TITLE_LIMIT, NOTE_BODY_LIMIT } fr
 
 import { connectionBetween, createsFlightConnectionCycle, type FlightConnectionInput } from '../src/data/flight-connections';
 import { startBookingImport, type AIBinding } from './booking-import';
-import { handleMcp, type ApiCall } from './mcp';
+import { handleMcp, RawBody, type ApiCall } from './mcp';
 import { addOptions, addVerify, confirmOptions, confirmVerify, listPasskeys, loginOptions, loginVerify, removePasskey, signupOptions, signupVerify } from './passkeys';
 
 type Env = {
@@ -1276,13 +1276,61 @@ async function mcpRoute(request: Request, env: Env, executionCtx: Parameters<typ
   await env.DB.prepare('UPDATE agent_keys SET last_used_at = unixepoch() WHERE id = ?').bind(key.id).run();
   const origin = new URL(request.url).origin;
   const api: ApiCall = async (method, path, body) => {
-    const inner = new Request(`${origin}/v1${path}`, { method, headers: { 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    const inner = body instanceof RawBody
+      ? new Request(`${origin}/v1${path}`, { method, headers: body.headers, body: body.bytes })
+      : new Request(`${origin}/v1${path}`, { method, headers: { 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     internalUsers.set(inner, user);
     const response = await app.fetch(inner, env, executionCtx);
     const text = await response.text();
     return { status: response.status, data: text ? JSON.parse(text) : null };
   };
   return handleMcp(request, api, key.canWrite === 1);
+}
+
+const UPLOAD_SECONDS = 600;
+
+/**
+ * upload_booking_document: a one-use URL, made only through /v1/mcp by a
+ * writing key, that lets an agent PUT a file from its own machine without
+ * the key. The file then goes through the usual documents route as that member.
+ */
+async function createDocumentUpload(request: Request, env: Env, user: User, tripId: string, bookingId: string) {
+  if (!internalUsers.has(request)) return json({ error: 'Not found' }, 404);
+  const forbidden = await requireMember(env, tripId, user.id);
+  if (forbidden) return forbidden;
+  const booking = await env.DB.prepare('SELECT id FROM bookings WHERE id = ? AND trip_id = ?').bind(bookingId, tripId).first();
+  if (!booking) return json({ error: '予約が見つかりません' }, 404);
+  const body = await request.json().catch(() => null);
+  const filename = isObject(body) ? textField(body.filename, 180, true) : null;
+  const contentType = isObject(body) && typeof body.contentType === 'string' ? body.contentType.toLowerCase() : '';
+  if (!filename) return json({ error: 'ファイル名を確認してください' }, 400);
+  if (!bookingDocumentTypes.has(contentType)) return json({ error: 'JPEG、PNG、WebP、HEIC、GIF、PDFのいずれかを選択してください' }, 400);
+  const token = randomToken();
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM document_uploads WHERE expires_at < unixepoch()'),
+    env.DB.prepare('INSERT INTO document_uploads (token_hash, user_id, trip_id, booking_id, filename, content_type, expires_at) VALUES (?, ?, ?, ?, ?, ?, unixepoch() + ?)')
+      .bind(await hashToken(token), user.id, tripId, bookingId, filename, contentType, UPLOAD_SECONDS),
+  ]);
+  return json({ uploadUrl: `${new URL(request.url).origin}/v1/uploads/${token}`, method: 'PUT', expiresIn: UPLOAD_SECONDS, maxBytes: 20 * 1024 * 1024 }, 201);
+}
+
+async function putDocumentUpload(request: Request, env: Env, token: string, executionCtx: Parameters<typeof app.fetch>[2]) {
+  if (request.method !== 'PUT' && request.method !== 'POST') return new Response(null, { status: 405, headers: { allow: 'PUT' } });
+  const ticket = await env.DB.prepare('DELETE FROM document_uploads WHERE token_hash = ? AND expires_at >= unixepoch() RETURNING user_id AS userId, trip_id AS tripId, booking_id AS bookingId, filename, content_type AS contentType')
+    .bind(await hashToken(token)).first<{ userId: string; tripId: string; bookingId: string; filename: string; contentType: string }>();
+  if (!ticket) return json({ error: 'アップロード用のURLが無効か期限切れです' }, 404);
+  const user = await findUser(env, ticket.userId);
+  if (!user) return json({ error: 'アカウントが見つかりません' }, 404);
+  const declared = Number(request.headers.get('content-length') ?? 0);
+  if (declared > 20 * 1024 * 1024) return json({ error: 'ファイルは20MB以下にしてください' }, 413);
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  const inner = new Request(`${new URL(request.url).origin}/v1/trips/${ticket.tripId}/bookings/${ticket.bookingId}/documents`, {
+    method: 'POST',
+    headers: { 'content-type': ticket.contentType, 'x-filename': encodeURIComponent(ticket.filename), 'x-file-size': String(bytes.byteLength) },
+    body: bytes,
+  });
+  internalUsers.set(inner, user);
+  return app.fetch(inner, env, executionCtx);
 }
 
 const app = new Hono<{ Bindings: Env; Variables: { user: User } }>();
@@ -1299,6 +1347,7 @@ app.get('/v1/avatars/:userId/:version', async (c) => {
   if (!object) return json({ error: 'Not found' }, 404);
   return new Response(object.body, { headers: { 'content-type': object.httpMetadata?.contentType ?? 'image/jpeg', 'cache-control': 'public, max-age=31536000, immutable' } });
 });
+app.all('/v1/uploads/:token', (c) => putDocumentUpload(c.req.raw, c.env, c.req.param('token'), (() => { try { return c.executionCtx; } catch { return undefined; } })()));
 app.all('/v1/mcp', (c) => mcpRoute(c.req.raw, c.env, (() => { try { return c.executionCtx; } catch { return undefined; } })()));
 app.post('/v1/auth/passkey/signup/options', (c) => signupOptions(c.req.raw, c.env));
 app.post('/v1/auth/passkey/signup', (c) => signupVerify(c.req.raw, c.env, (id) => startSession(c.env, id)));
@@ -1374,6 +1423,7 @@ app.patch('/v1/trips/:tripId/bookings/:bookingId/connection', (c) => updateFligh
 app.post('/v1/trips/:tripId/booking-import', (c) => importBookings(c.req.raw, c.env, c.get('user'), c.req.param('tripId')));
 app.get('/v1/trips/:tripId/booking-documents', (c) => listBookingDocuments(c.env, c.get('user'), c.req.param('tripId')));
 app.post('/v1/trips/:tripId/bookings/:bookingId/documents', (c) => uploadBookingDocument(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId')));
+app.post('/v1/trips/:tripId/bookings/:bookingId/document-uploads', (c) => createDocumentUpload(c.req.raw, c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId')));
 app.get('/v1/trips/:tripId/bookings/:bookingId/documents/:documentId', (c) => getBookingDocument(c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId'), c.req.param('documentId')));
 app.delete('/v1/trips/:tripId/bookings/:bookingId/documents/:documentId', (c) => deleteBookingDocument(c.env, c.get('user'), c.req.param('tripId'), c.req.param('bookingId'), c.req.param('documentId')));
 app.get('/v1/trips/:tripId/packing', (c) => listPacking(c.env, c.get('user'), c.req.param('tripId')));
