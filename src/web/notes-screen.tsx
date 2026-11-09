@@ -14,6 +14,7 @@ import type { TravelNote } from "@/data/types";
 import { DockToast, ThumbDock } from "./thumb-dock";
 import { poof, sink, spring } from "./memo-motion";
 import { PageTop } from "./page-top";
+import { cascadeIn } from "./itinerary-motion";
 import { useJellyScroll } from "./jelly-scroll";
 import { AddButton } from "./ui";
 import {
@@ -172,11 +173,12 @@ export function NotesScreen() {
   const page = useRef<HTMLDivElement>(null);
   // Fast scrolls leave the tiles a little behind (kondo-cartoon jelly scroll).
   useJellyScroll(page, ".memo-tile, .memo-lab");
-  // On arrival the labels and tiles land one after another, 40 ms apart.
+  // On arrival the parts rise in one by one, as the しおり opens.
   useLayoutEffect(() => {
-    page.current
-      ?.querySelectorAll(".memo-tile, .memo-lab")
-      .forEach((element, index) => sink(element, -20, index * 40));
+    cascadeIn(
+      page.current,
+      ".page-top, .memo-search, .memo-lab, .memo-tile, .memo-empty",
+    );
   }, []);
   const deleteNote = travel.deleteNote;
   const commitRemoval = useRef(() => {});

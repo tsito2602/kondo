@@ -15,11 +15,6 @@
       calc(150px + env(safe-area-inset-bottom));
   }
 }
-/* The page's parts sink in on their own (useSinkIn), not with the route rise. */
-.route-page-enter .page.prep-page > *,
-.route-page-enter.page.prep-page > * {
-  animation: none;
-}
 .prep-sr {
   position: absolute;
   width: 1px;
