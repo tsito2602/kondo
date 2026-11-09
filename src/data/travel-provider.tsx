@@ -28,6 +28,9 @@ const withOwnDone = (task: TravelTask, self: string | undefined): TravelTask => 
   const others = (task.doneBy ?? []).filter((id) => id !== self);
   return { ...task, doneBy: task.done ? [...others, self].sort() : others };
 };
+const SYNC_TIMEOUT_MS = 20_000;
+/** How often an open app fetches the others' edits. */
+const REFRESH_MS = 15_000;
 type BookingDocumentInput = { filename: string; contentType: string; size: number; bytes: ArrayBuffer };
 
 type TravelContextValue = {
@@ -130,6 +133,10 @@ export function TravelProvider({ children }: PropsWithChildren) {
   const sync = useCallback((): Promise<void> => {
     if (isDemo) return Promise.resolve();
     if (syncingRef.current) return syncingRef.current;
+    // A request iOS froze while the app was in the background can stay pending
+    // forever; give up on it so the next sync can run and bring the others' edits.
+    const call = <T,>(path: string, init: RequestInit = {}) =>
+      request<T>(path, { ...init, signal: typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(SYNC_TIMEOUT_MS) : undefined });
     const operation = Promise.resolve().then(async () => {
       setSyncing(true);
       let permissionNotice: string | null = null;
@@ -138,12 +145,18 @@ export function TravelProvider({ children }: PropsWithChildren) {
           while (cacheRef.current.pending.length) {
             const mutation = cacheRef.current.pending[0];
             try {
-              await request(mutation.path, {
+              await call(mutation.path, {
                 method: mutation.method,
                 ...(mutation.body ? { body: JSON.stringify(mutation.body) } : {}),
               });
             } catch (cause) {
               const status = cause instanceof Error && 'status' in cause ? cause.status : null;
+              if (Number(status) === 404 && (mutation.method === 'PATCH' || mutation.method === 'DELETE') && !mutation.path.endsWith('/connection')) {
+                // Someone else deleted it first. The edit has nothing left to change;
+                // keeping it would hold every later edit and every refresh behind it.
+                commit((current) => ({ ...current, pending: current.pending.filter((item) => item.id !== mutation.id) }));
+                continue;
+              }
               const forbiddenTrip = mutation.path.match(/^\/v1\/trips\/([^/]+)(?:\/|$)/)?.[1];
               if (Number(status) === 403 && forbiddenTrip) {
                 // Revoked edits must not block every other trip's queue or keep
@@ -153,7 +166,7 @@ export function TravelProvider({ children }: PropsWithChildren) {
                 permissionNotice = '旅行の権限が変更されたため、未同期の編集を取り消しました';
                 continue;
               }
-              if (Number(status) === 400 && /\/tasks(?:\/[^/]+)?$/.test(mutation.path) && cause instanceof Error && cause.message === 'この旅行のメンバーから担当を選んでください') {
+              if (Number(status) === 400 && /\/(?:tasks|packing)(?:\/[^/]+)?$/.test(mutation.path) && cause instanceof Error && cause.message === 'この旅行のメンバーから担当を選んでください') {
                 // A member may leave while this device is offline. Keep the task
                 // and its other edits, but retry without the revoked assignment.
                 commit((current) => ({ ...current, pending: current.pending.map((entry) => entry.id === mutation.id ? { ...entry, body: { ...entry.body, assignee: '' } } : entry) }));
@@ -173,18 +186,18 @@ export function TravelProvider({ children }: PropsWithChildren) {
             commit((current) => ({ ...current, pending: current.pending.filter((item) => item.id !== mutation.id) }));
           }
 
-          const { trips } = await request<{ trips: Trip[] }>('/v1/trips');
+          const { trips } = await call<{ trips: Trip[] }>('/v1/trips');
           const tripEntries = await Promise.all(
             trips.map(async (trip) => {
               const [itemResult, bookingResult, packingResult, taskResult, documentResult, placeResult, memberResult, noteResult] = await Promise.all([
-                request<{ items: ItineraryItem[] }>(`/v1/trips/${trip.id}/items`),
-                request<{ bookings: Booking[] }>(`/v1/trips/${trip.id}/bookings`),
-                request<{ items: PackingItem[] }>(`/v1/trips/${trip.id}/packing`),
-                request<{ tasks: TravelTask[] }>(`/v1/trips/${trip.id}/tasks`),
-                request<{ documents: BookingDocument[] }>(`/v1/trips/${trip.id}/booking-documents`),
-                request<{ places: Place[] }>(`/v1/trips/${trip.id}/places`),
-                request<{ members: TripMember[] }>(`/v1/trips/${trip.id}/members`),
-                request<{ notes: TravelNote[] }>(`/v1/trips/${trip.id}/notes`),
+                call<{ items: ItineraryItem[] }>(`/v1/trips/${trip.id}/items`),
+                call<{ bookings: Booking[] }>(`/v1/trips/${trip.id}/bookings`),
+                call<{ items: PackingItem[] }>(`/v1/trips/${trip.id}/packing`),
+                call<{ tasks: TravelTask[] }>(`/v1/trips/${trip.id}/tasks`),
+                call<{ documents: BookingDocument[] }>(`/v1/trips/${trip.id}/booking-documents`),
+                call<{ places: Place[] }>(`/v1/trips/${trip.id}/places`),
+                call<{ members: TripMember[] }>(`/v1/trips/${trip.id}/members`),
+                call<{ notes: TravelNote[] }>(`/v1/trips/${trip.id}/notes`),
               ]);
               return [trip.id, itemResult.items, bookingResult.bookings, packingResult.items, taskResult.tasks, documentResult.documents, placeResult.places, memberResult.members, noteResult.notes] as const;
             }),
@@ -242,15 +255,22 @@ export function TravelProvider({ children }: PropsWithChildren) {
       setReady(true);
       void sync();
     }).catch(() => { if (active) { setError('端末の保存データを開けませんでした'); setReady(true); } });
-    const onVisible = () => { if (globalThis.document?.visibilityState === 'visible') void sync(); };
+    const visible = () => globalThis.document?.visibilityState !== 'hidden';
+    const onVisible = () => { if (visible()) void sync(); };
     globalThis.document?.addEventListener('visibilitychange', onVisible);
+    // iOS home-screen apps come back through pageshow/focus without always
+    // firing visibilitychange.
     const onOnline = () => void sync();
     globalThis.addEventListener?.('online', onOnline);
-    const timer = setInterval(() => void sync(), 30_000);
+    globalThis.addEventListener?.('pageshow', onVisible);
+    globalThis.addEventListener?.('focus', onVisible);
+    const timer = setInterval(() => { if (visible()) void sync(); }, REFRESH_MS);
     return () => {
       active = false;
       globalThis.document?.removeEventListener('visibilitychange', onVisible);
       globalThis.removeEventListener?.('online', onOnline);
+      globalThis.removeEventListener?.('pageshow', onVisible);
+      globalThis.removeEventListener?.('focus', onVisible);
       clearInterval(timer);
     };
   }, [sync, isDemo, user?.id]);
