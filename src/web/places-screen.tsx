@@ -45,6 +45,7 @@ import { ItemEditor, PlaceEditor } from "./editors";
 import { BookingDetail, PlaceDetail } from "./details";
 import { reduceMotion } from "./motion";
 import { boing, hop, sink } from "./places-motion";
+import { cascadeIn } from "./itinerary-motion";
 import { useJellyScroll } from "./jelly-scroll";
 import { PlaceSheet, placeMapsHref } from "./place-sheet";
 
@@ -166,6 +167,13 @@ export function PlacesScreen() {
   const pageRef = useRef<HTMLDivElement>(null);
   // The map, the note and the list trail a fast scroll and settle (jelly scroll).
   useJellyScroll(pageRef, JELLY_ITEMS);
+  // On arrival the parts rise in one by one, as the しおり opens.
+  useLayoutEffect(() => {
+    cascadeIn(
+      pageRef.current,
+      ".page-top, .places-head, .places-map, .places-list h3, .places-row, .empty",
+    );
+  }, []);
   const selectedMark = selected ? model.byKey.get(selected) : undefined;
 
   const select = useCallback(
@@ -178,7 +186,7 @@ export function PlacesScreen() {
 
   if (!model.count && !model.hotels.length)
     return (
-      <div className="page places-page">
+      <div className="page places-page" ref={pageRef}>
         <PageTop tab="places" title="行きたい場所" />
         {travel.canEdit && (
           <AddButton label="場所を追加" onClick={() => setAdding(true)} />

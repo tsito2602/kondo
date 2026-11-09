@@ -11,6 +11,7 @@ import { TripCover } from "./trip-cover";
 import { reduceMotion } from "./motion";
 import { registerSquish, spring } from "./cartoon";
 import { useJellyScroll } from "./jelly-scroll";
+import { cascadeIn } from "./itinerary-motion";
 
 /** Places typed into one destination. 「・」 stays inside a single name. */
 export function destinationPlaces(destination: string) {
@@ -274,7 +275,7 @@ export function PastTripCard({
 }
 
 let entered = false;
-/** Cards drop in and land once per session, the first time the list appears. */
+/** The list rises in once per session, the first time it appears. */
 export function useTripListEntrance(list: React.RefObject<HTMLElement | null>) {
   useLayoutEffect(() => {
     if (entered || !list.current) return;
@@ -282,27 +283,10 @@ export function useTripListEntrance(list: React.RefObject<HTMLElement | null>) {
     // Returning from a trip already has its own transition.
     if (reduceMotion() || document.documentElement.dataset.tripTransition)
       return;
-    const cards = list.current.querySelectorAll<HTMLElement>(".home-trip");
-    cards.forEach((card, index) =>
-      card.animate?.(
-        [
-          { transform: "translateY(-40px) scale(.9,1.12)", opacity: 0 },
-          {
-            transform: "translateY(0) scale(.92,1.1)",
-            opacity: 1,
-            offset: 0.42,
-          },
-          { transform: "translateY(0) scale(1.06,.9)", offset: 0.6 },
-          { transform: "translateY(-2px) scale(.99,1.02)", offset: 0.8 },
-          { transform: "none", opacity: 1 },
-        ],
-        {
-          duration: 460,
-          delay: index * 50,
-          easing: "cubic-bezier(.4,0,.6,1)",
-          fill: "backwards",
-        },
-      ),
+    // The しおり's entrance: the parts rise in one by one.
+    cascadeIn(
+      list.current,
+      ".home-toolbar, .home-group-heading, .home-trip, .empty",
     );
   }, [list]);
 }

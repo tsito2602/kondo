@@ -2330,52 +2330,6 @@ input::-webkit-date-and-time-value {
     opacity: 0;
   }
 }
-/* The old page only lifts and fades, quickly, so it never reads as a second
-   moving heading. The new page's pieces then rise in a short stagger. */
-@keyframes page-rise {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-}
-.route-page-enter .page > :not(:has(.floating-add, .trip-menu-host)),
-.route-page-enter.page > :not(:has(.floating-add, .trip-menu-host)) {
-  animation: page-rise 640ms cubic-bezier(0.22, 0.72, 0.18, 1) both;
-  animation-delay: 140ms;
-}
-.route-page-enter .page > :nth-child(1),
-.route-page-enter.page > :nth-child(1) {
-  animation-delay: 50ms;
-}
-.route-page-enter .page > :nth-child(2),
-.route-page-enter.page > :nth-child(2) {
-  animation-delay: 100ms;
-}
-.route-page-enter .page > :nth-child(3),
-.route-page-enter.page > :nth-child(3) {
-  animation-delay: 150ms;
-}
-.route-page-enter .page > :nth-child(4),
-.route-page-enter.page > :nth-child(4) {
-  animation-delay: 200ms;
-}
-.route-page-enter .page > :nth-child(5),
-.route-page-enter.page > :nth-child(5) {
-  animation-delay: 245ms;
-}
-.route-page-enter .page > :nth-child(6),
-.route-page-enter.page > :nth-child(6) {
-  animation-delay: 290ms;
-}
-.route-page-enter .page > :nth-child(n + 7),
-.route-page-enter.page > :nth-child(n + 7) {
-  animation-delay: 330ms;
-}
-@media (prefers-reduced-motion: reduce) {
-  .route-page-enter * {
-    animation: none !important;
-  }
-}
 @media (prefers-reduced-transparency: reduce) {
   .modal:not(.full) {
     background: var(--paper);

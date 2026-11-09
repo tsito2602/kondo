@@ -28,6 +28,7 @@ import { localDate } from "@/utils/dates";
 import { AssigneeAvatar } from "./assignee-avatar";
 import { anim, RM, spring } from "./cartoon";
 import { useJellyScroll } from "./jelly-scroll";
+import { cascadeIn } from "./itinerary-motion";
 import { dismissModal } from "./motion";
 import { PageTop } from "./page-top";
 import {
@@ -47,26 +48,12 @@ import { AddButton, ErrorText, Modal } from "./ui";
 const boing = (el: Element | null | undefined, from: string) =>
   el ? spring(el, [{ transform: from }, { transform: "none" }], "boing") : 0;
 /** The mock's own sink: lands from above, squashes (1.06 × .9), settles. */
-const SINK = (from: number): Keyframe[] => [
-  { transform: `translateY(${from}px) scale(.9,1.12)`, opacity: 0 },
-  { transform: "translateY(0) scale(.92,1.1)", opacity: 1, offset: 0.42 },
-  { transform: "translateY(0) scale(1.06,.9)", offset: 0.6 },
-  { transform: "translateY(-2px) scale(.99,1.02)", offset: 0.8 },
-  { transform: "none", opacity: 1 },
-];
-/** Opening a page: its headings and lists sink in, 35 ms apart. */
-function useSinkIn(page: React.RefObject<HTMLElement | null>) {
+/** Opening a page: the しおり's entrance (its parts rise in one by one). */
+function useCascadeIn(page: React.RefObject<HTMLElement | null>) {
   useLayoutEffect(() => {
-    const parts = page.current?.querySelectorAll<HTMLElement>(
-      ".prep-list, .prep-kind-heading",
-    );
-    parts?.forEach((el, i) =>
-      anim(el, SINK(-20), {
-        duration: 460,
-        delay: i * 35,
-        easing: "cubic-bezier(.4,0,.6,1)",
-        fill: "backwards",
-      }),
+    cascadeIn(
+      page.current,
+      ".page-top, .prep-filters, .prep-kind-heading, .prep-row, .prep-none",
     );
   }, [page]);
 }
@@ -431,7 +418,7 @@ function Tasks() {
   const [sheet, setSheet] = useState<{ task?: TravelTask } | null>(null);
   const [fresh, setFresh] = useState("");
   const page = useRef<HTMLDivElement>(null);
-  useSinkIn(page);
+  useCascadeIn(page);
   useJellyScroll(page, ".prep-heading, .prep-list");
   const row$ = (id: string) =>
     page.current?.querySelector(`[data-task="${id}"]`);
@@ -849,7 +836,7 @@ function Packing() {
   const [filter, setFilter] = useState(ALL);
   const page = useRef<HTMLDivElement>(null);
   const me = memberAssignee(self ?? "");
-  useSinkIn(page);
+  useCascadeIn(page);
   useJellyScroll(page, ".prep-heading, .prep-list");
   useLayoutEffect(() => {
     if (!fresh) return;
