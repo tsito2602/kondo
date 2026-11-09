@@ -402,3 +402,35 @@ test('transport ordering and durations handle untimed, overnight and removed pre
   assert.equal(itemDetails({ kind: '予定' }).category, 'other');
   assert.equal(itemDetails({ kind: '観光' }).category, 'sightseeing');
 });
+
+test('an edit to something another member deleted is dropped and never blocks later edits or the refresh', async () => {
+  const stored = empty();
+  stored.pending = [
+    { id: 'gone-1', method: 'PATCH', path: '/v1/trips/trip/packing/gone', body: { name: 'Gone', packed: true } },
+    { id: 'gone-2', method: 'DELETE', path: '/v1/trips/trip/tasks/gone' },
+    { id: 'next', method: 'PATCH', path: '/v1/trips/trip/tasks/task', body: { ...task, title: 'Pack bags' } },
+  ];
+  const sent = [];
+  const f = await fixture({ stored, transport: async (path, init) => {
+    if (!init.method) return undefined;
+    sent.push(path);
+    if (path.endsWith('/gone')) throw Object.assign(new Error('見つかりません'), { status: 404 });
+  } });
+  try {
+    await f.api.sync();
+    const current = f.render();
+    assert.equal(current.pendingCount, 0);
+    assert.equal(current.error, null);
+    assert.ok(sent.includes('/v1/trips/trip/tasks/task'));
+    assert.equal(current.tasks[0].title, 'Pack bags');
+  } finally { f.close(); }
+});
+
+test('every sync request carries a timeout so a frozen request cannot stop later refreshes', async () => {
+  const f = await fixture();
+  try {
+    await f.api.sync();
+    assert.ok(f.requests.length > 0);
+    assert.ok(f.requests.every((r) => r.signal instanceof AbortSignal));
+  } finally { f.close(); }
+});
