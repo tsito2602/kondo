@@ -8,6 +8,7 @@ import { appVersion, updateLabel, useAppUpdate } from "./app-update";
 import { RM, spring } from "./cartoon";
 import { jellyScroll } from "./jelly-scroll";
 import { Glyph } from "./itinerary-icons";
+import { cascadeIn } from "./itinerary-motion";
 import { KindColorRows } from "./kind-settings";
 import { AvatarEditor } from "./avatar-editor";
 import { AgentKeyRows } from "./agent-keys";
@@ -516,13 +517,6 @@ function AppRows() {
 }
 
 // kondo-settings.html's sink: lands, flattens a little (1.06 × .9), settles.
-const SETTLE: Keyframe[] = [
-  { transform: "translateY(-20px) scale(.9,1.12)", opacity: 0 },
-  { transform: "translateY(0) scale(.92,1.1)", opacity: 1, offset: 0.42 },
-  { transform: "translateY(0) scale(1.06,.9)", offset: 0.6 },
-  { transform: "translateY(-2px) scale(.99,1.02)", offset: 0.8 },
-  { transform: "none", opacity: 1 },
-];
 const SETTLE_ITEMS =
   ":scope > .settings-label, :scope > .passport, :scope > .settings-theme, :scope > .settings-group";
 
@@ -535,17 +529,9 @@ export function SettingsScreen() {
   const { busy, run } = useAction();
   const navigate = useNavigate();
   const page = useRef<HTMLDivElement>(null);
-  // The groups land one after another (40 ms apart), as the mock opens.
+  // The groups rise in one by one, as the しおり opens.
   useLayoutEffect(() => {
-    if (RM()) return;
-    page.current?.querySelectorAll(SETTLE_ITEMS).forEach((el, i) =>
-      el.animate?.(SETTLE, {
-        duration: 460,
-        delay: i * 40,
-        easing: "cubic-bezier(.4,0,.6,1)",
-        fill: "backwards",
-      }),
-    );
+    cascadeIn(page.current, SETTLE_ITEMS);
   }, []);
   // Jelly scroll (kondo-cartoon §3) on the page's blocks.
   useEffect(() => {

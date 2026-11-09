@@ -17,7 +17,7 @@ import {
   useState,
 } from "react";
 import { PageTop } from "./page-top";
-import { bookingSink } from "./booking-motion";
+import { cascadeIn } from "./itinerary-motion";
 import { useJellyScroll } from "./jelly-scroll";
 import { useSearchParams } from "react-router";
 import { BookOpen } from "lucide-react";
@@ -56,11 +56,9 @@ export function BookingsScreen() {
   const now = useClockNow();
   const page = useRef<HTMLDivElement>(null);
   useJellyScroll(page, ".bk-card, .bk-dayh, .bk-conn");
-  // The list sinks in, card by card (the mock's first render: 40 ms apart).
+  // On arrival the parts rise in one by one, as the しおり opens.
   useLayoutEffect(() => {
-    page.current
-      ?.querySelectorAll<HTMLElement>(".bk-card, .bk-dayh")
-      .forEach((element, index) => bookingSink(element, -20, index * 40));
+    cascadeIn(page.current, ".page-top, .bk-dayh, .bk-card, .bk-conn, .empty");
   }, []);
   // A stamp spins in only when a booking turns 済 while this screen is open.
   const wasUsed = useRef<Map<string, boolean> | null>(null);

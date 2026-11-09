@@ -149,3 +149,28 @@ export async function poof(element: HTMLElement | null | undefined) {
       .finally(() => dot.remove());
   }
 }
+
+/**
+ * The しおり's entrance, shared by every page (Tsubasa 2026-11-09): the parts
+ * on screen rise in one by one on boing, top to bottom (kondo-itinerary
+ * cascade()).
+ */
+export function cascadeIn(root: Element | null | undefined, selector: string) {
+  if (!root || reduceMotion()) return;
+  const vh = window.innerHeight;
+  [...root.querySelectorAll<HTMLElement>(selector)]
+    .map((el) => ({ el, box: el.getBoundingClientRect() }))
+    .filter(({ box }) => box.top < vh + 20 && box.top > -200)
+    .sort((a, b) => a.box.top - b.box.top || a.box.left - b.box.left)
+    .forEach(({ el }, i) =>
+      spring(
+        el,
+        [
+          { transform: "translateY(34px) scale(.95)", opacity: 0 },
+          { transform: "none", opacity: 1 },
+        ],
+        "boing",
+        { delay: 60 + i * 40, fill: "backwards" },
+      ),
+    );
+}

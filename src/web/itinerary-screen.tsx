@@ -18,14 +18,14 @@ import {
 import type { ItineraryItem } from "@/data/types";
 import { addDays, formatDate } from "@/utils/dates";
 import { DayStrip } from "./day-strip";
-import { registerSquish, spring } from "./cartoon";
+import { registerSquish } from "./cartoon";
 import { useJellyScroll } from "./jelly-scroll";
 import { useItineraryScroll } from "./itinerary-scroll";
 import { reduceMotion } from "./motion";
 import { AddButton } from "./ui";
 import { PlaceDetail } from "./details";
 import { Glyph } from "./itinerary-icons";
-import { poof, pop, sink } from "./itinerary-motion";
+import { cascadeIn, poof, pop, sink } from "./itinerary-motion";
 import { TimelineRow, type OpenTarget } from "./itinerary-rows";
 import { BookingSheet, PlanSheet } from "./plan-sheet";
 import { PlanAddSheet } from "./plan-add";
@@ -34,28 +34,6 @@ import { PlanUndoDock } from "./plan-undo";
 const UNDO_MS = 4200;
 /** The timeline's moving parts (the mock's jelly and cascade selectors). */
 const ROWS = ".it-day-h, .it-ev, .it-gap, .it-conn, .it-now, .it-empty";
-
-/** Entrance: the day's rows rise in one by one (kondo-itinerary cascade()). */
-function cascadeRows(root: HTMLElement | null) {
-  if (!root) return;
-  const vh = window.innerHeight;
-  [...root.querySelectorAll<HTMLElement>(ROWS)]
-    .filter((el) => {
-      const y = el.getBoundingClientRect().top;
-      return y < vh + 20 && y > -200;
-    })
-    .forEach((el, i) =>
-      spring(
-        el,
-        [
-          { transform: "translateY(34px) scale(.95)", opacity: 0 },
-          { transform: "none", opacity: 1 },
-        ],
-        "boing",
-        { delay: 60 + i * 40, fill: "backwards" },
-      ),
-    );
-}
 
 /** The wall clock, ticking each minute, for the travelling view. */
 function useNow() {
@@ -162,7 +140,7 @@ export function ItineraryScreen() {
     return () => clearTimeout(timer);
   }, [params, selectDay]);
   useEffect(() => {
-    if (!today && !params.get("day")) cascadeRows(root.current);
+    if (!today && !params.get("day")) cascadeIn(root.current, ROWS);
     // Only the first paint cascades.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

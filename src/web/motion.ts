@@ -101,24 +101,6 @@ const tabOrder = [
   "notes",
 ];
 
-let enterTimer = 0;
-
-// The incoming snapshot is live, so the page's pieces rise in a short stagger
-// inside it (CSS). Drop the class once that is over, so rows added later are
-// never delayed.
-function markPageEnter() {
-  const page = document.getElementById("main-content");
-  if (!page) return;
-  page.classList.remove("route-page-enter");
-  void page.offsetWidth;
-  page.classList.add("route-page-enter");
-  window.clearTimeout(enterTimer);
-  enterTimer = window.setTimeout(
-    () => page.classList.remove("route-page-enter"),
-    1100,
-  );
-}
-
 // Pin each snapshot to its own viewport coordinates. The browser's default
 // group animation otherwise interpolates a scrolled, tall page into the next
 // page's top/height, visibly pulling the outgoing content back to the top.
@@ -146,7 +128,6 @@ export function startRouteTransition(update: () => void) {
   capture("old");
   const transition = document.startViewTransition(() => {
     flushSync(update);
-    markPageEnter();
     capture("new");
   });
   void transition.ready.catch(() => undefined);
