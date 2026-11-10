@@ -338,7 +338,7 @@ function TravelApp() {
       : location;
   const routePath =
     typeof routeLocation === "string" ? routeLocation : routeLocation.pathname;
-  useUpdateGuard(travel.ready, travel.pendingCount);
+  useUpdateGuard(travel.ready);
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [routePath]);
