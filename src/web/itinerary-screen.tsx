@@ -13,6 +13,7 @@ import { itemDetails } from "@/data/itinerary";
 import {
   buildTimeline,
   planPlace,
+  listPlaceOf,
   timelineEntries,
 } from "@/data/plan-timeline";
 import type { ItineraryItem } from "@/data/types";
@@ -222,10 +223,7 @@ export function ItineraryScreen() {
     open?.kind === "item"
       ? travel.items.find((item) => item.id === open.id)
       : undefined;
-  const listPlace =
-    openItem && !itemDetails(openItem).ownPlace
-      ? planPlace(openItem, travel.places)
-      : undefined;
+  const listPlace = openItem && listPlaceOf(openItem, travel.places);
   return (
     <div className="itinerary-screen" ref={root}>
       <div className="it-top" ref={top}>

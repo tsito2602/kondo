@@ -11,6 +11,7 @@ import {
   isJourney,
   nightsOf,
   planPlace,
+  planTitle,
   type DayEntry,
   type Row,
 } from "@/data/plan-timeline";
@@ -120,7 +121,7 @@ function PlanCard({
         <Glyph name={categoryGlyph[category.value]} />
         {category.label}
       </div>
-      <h3>{item.title}</h3>
+      <h3>{planTitle(item, places)}</h3>
       {place && (
         <div className="it-where">
           {place.number ? (

@@ -40,7 +40,7 @@ export function stayPlanOf(item: ItineraryItem, bookings: readonly Booking[]) {
   return booking && stay ? { booking, endpoint: stay.endpoint } : null;
 }
 
-export function timelineEntries(items: ItineraryItem[], bookings: Booking[]): Entry[] {
+export function timelineEntries(items: ItineraryItem[], bookings: Booking[], places: readonly Place[] = []): Entry[] {
   const stayPlans = new Map<string, ItineraryItem>();
   const plans: ItineraryItem[] = [];
   for (const item of items) {
@@ -50,7 +50,7 @@ export function timelineEntries(items: ItineraryItem[], bookings: Booking[]): En
     else if (!item.details?.stay) plans.push(item);
   }
   return orderItineraryEntries([
-    ...plans.map((item) => ({ key: `item-${item.id}`, day: item.day, time: item.time, title: item.title, item })),
+    ...plans.map((item) => ({ key: `item-${item.id}`, day: item.day, time: item.time, title: planTitle(item, places), item })),
     ...bookings.flatMap((booking) => {
       const start = stayPlans.get(`${booking.id}-start`);
       const entries: Entry[] = [
@@ -113,6 +113,16 @@ export const fromMinutes = (minutes: number) => `${String(Math.floor(minutes / 6
 /** Where a plan is on the map: its numbered place, else a link of its own. */
 export function planPlace(item: ItineraryItem, places: readonly Place[]) {
   return places.find((place) => place.itineraryItemId === item.id);
+}
+/**
+ * A plan scheduled from the places list is that place: it goes by the place's
+ * name, edited in 場所を編集 (Tsubasa 2026-11-03: one name, no drift).
+ */
+export function listPlaceOf(item: ItineraryItem, places: readonly Place[]) {
+  return itemDetails(item).ownPlace ? undefined : planPlace(item, places);
+}
+export function planTitle(item: ItineraryItem, places: readonly Place[]) {
+  return listPlaceOf(item, places)?.title || item.title;
 }
 export function entryCoords(entry: Entry, places: readonly Place[]): LatLng | null {
   if (entry.item) {
@@ -201,7 +211,7 @@ export type TimelineDay = { day: string; rows: Row[]; today: boolean };
  * marked and a いま row sits where the current time falls.
  */
 export function buildTimeline({ days, items, bookings, places, now }: { days: string[]; items: ItineraryItem[]; bookings: Booking[]; places: Place[]; now?: Date | null }): TimelineDay[] {
-  const entries = timelineEntries(items, bookings);
+  const entries = timelineEntries(items, bookings, places);
   const connections = findFlightConnections(bookings);
   const zoneAt = zoneResolver(bookings);
   const clock = (day: string, time: string) => (now ? wallClock(zoneAt(day, time), now) : '');
