@@ -361,7 +361,8 @@ function TaskRow({
   onToggle: () => void;
   onEdit: () => void;
 }) {
-  const done = showCheck && task.done;
+  // Done shows on every list, the doer's or not (Tsubasa 2026-11-09).
+  const done = task.done;
   return (
     <div
       role="listitem"
@@ -495,12 +496,7 @@ function Tasks() {
       sub = (
         <>
           <AssigneeAvatar value={task.assignee} members={travel.members} />
-          {doer(task)}がやる ·{" "}
-          {task.assignee !== me && task.done ? (
-            "済み"
-          ) : (
-            <DueText task={task} today={today} />
-          )}
+          {doer(task)}がやる · <DueText task={task} today={today} />
         </>
       );
     return (
@@ -777,7 +773,7 @@ function PackRow({
   onToggle: () => void;
   onEdit?: () => void;
 }) {
-  const done = showCheck && item.packed;
+  const done = item.packed;
   return (
     <div
       role="listitem"
@@ -922,7 +918,6 @@ function Packing() {
             members={travel.members}
           />
           {carrier(item)}が持つ
-          {item.assignee !== me && item.packed ? " · 入れた" : ""}
         </>
       ) : (
         "まだ決めていない"
