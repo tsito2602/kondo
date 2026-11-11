@@ -93,7 +93,9 @@ export function ItineraryScreen() {
   );
   const days = useMemo(() => {
     const values = new Set(
-      timelineEntries(items, travel.bookings).map((entry) => entry.day),
+      timelineEntries(items, travel.bookings, travel.places).map(
+        (entry) => entry.day,
+      ),
     );
     for (const booking of travel.bookings) {
       if (booking.kind !== "hotel") continue;
@@ -111,7 +113,7 @@ export function ItineraryScreen() {
     )
       values.add(day);
     return [...values].sort();
-  }, [items, travel.bookings, trip.startsOn, trip.endsOn]);
+  }, [items, travel.bookings, travel.places, trip.startsOn, trip.endsOn]);
   const timeline = useMemo(
     () =>
       buildTimeline({

@@ -12,7 +12,7 @@ const { outputFiles } = await build({
 });
 const mod = { exports: {} };
 new Function('module', 'exports', outputFiles[0].text)(mod, mod.exports);
-const { placeNumbers, placeVisits, matchBookingPlace, linkBookingPlace, buildTimeline, createDemoCache, planForBooking } = mod.exports;
+const { placeNumbers, placeVisits, matchBookingPlace, linkBookingPlace, buildTimeline, createDemoCache, planForBooking, timelineEntries } = mod.exports;
 
 const pin = (name, lat, lng) => `https://www.google.com/maps/place/${encodeURIComponent(name)}/@${lat},${lng},17z/data=!4m6!3m5!8m2!3d${lat}!4d${lng}`;
 const place = (id, extra = {}) => ({ id, title: id, note: '', openingHours: '', reservationStatus: 'not_needed', location: '', itineraryItemId: null, ...extra });
@@ -108,4 +108,17 @@ test('a venue booking takes over the plan of its place, or a plan that day named
   assert.equal(planForBooking(booking('メルセデス・ベンツ博物館', { day: '2026-11-25' }), items, places), null);
   // Flights, trains, hotels and cars keep their own rows.
   assert.equal(planForBooking(booking('t', { kind: 'hotel', day: '2026-11-25', placeId: 'museum' }), items, places), null);
+});
+
+test('a ticket added before plans were joined still shows once in the しおり', () => {
+  const items = [
+    { id: 'plan', day: '2026-11-25', time: '', kind: '観光', title: 'ポルシェミュージアム', note: '' },
+    { id: 'market', day: '2026-11-25', time: '17:00', kind: '観光', title: 'クリスマスマーケット', note: '' },
+  ];
+  const bookings = [booking('ticket', { title: 'ポルシェミュージアム', day: '2026-11-25', endDay: '2026-11-25' })];
+  const titles = timelineEntries(items, bookings, []).map((entry) => entry.title);
+  assert.deepEqual(titles.sort(), ['クリスマスマーケット', 'ポルシェミュージアム']);
+  // Without a time of its own, the booking takes its plan's.
+  const timed = timelineEntries([{ ...items[0], time: '14:00' }], bookings, []);
+  assert.deepEqual(timed.map((entry) => [entry.key, entry.time]), [['booking-ticket-start', '14:00']]);
 });

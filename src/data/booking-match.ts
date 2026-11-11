@@ -107,3 +107,23 @@ export function planForBooking(
   };
   return plans.find((item) => item.day === booking.day && (named(item.title) || named(places.find((entry) => entry.itineraryItemId === item.id)?.title ?? ''))) ?? null;
 }
+
+/**
+ * Plans a venue booking already stands for, by booking id. A booking added
+ * before plans were joined on add (or through MCP) leaves its plan behind;
+ * the しおり shows the pair as the booking alone (Tsubasa 2026-11-11:
+ * ポルシェミュージアム twice on one day), with the plan's time when the
+ * booking has none.
+ */
+export function joinedPlans(items: ItineraryItem[], bookings: readonly Booking[], places: readonly Place[]) {
+  const joined = new Map<string, ItineraryItem>();
+  const taken = new Set<string>();
+  const venues = bookings.filter((booking) => VENUE_KINDS.has(booking.kind)).sort((a, b) => a.day.localeCompare(b.day) || a.id.localeCompare(b.id));
+  for (const booking of venues) {
+    const plan = planForBooking(booking, items.filter((item) => !taken.has(item.id)), places);
+    if (!plan) continue;
+    taken.add(plan.id);
+    joined.set(booking.id, plan);
+  }
+  return joined;
+}
