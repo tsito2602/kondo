@@ -30,7 +30,7 @@ test('each day says where the night is spent and where we are', () => {
   assert.equal(sheet.days[0].night.text, '機内泊');
   assert.equal(sheet.days[1].night.lead, '泊まる所');
   assert.equal(sheet.days[1].night.glyph, 'bed');
-  assert.match(sheet.days.at(-1).night.text, /成田国際空港に帰ってきます/);
+  assert.match(sheet.days.at(-1).night.text, /^17:35 成田国際空港着$/);
 });
 
 test('the first sheet lists flights, hotels and the time difference, nothing private', () => {

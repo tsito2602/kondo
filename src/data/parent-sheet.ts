@@ -235,7 +235,7 @@ export function buildParentSheet({
     else if (layover) night = { glyph: 'up', lead: '', text: `${airportShort(layover.airportCode, layover.airportName)}で乗り継ぎ` };
     else if (day === last) {
       const home = landing.find((flight) => findAirportByCode(flight.destinationCode)?.timeZone === JAPAN_ZONE);
-      if (home) night = { glyph: 'down', lead: '', text: `${home.endTime ? `${home.endTime} ` : ''}${airportShort(home.destinationCode, home.destination)}に帰ってきます` };
+      if (home) night = { glyph: 'down', lead: '', text: `${home.endTime ? `${home.endTime} ` : ''}${airportShort(home.destinationCode, home.destination)}着` };
     }
     const japanOnly = out.every((row) => !row.japan);
     return { day, number: index + 1, date: longDate(day), short: md(day), route, night, japanOnly, rows: out };
