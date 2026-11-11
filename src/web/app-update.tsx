@@ -132,15 +132,11 @@ export function applyUpdate() {
   worker.postMessage({ type: "ACTIVATE_UPDATE" });
 }
 
-// Updating reloads the page, so it waits until local changes have been sent.
-let pendingChanges = 0;
-
-/** Tells the notice about unsynced changes, and toasts once after an update's reload. */
-export function useUpdateGuard(ready: boolean, pendingCount: number) {
+/** Toasts once after an update's reload. Unsent changes need no wait: the
+ * queue lives in the device's storage and the new version sends it, which
+ * also lets a version with a send bug be replaced (2026-11-10). */
+export function useUpdateGuard(ready: boolean) {
   const notify = useToast();
-  useEffect(() => {
-    pendingChanges = pendingCount;
-  }, [pendingCount]);
   useEffect(() => {
     if (!ready) return;
     let updated = false;
@@ -192,10 +188,6 @@ export function UpdateNotice() {
       className="update-notice"
       aria-label={`アップデートされました。kondo ${label}。更新する`}
       onClick={async (event) => {
-        if (pendingChanges) {
-          notify("未同期の変更を送信してから新しくできます");
-          return;
-        }
         // kondo-settings.html: the pill squishes, the screen blurs away, then
         // the new version takes over (and toasts after the reload).
         await spring(
