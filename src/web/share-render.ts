@@ -335,7 +335,8 @@ function nightStrip(pen: Pen, day: SheetDay): Block | null {
   const night = day.night;
   const inner = s.width - s.padX * 2;
   const icon = 18;
-  const lead = `${night.lead} `;
+  // 「泊まる所 ホテル名」, or a whole phrase alone (機内泊, 〜に帰ってきます).
+  const lead = night.lead ? `${night.lead}　` : "";
   pen.ctx.font = font(400, s.stay);
   const leadW = pen.ctx.measureText(lead).width;
   const lines = measure(
@@ -606,7 +607,9 @@ function overviewBlocks(
     for (const flight of sheet.flights) {
       if (img) {
         const dateW = 62;
-        const h = 16 + 14 * 1.35 + 14 * 1.3 + (flight.japan ? 11 * 1.45 : 0);
+        // 航空会社 + 便名 on its own line: a full carrier name never fits a column.
+        const h =
+          16 + 12 * 1.4 + 14 * 1.35 + 14 * 1.3 + (flight.japan ? 11 * 1.45 : 0);
         blocks.push({
           height: h,
           draw(pen, y) {
@@ -618,16 +621,10 @@ function overviewBlocks(
               font(700, 11.5),
               pen.inks.ink,
             );
-            text(
-              pen,
-              flight.number,
-              s.padX,
-              y + 8 + 12 + 15,
-              font(700, 11.5),
-              pen.inks.ink,
-            );
             const x = s.padX + dateW + 10;
-            let ty = y + 8 + 13;
+            let ty = y + 8 + 12;
+            text(pen, flight.number, x, ty, font(700, 12), pen.inks.mute);
+            ty += 12 * 1.4 + 1;
             text(pen, flight.route, x, ty, font(700, 14), pen.inks.ink);
             ty += 14 * 1.3;
             text(pen, flight.times, x, ty, font(700, 14, NUM), pen.inks.ink);
@@ -644,24 +641,21 @@ function overviewBlocks(
           },
         });
       } else {
+        // 航空会社 便名, then the route on the same line; the A4 page keeps one block per flight.
         const h = 16 + 13 * 1.4 + 16 * 1.3;
         blocks.push({
           height: h,
           draw(pen, y) {
             const top = y + 8 + 13;
+            const x = s.padX + 80;
             text(pen, flight.date, s.padX, top, font(400, 13), pen.inks.ink);
-            text(
-              pen,
-              flight.number,
-              s.padX + 80,
-              top,
-              font(700, 13),
-              pen.inks.ink,
-            );
+            pen.ctx.font = font(700, 13);
+            const numberW = pen.ctx.measureText(flight.number).width;
+            text(pen, flight.number, x, top, font(700, 13), pen.inks.ink);
             text(
               pen,
               flight.route,
-              s.padX + 150,
+              x + (numberW ? numberW + 14 : 0),
               top,
               font(400, 13),
               pen.inks.ink,
@@ -669,32 +663,21 @@ function overviewBlocks(
             text(
               pen,
               flight.times,
-              s.padX + 150,
+              x,
               top + 16 * 1.3,
               font(700, 16, NUM),
               pen.inks.ink,
             );
-            if (flight.japan) {
-              const [label, ...rest] = flight.japan.split(" ");
+            if (flight.japan)
               text(
                 pen,
-                label,
-                s.width - s.padX,
-                top,
-                font(400, 11.5),
-                pen.inks.mute,
-                "right",
-              );
-              text(
-                pen,
-                rest.join(" "),
+                flight.japan,
                 s.width - s.padX,
                 top + 16 * 1.3,
                 font(400, 11.5),
                 pen.inks.mute,
                 "right",
               );
-            }
             rule(pen, y + h);
           },
         });
