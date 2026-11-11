@@ -369,6 +369,7 @@ button.bk-card {
   color: var(--p-mute);
 }
 .bk-kv b {
+  overflow-wrap: anywhere;
   font-size: 15px;
   font-weight: 700;
 }
@@ -379,7 +380,10 @@ button.bk-card {
   letter-spacing: 0.06em;
 }
 .bk-kv .bk-kv-note {
+  display: block;
   white-space: pre-wrap;
+  /* A long URL breaks inside the card. */
+  overflow-wrap: anywhere;
 }
 .bk-kv button,
 .bk-kv a,
@@ -420,6 +424,19 @@ button.bk-card {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.bk-kv > div > .bk-doc {
+  flex: 1;
+}
+/* A long file name ends in … before 開く and the bin. */
+.bk-doc > span:last-child {
+  min-width: 0;
+}
+.bk-doc b {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .bk-pg {
   display: grid;

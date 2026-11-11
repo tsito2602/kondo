@@ -9,6 +9,7 @@ import {
 } from "@/data/flight-connections";
 import { mapUrl, referenceUrl, registeredGoogleMapsUrl } from "@/data/places";
 import { useTravel } from "@/data/travel-provider";
+import { joinedPlans } from "@/data/booking-match";
 import type { BookingDocument } from "@/data/types";
 import {
   BookingCard,
@@ -108,6 +109,14 @@ export function BookingDetail({
   if (!booking) return null;
 
   const documents = travel.documentsByBooking[id] ?? [];
+  // The plan this booking stands for in the しおり keeps its memo here.
+  const planNote =
+    joinedPlans(travel.items, travel.bookings, travel.places)
+      .get(id)
+      ?.note.trim() ?? "";
+  const note = [booking.note.trim(), planNote]
+    .filter((text, index, all) => text && all.indexOf(text) === index)
+    .join("\n");
   const connection = findFlightConnections(travel.bookings).find(
     (entry) => entry.arrivalBookingId === id,
   );
@@ -303,11 +312,11 @@ export function BookingDetail({
                 )}
               </div>
             )}
-            {booking.note && (
+            {note && (
               <div>
                 <span>
                   <small>メモ</small>
-                  <b className="bk-kv-note">{booking.note}</b>
+                  <b className="bk-kv-note">{note}</b>
                 </span>
               </div>
             )}
