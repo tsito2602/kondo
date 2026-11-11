@@ -208,6 +208,12 @@ export function buildParentSheet({
         if (city && cities.at(-1) !== city) cities.push(city);
     }
     if (!cities.length && landing.length) cities.push(cityOf(landing.at(-1)!.destinationCode, landing.at(-1)!.destination));
+    // A day without flights: where the last flight landed (Tsubasa 2026-11-11: the
+    // trip's own 行き先 listed every city, as if we were in all of them at once).
+    if (!cities.length) {
+      const landed = flights.filter((flight) => (flight.endDay || flight.day) < day).at(-1);
+      if (landed) cities.push(cityOf(landed.destinationCode, landed.destination));
+    }
     const route = cities.length ? cities.join(' → ') : trip.destination.trim();
     // Where the night is spent.
     const hotel = hotels.find((booking) => booking.day <= day && day < (booking.endDay || booking.day));
