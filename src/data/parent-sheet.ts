@@ -65,11 +65,17 @@ const addDay = (day: string, count: number) => {
 const isLink = (text: string) => /^https?:\/\//i.test(text.trim());
 
 /** 成田国際空港 → 成田: the word a parent says, else the city, else the code. */
+/** The airport's full name (成田国際空港), never shortened (Tsubasa 2026-11-11). */
 export function airportShort(code: string, saved = '') {
-  const name = airportName(code, saved).replace(/(国際)?空港$/, '').trim();
-  return name || findAirportByCode(code)?.city || code || saved;
+  return airportName(code, saved).trim() || findAirportByCode(code)?.city || code || saved;
 }
-/** A city for 毎日の居場所; airports at home keep their own name (成田, 羽田), the one parents drive to. */
+/** 航空会社・鉄道会社 then the number, as the booking card heads it (エミレーツ航空 EK319). */
+const carrierHeading = (booking: Booking) => {
+  const detail = (booking.detail ?? '').trim();
+  const carrier = detail && !/^https?:/i.test(detail) ? detail : '';
+  return [carrier, (booking.title ?? '').trim()].filter(Boolean).join(' ');
+};
+/** A city for 毎日の居場所; airports at home keep their own full name (成田国際空港), the one parents drive to. */
 const cityOf = (code: string, saved = '') => {
   const airport = findAirportByCode(code);
   return airport?.timeZone === JAPAN_ZONE ? airportShort(code, saved) : airport?.city || airportShort(code, saved);
@@ -144,7 +150,7 @@ function entryRow(entry: DayEntry, zoneAt: (day: string, time: string) => string
     const from = flight ? airportShort(booking.originCode, booking.origin) : booking.origin;
     const to = flight ? airportShort(booking.destinationCode, booking.destination) : booking.destination;
     if (entry.endpoint === 'end')
-      return { ...base, glyph: flight ? 'down' : 'move', kind, title: `${to || booking.title}に到着`, sub: booking.title };
+      return { ...base, glyph: flight ? 'down' : 'move', kind, title: `${to || booking.title}に到着`, sub: carrierHeading(booking) };
     const arrivalZone = flight ? findAirportByCode(booking.destinationCode)?.timeZone : zoneAt(booking.endDay || booking.day, booking.endTime);
     const arrivalJapan = japanTime(booking.endDay || booking.day, booking.endTime, arrivalZone, booking.day);
     const arrival =
@@ -152,7 +158,7 @@ function entryRow(entry: DayEntry, zoneAt: (day: string, time: string) => string
         ? `${laterDayMark(booking.day, booking.endDay)}${booking.endTime}着${arrivalJapan && !arrivalJapan.japan ? `（日本 ${arrivalJapan.mark}${arrivalJapan.time}）` : ''}`
         : '';
     const route = from || to ? `${from || '出発地'} → ${to || '到着地'}` : '';
-    const title = flight ? `飛行機 ${booking.title}`.trim() : booking.title || '電車';
+    const title = flight ? `飛行機 ${carrierHeading(booking)}`.trim() : carrierHeading(booking) || '電車';
     return { ...base, glyph: flight ? 'up' : 'move', kind, title, sub: [route, arrival].filter(Boolean).join('\n') };
   }
   if (booking.kind === 'hotel')
@@ -224,12 +230,12 @@ export function buildParentSheet({
       return arrival && departure && (arrival.endDay || arrival.day) === day && departure.day > day;
     });
     let night: SheetDay['night'] = null;
-    if (hotel) night = { glyph: 'bed', lead: 'この日の夜', text: hotel.title };
-    else if (overnight) night = { glyph: 'up', lead: 'この日の夜', text: '機内' };
-    else if (layover) night = { glyph: 'up', lead: 'この日の夜', text: `${airportShort(layover.airportCode, layover.airportName)}で乗り継ぎ` };
+    if (hotel) night = { glyph: 'bed', lead: '泊まる所', text: hotel.title };
+    else if (overnight) night = { glyph: 'up', lead: '', text: '機内泊' };
+    else if (layover) night = { glyph: 'up', lead: '', text: `${airportShort(layover.airportCode, layover.airportName)}で乗り継ぎ` };
     else if (day === last) {
       const home = landing.find((flight) => findAirportByCode(flight.destinationCode)?.timeZone === JAPAN_ZONE);
-      if (home) night = { glyph: 'down', lead: 'この日', text: `${home.endTime ? `${home.endTime} ` : ''}${airportShort(home.destinationCode, home.destination)}に帰ってきます` };
+      if (home) night = { glyph: 'down', lead: '', text: `${home.endTime ? `${home.endTime} ` : ''}${airportShort(home.destinationCode, home.destination)}着` };
     }
     const japanOnly = out.every((row) => !row.japan);
     return { day, number: index + 1, date: longDate(day), short: md(day), route, night, japanOnly, rows: out };
@@ -248,7 +254,7 @@ export function buildParentSheet({
     const japan = both || (!depZone && !arrZone) ? '' : [japanAt(flight.day, flight.time, depZone), japanAt(arrivalDay, flight.endTime, arrZone)].filter(Boolean).join(' → ');
     return {
       date: md(flight.day),
-      number: flight.title,
+      number: carrierHeading(flight),
       route: `${airportShort(flight.originCode, flight.origin)} → ${airportShort(flight.destinationCode, flight.destination)}`,
       times,
       japan: japan ? `日本 ${japan}` : '',

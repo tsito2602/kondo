@@ -26,10 +26,11 @@ test('Japan time sits beside local time, with 翌 when Japan is a day ahead', ()
 });
 
 test('each day says where the night is spent and where we are', () => {
-  assert.deepEqual(sheet.days.map((day) => day.route).slice(0, 2), ['成田 → ドバイ', 'ドバイ → ウィーン']);
-  assert.equal(sheet.days[0].night.text, '機内');
+  assert.deepEqual(sheet.days.map((day) => day.route).slice(0, 2), ['成田国際空港 → ドバイ', 'ドバイ → ウィーン']);
+  assert.equal(sheet.days[0].night.text, '機内泊');
+  assert.equal(sheet.days[1].night.lead, '泊まる所');
   assert.equal(sheet.days[1].night.glyph, 'bed');
-  assert.match(sheet.days.at(-1).night.text, /成田に帰ってきます/);
+  assert.match(sheet.days.at(-1).night.text, /^17:35 成田国際空港着$/);
 });
 
 test('the first sheet lists flights, hotels and the time difference, nothing private', () => {

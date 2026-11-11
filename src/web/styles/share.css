@@ -12,8 +12,10 @@
   gap: 12px;
   align-items: flex-start;
   min-height: 220px;
-  margin: -6px -28px 0;
-  padding: 6px 28px 14px;
+  /* Bleeds to the panel's edges exactly (.modal-body's 20px), never past
+     them, so only the strip scrolls sideways. */
+  margin: -6px -20px 0;
+  padding: 6px 20px 14px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scroll-snap-type: x mandatory;
