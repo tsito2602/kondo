@@ -335,7 +335,7 @@ function nightStrip(pen: Pen, day: SheetDay): Block | null {
   const night = day.night;
   const inner = s.width - s.padX * 2;
   const icon = 18;
-  // 「泊まる所 ホテル名」, or a whole phrase alone (機内泊, 〜に帰ってきます).
+  // 「泊まる所 ホテル名」, or a whole phrase alone (機内泊, 17:35 成田国際空港着).
   const lead = night.lead ? `${night.lead}　` : "";
   pen.ctx.font = font(400, s.stay);
   const leadW = pen.ctx.measureText(lead).width;
