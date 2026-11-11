@@ -3,36 +3,34 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
-/** The build's user-facing version, e.g. 2.0.538: major.minor from
- * package.json, then the commit count, so every deploy gets a higher number. */
-function buildVersion() {
-  const [major, minor] = (process.env.npm_package_version ?? "2.0.0").split(
-    ".",
-  );
+// The release number is package.json's version, set by hand in the PR that
+// ships it (docs/VERSIONING.md). Production shows it as is; staging and local
+// builds add how many commits came after it, e.g. 2.6.0-staging.3.
+function buildVersion(branch: string | undefined) {
+  const { version } = JSON.parse(readFileSync("package.json", "utf8")) as {
+    version: string;
+  };
+  if (branch === "main") return version;
   const git = (...args: string[]) =>
     execFileSync("git", args, { encoding: "utf8", stdio: "pipe" }).trim();
   try {
     // A shallow deploy checkout would count too few commits.
     if (git("rev-parse", "--is-shallow-repository") === "true")
       git("fetch", "--unshallow", "--quiet");
-    // Counted from the 2.0.0 release commit (the redesign's first production
-    // release, 2026-10-07), so that release itself reads 2.0.0.
-    const release = git(
-      "log",
-      "-1",
-      "--format=%H",
-      "--grep=^Release 2\\.0\\.0$",
-    );
-    return `${major}.${minor}.${git("rev-list", "--count", release ? `${release}..HEAD` : "HEAD")}`;
+    const bump = git("log", "-1", "--format=%H", "-G\"version\":", "--", "package.json");
+    const count = git("rev-list", "--count", bump ? `${bump}..HEAD` : "HEAD");
+    return `${version}-staging.${count}`;
   } catch {
-    return `${major}.${minor}.0`;
+    return `${version}-staging`;
   }
 }
 
 export default defineConfig(({ mode }) => {
   const env = { ...loadEnv(mode, process.cwd(), ""), ...process.env };
-  const version = env.VITE_APP_VERSION || buildVersion();
+  const version =
+    env.VITE_APP_VERSION || buildVersion(env.WORKERS_CI_BRANCH);
   return {
     plugins: [
       {
