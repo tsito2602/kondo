@@ -7,7 +7,8 @@ import { readFileSync } from "node:fs";
 
 // The release number is package.json's version, set by hand in the PR that
 // ships it (docs/VERSIONING.md). Production shows it as is; staging and local
-// builds add how many commits came after it, e.g. 2.6.0-staging.3.
+// builds add how many commits came after it, e.g. 2.6.0 (3); the word
+// staging is left out (Tsubasa 2026-11-11: the staging URL already says it).
 function buildVersion(branch: string | undefined) {
   const { version } = JSON.parse(readFileSync("package.json", "utf8")) as {
     version: string;
@@ -21,9 +22,9 @@ function buildVersion(branch: string | undefined) {
       git("fetch", "--unshallow", "--quiet");
     const bump = git("log", "-1", "--format=%H", "-G\"version\":", "--", "package.json");
     const count = git("rev-list", "--count", bump ? `${bump}..HEAD` : "HEAD");
-    return `${version}-staging.${count}`;
+    return `${version} (${count})`;
   } catch {
-    return `${version}-staging`;
+    return version;
   }
 }
 
