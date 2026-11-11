@@ -42,3 +42,19 @@ test('the first sheet lists flights, hotels and the time difference, nothing pri
   const words = JSON.stringify(sheet);
   for (const secret of ['K7Q2PX', '40921776', '座席']) assert.ok(!words.includes(secret), secret);
 });
+
+test('a day without flights is where the last flight landed, not every city of the trip', () => {
+  const flight = (id, from, to, day, time, endDay, endTime) => ({ id, kind: 'flight', title: id, detail: '', location: '', origin: '', originCode: from, destination: '', destinationCode: to, day, time, endDay, endTime, confirmationCode: '', note: '' });
+  const bookings = [
+    flight('CA422', 'HND', 'PEK', '2026-11-21', '21:00', '2026-11-22', '00:20'),
+    flight('CA841', 'PEK', 'VIE', '2026-11-22', '03:00', '2026-11-22', '06:20'),
+    flight('EW2759', 'VIE', 'STR', '2026-11-24', '19:35', '2026-11-24', '20:50'),
+  ];
+  const trip = { name: '新婚旅行', destination: 'ウィーン・シュトゥットガルト', startsOn: '2026-11-21', endsOn: '2026-11-26', memberCount: 2 };
+  const { days } = buildParentSheet({ trip, items: [], bookings, places: [] });
+  const route = Object.fromEntries(days.map((day) => [day.day, day.route]));
+  assert.equal(route['2026-11-23'], 'ウィーン');
+  assert.equal(route['2026-11-25'], 'シュトゥットガルト');
+  // No flights at all: the trip's destination is all there is.
+  assert.equal(buildParentSheet({ trip, items: [], bookings: [], places: [] }).days[0].route, 'ウィーン・シュトゥットガルト');
+});
