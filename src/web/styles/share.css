@@ -1,0 +1,153 @@
+/* しおりを渡す (trip-share.tsx; mock kondo-export.html, A・1). The preview
+   strip on top, 入れる日 and 見た目 below it, and PDF / 画像 last, right
+   above the dock where the thumb is (Tsubasa 2026-11-11). */
+.share-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 100%;
+}
+.share-strip {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  min-height: 220px;
+  margin: -6px -28px 0;
+  padding: 6px 28px 14px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  transition: opacity 0.2s;
+}
+.share-strip::-webkit-scrollbar {
+  display: none;
+}
+.share-strip[data-stale="true"] {
+  opacity: 0.45;
+}
+.share-page {
+  flex: none;
+  width: 240px;
+  height: auto;
+  max-height: 52dvh;
+  object-fit: contain;
+  object-position: top;
+  border-radius: 6px;
+  background: var(--p-paper);
+  box-shadow:
+    0 0 0 1px var(--p-line),
+    0 10px 22px -12px #0006;
+  scroll-snap-align: center;
+}
+.share-panel[data-format="img"] .share-page {
+  width: 190px;
+  border-radius: 12px;
+}
+.share-count {
+  margin: -14px 0 0;
+  min-height: 1em;
+  text-align: center;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--p-mute);
+}
+.share-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.share-field > span {
+  font-size: 13px;
+  color: var(--p-mute);
+}
+.share-days {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.share-days::-webkit-scrollbar {
+  display: none;
+}
+.share-days button {
+  flex: 1 0 52px;
+  border: 0;
+  border-radius: 16px;
+  padding: 6px 0;
+  background: var(--p-soft);
+  color: var(--p-mute);
+  line-height: 1.1;
+  cursor: pointer;
+}
+.share-days b {
+  display: block;
+  font-family: var(--f-num);
+  font-size: 18px;
+  font-weight: 800;
+}
+.share-days small {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+}
+.share-days button[aria-pressed="true"] {
+  background: var(--p-ink);
+  color: var(--p-paper);
+}
+.share-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: auto;
+}
+.share-seg {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  padding: 5px;
+  border-radius: 24px;
+  background: var(--p-soft);
+}
+.share-seg button {
+  flex: 1;
+  border: 0;
+  border-radius: 19px;
+  background: none;
+  color: var(--p-mute);
+  line-height: 1.25;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.share-seg button[aria-pressed="true"] {
+  color: var(--p-paper);
+}
+.share-seg > .segment-selection {
+  z-index: 0;
+  top: 5px;
+  bottom: 5px;
+  border-radius: 19px;
+  background: var(--p-ink);
+  box-shadow: none;
+}
+.share-seg button {
+  position: relative;
+  z-index: 1;
+}
+.share-theme button {
+  padding: 9px 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.share-format button {
+  padding: 8px 0 7px;
+}
+.share-format b {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+}
+.share-format small {
+  font-family: var(--f-mono);
+  font-size: 11px;
+}
