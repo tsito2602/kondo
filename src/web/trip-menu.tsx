@@ -7,6 +7,7 @@ import {
   Pencil,
   RefreshCw,
   Settings,
+  Share,
   Trash2,
   Users,
 } from "lucide-react";
@@ -14,6 +15,7 @@ import { useAuth } from "@/auth/auth-provider";
 import { useTravel } from "@/data/travel-provider";
 import { AnchoredMenu } from "./anchored-menu";
 import { TripEditor } from "./editors";
+import { TripShare } from "./trip-share";
 import { useAction, useToast } from "./ui";
 
 // The trip's … menu (メンバー管理, 旅行を編集, オフライン保存, 設定, 旅行を削除
@@ -91,6 +93,7 @@ export function TripMenuButton({ tripId }: { tripId: string }) {
   const [menu, setMenu] = useState(false);
   const menuTrigger = useRef<HTMLDivElement>(null);
   const [editing, setEditing] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [progress, setProgress] = useState("");
   const trip = travel.trips.find((trip) => trip.id === tripId);
   if (!trip) return null;
@@ -155,6 +158,13 @@ export function TripMenuButton({ tripId }: { tripId: string }) {
               )}
               <button
                 data-menu-item
+                onClick={() => closeMenu(() => setSharing(true))}
+              >
+                <span>しおりを渡す</span>
+                <Share size={23} />
+              </button>
+              <button
+                data-menu-item
                 onClick={() =>
                   closeMenu(() =>
                     navigate("/settings", {
@@ -206,6 +216,7 @@ export function TripMenuButton({ tripId }: { tripId: string }) {
         )}
       </AnchoredMenu>
       {editing && <TripEditor trip={trip} onClose={() => setEditing(false)} />}
+      {sharing && <TripShare trip={trip} onClose={() => setSharing(false)} />}
     </>
   );
 }

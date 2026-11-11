@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { DatabaseSync } from "node:sqlite";
 import { createHash, randomUUID } from "node:crypto";
@@ -88,6 +89,23 @@ async function bundle(contents) {
     format: "cjs",
     jsx: "automatic",
     packages: "external",
+    // Vite's ?raw imports (share-render.ts reads palette.css as text).
+    plugins: [
+      {
+        name: "raw",
+        setup(build) {
+          build.onResolve({ filter: /\?raw$/ }, (args) => ({
+            path: new URL(args.path.slice(0, -4), `file://${args.resolveDir}/`)
+              .pathname,
+            namespace: "raw",
+          }));
+          build.onLoad({ filter: /.*/, namespace: "raw" }, (args) => ({
+            contents: readFileSync(args.path, "utf8"),
+            loader: "text",
+          }));
+        },
+      },
+    ],
     define: {
       "import.meta.env.DEV": "false",
       "import.meta.env.PROD": "false",
