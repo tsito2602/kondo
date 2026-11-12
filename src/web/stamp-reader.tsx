@@ -53,7 +53,7 @@ export function StampReader({
     if (!desk) return;
     let alive = true;
     const docs = [...desk.querySelectorAll<HTMLElement>(".bk-desk-doc")];
-    const stamp = desk.querySelector<HTMLElement>(".bk-stamp")!;
+    const stamp = desk.querySelector<HTMLElement>(".bk-desk-stamp")!;
     const flying: HTMLElement[] = [];
 
     const shuffle = async () => {
@@ -357,7 +357,7 @@ export function StampReader({
           </div>
         ))
         .reverse()}
-      <div className="bk-stamp">
+      <div className="bk-desk-stamp">
         <i />
         <i />
         <i />

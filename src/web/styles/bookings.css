@@ -1132,7 +1132,7 @@ button.bk-card {
   font-size: 9px;
   color: var(--muted);
 }
-.bk-stamp {
+.bk-desk-stamp {
   position: absolute;
   left: 50%;
   top: -6px;
@@ -1141,22 +1141,22 @@ button.bk-card {
   margin-left: -35px;
   transform-origin: 50% 100%;
 }
-.bk-stamp i {
+.bk-desk-stamp i {
   display: block;
   margin: 0 auto;
   background: var(--p-ink);
 }
-.bk-stamp i:nth-child(1) {
+.bk-desk-stamp i:nth-child(1) {
   width: 30px;
   height: 30px;
   border-radius: 50%;
 }
-.bk-stamp i:nth-child(2) {
+.bk-desk-stamp i:nth-child(2) {
   width: 14px;
   height: 18px;
   margin-top: -4px;
 }
-.bk-stamp i:nth-child(3) {
+.bk-desk-stamp i:nth-child(3) {
   width: 70px;
   height: 22px;
   border-radius: 8px;
