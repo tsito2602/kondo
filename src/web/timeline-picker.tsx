@@ -360,7 +360,7 @@ export function TimelinePicker({
     state.frame = requestAnimationFrame(autoscroll);
   };
   const press = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || !track.current) return;
+    if (event.button !== 0 || !track.current || flying.current) return;
     const handle = (event.target as HTMLElement).closest<HTMLElement>(
       "[data-h]",
     )?.dataset.h;
@@ -403,6 +403,100 @@ export function TimelinePicker({
       );
   };
   useEffect(() => () => release(), []);
+
+  // ---- another day: the strip of the trip's days (same time, that day) ----
+  // The block stays where it is on screen while the timeline runs under it
+  // to the new day, then lands.
+  const strip = useRef<HTMLDivElement>(null);
+  const flight = useRef<{ s0: number; screen: number } | null>(null);
+  const flying = useRef(0);
+  const toDay = (index: number) => {
+    const box = stage.current;
+    if (!box || drag.current || flying.current) return;
+    if (index === startIndex) return;
+    const next = moveSpan(
+      span,
+      span.start + (index - startIndex) * DAY,
+      1,
+      bounds,
+    );
+    if (next.start === span.start) return;
+    flight.current = {
+      s0: box.scrollTop,
+      screen: y(span.start) - box.scrollTop,
+    };
+    haptic();
+    setSpan(next);
+  };
+  useLayoutEffect(() => {
+    const from = flight.current;
+    flight.current = null;
+    const box = stage.current;
+    const block = me.current;
+    if (!from || !box || !block) return;
+    const target = y(span.start);
+    const s1 = Math.max(
+      0,
+      Math.min(box.scrollHeight - box.clientHeight, target - from.screen),
+    );
+    const startY = from.s0 + from.screen;
+    if (RM()) {
+      box.scrollTop = s1;
+      return;
+    }
+    const days = Math.abs(target - startY) / (DAY * PXM);
+    const ms = Math.min(720, 380 + days * 90);
+    const t0 = performance.now();
+    const inOut = (t: number) =>
+      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    block.classList.add("is-held");
+    void spring(
+      block,
+      [{ transform: "scale(1.04,.94)" }, { transform: "none" }],
+      "squish",
+    );
+    const step = (now: number) => {
+      const t = Math.min(1, (now - t0) / ms);
+      const e = inOut(t);
+      box.scrollTop = from.s0 + (s1 - from.s0) * e;
+      block.style.translate = `0 ${startY + (target - startY) * e - target}px`;
+      if (t < 1) {
+        flying.current = requestAnimationFrame(step);
+        return;
+      }
+      flying.current = 0;
+      block.style.translate = "";
+      block.classList.remove("is-held");
+      void spring(
+        block,
+        [{ transform: "scale(.96,1.06)" }, { transform: "none" }],
+        "boing",
+      );
+    };
+    flying.current = requestAnimationFrame(step);
+  }, [span.start]);
+  useEffect(
+    () => () => {
+      if (flying.current) cancelAnimationFrame(flying.current);
+    },
+    [],
+  );
+  // The picked day's circle pops when the plan lands on another day.
+  const shownDay = useRef(startIndex);
+  useEffect(() => {
+    if (shownDay.current === startIndex) return;
+    shownDay.current = startIndex;
+    const day = strip.current?.children[startIndex] as HTMLElement | undefined;
+    const circle = day?.querySelector(".tlp-day-n");
+    if (circle)
+      void spring(
+        circle,
+        [{ transform: "scale(1.18,.86)" }, { transform: "none" }],
+        "boing",
+      );
+    day?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [startIndex]);
+  const today = localDate();
 
   const onKey = (event: KeyboardEvent<HTMLDivElement>) => {
     const next = keySpan(
@@ -464,7 +558,13 @@ export function TimelinePicker({
       <div className="tlp">
         <div className="tlp-h">
           <b>{title}</b>
-          <span aria-live="polite">{dayLabel(startDay)}</span>
+          {multiDay ? (
+            <span className="tlp-sr" aria-live="polite">
+              {dayLabel(startDay)}
+            </span>
+          ) : (
+            <span aria-live="polite">{dayLabel(startDay)}</span>
+          )}
         </div>
         <div className="tlp-readout">
           <label>
@@ -518,6 +618,25 @@ export function TimelinePicker({
         <p className="tlp-dur" aria-live="polite">
           {point ? "数字を押すと入力できます" : lengthLabel(length)}
         </p>
+        {multiDay && (
+          <div className="tlp-days" ref={strip} role="group" aria-label="日">
+            {trackDays.map((at, index) => (
+              <button
+                key={at}
+                type="button"
+                aria-pressed={index === startIndex}
+                aria-current={at === today ? "date" : undefined}
+                aria-label={dayLabel(at)}
+                onClick={() => toDay(index)}
+              >
+                <small aria-hidden="true">{weekdayOf(at)}</small>
+                <span className="tlp-day-n" aria-hidden="true">
+                  {Number(at.slice(8, 10))}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
         <div
           className="tlp-stage"
           ref={stage}
