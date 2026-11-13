@@ -85,12 +85,13 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
   const active = activeEntry?.value as DockEntry | undefined;
   const add = ordered.filter((entry) => entry.scope === "add").at(-1)?.value as
     AddAction | undefined;
-  // The ＋ pops in (kondo-cartoon's popIn: from .4, k380 d13) whenever it
-  // appears or a screen swaps in its own add action.
+  // The ＋ pops in (kondo-cartoon's popIn: from .4, k380 d13) only when it
+  // appears. Switching pages swaps in that page's add action, but the ＋
+  // itself stays put (Tsubasa 2026-11-13: ページ切り替えのたびに動かない).
   const addButton = useRef<HTMLButtonElement>(null);
-  const addLabel = add?.label;
+  const addShown = Boolean(add);
   useLayoutEffect(() => {
-    if (!addLabel || !addButton.current) return;
+    if (!addShown || !addButton.current) return;
     spring(
       addButton.current,
       [
@@ -100,7 +101,7 @@ export function ThumbDockProvider({ children }: PropsWithChildren) {
       { k: 380, d: 13 },
       { delay: 110, fill: "backwards" },
     );
-  }, [addLabel]);
+  }, [addShown]);
   const browse = ordered
     .filter(
       (entry) =>
